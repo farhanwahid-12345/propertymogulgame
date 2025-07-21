@@ -120,6 +120,13 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
               ${property.monthlyIncome.toLocaleString()}/mo
             </span>
           </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Annual Yield:</span>
+            <span className="font-semibold text-accent">
+              {((property.monthlyIncome * 12 / property.price) * 100).toFixed(2)}%
+            </span>
+          </div>
         </div>
 
         {property.owned ? (
