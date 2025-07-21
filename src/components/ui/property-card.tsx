@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export interface Property {
+  id: string;
+  name: string;
+  type: "residential" | "commercial" | "luxury";
+  price: number;
+  value: number;
+  neighborhood: string;
+  monthlyIncome: number;
+  image: string;
+  owned?: boolean;
+  marketTrend: "up" | "down" | "stable";
+}
+
+interface PropertyCardProps {
+  property: Property;
+  onBuy?: (property: Property) => void;
+  onSell?: (property: Property) => void;
+  playerCash?: number;
+}
+
+const PropertyTypeIcon = {
+  residential: Home,
+  commercial: Building2,
+  luxury: Crown,
+};
+
+const PropertyTypeColor = {
+  residential: "property-residential",
+  commercial: "property-commercial", 
+  luxury: "property-luxury",
+};
+
+export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: PropertyCardProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const Icon = PropertyTypeIcon[property.type];
+  const canAfford = playerCash >= property.price;
+  const profitLoss = property.value - property.price;
+  const profitPercent = ((profitLoss / property.price) * 100).toFixed(1);
+
+  const handleAction = async (action: () => void) => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate transaction
+    action();
+    setIsLoading(false);
+  };
+
+  return (
+    <Card className={cn(
+      "transition-all duration-300 hover:shadow-lg hover:scale-105",
+      property.owned && "ring-2 ring-primary"
+    )}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Icon className={cn("h-5 w-5", `text-${PropertyTypeColor[property.type]}`)} />
+            <CardTitle className="text-lg">{property.name}</CardTitle>
+          </div>
+          <div className="flex items-center gap-1">
+            {property.marketTrend === "up" ? (
+              <TrendingUp className="h-4 w-4 text-success" />
+            ) : property.marketTrend === "down" ? (
+              <TrendingDown className="h-4 w-4 text-danger" />
+            ) : null}
+            <Badge variant="outline" className="capitalize">
+              {property.type}
+            </Badge>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+          <img 
+            src={property.image} 
+            alt={property.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Price:</span>
+            <span className="font-bold text-lg">
+              ${property.price.toLocaleString()}
+            </span>
+          </div>
+          
+          {property.owned && (
+            <>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Current Value:</span>
+                <span className="font-bold">
+                  ${property.value.toLocaleString()}
+                </span>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Profit/Loss:</span>
+                <span className={cn(
+                  "font-bold",
+                  profitLoss >= 0 ? "text-success" : "text-danger"
+                )}>
+                  {profitLoss >= 0 ? "+" : ""}${profitLoss.toLocaleString()} ({profitPercent}%)
+                </span>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Monthly Income:</span>
+            <span className="font-semibold text-success">
+              ${property.monthlyIncome.toLocaleString()}/mo
+            </span>
+          </div>
+        </div>
+
+        {property.owned ? (
+          <Button 
+            variant="destructive" 
+            className="w-full" 
+            onClick={() => handleAction(() => onSell?.(property))}
+            disabled={isLoading}
+          >
+            {isLoading ? "Selling..." : `Sell for $${property.value.toLocaleString()}`}
+          </Button>
+        ) : (
+          <Button 
+            className="w-full bg-gradient-primary hover:opacity-90" 
+            onClick={() => handleAction(() => onBuy?.(property))}
+            disabled={!canAfford || isLoading}
+          >
+            {isLoading ? "Buying..." : !canAfford ? "Not Enough Cash" : `Buy for $${property.price.toLocaleString()}`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
