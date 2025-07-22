@@ -103,7 +103,19 @@ export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(() => {
     const saved = localStorage.getItem("propertyTycoonSave");
     if (saved) {
-      return JSON.parse(saved);
+      const parsedState = JSON.parse(saved);
+      // Ensure all required properties exist for backward compatibility
+      return {
+        cash: parsedState.cash || INITIAL_CASH,
+        ownedProperties: parsedState.ownedProperties || [],
+        mortgages: parsedState.mortgages || [],
+        level: parsedState.level || 1,
+        experience: parsedState.experience || 0,
+        experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
+        monthsPlayed: parsedState.monthsPlayed || 0,
+        timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
+        isBankrupt: parsedState.isBankrupt || false
+      };
     }
     return {
       cash: INITIAL_CASH,
@@ -113,7 +125,7 @@ export function useGameState() {
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
-      timeUntilNextMonth: 180, // 3 minutes in seconds
+      timeUntilNextMonth: 180,
       isBankrupt: false
     };
   });
