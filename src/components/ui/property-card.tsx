@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +22,7 @@ export interface Property {
 
 interface PropertyCardProps {
   property: Property;
-  onBuy?: (property: Property) => void;
+  onBuy?: (property: Property, mortgagePercentage?: number) => void;
   onSell?: (property: Property) => void;
   playerCash?: number;
 }
@@ -39,8 +41,14 @@ const PropertyTypeColor = {
 
 export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showMortgageOptions, setShowMortgageOptions] = useState(false);
+  const [mortgagePercentage, setMortgagePercentage] = useState([80]);
+  
   const Icon = PropertyTypeIcon[property.type];
-  const canAfford = playerCash >= property.price;
+  const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
+  const cashRequired = property.price - mortgageAmount;
+  const canAffordCash = playerCash >= property.price;
+  const canAffordMortgage = playerCash >= cashRequired;
   const profitLoss = property.value - property.price;
   const profitPercent = ((profitLoss / property.price) * 100).toFixed(1);
 
@@ -89,7 +97,7 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Price:</span>
             <span className="font-bold text-lg">
-              ${property.price.toLocaleString()}
+              £{property.price.toLocaleString()}
             </span>
           </div>
           
@@ -98,7 +106,7 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Current Value:</span>
                 <span className="font-bold">
-                  ${property.value.toLocaleString()}
+                  £{property.value.toLocaleString()}
                 </span>
               </div>
               
@@ -108,7 +116,7 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
                   "font-bold",
                   profitLoss >= 0 ? "text-success" : "text-danger"
                 )}>
-                  {profitLoss >= 0 ? "+" : ""}${profitLoss.toLocaleString()} ({profitPercent}%)
+                  {profitLoss >= 0 ? "+" : ""}£{profitLoss.toLocaleString()} ({profitPercent}%)
                 </span>
               </div>
             </>
@@ -117,7 +125,7 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Monthly Income:</span>
             <span className="font-semibold text-success">
-              ${property.monthlyIncome.toLocaleString()}/mo
+              £{property.monthlyIncome.toLocaleString()}/mo
             </span>
           </div>
 
@@ -136,16 +144,63 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
             onClick={() => handleAction(() => onSell?.(property))}
             disabled={isLoading}
           >
-            {isLoading ? "Selling..." : `Sell for $${property.value.toLocaleString()}`}
+            {isLoading ? "Selling..." : `Sell for £${property.value.toLocaleString()}`}
           </Button>
         ) : (
-          <Button 
-            className="w-full bg-gradient-primary hover:opacity-90" 
-            onClick={() => handleAction(() => onBuy?.(property))}
-            disabled={!canAfford || isLoading}
-          >
-            {isLoading ? "Buying..." : !canAfford ? "Not Enough Cash" : `Buy for $${property.price.toLocaleString()}`}
-          </Button>
+          <div className="space-y-3">
+            {!showMortgageOptions ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  className="w-full bg-gradient-primary hover:opacity-90" 
+                  onClick={() => handleAction(() => onBuy?.(property, 0))}
+                  disabled={!canAffordCash || isLoading}
+                >
+                  {isLoading ? "Buying..." : !canAffordCash ? "Not Enough Cash" : "Buy Cash"}
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowMortgageOptions(true)}
+                >
+                  Mortgage
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Mortgage: {mortgagePercentage[0]}%</Label>
+                  <Slider
+                    value={mortgagePercentage}
+                    onValueChange={setMortgagePercentage}
+                    max={95}
+                    min={50}
+                    step={5}
+                    className="w-full"
+                  />
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <div>Mortgage: £{mortgageAmount.toLocaleString()}</div>
+                    <div>Cash needed: £{cashRequired.toLocaleString()}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    className="w-full bg-gradient-primary hover:opacity-90" 
+                    onClick={() => handleAction(() => onBuy?.(property, mortgagePercentage[0]))}
+                    disabled={!canAffordMortgage || isLoading}
+                  >
+                    {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : "Buy"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowMortgageOptions(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

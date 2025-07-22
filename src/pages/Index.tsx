@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyCard } from "@/components/ui/property-card";
 import { GameStats } from "@/components/ui/game-stats";
+import { GameClock } from "@/components/ui/game-clock";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw, Building, Home, Crown } from "lucide-react";
 import cityHero from "@/assets/city-hero.jpg";
@@ -30,27 +31,38 @@ const Index = () => {
             Property Tycoon
           </h1>
           <p className="text-xl max-w-2xl mx-auto">
-            Build your real estate empire in the virtual city of Prosperopolis. 
-            Start with $1M and become the ultimate property mogul!
+            Build your real estate empire in Middlesbrough, England. 
+            Start with £100K and become the ultimate property mogul!
           </p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Game Clock */}
+        <GameClock 
+          monthsPlayed={gameState.monthsPlayed}
+          timeUntilNextMonth={gameState.timeUntilNextMonth}
+        />
+
         {/* Game Stats */}
         <GameStats
           cash={gameState.cash}
           netWorth={gameState.netWorth}
           totalProperties={gameState.ownedProperties.length}
           monthlyIncome={gameState.totalMonthlyIncome}
+          totalMonthlyExpenses={gameState.totalMonthlyExpenses}
+          totalDebt={gameState.totalDebt}
           level={gameState.level}
           experience={gameState.experience}
           experienceToNext={gameState.experienceToNext}
+          monthsPlayed={gameState.monthsPlayed}
+          isBankrupt={gameState.isBankrupt}
+          onReset={gameState.resetGame}
         />
 
         {/* Game Controls */}
         <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-bold text-white">Game Dashboard</h2>
+          <h2 className="text-3xl font-bold text-white">Property Market</h2>
           <Button 
             variant="outline" 
             onClick={gameState.resetGame}
@@ -64,7 +76,7 @@ const Index = () => {
         {/* Property Market */}
         <Card className="bg-white/95 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-2xl">Property Market</CardTitle>
+            <CardTitle className="text-2xl">Available Properties</CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
