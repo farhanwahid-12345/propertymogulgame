@@ -2,6 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { Property } from "@/components/ui/property-card";
 import { toast } from "@/hooks/use-toast";
 
+interface MortgageProvider {
+  id: string;
+  name: string;
+  baseRate: number;
+  maxLTV: number; // Maximum Loan-to-Value ratio
+  minCreditScore: number;
+  description: string;
+}
+
 interface Mortgage {
   propertyId: string;
   principal: number;
@@ -9,6 +18,7 @@ interface Mortgage {
   remainingBalance: number;
   interestRate: number;
   termMonths: number;
+  providerId: string;
 }
 
 interface GameState {
@@ -29,73 +39,254 @@ const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
 const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
 const MAINTENANCE_RATE = 0.008; // 0.8% annual maintenance costs
 
-// Middlesbrough properties based on real market data
+// Mortgage providers with different risk profiles
+const MORTGAGE_PROVIDERS: MortgageProvider[] = [
+  {
+    id: "hsbc",
+    name: "HSBC",
+    baseRate: 0.045, // 4.5%
+    maxLTV: 0.8, // 80%
+    minCreditScore: 700,
+    description: "Premier high street bank with strict lending criteria"
+  },
+  {
+    id: "halifax",
+    name: "Halifax",
+    baseRate: 0.052, // 5.2%
+    maxLTV: 0.85, // 85%
+    minCreditScore: 650,
+    description: "Popular building society with competitive rates"
+  },
+  {
+    id: "nationwide",
+    name: "Nationwide",
+    baseRate: 0.048, // 4.8%
+    maxLTV: 0.85, // 85%
+    minCreditScore: 680,
+    description: "Member-owned building society"
+  },
+  {
+    id: "quickcash",
+    name: "QuickCash Mortgages",
+    baseRate: 0.089, // 8.9%
+    maxLTV: 0.95, // 95%
+    minCreditScore: 500,
+    description: "Fast approval but high rates"
+  },
+  {
+    id: "shadylender",
+    name: "Easy Finance Ltd",
+    baseRate: 0.125, // 12.5%
+    maxLTV: 0.95, // 95%
+    minCreditScore: 400,
+    description: "Last resort lender with very high rates"
+  }
+];
+
+// Expanded Middlesbrough properties with real street names and addresses
 const AVAILABLE_PROPERTIES: Property[] = [
+  // Residential Properties
   {
     id: "1",
-    name: "Victorian Terrace House",
+    name: "45 Linthorpe Road",
     type: "residential",
-    price: 85000,
-    value: 85000,
+    price: 75000,
+    value: 75000,
     neighborhood: "Linthorpe",
-    monthlyIncome: 650,
+    monthlyIncome: 600,
     image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop",
     marketTrend: "up"
   },
   {
-    id: "2", 
-    name: "Modern Starter Home",
+    id: "2",
+    name: "12 Park Road South",
     type: "residential",
-    price: 120000,
-    value: 120000,
-    neighborhood: "Marton",
-    monthlyIncome: 850,
+    price: 68000,
+    value: 68000,
+    neighborhood: "Linthorpe",
+    monthlyIncome: 550,
     image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop",
     marketTrend: "stable"
   },
   {
     id: "3",
-    name: "Town Centre Office",
+    name: "78 Acklam Road",
+    type: "residential",
+    price: 95000,
+    value: 95000,
+    neighborhood: "Acklam",
+    monthlyIncome: 725,
+    image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=400&h=300&fit=crop",
+    marketTrend: "up"
+  },
+  {
+    id: "4",
+    name: "156 Cargo Fleet Lane",
+    type: "residential",
+    price: 58000,
+    value: 58000,
+    neighborhood: "Port Clarence",
+    monthlyIncome: 475,
+    image: "https://images.unsplash.com/photo-1459767129954-1b1c1f9b9ace?w=400&h=300&fit=crop",
+    marketTrend: "stable"
+  },
+  {
+    id: "5",
+    name: "23 Marton Road",
+    type: "residential",
+    price: 120000,
+    value: 120000,
+    neighborhood: "Marton",
+    monthlyIncome: 850,
+    image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop",
+    marketTrend: "up"
+  },
+  {
+    id: "6",
+    name: "67 Roman Road",
+    type: "residential",
+    price: 82000,
+    value: 82000,
+    neighborhood: "Pallister Park",
+    monthlyIncome: 625,
+    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&h=300&fit=crop",
+    marketTrend: "down"
+  },
+  {
+    id: "7",
+    name: "91 Trimdon Avenue",
+    type: "residential",
+    price: 72000,
+    value: 72000,
+    neighborhood: "Acklam",
+    monthlyIncome: 575,
+    image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=400&h=300&fit=crop",
+    marketTrend: "stable"
+  },
+  {
+    id: "8",
+    name: "34 Southfield Road",
+    type: "residential",
+    price: 145000,
+    value: 145000,
+    neighborhood: "Middlesbrough Centre",
+    monthlyIncome: 950,
+    image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop",
+    marketTrend: "up"
+  },
+
+  // Commercial Properties
+  {
+    id: "9",
+    name: "Unit 5 Albert Road",
     type: "commercial",
     price: 180000,
     value: 180000,
     neighborhood: "Middlesbrough Centre",
     monthlyIncome: 1200,
-    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=300&fit=crop",
+    image: "https://images.unsplash.com/photo-1497604401993-f2e922e5cb0a?w=400&h=300&fit=crop",
     marketTrend: "up"
   },
   {
-    id: "4",
-    name: "Retail Unit",
-    type: "commercial", 
+    id: "10",
+    name: "Shop A, Linthorpe Road",
+    type: "commercial",
+    price: 165000,
+    value: 165000,
+    neighborhood: "Linthorpe",
+    monthlyIncome: 1100,
+    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+    marketTrend: "stable"
+  },
+  {
+    id: "11",
+    name: "Captain Cook Square Unit",
+    type: "commercial",
     price: 250000,
     value: 250000,
     neighborhood: "Captain Cook Square",
     monthlyIncome: 1800,
-    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
+    image: "https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&h=300&fit=crop",
     marketTrend: "down"
   },
   {
-    id: "5",
-    name: "Executive Home",
-    type: "luxury",
+    id: "12",
+    name: "Warehouse, Vulcan Street",
+    type: "commercial",
     price: 320000,
     value: 320000,
+    neighborhood: "South Bank",
+    monthlyIncome: 2100,
+    image: "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=400&h=300&fit=crop",
+    marketTrend: "stable"
+  },
+
+  // Luxury Properties
+  {
+    id: "13",
+    name: "8 The Avenue, Nunthorpe",
+    type: "luxury",
+    price: 385000,
+    value: 385000,
     neighborhood: "Nunthorpe",
-    monthlyIncome: 2200,
+    monthlyIncome: 2400,
     image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop",
     marketTrend: "up"
   },
   {
-    id: "6",
-    name: "Detached Family Home",
+    id: "14",
+    name: "Manor House, Stokesley Road",
+    type: "luxury",
+    price: 520000,
+    value: 520000,
+    neighborhood: "Marton",
+    monthlyIncome: 3200,
+    image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400&h=300&fit=crop",
+    marketTrend: "stable"
+  },
+  {
+    id: "15",
+    name: "Executive Home, Grey Towers",
+    type: "luxury",
+    price: 675000,
+    value: 675000,
+    neighborhood: "Nunthorpe",
+    monthlyIncome: 4100,
+    image: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?w=400&h=300&fit=crop",
+    marketTrend: "up"
+  },
+  {
+    id: "16",
+    name: "Penthouse, Centre Square",
     type: "luxury",
     price: 450000,
     value: 450000,
-    neighborhood: "Stokesley Road",
+    neighborhood: "Middlesbrough Centre",
     monthlyIncome: 2800,
-    image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400&h=300&fit=crop",
+    image: "https://images.unsplash.com/photo-1493397212122-2b85dda8106b?w=400&h=300&fit=crop",
+    marketTrend: "down"
+  },
+  {
+    id: "17",
+    name: "Historic Villa, The Crescent",
+    type: "luxury",
+    price: 750000,
+    value: 750000,
+    neighborhood: "Linthorpe",
+    monthlyIncome: 4500,
+    image: "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&h=300&fit=crop",
     marketTrend: "stable"
+  },
+  {
+    id: "18",
+    name: "Modern Townhouse, Hemlington",
+    type: "luxury",
+    price: 295000,
+    value: 295000,
+    neighborhood: "Hemlington",
+    monthlyIncome: 1950,
+    image: "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=400&h=300&fit=crop",
+    marketTrend: "up"
   }
 ];
 
@@ -260,7 +451,7 @@ export function useGameState() {
     return () => clearInterval(monthlyInterval);
   }, []);
 
-  const buyProperty = useCallback((property: Property, mortgagePercentage: number = 0) => {
+  const buyProperty = useCallback((property: Property, mortgagePercentage: number = 0, providerId?: string) => {
     setGameState(prev => {
       if (prev.isBankrupt) {
         toast({
@@ -296,7 +487,8 @@ export function useGameState() {
           monthlyPayment,
           remainingBalance: mortgageAmount,
           interestRate: MORTGAGE_INTEREST_RATE,
-          termMonths
+          termMonths,
+          providerId: providerId || "halifax"
         };
       }
 
@@ -382,12 +574,35 @@ export function useGameState() {
     total + mortgage.remainingBalance, 0
   );
 
+  // Calculate credit score based on player performance
+  const calculateCreditScore = () => {
+    let score = 600; // Base score
+    
+    // Increase based on net worth
+    score += Math.min((netWorth - totalDebt) / 10000, 200); // Up to 200 points
+    
+    // Increase based on level
+    score += gameState.level * 10;
+    
+    // Decrease if high debt-to-income ratio
+    const debtToIncomeRatio = totalDebt / Math.max(totalMonthlyIncome * 12, 1);
+    if (debtToIncomeRatio > 0.5) score -= 100;
+    if (debtToIncomeRatio > 0.3) score -= 50;
+    
+    // Decrease if bankrupt history
+    if (gameState.isBankrupt) score -= 150;
+    
+    return Math.max(400, Math.min(850, Math.floor(score)));
+  };
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
     totalMonthlyIncome,
     totalMonthlyExpenses,
     totalDebt,
+    creditScore: calculateCreditScore(),
+    mortgageProviders: MORTGAGE_PROVIDERS,
     availableProperties,
     buyProperty,
     sellProperty,

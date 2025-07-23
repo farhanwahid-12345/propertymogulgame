@@ -22,9 +22,11 @@ export interface Property {
 
 interface PropertyCardProps {
   property: Property;
-  onBuy?: (property: Property, mortgagePercentage?: number) => void;
+  onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string) => void;
   onSell?: (property: Property) => void;
   playerCash?: number;
+  creditScore?: number;
+  mortgageProviders?: any[];
 }
 
 const PropertyTypeIcon = {
@@ -39,10 +41,18 @@ const PropertyTypeColor = {
   luxury: "property-luxury",
 };
 
-export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: PropertyCardProps) {
+export function PropertyCard({ 
+  property, 
+  onBuy, 
+  onSell, 
+  playerCash = 0, 
+  creditScore = 600,
+  mortgageProviders = []
+}: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
-  const [mortgagePercentage, setMortgagePercentage] = useState([80]);
+  const [mortgagePercentage, setMortgagePercentage] = useState([60]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   
   const Icon = PropertyTypeIcon[property.type];
   const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
@@ -57,6 +67,17 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
     await new Promise(resolve => setTimeout(resolve, 500)); // Simulate transaction
     action();
     setIsLoading(false);
+  };
+
+  const handleBuyWithMortgage = () => {
+    if (mortgageAmount > 0 && !selectedProviderId) {
+      return; // Don't allow purchase without selecting provider
+    }
+    handleAction(() => {
+      onBuy?.(property, mortgagePercentage[0], selectedProviderId);
+      setShowMortgageOptions(false);
+      setSelectedProviderId("");
+    });
   };
 
   return (
@@ -182,18 +203,50 @@ export function PropertyCard({ property, onBuy, onSell, playerCash = 0 }: Proper
                     <div>Cash needed: £{cashRequired.toLocaleString()}</div>
                   </div>
                 </div>
+                {mortgageAmount > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Choose Mortgage Provider:</Label>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {mortgageProviders.map((provider: any) => {
+                        const requiredLTV = mortgageAmount / property.price;
+                        const eligible = requiredLTV <= provider.maxLTV && creditScore >= provider.minCreditScore;
+                        
+                        return (
+                          <div 
+                            key={provider.id}
+                            className={`p-2 border rounded cursor-pointer transition-colors ${
+                              selectedProviderId === provider.id ? 'border-primary bg-primary/10' : 'border-border'
+                            } ${!eligible ? 'opacity-50' : ''}`}
+                            onClick={() => eligible && setSelectedProviderId(provider.id)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium text-sm">{provider.name}</span>
+                              <span className="text-xs">{(provider.baseRate * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {eligible ? "Available" : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
                     className="w-full bg-gradient-primary hover:opacity-90" 
-                    onClick={() => handleAction(() => onBuy?.(property, mortgagePercentage[0]))}
-                    disabled={!canAffordMortgage || isLoading}
+                    onClick={handleBuyWithMortgage}
+                    disabled={!canAffordMortgage || isLoading || (mortgageAmount > 0 && !selectedProviderId)}
                   >
                     {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : "Buy"}
                   </Button>
                   <Button 
                     variant="outline"
                     className="w-full"
-                    onClick={() => setShowMortgageOptions(false)}
+                    onClick={() => {
+                      setShowMortgageOptions(false);
+                      setSelectedProviderId("");
+                    }}
                   >
                     Cancel
                   </Button>

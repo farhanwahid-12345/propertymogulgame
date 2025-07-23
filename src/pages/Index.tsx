@@ -7,7 +7,7 @@ import { GameStats } from "@/components/ui/game-stats";
 import { GameClock } from "@/components/ui/game-clock";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw, Building, Home, Crown } from "lucide-react";
-import cityHero from "@/assets/city-hero.jpg";
+import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 
 const Index = () => {
   const gameState = useGameState();
@@ -23,7 +23,7 @@ const Index = () => {
       {/* Hero Section */}
       <div 
         className="relative h-[300px] bg-cover bg-center flex items-center justify-center"
-        style={{ backgroundImage: `url(${cityHero})` }}
+        style={{ backgroundImage: `url(${transporterBridgeHero})` }}
       >
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative text-center text-white space-y-4">
@@ -107,6 +107,8 @@ const Index = () => {
                       property={property}
                       onBuy={gameState.buyProperty}
                       playerCash={gameState.cash}
+                      creditScore={gameState.creditScore}
+                      mortgageProviders={gameState.mortgageProviders}
                     />
                   ))}
                 </div>
@@ -120,6 +122,8 @@ const Index = () => {
                       property={property}
                       onBuy={gameState.buyProperty}
                       playerCash={gameState.cash}
+                      creditScore={gameState.creditScore}
+                      mortgageProviders={gameState.mortgageProviders}
                     />
                   ))}
                 </div>
@@ -133,6 +137,8 @@ const Index = () => {
                       property={property}
                       onBuy={gameState.buyProperty}
                       playerCash={gameState.cash}
+                      creditScore={gameState.creditScore}
+                      mortgageProviders={gameState.mortgageProviders}
                     />
                   ))}
                 </div>
@@ -146,6 +152,8 @@ const Index = () => {
                       property={property}
                       onBuy={gameState.buyProperty}
                       playerCash={gameState.cash}
+                      creditScore={gameState.creditScore}
+                      mortgageProviders={gameState.mortgageProviders}
                     />
                   ))}
                 </div>
