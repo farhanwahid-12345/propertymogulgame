@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
+import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +26,13 @@ interface PropertyCardProps {
   property: Property;
   onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string) => void;
   onSell?: (property: Property) => void;
+  onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
+  onRenovate?: (propertyId: string, renovation: RenovationType) => void;
   playerCash?: number;
   creditScore?: number;
   mortgageProviders?: any[];
+  currentTenant?: Tenant;
+  activeRenovations?: string[];
 }
 
 const PropertyTypeIcon = {
@@ -44,10 +50,14 @@ const PropertyTypeColor = {
 export function PropertyCard({ 
   property, 
   onBuy, 
-  onSell, 
+  onSell,
+  onSelectTenant,
+  onRenovate,
   playerCash = 0, 
   creditScore = 600,
-  mortgageProviders = []
+  mortgageProviders = [],
+  currentTenant,
+  activeRenovations = []
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -159,14 +169,38 @@ export function PropertyCard({
         </div>
 
         {property.owned ? (
-          <Button 
-            variant="destructive" 
-            className="w-full" 
-            onClick={() => handleAction(() => onSell?.(property))}
-            disabled={isLoading}
-          >
-            {isLoading ? "Selling..." : `Sell for £${property.value.toLocaleString()}`}
-          </Button>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              {onSelectTenant && (
+                <TenantSelector
+                  propertyId={property.id}
+                  baseRent={property.monthlyIncome}
+                  onSelectTenant={onSelectTenant}
+                  currentTenant={currentTenant}
+                />
+              )}
+              
+              {onRenovate && (
+                <RenovationDialog
+                  propertyId={property.id}
+                  propertyValue={property.value}
+                  currentRent={property.monthlyIncome}
+                  playerCash={playerCash}
+                  onRenovate={onRenovate}
+                  activeRenovations={activeRenovations}
+                />
+              )}
+            </div>
+            
+            <Button 
+              variant="destructive" 
+              className="w-full" 
+              onClick={() => handleAction(() => onSell?.(property))}
+              disabled={isLoading}
+            >
+              {isLoading ? "Selling..." : `Sell for £${property.value.toLocaleString()}`}
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {!showMortgageOptions ? (

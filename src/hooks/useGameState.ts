@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Property } from "@/components/ui/property-card";
+import { Tenant } from "@/components/ui/tenant-selector";
+import { RenovationType } from "@/components/ui/renovation-dialog";
 import { toast } from "@/hooks/use-toast";
 
 interface MortgageProvider {
@@ -21,10 +23,27 @@ interface Mortgage {
   providerId: string;
 }
 
+interface PropertyTenant {
+  propertyId: string;
+  tenant: Tenant;
+  rentMultiplier: number;
+  startDate: number; // timestamp
+}
+
+interface Renovation {
+  id: string;
+  propertyId: string;
+  type: RenovationType;
+  startDate: number; // timestamp
+  completionDate: number; // timestamp
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
   mortgages: Mortgage[];
+  tenants: PropertyTenant[];
+  renovations: Renovation[];
   level: number;
   experience: number;
   experienceToNext: number;
@@ -300,6 +319,8 @@ export function useGameState() {
         cash: parsedState.cash || INITIAL_CASH,
         ownedProperties: parsedState.ownedProperties || [],
         mortgages: parsedState.mortgages || [],
+        tenants: parsedState.tenants || [],
+        renovations: parsedState.renovations || [],
         level: parsedState.level || 1,
         experience: parsedState.experience || 0,
         experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
@@ -312,6 +333,8 @@ export function useGameState() {
       cash: INITIAL_CASH,
       ownedProperties: [],
       mortgages: [],
+      tenants: [],
+      renovations: [],
       level: 1,
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
@@ -539,6 +562,8 @@ export function useGameState() {
       cash: INITIAL_CASH,
       ownedProperties: [],
       mortgages: [],
+      tenants: [],
+      renovations: [],
       level: 1,
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
@@ -555,6 +580,127 @@ export function useGameState() {
       description: "Started fresh with £100K. Good luck building your empire!",
     });
   }, []);
+
+  const selectTenant = useCallback((propertyId: string, tenant: Tenant) => {
+    setGameState(prev => {
+      const existingTenantIndex = prev.tenants.findIndex(t => t.propertyId === propertyId);
+      const newTenant: PropertyTenant = {
+        propertyId,
+        tenant,
+        rentMultiplier: tenant.rentMultiplier,
+        startDate: Date.now()
+      };
+
+      let updatedTenants;
+      if (existingTenantIndex >= 0) {
+        updatedTenants = [...prev.tenants];
+        updatedTenants[existingTenantIndex] = newTenant;
+      } else {
+        updatedTenants = [...prev.tenants, newTenant];
+      }
+
+      // Update property monthly income based on tenant
+      const updatedProperties = prev.ownedProperties.map(property => {
+        if (property.id === propertyId) {
+          const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || property.monthlyIncome;
+          return {
+            ...property,
+            monthlyIncome: Math.floor(baseRent * tenant.rentMultiplier)
+          };
+        }
+        return property;
+      });
+
+      toast({
+        title: "Tenant Selected!",
+        description: `${tenant.name} is now renting your property at £${Math.floor((AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || 0) * tenant.rentMultiplier)}/mo`,
+      });
+
+      return {
+        ...prev,
+        tenants: updatedTenants,
+        ownedProperties: updatedProperties
+      };
+    });
+  }, []);
+
+  const startRenovation = useCallback((propertyId: string, renovationType: RenovationType) => {
+    setGameState(prev => {
+      if (prev.cash < renovationType.cost) {
+        toast({
+          title: "Insufficient Funds",
+          description: `You need £${renovationType.cost.toLocaleString()} to start this renovation!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      const renovation: Renovation = {
+        id: `${propertyId}_${renovationType.id}_${Date.now()}`,
+        propertyId,
+        type: renovationType,
+        startDate: Date.now(),
+        completionDate: Date.now() + (renovationType.duration * 24 * 60 * 60 * 1000)
+      };
+
+      toast({
+        title: "Renovation Started!",
+        description: `${renovationType.name} renovation has begun. It will take ${renovationType.duration} days to complete.`,
+      });
+
+      return {
+        ...prev,
+        cash: prev.cash - renovationType.cost,
+        renovations: [...prev.renovations, renovation]
+      };
+    });
+  }, []);
+
+  const settleMortgage = useCallback((mortgagePropertyId: string, settlementPropertyId: string) => {
+    setGameState(prev => {
+      const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
+      const settlementProperty = prev.ownedProperties.find(p => p.id === settlementPropertyId);
+      
+      if (!mortgage || !settlementProperty) {
+        toast({
+          title: "Settlement Failed",
+          description: "Could not find mortgage or settlement property!",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      if (settlementProperty.value < mortgage.remainingBalance) {
+        toast({
+          title: "Insufficient Property Value",
+          description: "The settlement property value is not enough to cover the mortgage!",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      const cashFromSale = settlementProperty.value - mortgage.remainingBalance;
+
+      toast({
+        title: "Mortgage Settled!",
+        description: `${settlementProperty.name} was sold to pay off the mortgage. You received £${cashFromSale.toLocaleString()} in cash.`,
+      });
+
+      return {
+        ...prev,
+        cash: prev.cash + cashFromSale,
+        ownedProperties: prev.ownedProperties.filter(p => p.id !== settlementPropertyId),
+        mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
+        tenants: prev.tenants.filter(t => t.propertyId !== settlementPropertyId)
+      };
+    });
+
+    // Add settlement property back to available properties
+    const settlementProperty = gameState.ownedProperties.find(p => p.id === settlementPropertyId);
+    if (settlementProperty) {
+      setAvailableProperties(prev => [...prev, { ...settlementProperty, owned: false }]);
+    }
+  }, [gameState.ownedProperties]);
 
   const netWorth = gameState.cash + gameState.ownedProperties.reduce((total, property) => 
     total + property.value, 0
@@ -606,6 +752,9 @@ export function useGameState() {
     availableProperties,
     buyProperty,
     sellProperty,
+    selectTenant,
+    startRenovation,
+    settleMortgage,
     resetGame
   };
 }

@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyCard } from "@/components/ui/property-card";
 import { GameStats } from "@/components/ui/game-stats";
 import { GameClock } from "@/components/ui/game-clock";
+import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw, Building, Home, Crown } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
@@ -63,14 +64,21 @@ const Index = () => {
         {/* Game Controls */}
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold text-white">Property Market</h2>
-          <Button 
-            variant="outline" 
-            onClick={gameState.resetGame}
-            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset Game
-          </Button>
+          <div className="flex gap-2">
+            <MortgageSettlement 
+              ownedProperties={gameState.ownedProperties}
+              mortgages={gameState.mortgages}
+              onSettleMortgage={gameState.settleMortgage}
+            />
+            <Button 
+              variant="outline" 
+              onClick={gameState.resetGame}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset Game
+            </Button>
+          </div>
         </div>
 
         {/* Property Market */}
@@ -102,14 +110,14 @@ const Index = () => {
               <TabsContent value="market" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {gameState.availableProperties.map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      property={property}
-                      onBuy={gameState.buyProperty}
-                      playerCash={gameState.cash}
-                      creditScore={gameState.creditScore}
-                      mortgageProviders={gameState.mortgageProviders}
-                    />
+                     <PropertyCard
+                       key={property.id}
+                       property={property}
+                       onBuy={gameState.buyProperty}
+                       playerCash={gameState.cash}
+                       creditScore={gameState.creditScore}
+                       mortgageProviders={gameState.mortgageProviders}
+                     />
                   ))}
                 </div>
               </TabsContent>
@@ -117,14 +125,14 @@ const Index = () => {
               <TabsContent value="residential" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredProperties("residential").map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      property={property}
-                      onBuy={gameState.buyProperty}
-                      playerCash={gameState.cash}
-                      creditScore={gameState.creditScore}
-                      mortgageProviders={gameState.mortgageProviders}
-                    />
+                     <PropertyCard
+                       key={property.id}
+                       property={property}
+                       onBuy={gameState.buyProperty}
+                       playerCash={gameState.cash}
+                       creditScore={gameState.creditScore}
+                       mortgageProviders={gameState.mortgageProviders}
+                     />
                   ))}
                 </div>
               </TabsContent>
@@ -132,14 +140,14 @@ const Index = () => {
               <TabsContent value="commercial" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredProperties("commercial").map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      property={property}
-                      onBuy={gameState.buyProperty}
-                      playerCash={gameState.cash}
-                      creditScore={gameState.creditScore}
-                      mortgageProviders={gameState.mortgageProviders}
-                    />
+                     <PropertyCard
+                       key={property.id}
+                       property={property}
+                       onBuy={gameState.buyProperty}
+                       playerCash={gameState.cash}
+                       creditScore={gameState.creditScore}
+                       mortgageProviders={gameState.mortgageProviders}
+                     />
                   ))}
                 </div>
               </TabsContent>
@@ -147,14 +155,14 @@ const Index = () => {
               <TabsContent value="luxury" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredProperties("luxury").map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      property={property}
-                      onBuy={gameState.buyProperty}
-                      playerCash={gameState.cash}
-                      creditScore={gameState.creditScore}
-                      mortgageProviders={gameState.mortgageProviders}
-                    />
+                     <PropertyCard
+                       key={property.id}
+                       property={property}
+                       onBuy={gameState.buyProperty}
+                       playerCash={gameState.cash}
+                       creditScore={gameState.creditScore}
+                       mortgageProviders={gameState.mortgageProviders}
+                     />
                   ))}
                 </div>
               </TabsContent>
@@ -171,12 +179,16 @@ const Index = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {gameState.ownedProperties.map((property) => (
-                  <PropertyCard
-                    key={property.id}
-                    property={property}
-                    onSell={gameState.sellProperty}
-                    playerCash={gameState.cash}
-                  />
+                   <PropertyCard
+                     key={property.id}
+                     property={property}
+                     onSell={gameState.sellProperty}
+                     onSelectTenant={gameState.selectTenant}
+                     onRenovate={gameState.startRenovation}
+                     playerCash={gameState.cash}
+                     currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
+                     activeRenovations={gameState.renovations.filter(r => r.propertyId === property.id && r.completionDate > Date.now()).map(r => r.type.id)}
+                   />
                 ))}
               </div>
             </CardContent>

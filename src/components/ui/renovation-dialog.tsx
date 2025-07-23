@@ -1,0 +1,318 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Hammer, Paintbrush, Home, Plus, Wrench, Zap } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export interface RenovationType {
+  id: string;
+  name: string;
+  cost: number;
+  rentIncrease: number; // Monthly rent increase
+  valueIncrease: number; // Property value increase
+  duration: number; // Days to complete
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  category: "maintenance" | "improvement" | "extension";
+}
+
+interface RenovationDialogProps {
+  propertyId: string;
+  propertyValue: number;
+  currentRent: number;
+  playerCash: number;
+  onRenovate: (propertyId: string, renovation: RenovationType) => void;
+  activeRenovations?: string[]; // IDs of renovations in progress
+}
+
+const RENOVATION_OPTIONS: RenovationType[] = [
+  // Maintenance
+  {
+    id: "basic_repair",
+    name: "Basic Repairs",
+    cost: 2500,
+    rentIncrease: 50,
+    valueIncrease: 3000,
+    duration: 7,
+    description: "Fix leaks, cracks, and basic wear and tear",
+    icon: Wrench,
+    category: "maintenance"
+  },
+  {
+    id: "full_redecoration",
+    name: "Full Redecoration", 
+    cost: 4500,
+    rentIncrease: 125,
+    valueIncrease: 6000,
+    duration: 14,
+    description: "Complete interior painting and minor cosmetic updates",
+    icon: Paintbrush,
+    category: "maintenance"
+  },
+  
+  // Improvements
+  {
+    id: "kitchen_upgrade",
+    name: "Kitchen Upgrade",
+    cost: 8500,
+    rentIncrease: 200,
+    valueIncrease: 12000,
+    duration: 21,
+    description: "Modern kitchen with new appliances and worktops",
+    icon: Home,
+    category: "improvement"
+  },
+  {
+    id: "bathroom_renovation",
+    name: "Bathroom Renovation",
+    cost: 6500,
+    rentIncrease: 150,
+    valueIncrease: 9000,
+    duration: 18,
+    description: "Complete bathroom refit with modern fixtures",
+    icon: Home,
+    category: "improvement"
+  },
+  {
+    id: "central_heating",
+    name: "Central Heating System",
+    cost: 7500,
+    rentIncrease: 175,
+    valueIncrease: 10000,
+    duration: 10,
+    description: "Install or upgrade central heating and insulation",
+    icon: Zap,
+    category: "improvement"
+  },
+  {
+    id: "double_glazing",
+    name: "Double Glazing",
+    cost: 5500,
+    rentIncrease: 100,
+    valueIncrease: 8000,
+    duration: 12,
+    description: "Replace all windows with energy-efficient double glazing",
+    icon: Home,
+    category: "improvement"
+  },
+  
+  // Extensions
+  {
+    id: "loft_conversion",
+    name: "Loft Conversion",
+    cost: 15000,
+    rentIncrease: 350,
+    valueIncrease: 25000,
+    duration: 45,
+    description: "Convert loft space into additional bedroom",
+    icon: Plus,
+    category: "extension"
+  },
+  {
+    id: "rear_extension",
+    name: "Single-Story Extension", 
+    cost: 25000,
+    rentIncrease: 450,
+    valueIncrease: 35000,
+    duration: 60,
+    description: "Add extra room to rear of property",
+    icon: Plus,
+    category: "extension"
+  },
+  {
+    id: "conservatory",
+    name: "Conservatory",
+    cost: 12000,
+    rentIncrease: 250,
+    valueIncrease: 18000,
+    duration: 30,
+    description: "Glass conservatory extension",
+    icon: Plus,
+    category: "extension"
+  }
+];
+
+const CategoryColors = {
+  maintenance: "text-secondary border-secondary/20 bg-secondary/5",
+  improvement: "text-primary border-primary/20 bg-primary/5",
+  extension: "text-luxury border-luxury/20 bg-luxury/5"
+};
+
+export function RenovationDialog({ 
+  propertyId, 
+  propertyValue, 
+  currentRent, 
+  playerCash, 
+  onRenovate,
+  activeRenovations = []
+}: RenovationDialogProps) {
+  const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleRenovate = () => {
+    if (selectedRenovation) {
+      onRenovate(propertyId, selectedRenovation);
+      setIsOpen(false);
+      setSelectedRenovation(null);
+    }
+  };
+
+  const canAfford = (renovation: RenovationType) => playerCash >= renovation.cost;
+  const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
+
+  const groupedRenovations = RENOVATION_OPTIONS.reduce((acc, renovation) => {
+    if (!acc[renovation.category]) acc[renovation.category] = [];
+    acc[renovation.category].push(renovation);
+    return acc;
+  }, {} as Record<string, RenovationType[]>);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="w-full">
+          <Hammer className="h-4 w-4 mr-2" />
+          Renovate
+        </Button>
+      </DialogTrigger>
+      
+      <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Property Renovations</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {Object.entries(groupedRenovations).map(([category, renovations]) => (
+            <div key={category}>
+              <h3 className="text-lg font-semibold mb-3 capitalize">{category}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {renovations.map((renovation) => {
+                  const Icon = renovation.icon;
+                  const isSelected = selectedRenovation?.id === renovation.id;
+                  const affordable = canAfford(renovation);
+                  const inProgress = isInProgress(renovation);
+                  
+                  return (
+                    <Card 
+                      key={renovation.id}
+                      className={cn(
+                        "cursor-pointer transition-all hover:shadow-md",
+                        isSelected && "ring-2 ring-primary",
+                        !affordable && "opacity-60",
+                        inProgress && "opacity-40 pointer-events-none",
+                        CategoryColors[renovation.category]
+                      )}
+                      onClick={() => affordable && !inProgress && setSelectedRenovation(renovation)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-5 w-5" />
+                            <CardTitle className="text-base">{renovation.name}</CardTitle>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {renovation.duration}d
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="space-y-3">
+                        <p className="text-sm text-muted-foreground">{renovation.description}</p>
+                        
+                        {inProgress && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span>In Progress</span>
+                              <span>50%</span>
+                            </div>
+                            <Progress value={50} className="h-2" />
+                          </div>
+                        )}
+                        
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Cost:</span>
+                            <span className={cn(
+                              "font-semibold",
+                              affordable ? "text-foreground" : "text-danger"
+                            )}>
+                              £{renovation.cost.toLocaleString()}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span>Rent Increase:</span>
+                            <span className="text-success font-semibold">
+                              +£{renovation.rentIncrease}/mo
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between">
+                            <span>Value Increase:</span>
+                            <span className="text-success font-semibold">
+                              +£{renovation.valueIncrease.toLocaleString()}
+                            </span>
+                          </div>
+                          
+                          <div className="pt-2 border-t">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>ROI (Annual):</span>
+                              <span>
+                                {((renovation.rentIncrease * 12 / renovation.cost) * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {selectedRenovation && (
+          <div className="bg-muted p-4 rounded-lg mt-4">
+            <h4 className="font-semibold mb-2">Renovation Summary</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">New Monthly Rent:</span>
+                <br />
+                <span className="font-semibold text-success">
+                  £{(currentRent + selectedRenovation.rentIncrease).toLocaleString()}/mo
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">New Property Value:</span>
+                <br />
+                <span className="font-semibold text-success">
+                  £{(propertyValue + selectedRenovation.valueIncrease).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center pt-4 border-t">
+          <div className="text-sm text-muted-foreground">
+            Available Cash: £{playerCash.toLocaleString()}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRenovate}
+              disabled={!selectedRenovation || !canAfford(selectedRenovation!)}
+            >
+              Start Renovation
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
