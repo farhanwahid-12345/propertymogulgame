@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyCard } from "@/components/ui/property-card";
-import { GameStats } from "@/components/ui/game-stats";
 import { GameClock } from "@/components/ui/game-clock";
+import { GameStats } from "@/components/ui/game-stats";
 import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw, Building, Home, Crown } from "lucide-react";
@@ -49,16 +49,18 @@ const Index = () => {
         <GameStats
           cash={gameState.cash}
           netWorth={gameState.netWorth}
-          totalProperties={gameState.ownedProperties.length}
-          monthlyIncome={gameState.totalMonthlyIncome}
-          totalMonthlyExpenses={gameState.totalMonthlyExpenses}
-          totalDebt={gameState.totalDebt}
           level={gameState.level}
           experience={gameState.experience}
           experienceToNext={gameState.experienceToNext}
+          totalMonthlyIncome={gameState.totalMonthlyIncome}
+          totalMonthlyExpenses={gameState.totalMonthlyExpenses}
+          totalDebt={gameState.totalDebt}
+          creditScore={gameState.creditScore}
+          ownedPropertiesCount={gameState.ownedProperties.length}
+          timeUntilNextMonth={gameState.timeUntilNextMonth}
+          currentMarketRate={gameState.currentMarketRate}
+          tenantEvents={gameState.tenantEvents}
           monthsPlayed={gameState.monthsPlayed}
-          isBankrupt={gameState.isBankrupt}
-          onReset={gameState.resetGame}
         />
 
         {/* Game Controls */}

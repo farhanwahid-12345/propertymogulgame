@@ -38,6 +38,13 @@ interface Renovation {
   completionDate: number; // timestamp
 }
 
+interface TenantEvent {
+  propertyId: string;
+  type: 'default' | 'damage' | 'early_exit';
+  amount: number;
+  month: number;
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
@@ -50,6 +57,9 @@ interface GameState {
   monthsPlayed: number;
   timeUntilNextMonth: number;
   isBankrupt: boolean;
+  creditScore: number;
+  currentMarketRate: number;
+  tenantEvents: TenantEvent[];
 }
 
 const INITIAL_CASH = 100000; // £100K starting cash
@@ -57,6 +67,7 @@ const EXPERIENCE_BASE = 1000;
 const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
 const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
 const MAINTENANCE_RATE = 0.008; // 0.8% annual maintenance costs
+const BASE_MARKET_RATE = 0.035; // 3.5% base market rate
 
 // Mortgage providers with different risk profiles
 const MORTGAGE_PROVIDERS: MortgageProvider[] = [
@@ -315,19 +326,22 @@ export function useGameState() {
     if (saved) {
       const parsedState = JSON.parse(saved);
       // Ensure all required properties exist for backward compatibility
-      return {
-        cash: parsedState.cash || INITIAL_CASH,
-        ownedProperties: parsedState.ownedProperties || [],
-        mortgages: parsedState.mortgages || [],
-        tenants: parsedState.tenants || [],
-        renovations: parsedState.renovations || [],
-        level: parsedState.level || 1,
-        experience: parsedState.experience || 0,
-        experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
-        monthsPlayed: parsedState.monthsPlayed || 0,
-        timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
-        isBankrupt: parsedState.isBankrupt || false
-      };
+    return {
+      cash: parsedState.cash || INITIAL_CASH,
+      ownedProperties: parsedState.ownedProperties || [],
+      mortgages: parsedState.mortgages || [],
+      tenants: parsedState.tenants || [],
+      renovations: parsedState.renovations || [],
+      level: parsedState.level || 1,
+      experience: parsedState.experience || 0,
+      experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
+      monthsPlayed: parsedState.monthsPlayed || 0,
+      timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
+      isBankrupt: parsedState.isBankrupt || false,
+      creditScore: parsedState.creditScore || 650,
+      currentMarketRate: parsedState.currentMarketRate || BASE_MARKET_RATE,
+      tenantEvents: parsedState.tenantEvents || []
+    };
     }
     return {
       cash: INITIAL_CASH,
@@ -340,7 +354,10 @@ export function useGameState() {
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
       timeUntilNextMonth: 180,
-      isBankrupt: false
+      isBankrupt: false,
+      creditScore: 650,
+      currentMarketRate: BASE_MARKET_RATE,
+      tenantEvents: []
     };
   });
 
@@ -351,19 +368,47 @@ export function useGameState() {
     localStorage.setItem("propertyTycoonSave", JSON.stringify(gameState));
   }, [gameState]);
 
-  // Market fluctuation simulation
+  // Market fluctuation and dynamic interest rates
   useEffect(() => {
     const interval = setInterval(() => {
-      setGameState(prev => ({
-        ...prev,
-        ownedProperties: prev.ownedProperties.map(property => ({
-          ...property,
-          value: Math.max(
-            property.price * 0.5, // Minimum 50% of original price
-            property.value * (0.98 + Math.random() * 0.04) // -2% to +2% change
-          )
-        }))
-      }));
+      setGameState(prev => {
+        // Update market rate (simulates economic conditions)
+        const marketChange = (Math.random() - 0.5) * 0.002; // ±0.1% change
+        const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
+        
+        // Check for tenant events
+        const newTenantEvents: TenantEvent[] = [];
+        prev.tenants.forEach(({ propertyId, tenant }) => {
+          if (Math.random() < (tenant.defaultRisk + tenant.damageRisk) / 200) {
+            const eventType = Math.random() < 0.4 ? 'default' : Math.random() < 0.7 ? 'damage' : 'early_exit';
+            const property = prev.ownedProperties.find(p => p.id === propertyId);
+            if (property) {
+              const amount = eventType === 'damage' ? property.value * (0.05 + Math.random() * 0.15) :
+                            eventType === 'default' ? property.monthlyIncome * (1 + Math.random() * 2) :
+                            0;
+              newTenantEvents.push({
+                propertyId,
+                type: eventType,
+                amount,
+                month: prev.monthsPlayed
+              });
+            }
+          }
+        });
+
+        return {
+          ...prev,
+          currentMarketRate: newMarketRate,
+          tenantEvents: [...prev.tenantEvents, ...newTenantEvents],
+          ownedProperties: prev.ownedProperties.map(property => ({
+            ...property,
+            value: Math.max(
+              property.price * 0.5, // Minimum 50% of original price
+              property.value * (0.98 + Math.random() * 0.04) // -2% to +2% change
+            )
+          }))
+        };
+      });
 
       setAvailableProperties(prev => 
         prev.map(property => ({
@@ -499,8 +544,11 @@ export function useGameState() {
 
       let newMortgage: Mortgage | null = null;
       if (mortgageAmount > 0) {
+        const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+        const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
+          (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const termMonths = 300; // 25 years
-        const monthlyRate = MORTGAGE_INTEREST_RATE / 12;
+        const monthlyRate = dynamicRate / 12;
         const monthlyPayment = mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
           (Math.pow(1 + monthlyRate, termMonths) - 1);
         
@@ -509,7 +557,8 @@ export function useGameState() {
           principal: mortgageAmount,
           monthlyPayment,
           remainingBalance: mortgageAmount,
-          interestRate: MORTGAGE_INTEREST_RATE,
+          interestRate: provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
+            (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0),
           termMonths,
           providerId: providerId || "halifax"
         };
@@ -569,7 +618,10 @@ export function useGameState() {
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
       timeUntilNextMonth: 180,
-      isBankrupt: false
+      isBankrupt: false,
+      creditScore: 650,
+      currentMarketRate: BASE_MARKET_RATE,
+      tenantEvents: []
     };
     setGameState(newState);
     setAvailableProperties(AVAILABLE_PROPERTIES);
