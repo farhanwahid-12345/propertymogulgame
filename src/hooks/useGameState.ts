@@ -368,13 +368,36 @@ export function useGameState() {
     localStorage.setItem("propertyTycoonSave", JSON.stringify(gameState));
   }, [gameState]);
 
-  // Market fluctuation and dynamic interest rates
+  // Market fluctuation, tenant events, and renovation completion
   useEffect(() => {
     const interval = setInterval(() => {
       setGameState(prev => {
         // Update market rate (simulates economic conditions)
         const marketChange = (Math.random() - 0.5) * 0.002; // ±0.1% change
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
+        
+        // Check for completed renovations
+        const currentTime = Date.now();
+        const completedRenovations = prev.renovations.filter(r => currentTime >= r.completionDate);
+        const activeRenovations = prev.renovations.filter(r => currentTime < r.completionDate);
+        
+        // Apply renovation benefits
+        let updatedProperties = [...prev.ownedProperties];
+        completedRenovations.forEach(renovation => {
+          const propertyIndex = updatedProperties.findIndex(p => p.id === renovation.propertyId);
+          if (propertyIndex >= 0) {
+            updatedProperties[propertyIndex] = {
+              ...updatedProperties[propertyIndex],
+              value: updatedProperties[propertyIndex].value + renovation.type.valueIncrease,
+              monthlyIncome: updatedProperties[propertyIndex].monthlyIncome + renovation.type.rentIncrease
+            };
+            
+            toast({
+              title: "Renovation Complete!",
+              description: `${renovation.type.name} finished! Property value increased by £${renovation.type.valueIncrease.toLocaleString()}, rent by £${renovation.type.rentIncrease}/mo.`,
+            });
+          }
+        });
         
         // Check for tenant events
         const newTenantEvents: TenantEvent[] = [];
@@ -398,15 +421,16 @@ export function useGameState() {
 
         return {
           ...prev,
-          currentMarketRate: newMarketRate,
-          tenantEvents: [...prev.tenantEvents, ...newTenantEvents],
-          ownedProperties: prev.ownedProperties.map(property => ({
+          ownedProperties: updatedProperties.map(property => ({
             ...property,
             value: Math.max(
               property.price * 0.5, // Minimum 50% of original price
               property.value * (0.98 + Math.random() * 0.04) // -2% to +2% change
             )
-          }))
+          })),
+          renovations: activeRenovations,
+          currentMarketRate: newMarketRate,
+          tenantEvents: [...prev.tenantEvents, ...newTenantEvents]
         };
       });
 

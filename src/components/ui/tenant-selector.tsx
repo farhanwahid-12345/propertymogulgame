@@ -26,104 +26,77 @@ interface TenantSelectorProps {
   currentTenant?: Tenant;
 }
 
-const TENANT_PROFILES: Tenant[] = [
-  {
-    id: "premium_1",
-    name: "Dr. Sarah Mitchell",
-    profile: "premium",
-    creditScore: 780,
-    monthlyIncome: 8500,
-    employmentStatus: "NHS Consultant",
-    rentMultiplier: 1.2,
-    defaultRisk: 2,
-    damageRisk: 1,
-    description: "Professional tenant with excellent credit and stable income"
-  },
-  {
-    id: "premium_2", 
-    name: "James & Emma Thompson",
-    profile: "premium",
-    creditScore: 745,
-    monthlyIncome: 7200,
-    employmentStatus: "IT Managers",
-    rentMultiplier: 1.15,
-    defaultRisk: 3,
-    damageRisk: 2,
-    description: "Young professional couple, dual income, no pets"
-  },
-  {
-    id: "standard_1",
-    name: "Michael Brown",
-    profile: "standard",
-    creditScore: 680,
-    monthlyIncome: 4200,
-    employmentStatus: "Teacher",
-    rentMultiplier: 1.0,
-    defaultRisk: 8,
-    damageRisk: 5,
-    description: "Reliable professional with steady employment"
-  },
-  {
-    id: "standard_2",
-    name: "Lisa & Tom Wilson",
-    profile: "standard",
-    creditScore: 650,
-    monthlyIncome: 5100,
-    employmentStatus: "Retail Managers",
-    rentMultiplier: 1.05,
-    defaultRisk: 12,
-    damageRisk: 8,
-    description: "Family with children, good references"
-  },
-  {
-    id: "budget_1",
-    name: "Gary Jenkins",
-    profile: "budget",
-    creditScore: 590,
-    monthlyIncome: 2800,
-    employmentStatus: "Factory Worker",
-    rentMultiplier: 0.9,
-    defaultRisk: 25,
-    damageRisk: 15,
-    description: "Working class tenant, limited income but employed"
-  },
-  {
-    id: "budget_2",
-    name: "Sophie Martinez",
-    profile: "budget",
-    creditScore: 610,
-    monthlyIncome: 3200,
-    employmentStatus: "Part-time Carer",
-    rentMultiplier: 0.85,
-    defaultRisk: 20,
-    damageRisk: 12,
-    description: "Single mother, part-time work, housing benefit"
-  },
-  {
-    id: "risky_1",
-    name: "Danny O'Connor",
-    profile: "risky", 
-    creditScore: 480,
-    monthlyIncome: 2100,
-    employmentStatus: "Unemployed",
-    rentMultiplier: 0.7,
-    defaultRisk: 45,
-    damageRisk: 35,
-    description: "Recently unemployed, poor credit history"
-  },
-  {
-    id: "risky_2",
-    name: "Mark Stevens",
-    profile: "risky",
-    creditScore: 520,
-    monthlyIncome: 2500,
-    employmentStatus: "Temporary Work",
-    rentMultiplier: 0.75,
-    defaultRisk: 40,
-    damageRisk: 30,
-    description: "Inconsistent employment, previous arrears"
-  }
-];
+// Generate dynamic tenant pools
+const generateTenantProfiles = (): Tenant[] => {
+  const firstNames = ["James", "Sarah", "Michael", "Emma", "David", "Lisa", "John", "Kate", "Tom", "Sophie", "Alex", "Rachel", "Ben", "Amy", "Chris", "Lucy"];
+  const lastNames = ["Smith", "Jones", "Brown", "Wilson", "Taylor", "Davies", "Evans", "Thomas", "Roberts", "Johnson", "Williams", "Miller", "Davis", "Garcia", "Rodriguez", "Martinez"];
+  
+  const getRandomName = () => {
+    const first = firstNames[Math.floor(Math.random() * firstNames.length)];
+    const last = lastNames[Math.floor(Math.random() * lastNames.length)];
+    return `${first} ${last}`;
+  };
+
+  const profiles = [
+    // Premium tenants (2-3 available)
+    ...Array.from({ length: 2 + Math.floor(Math.random() * 2) }, (_, i) => ({
+      id: `premium_${i + 1}`,
+      name: getRandomName(),
+      profile: "premium" as const,
+      creditScore: 720 + Math.floor(Math.random() * 80),
+      monthlyIncome: 6500 + Math.floor(Math.random() * 3000),
+      employmentStatus: ["NHS Doctor", "Senior Engineer", "Solicitor", "University Professor", "Consultant"][Math.floor(Math.random() * 5)],
+      rentMultiplier: 1.15 + Math.random() * 0.1,
+      defaultRisk: 1 + Math.floor(Math.random() * 3),
+      damageRisk: 1 + Math.floor(Math.random() * 2),
+      description: "High-income professional with excellent credit history"
+    })),
+    
+    // Standard tenants (3-4 available)
+    ...Array.from({ length: 3 + Math.floor(Math.random() * 2) }, (_, i) => ({
+      id: `standard_${i + 1}`,
+      name: getRandomName(),
+      profile: "standard" as const,
+      creditScore: 620 + Math.floor(Math.random() * 80),
+      monthlyIncome: 3500 + Math.floor(Math.random() * 2000),
+      employmentStatus: ["Teacher", "Nurse", "Accountant", "Manager", "Civil Servant"][Math.floor(Math.random() * 5)],
+      rentMultiplier: 0.95 + Math.random() * 0.15,
+      defaultRisk: 5 + Math.floor(Math.random() * 10),
+      damageRisk: 3 + Math.floor(Math.random() * 8),
+      description: "Stable employment with good references"
+    })),
+    
+    // Budget tenants (2-3 available)  
+    ...Array.from({ length: 2 + Math.floor(Math.random() * 2) }, (_, i) => ({
+      id: `budget_${i + 1}`,
+      name: getRandomName(),
+      profile: "budget" as const,
+      creditScore: 520 + Math.floor(Math.random() * 80),
+      monthlyIncome: 2200 + Math.floor(Math.random() * 1200),
+      employmentStatus: ["Shop Worker", "Warehouse Staff", "Care Worker", "Security Guard", "Cleaner"][Math.floor(Math.random() * 5)],
+      rentMultiplier: 0.8 + Math.random() * 0.15,
+      defaultRisk: 15 + Math.floor(Math.random() * 15),
+      damageRisk: 8 + Math.floor(Math.random() * 12),
+      description: "Lower income but employed and willing to pay market rate"
+    })),
+    
+    // Risky tenants (1-2 available, but pay MORE)
+    ...Array.from({ length: 1 + Math.floor(Math.random() * 2) }, (_, i) => ({
+      id: `risky_${i + 1}`,
+      name: getRandomName(),
+      profile: "risky" as const,
+      creditScore: 420 + Math.floor(Math.random() * 120),
+      monthlyIncome: 1800 + Math.floor(Math.random() * 1000),
+      employmentStatus: ["Unemployed", "Temporary Work", "Benefits", "Gig Work", "Part-time"][Math.floor(Math.random() * 5)],
+      rentMultiplier: 1.1 + Math.random() * 0.3, // Risky tenants pay MORE
+      defaultRisk: 25 + Math.floor(Math.random() * 25),
+      damageRisk: 15 + Math.floor(Math.random() * 25),
+      description: "Higher risk but willing to pay premium rent for accommodation"
+    }))
+  ];
+  
+  return profiles;
+};
 
 const ProfileColors = {
   premium: "text-luxury border-luxury/20 bg-luxury/5",
@@ -142,6 +115,7 @@ const ProfileIcons = {
 export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTenant }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [tenantProfiles] = useState(() => generateTenantProfiles());
 
   const handleSelectTenant = () => {
     if (selectedTenant) {
@@ -175,7 +149,7 @@ export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTe
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {TENANT_PROFILES.map((tenant) => {
+          {tenantProfiles.map((tenant) => {
             const Icon = ProfileIcons[tenant.profile];
             const potentialRent = Math.floor(baseRent * tenant.rentMultiplier);
             const isSelected = selectedTenant?.id === tenant.id;
