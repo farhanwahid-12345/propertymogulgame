@@ -30,6 +30,19 @@ interface PropertyTenant {
   startDate: number; // timestamp
 }
 
+interface VoidPeriod {
+  propertyId: string;
+  startDate: number; // timestamp
+  endDate: number; // timestamp
+}
+
+interface PropertyListing {
+  propertyId: string;
+  listingDate: number; // timestamp
+  isAuction: boolean;
+  daysUntilSale: number;
+}
+
 interface Renovation {
   id: string;
   propertyId: string;
@@ -60,6 +73,8 @@ interface GameState {
   creditScore: number;
   currentMarketRate: number;
   tenantEvents: TenantEvent[];
+  voidPeriods: VoidPeriod[];
+  propertyListings: PropertyListing[];
 }
 
 const INITIAL_CASH = 100000; // £100K starting cash
@@ -68,6 +83,13 @@ const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
 const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
 const MAINTENANCE_RATE = 0.008; // 0.8% annual maintenance costs
 const BASE_MARKET_RATE = 0.035; // 3.5% base market rate
+
+// Transaction costs
+const SOLICITOR_FEES = 1500; // Fixed solicitor fees
+const ESTATE_AGENT_RATE = 0.015; // 1.5% of sale price
+const STAMP_DUTY_RATE = 0.03; // 3% stamp duty
+const MORTGAGE_BROKER_FEE = 500; // Fixed broker fee
+const AUCTION_SELLER_FEE = 0.05; // 5% for quick auction sales
 
 // Mortgage providers with different risk profiles
 const MORTGAGE_PROVIDERS: MortgageProvider[] = [
@@ -336,11 +358,13 @@ export function useGameState() {
       experience: parsedState.experience || 0,
       experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
       monthsPlayed: parsedState.monthsPlayed || 0,
-      timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
+      timeUntilNextMonth: parsedState.timeUntilNextMonth || 60,
       isBankrupt: parsedState.isBankrupt || false,
       creditScore: parsedState.creditScore || 650,
       currentMarketRate: parsedState.currentMarketRate || BASE_MARKET_RATE,
-      tenantEvents: parsedState.tenantEvents || []
+      tenantEvents: parsedState.tenantEvents || [],
+      voidPeriods: parsedState.voidPeriods || [],
+      propertyListings: parsedState.propertyListings || []
     };
     }
     return {
@@ -353,11 +377,13 @@ export function useGameState() {
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
-      timeUntilNextMonth: 180,
+      timeUntilNextMonth: 60,
       isBankrupt: false,
       creditScore: 650,
       currentMarketRate: BASE_MARKET_RATE,
-      tenantEvents: []
+      tenantEvents: [],
+      voidPeriods: [],
+      propertyListings: []
     };
   });
 
@@ -392,11 +418,50 @@ export function useGameState() {
               monthlyIncome: updatedProperties[propertyIndex].monthlyIncome + renovation.type.rentIncrease
             };
             
-            toast({
-              title: "Renovation Complete!",
-              description: `${renovation.type.name} finished! Property value increased by £${renovation.type.valueIncrease.toLocaleString()}, rent by £${renovation.type.rentIncrease}/mo.`,
-            });
+            if (completedRenovations.indexOf(renovation) === 0) { // Only show first toast
+              toast({
+                title: "Renovation Complete!",
+                description: `${renovation.type.name} finished! Property value increased by £${renovation.type.valueIncrease.toLocaleString()}, rent by £${renovation.type.rentIncrease}/mo.`,
+              });
+            }
           }
+        });
+
+        // Update property listings (properties being sold)
+        const updatedListings = prev.propertyListings.map(listing => ({
+          ...listing,
+          daysUntilSale: Math.max(0, listing.daysUntilSale - 1)
+        }));
+
+        // Process property sales
+        const completedSales = updatedListings.filter(listing => listing.daysUntilSale === 0);
+        completedSales.forEach(sale => {
+          const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
+          if (property) {
+            const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
+            const salePrice = sale.isAuction ? property.value * 0.85 : property.value; // 15% discount for auction
+            const estateAgentFees = sale.isAuction ? salePrice * AUCTION_SELLER_FEE : salePrice * ESTATE_AGENT_RATE;
+            const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
+            const netProceeds = salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
+            
+            toast({
+              title: `Property Sold ${sale.isAuction ? '(Auction)' : ''}!`,
+              description: `${property.name} sold for £${salePrice.toLocaleString()}. Net proceeds: £${netProceeds.toLocaleString()}`,
+            });
+            
+            // Will be handled in the return statement
+          }
+        });
+
+        // Process void periods
+        const activeVoidPeriods = prev.voidPeriods.filter(vp => currentTime < vp.endDate);
+        const endedVoidPeriods = prev.voidPeriods.filter(vp => currentTime >= vp.endDate);
+        
+        endedVoidPeriods.forEach(vp => {
+          toast({
+            title: "Void Period Ended",
+            description: "Your property is now ready for a new tenant!",
+          });
         });
         
         // Check for tenant events
@@ -419,18 +484,46 @@ export function useGameState() {
           }
         });
 
+        // Handle completed sales
+        const remainingProperties = updatedProperties.filter(p => 
+          !completedSales.some(sale => sale.propertyId === p.id)
+        );
+        const remainingMortgages = prev.mortgages.filter(m => 
+          !completedSales.some(sale => sale.propertyId === m.propertyId)
+        );
+        const remainingTenants = prev.tenants.filter(t => 
+          !completedSales.some(sale => sale.propertyId === t.propertyId)
+        );
+        
+        const saleCashGained = completedSales.reduce((total, sale) => {
+          const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
+          if (property) {
+            const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
+            const salePrice = sale.isAuction ? property.value * 0.85 : property.value;
+            const estateAgentFees = sale.isAuction ? salePrice * AUCTION_SELLER_FEE : salePrice * ESTATE_AGENT_RATE;
+            const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
+            return total + salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
+          }
+          return total;
+        }, 0);
+
         return {
           ...prev,
-          ownedProperties: updatedProperties.map(property => ({
+          cash: prev.cash + saleCashGained,
+          ownedProperties: remainingProperties.map(property => ({
             ...property,
             value: Math.max(
               property.price * 0.5, // Minimum 50% of original price
               property.value * (0.98 + Math.random() * 0.04) // -2% to +2% change
             )
           })),
+          mortgages: remainingMortgages,
+          tenants: remainingTenants,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
-          tenantEvents: [...prev.tenantEvents, ...newTenantEvents]
+          tenantEvents: [...prev.tenantEvents, ...newTenantEvents],
+          voidPeriods: activeVoidPeriods,
+          propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0)
         };
       });
 
@@ -471,9 +564,15 @@ export function useGameState() {
       setGameState(prev => {
         if (prev.isBankrupt) return prev;
 
-        const monthlyIncome = prev.ownedProperties.reduce((total, property) => 
-          total + property.monthlyIncome, 0
-        );
+        // Only count income from properties with tenants (not in void periods)
+        const currentTime = Date.now();
+        const monthlyIncome = prev.ownedProperties.reduce((total, property) => {
+          const hasTenant = prev.tenants.some(t => t.propertyId === property.id);
+          const isInVoidPeriod = prev.voidPeriods.some(vp => 
+            vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
+          );
+          return total + (hasTenant && !isInVoidPeriod ? property.monthlyIncome : 0);
+        }, 0);
         
         // Calculate monthly expenses
         const mortgagePayments = prev.mortgages.reduce((total, mortgage) => 
@@ -534,11 +633,11 @@ export function useGameState() {
           level: newLevel,
           experienceToNext: newExperienceToNext,
           monthsPlayed: prev.monthsPlayed + 1,
-          timeUntilNextMonth: 180, // Reset to 3 minutes
+          timeUntilNextMonth: 60, // Reset to 1 minute
           isBankrupt
         };
       });
-    }, 180000); // Every 3 minutes = 1 month
+    }, 60000); // Every 1 minute = 1 month
 
     return () => clearInterval(monthlyInterval);
   }, []);
@@ -555,12 +654,14 @@ export function useGameState() {
       }
 
       const mortgageAmount = (property.price * mortgagePercentage) / 100;
-      const cashRequired = property.price - mortgageAmount;
+      const stampDuty = property.price * STAMP_DUTY_RATE;
+      const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + 
+        (mortgageAmount > 0 ? MORTGAGE_BROKER_FEE : 0);
       
       if (prev.cash < cashRequired) {
         toast({
           title: "Insufficient Funds",
-          description: `You need £${cashRequired.toLocaleString()} cash to buy this property!`,
+          description: `You need £${cashRequired.toLocaleString()} cash (inc. fees) to buy this property!`,
           variant: "destructive"
         });
         return prev;
@@ -590,7 +691,7 @@ export function useGameState() {
 
       toast({
         title: "Property Purchased!",
-        description: `You bought ${property.name} for £${property.price.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}`,
+        description: `You bought ${property.name} for £${property.price.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}. Total cost: £${cashRequired.toLocaleString()}`,
       });
 
       return {
@@ -605,29 +706,27 @@ export function useGameState() {
     setAvailableProperties(prev => prev.filter(p => p.id !== property.id));
   }, []);
 
-  const sellProperty = useCallback((property: Property) => {
+  const sellProperty = useCallback((property: Property, isAuction: boolean = false) => {
     setGameState(prev => {
-      const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
-      const salePrice = property.value;
-      const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
-      const netProceeds = salePrice - mortgagePayoff;
-      const profit = netProceeds - (property.price - (mortgage ? mortgage.principal : 0));
+      const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60); // Auction: 1 day, Market: 30-90 days
       
+      const newListing: PropertyListing = {
+        propertyId: property.id,
+        listingDate: Date.now(),
+        isAuction,
+        daysUntilSale: daysToSell
+      };
+
       toast({
-        title: "Property Sold!",
-        description: `You sold ${property.name} for £${salePrice.toLocaleString()}. ${mortgage ? `Mortgage payoff: £${mortgagePayoff.toLocaleString()}. ` : ''}${profit >= 0 ? `Profit: £${profit.toLocaleString()}` : `Loss: £${Math.abs(profit).toLocaleString()}`}`,
+        title: `Property Listed for Sale!`,
+        description: `${property.name} listed ${isAuction ? 'for auction' : 'on the market'}. Expected sale in ${daysToSell} days.`,
       });
 
       return {
         ...prev,
-        cash: prev.cash + netProceeds,
-        ownedProperties: prev.ownedProperties.filter(p => p.id !== property.id),
-        mortgages: prev.mortgages.filter(m => m.propertyId !== property.id),
-        experience: prev.experience + Math.floor(salePrice / 15000)
+        propertyListings: [...prev.propertyListings, newListing]
       };
     });
-
-    setAvailableProperties(prev => [...prev, { ...property, owned: false }]);
   }, []);
 
   const resetGame = useCallback(() => {
@@ -641,11 +740,13 @@ export function useGameState() {
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
-      timeUntilNextMonth: 180,
+      timeUntilNextMonth: 60,
       isBankrupt: false,
       creditScore: 650,
       currentMarketRate: BASE_MARKET_RATE,
-      tenantEvents: []
+      tenantEvents: [],
+      voidPeriods: [],
+      propertyListings: []
     };
     setGameState(newState);
     setAvailableProperties(AVAILABLE_PROPERTIES);
@@ -659,6 +760,9 @@ export function useGameState() {
 
   const selectTenant = useCallback((propertyId: string, tenant: Tenant) => {
     setGameState(prev => {
+      // Remove any existing void period for this property
+      const updatedVoidPeriods = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
+      
       const existingTenantIndex = prev.tenants.findIndex(t => t.propertyId === propertyId);
       const newTenant: PropertyTenant = {
         propertyId,
@@ -695,7 +799,31 @@ export function useGameState() {
       return {
         ...prev,
         tenants: updatedTenants,
-        ownedProperties: updatedProperties
+        ownedProperties: updatedProperties,
+        voidPeriods: updatedVoidPeriods
+      };
+    });
+  }, []);
+
+  const removeTenant = useCallback((propertyId: string) => {
+    setGameState(prev => {
+      // Create void period (1-3 months)
+      const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000; // 30-90 days in ms
+      const voidPeriod: VoidPeriod = {
+        propertyId,
+        startDate: Date.now(),
+        endDate: Date.now() + voidDuration
+      };
+
+      toast({
+        title: "Tenant Removed",
+        description: `Property will be void for ${Math.floor(voidDuration / (24 * 60 * 60 * 1000))} days.`,
+      });
+
+      return {
+        ...prev,
+        tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
+        voidPeriods: [...prev.voidPeriods, voidPeriod]
       };
     });
   }, []);
@@ -711,17 +839,28 @@ export function useGameState() {
         return prev;
       }
 
+      // Check for existing renovation on same property
+      const existingRenovation = prev.renovations.find(r => r.propertyId === propertyId);
+      if (existingRenovation) {
+        toast({
+          title: "Renovation in Progress",
+          description: "This property already has an ongoing renovation!",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
       const renovation: Renovation = {
         id: `${propertyId}_${renovationType.id}_${Date.now()}`,
         propertyId,
         type: renovationType,
         startDate: Date.now(),
-        completionDate: Date.now() + (renovationType.duration * 24 * 60 * 60 * 1000)
+        completionDate: Date.now() + (renovationType.duration * 60 * 1000) // Convert minutes to milliseconds
       };
 
       toast({
         title: "Renovation Started!",
-        description: `${renovationType.name} renovation has begun. It will take ${renovationType.duration} days to complete.`,
+        description: `${renovationType.name} renovation has begun. It will take ${renovationType.duration} minutes to complete.`,
       });
 
       return {
@@ -732,51 +871,148 @@ export function useGameState() {
     });
   }, []);
 
-  const settleMortgage = useCallback((mortgagePropertyId: string, settlementPropertyId: string) => {
+  const settleMortgage = useCallback((mortgagePropertyId: string, useCash: boolean = false, settlementPropertyId?: string) => {
     setGameState(prev => {
       const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
-      const settlementProperty = prev.ownedProperties.find(p => p.id === settlementPropertyId);
       
-      if (!mortgage || !settlementProperty) {
+      if (!mortgage) {
         toast({
           title: "Settlement Failed",
-          description: "Could not find mortgage or settlement property!",
+          description: "Could not find mortgage!",
           variant: "destructive"
         });
         return prev;
       }
 
-      if (settlementProperty.value < mortgage.remainingBalance) {
+      if (useCash) {
+        if (prev.cash < mortgage.remainingBalance) {
+          toast({
+            title: "Insufficient Cash",
+            description: `You need £${mortgage.remainingBalance.toLocaleString()} to pay off this mortgage!`,
+            variant: "destructive"
+          });
+          return prev;
+        }
+
         toast({
-          title: "Insufficient Property Value",
-          description: "The settlement property value is not enough to cover the mortgage!",
+          title: "Mortgage Paid Off!",
+          description: `Mortgage paid off with cash: £${mortgage.remainingBalance.toLocaleString()}`,
+        });
+
+        return {
+          ...prev,
+          cash: prev.cash - mortgage.remainingBalance,
+          mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId)
+        };
+      } else {
+        const settlementProperty = prev.ownedProperties.find(p => p.id === settlementPropertyId);
+        
+        if (!settlementProperty) {
+          toast({
+            title: "Settlement Failed",
+            description: "Could not find settlement property!",
+            variant: "destructive"
+          });
+          return prev;
+        }
+
+        if (settlementProperty.value < mortgage.remainingBalance) {
+          toast({
+            title: "Insufficient Property Value",
+            description: "The settlement property value is not enough to cover the mortgage!",
+            variant: "destructive"
+          });
+          return prev;
+        }
+
+        const cashFromSale = settlementProperty.value - mortgage.remainingBalance - SOLICITOR_FEES - (settlementProperty.value * ESTATE_AGENT_RATE);
+
+        toast({
+          title: "Mortgage Settled!",
+          description: `${settlementProperty.name} was sold to pay off the mortgage. Net cash: £${cashFromSale.toLocaleString()}`,
+        });
+
+        return {
+          ...prev,
+          cash: prev.cash + cashFromSale,
+          ownedProperties: prev.ownedProperties.filter(p => p.id !== settlementPropertyId),
+          mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
+          tenants: prev.tenants.filter(t => t.propertyId !== settlementPropertyId),
+          voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== settlementPropertyId)
+        };
+      }
+    });
+  }, []);
+
+  const remortgageProperty = useCallback((propertyId: string, newLoanAmount: number, providerId: string) => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      const existingMortgage = prev.mortgages.find(m => m.propertyId === propertyId);
+      const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
+      
+      if (!property || !provider) {
+        toast({
+          title: "Remortgage Failed",
+          description: "Property or provider not found!",
           variant: "destructive"
         });
         return prev;
       }
 
-      const cashFromSale = settlementProperty.value - mortgage.remainingBalance;
+      const maxLTV = property.value * provider.maxLTV;
+      if (newLoanAmount > maxLTV) {
+        toast({
+          title: "Loan Too Large",
+          description: `Maximum loan for this property is £${maxLTV.toLocaleString()}`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      const totalFees = SOLICITOR_FEES + MORTGAGE_BROKER_FEE;
+      const existingBalance = existingMortgage ? existingMortgage.remainingBalance : 0;
+      const cashRaised = newLoanAmount - existingBalance - totalFees;
+
+      if (cashRaised < 0) {
+        toast({
+          title: "Remortgage Failed",
+          description: "New loan amount must cover existing mortgage and fees!",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
+        (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+      const termMonths = 300; // 25 years
+      const monthlyRate = dynamicRate / 12;
+      const monthlyPayment = newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
+        (Math.pow(1 + monthlyRate, termMonths) - 1);
+
+      const newMortgage: Mortgage = {
+        propertyId,
+        principal: newLoanAmount,
+        monthlyPayment,
+        remainingBalance: newLoanAmount,
+        interestRate: dynamicRate,
+        termMonths,
+        providerId
+      };
 
       toast({
-        title: "Mortgage Settled!",
-        description: `${settlementProperty.name} was sold to pay off the mortgage. You received £${cashFromSale.toLocaleString()} in cash.`,
+        title: "Remortgage Complete!",
+        description: `Property remortgaged for £${newLoanAmount.toLocaleString()}. Cash raised: £${cashRaised.toLocaleString()}`,
       });
 
       return {
         ...prev,
-        cash: prev.cash + cashFromSale,
-        ownedProperties: prev.ownedProperties.filter(p => p.id !== settlementPropertyId),
-        mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
-        tenants: prev.tenants.filter(t => t.propertyId !== settlementPropertyId)
+        cash: prev.cash + cashRaised,
+        mortgages: existingMortgage 
+          ? prev.mortgages.map(m => m.propertyId === propertyId ? newMortgage : m)
+          : [...prev.mortgages, newMortgage]
       };
     });
-
-    // Add settlement property back to available properties
-    const settlementProperty = gameState.ownedProperties.find(p => p.id === settlementPropertyId);
-    if (settlementProperty) {
-      setAvailableProperties(prev => [...prev, { ...settlementProperty, owned: false }]);
-    }
-  }, [gameState.ownedProperties]);
+  }, []);
 
   const netWorth = gameState.cash + gameState.ownedProperties.reduce((total, property) => 
     total + property.value, 0
@@ -829,8 +1065,10 @@ export function useGameState() {
     buyProperty,
     sellProperty,
     selectTenant,
+    removeTenant,
     startRenovation,
     settleMortgage,
+    remortgageProperty,
     resetGame
   };
 }

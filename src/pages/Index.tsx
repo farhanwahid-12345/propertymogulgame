@@ -70,6 +70,7 @@ const Index = () => {
             <MortgageSettlement 
               ownedProperties={gameState.ownedProperties}
               mortgages={gameState.mortgages}
+              cash={gameState.cash}
               onSettleMortgage={gameState.settleMortgage}
             />
             <Button 

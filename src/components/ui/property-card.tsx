@@ -25,14 +25,17 @@ export interface Property {
 interface PropertyCardProps {
   property: Property;
   onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string) => void;
-  onSell?: (property: Property) => void;
+  onSell?: (property: Property, isAuction?: boolean) => void;
   onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
   onRenovate?: (propertyId: string, renovation: RenovationType) => void;
+  onRemortgage?: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   playerCash?: number;
   creditScore?: number;
   mortgageProviders?: any[];
   currentTenant?: Tenant;
   activeRenovations?: string[];
+  propertyListings?: any[];
+  removeTenant?: (propertyId: string) => void;
 }
 
 const PropertyTypeIcon = {
@@ -53,11 +56,14 @@ export function PropertyCard({
   onSell,
   onSelectTenant,
   onRenovate,
+  onRemortgage,
   playerCash = 0, 
   creditScore = 600,
   mortgageProviders = [],
   currentTenant,
-  activeRenovations = []
+  activeRenovations = [],
+  propertyListings = [],
+  removeTenant
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -192,14 +198,30 @@ export function PropertyCard({
               )}
             </div>
             
-            <Button 
-              variant="destructive" 
-              className="w-full" 
-              onClick={() => handleAction(() => onSell?.(property))}
-              disabled={isLoading}
-            >
-              {isLoading ? "Selling..." : `Sell for £${property.value.toLocaleString()}`}
-            </Button>
+            {propertyListings?.some(l => l.propertyId === property.id) ? (
+              <div className="text-center py-2 text-muted-foreground">
+                Property listed for sale
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => handleAction(() => onSell?.(property, false))}
+                  disabled={isLoading}
+                >
+                  List for Sale
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => handleAction(() => onSell?.(property, true))}
+                  disabled={isLoading}
+                >
+                  Auction (Fast)
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

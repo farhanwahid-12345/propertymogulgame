@@ -25,16 +25,19 @@ interface Mortgage {
 interface MortgageSettlementProps {
   ownedProperties: Property[];
   mortgages: Mortgage[];
-  onSettleMortgage: (mortgagePropertyId: string, settlementPropertyId: string) => void;
+  cash: number;
+  onSettleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string) => void;
 }
 
 export function MortgageSettlement({ 
   ownedProperties, 
   mortgages,
+  cash,
   onSettleMortgage 
 }: MortgageSettlementProps) {
   const [selectedMortgage, setSelectedMortgage] = useState<string>("");
   const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [settlementMethod, setSettlementMethod] = useState<"cash" | "property">("cash");
   const [isOpen, setIsOpen] = useState(false);
 
   // Only show properties with mortgages
@@ -52,21 +55,30 @@ export function MortgageSettlement({
   const selectedPropertyDetails = ownedProperties.find(p => p.id === selectedProperty);
   const selectedMortgageProperty = ownedProperties.find(p => p.id === selectedMortgage);
 
-  const canSettle = selectedMortgageDetails && selectedPropertyDetails && 
+  const canSettleWithCash = selectedMortgageDetails && cash >= selectedMortgageDetails.remainingBalance;
+  const canSettleWithProperty = selectedMortgageDetails && selectedPropertyDetails && 
     selectedPropertyDetails.value >= selectedMortgageDetails.remainingBalance;
+  
+  const canSettle = settlementMethod === "cash" ? canSettleWithCash : canSettleWithProperty;
 
   const handleSettle = () => {
-    if (selectedMortgage && selectedProperty && canSettle) {
-      onSettleMortgage(selectedMortgage, selectedProperty);
+    if (selectedMortgage && canSettle) {
+      if (settlementMethod === "cash") {
+        onSettleMortgage(selectedMortgage, true);
+      } else if (selectedProperty) {
+        onSettleMortgage(selectedMortgage, false, selectedProperty);
+      }
       setIsOpen(false);
       setSelectedMortgage("");
       setSelectedProperty("");
+      setSettlementMethod("cash");
     }
   };
 
   const clearSelection = () => {
     setSelectedMortgage("");
     setSelectedProperty("");
+    setSettlementMethod("cash");
   };
 
   return (
@@ -80,13 +92,12 @@ export function MortgageSettlement({
       
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Settle Mortgage with Property</DialogTitle>
+          <DialogTitle>Settle Mortgage</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
           <div className="text-sm text-muted-foreground">
-            Use the equity from one of your debt-free properties to pay off a mortgage on another property.
-            The property used for settlement will be sold automatically.
+            Pay off a mortgage using cash or by selling another property.
           </div>
           
           {propertiesWithMortgages.length === 0 ? (
@@ -127,38 +138,74 @@ export function MortgageSettlement({
                 </div>
 
                 {selectedMortgage && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Select debt-free property to use for settlement:
-                    </label>
-                    {availableProperties.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground">
-                        No debt-free properties available for settlement
-                      </div>
-                    ) : (
-                      <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                  <>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">
+                        Settlement method:
+                      </label>
+                      <Select value={settlementMethod} onValueChange={(value: "cash" | "property") => {
+                        setSettlementMethod(value);
+                        setSelectedProperty(""); // Reset property selection
+                      }}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Choose property to sell..." />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {availableProperties.map((property) => (
-                            <SelectItem key={property.id} value={property.id}>
-                              <div className="flex justify-between items-center w-full">
-                                <span>{property.name}</span>
-                                <Badge variant="outline" className="ml-2">
-                                  £{property.value.toLocaleString()} value
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="cash">
+                            <div className="flex justify-between items-center w-full">
+                              <span>Pay with Cash</span>
+                              <Badge variant="outline" className="ml-2">
+                                £{cash.toLocaleString()} available
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="property">
+                            <div className="flex justify-between items-center w-full">
+                              <span>Sell Property</span>
+                              <Badge variant="outline" className="ml-2">
+                                {availableProperties.length} properties
+                              </Badge>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {settlementMethod === "property" && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">
+                          Select debt-free property to sell:
+                        </label>
+                        {availableProperties.length === 0 ? (
+                          <div className="text-center py-4 text-muted-foreground">
+                            No debt-free properties available for settlement
+                          </div>
+                        ) : (
+                          <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Choose property to sell..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableProperties.map((property) => (
+                                <SelectItem key={property.id} value={property.id}>
+                                  <div className="flex justify-between items-center w-full">
+                                    <span>{property.name}</span>
+                                    <Badge variant="outline" className="ml-2">
+                                      £{property.value.toLocaleString()} value
+                                    </Badge>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
 
-              {selectedMortgage && selectedProperty && (
+              {selectedMortgage && (settlementMethod === "cash" || selectedProperty) && (
                 <Card className={cn(
                   "border-2",
                   canSettle ? "border-success bg-success/5" : "border-danger bg-danger/5"
@@ -187,28 +234,56 @@ export function MortgageSettlement({
                           £{selectedMortgageDetails?.remainingBalance.toLocaleString()}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Property to sell:</span>
-                        <br />
-                        <span className="font-medium">{selectedPropertyDetails?.name}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Property value:</span>
-                        <br />
-                        <span className="font-semibold text-success">
-                          £{selectedPropertyDetails?.value.toLocaleString()}
-                        </span>
-                      </div>
+                      {settlementMethod === "cash" ? (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Available cash:</span>
+                            <br />
+                            <span className="font-medium">£{cash.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Remaining cash:</span>
+                            <br />
+                            <span className={`font-semibold ${canSettleWithCash ? 'text-success' : 'text-danger'}`}>
+                              £{(cash - (selectedMortgageDetails?.remainingBalance || 0)).toLocaleString()}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Property to sell:</span>
+                            <br />
+                            <span className="font-medium">{selectedPropertyDetails?.name}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Property value:</span>
+                            <br />
+                            <span className="font-semibold text-success">
+                              £{selectedPropertyDetails?.value.toLocaleString()}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                     
                     {canSettle ? (
                       <div className="pt-2 border-t">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Cash remaining after settlement:</span>
-                          <span className="font-semibold text-success">
-                            £{((selectedPropertyDetails?.value || 0) - (selectedMortgageDetails?.remainingBalance || 0)).toLocaleString()}
-                          </span>
-                        </div>
+                        {settlementMethod === "cash" ? (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cash after settlement:</span>
+                            <span className="font-semibold text-success">
+                              £{(cash - (selectedMortgageDetails?.remainingBalance || 0)).toLocaleString()}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cash from sale (after fees):</span>
+                            <span className="font-semibold text-success">
+                              £{Math.max(0, ((selectedPropertyDetails?.value || 0) - (selectedMortgageDetails?.remainingBalance || 0) - 1500 - ((selectedPropertyDetails?.value || 0) * 0.015))).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Monthly payment saved:</span>
                           <span className="font-semibold text-success">
@@ -219,8 +294,10 @@ export function MortgageSettlement({
                     ) : (
                       <div className="pt-2 border-t">
                         <p className="text-danger text-sm">
-                          Property value is insufficient to cover the mortgage balance.
-                          You need an additional £{((selectedMortgageDetails?.remainingBalance || 0) - (selectedPropertyDetails?.value || 0)).toLocaleString()}.
+                          {settlementMethod === "cash" 
+                            ? `Insufficient cash. You need £${((selectedMortgageDetails?.remainingBalance || 0) - cash).toLocaleString()} more.`
+                            : `Property value is insufficient to cover the mortgage balance. You need an additional £${((selectedMortgageDetails?.remainingBalance || 0) - (selectedPropertyDetails?.value || 0)).toLocaleString()}.`
+                          }
                         </p>
                       </div>
                     )}
@@ -235,7 +312,7 @@ export function MortgageSettlement({
           <Button variant="outline" onClick={() => setIsOpen(false)}>
             Cancel
           </Button>
-          {selectedMortgage && !selectedProperty && availableProperties.length > 0 && (
+          {selectedMortgage && (
             <Button variant="outline" onClick={clearSelection}>
               Clear Selection
             </Button>
