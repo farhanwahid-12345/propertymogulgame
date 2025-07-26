@@ -14,13 +14,16 @@ interface MortgageProvider {
 }
 
 interface Mortgage {
+  id: string;
   propertyId: string;
   principal: number;
   monthlyPayment: number;
   remainingBalance: number;
   interestRate: number;
-  termMonths: number;
+  termYears: number; // 5, 10, 15, 20, 25, 30
+  mortgageType: 'repayment' | 'interest-only';
   providerId: string;
+  startDate: number;
 }
 
 interface PropertyTenant {
@@ -588,17 +591,40 @@ export function useGameState() {
         const totalExpenses = mortgagePayments + propertyTax + maintenance;
         const netIncome = monthlyIncome - totalExpenses;
         
-        // Update mortgage balances
+        // Update mortgage balances and check for payoffs
         const updatedMortgages = prev.mortgages.map(mortgage => {
           const interest = mortgage.remainingBalance * (mortgage.interestRate / 12);
-          const principal = mortgage.monthlyPayment - interest;
-          const newBalance = Math.max(0, mortgage.remainingBalance - principal);
+          let principal = 0;
+          let newBalance = mortgage.remainingBalance;
+          
+          if (mortgage.mortgageType === 'repayment') {
+            principal = mortgage.monthlyPayment - interest;
+            newBalance = Math.max(0, mortgage.remainingBalance - principal);
+          }
+          // For interest-only, balance stays the same
           
           return {
             ...mortgage,
             remainingBalance: newBalance
           };
-        }).filter(mortgage => mortgage.remainingBalance > 0);
+        });
+
+        // Check for paid-off mortgages
+        const paidOffMortgages = updatedMortgages.filter(m => 
+          prev.mortgages.find(old => old.id === m.id)?.remainingBalance > 0 && m.remainingBalance === 0
+        );
+        
+        paidOffMortgages.forEach(mortgage => {
+          const property = prev.ownedProperties.find(p => p.id === mortgage.propertyId);
+          if (property) {
+            toast({
+              title: "Mortgage Paid Off! 🎉",
+              description: `${property.name} is now fully owned! No more monthly payments of £${mortgage.monthlyPayment.toLocaleString()}.`,
+            });
+          }
+        });
+
+        const finalMortgages = updatedMortgages.filter(mortgage => mortgage.remainingBalance > 0);
         
         const newCash = prev.cash + netIncome;
         const isBankrupt = newCash < 0 && totalExpenses > monthlyIncome;
@@ -626,7 +652,7 @@ export function useGameState() {
         return {
           ...prev,
           cash: Math.max(0, newCash),
-          mortgages: updatedMortgages,
+          mortgages: finalMortgages,
           experience: newLevel > prev.level ? 0 : newExperience,
           level: newLevel,
           experienceToNext: newExperienceToNext,
@@ -640,7 +666,7 @@ export function useGameState() {
     return () => clearInterval(monthlyInterval);
   }, []);
 
-  const buyProperty = useCallback((property: Property, mortgagePercentage: number = 0, providerId?: string) => {
+  const buyProperty = useCallback((property: Property, mortgagePercentage: number = 0, providerId?: string, termYears: number = 25, mortgageType: 'repayment' | 'interest-only' = 'repayment') => {
     setGameState(prev => {
       if (prev.isBankrupt) {
         toast({
@@ -670,20 +696,30 @@ export function useGameState() {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
           (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
-        const termMonths = 300; // 25 years
         const monthlyRate = dynamicRate / 12;
-        const monthlyPayment = mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
-          (Math.pow(1 + monthlyRate, termMonths) - 1);
+        
+        let monthlyPayment: number;
+        if (mortgageType === 'interest-only') {
+          monthlyPayment = mortgageAmount * monthlyRate;
+        } else {
+          // Repayment mortgage calculation
+          const totalPayments = termYears * 12;
+          monthlyPayment = mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+            (Math.pow(1 + monthlyRate, totalPayments) - 1);
+        }
         
         newMortgage = {
+          id: `${property.id}_${Date.now()}`,
           propertyId: property.id,
           principal: mortgageAmount,
           monthlyPayment,
           remainingBalance: mortgageAmount,
           interestRate: provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
             (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0),
-          termMonths,
-          providerId: providerId || "halifax"
+          termYears,
+          mortgageType,
+          providerId: providerId || "halifax",
+          startDate: Date.now()
         };
       }
 
@@ -988,13 +1024,16 @@ export function useGameState() {
         (Math.pow(1 + monthlyRate, termMonths) - 1);
 
       const newMortgage: Mortgage = {
+        id: `${propertyId}_${Date.now()}`,
         propertyId,
         principal: newLoanAmount,
         monthlyPayment,
         remainingBalance: newLoanAmount,
         interestRate: dynamicRate,
-        termMonths,
-        providerId
+        termYears: 25,
+        mortgageType: 'repayment',
+        providerId,
+        startDate: Date.now()
       };
 
       toast({

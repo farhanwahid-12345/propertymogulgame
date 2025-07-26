@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
@@ -24,7 +26,7 @@ export interface Property {
 
 interface PropertyCardProps {
   property: Property;
-  onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string) => void;
+  onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
   onSell?: (property: Property, isAuction?: boolean) => void;
   onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
   onRenovate?: (propertyId: string, renovation: RenovationType) => void;
@@ -69,6 +71,8 @@ export function PropertyCard({
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
   const [mortgagePercentage, setMortgagePercentage] = useState([60]);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
+  const [mortgageTermYears, setMortgageTermYears] = useState("25");
+  const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
   
   const Icon = PropertyTypeIcon[property.type];
   const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
@@ -90,9 +94,11 @@ export function PropertyCard({
       return; // Don't allow purchase without selecting provider
     }
     handleAction(() => {
-      onBuy?.(property, mortgagePercentage[0], selectedProviderId);
+      onBuy?.(property, mortgagePercentage[0], selectedProviderId, parseInt(mortgageTermYears), mortgageType);
       setShowMortgageOptions(false);
       setSelectedProviderId("");
+      setMortgageTermYears("25");
+      setMortgageType('repayment');
     });
   };
 
@@ -259,34 +265,86 @@ export function PropertyCard({
                     <div>Cash needed: £{cashRequired.toLocaleString()}</div>
                   </div>
                 </div>
+                
                 {mortgageAmount > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Choose Mortgage Provider:</Label>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
-                      {mortgageProviders.map((provider: any) => {
-                        const requiredLTV = mortgageAmount / property.price;
-                        const eligible = requiredLTV <= provider.maxLTV && creditScore >= provider.minCreditScore;
-                        
-                        return (
-                          <div 
-                            key={provider.id}
-                            className={`p-2 border rounded cursor-pointer transition-colors ${
-                              selectedProviderId === provider.id ? 'border-primary bg-primary/10' : 'border-border'
-                            } ${!eligible ? 'opacity-50' : ''}`}
-                            onClick={() => eligible && setSelectedProviderId(provider.id)}
-                          >
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium text-sm">{provider.name}</span>
-                              <span className="text-xs">{(provider.baseRate * 100).toFixed(1)}%</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {eligible ? "Available" : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
-                            </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-sm font-medium">Term</Label>
+                        <Select value={mortgageTermYears} onValueChange={setMortgageTermYears}>
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5 years</SelectItem>
+                            <SelectItem value="10">10 years</SelectItem>
+                            <SelectItem value="15">15 years</SelectItem>
+                            <SelectItem value="20">20 years</SelectItem>
+                            <SelectItem value="25">25 years</SelectItem>
+                            <SelectItem value="30">30 years</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-sm font-medium">Type</Label>
+                        <RadioGroup 
+                          value={mortgageType} 
+                          onValueChange={(value: 'repayment' | 'interest-only') => setMortgageType(value)}
+                          className="flex gap-4 mt-1"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="repayment" id="repayment" />
+                            <Label htmlFor="repayment" className="text-xs">Repayment</Label>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="interest-only" id="interest-only" />
+                            <Label htmlFor="interest-only" className="text-xs">Interest Only</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
                     </div>
-                  </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Choose Mortgage Provider:</Label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                        {mortgageProviders.map((provider: any) => {
+                          const requiredLTV = mortgageAmount / property.price;
+                          const eligible = requiredLTV <= provider.maxLTV && creditScore >= provider.minCreditScore;
+                          
+                          // Calculate estimated monthly payment
+                          const interestRate = provider.baseRate + ((700 - creditScore) / 1000) * 0.02;
+                          const monthlyInterest = interestRate / 12;
+                          let estimatedMonthly: number;
+                          
+                          if (mortgageType === 'interest-only') {
+                            estimatedMonthly = mortgageAmount * monthlyInterest;
+                          } else {
+                            const totalPayments = parseInt(mortgageTermYears) * 12;
+                            estimatedMonthly = mortgageAmount * (monthlyInterest * Math.pow(1 + monthlyInterest, totalPayments)) / (Math.pow(1 + monthlyInterest, totalPayments) - 1);
+                          }
+                          
+                          return (
+                            <div 
+                              key={provider.id}
+                              className={`p-2 border rounded cursor-pointer transition-colors ${
+                                selectedProviderId === provider.id ? 'border-primary bg-primary/10' : 'border-border'
+                              } ${!eligible ? 'opacity-50' : ''}`}
+                              onClick={() => eligible && setSelectedProviderId(provider.id)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium text-sm">{provider.name}</span>
+                                <span className="text-xs">{(provider.baseRate * 100).toFixed(1)}%</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {eligible ? `£${estimatedMonthly.toLocaleString()}/mo (${mortgageType})` : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
@@ -302,6 +360,8 @@ export function PropertyCard({
                     onClick={() => {
                       setShowMortgageOptions(false);
                       setSelectedProviderId("");
+                      setMortgageTermYears("25");
+                      setMortgageType('repayment');
                     }}
                   >
                     Cancel
