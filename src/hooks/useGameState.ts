@@ -418,12 +418,10 @@ export function useGameState() {
               monthlyIncome: updatedProperties[propertyIndex].monthlyIncome + renovation.type.rentIncrease
             };
             
-            if (completedRenovations.indexOf(renovation) === 0) { // Only show first toast
-              toast({
-                title: "Renovation Complete!",
-                description: `${renovation.type.name} finished! Property value increased by £${renovation.type.valueIncrease.toLocaleString()}, rent by £${renovation.type.rentIncrease}/mo.`,
-              });
-            }
+            toast({
+              title: "Renovation Complete!",
+              description: `${renovation.type.name} finished on ${updatedProperties[propertyIndex].name}! Property value increased by £${renovation.type.valueIncrease.toLocaleString()}, rent by £${renovation.type.rentIncrease}/mo.`,
+            });
           }
         });
 

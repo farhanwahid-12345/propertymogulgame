@@ -15,9 +15,20 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("market");
 
   const filteredProperties = (type?: string) => {
-    if (!type) return gameState.availableProperties;
-    return gameState.availableProperties.filter(p => p.type === type);
+    let properties = type ? gameState.availableProperties.filter(p => p.type === type) : gameState.availableProperties;
+    // Sort by yield (monthly income / price * 12 * 100 for percentage)
+    return properties.sort((a, b) => {
+      const yieldA = (a.monthlyIncome / a.price) * 12 * 100;
+      const yieldB = (b.monthlyIncome / b.price) * 12 * 100;
+      return yieldB - yieldA;
+    });
   };
+
+  const sortedOwnedProperties = gameState.ownedProperties.sort((a, b) => {
+    const yieldA = (a.monthlyIncome / a.value) * 12 * 100;
+    const yieldB = (b.monthlyIncome / b.value) * 12 * 100;
+    return yieldB - yieldA;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-city">
@@ -112,7 +123,7 @@ const Index = () => {
 
               <TabsContent value="market" className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {gameState.availableProperties.map((property) => (
+                  {filteredProperties().map((property) => (
                      <PropertyCard
                        key={property.id}
                        property={property}
@@ -181,7 +192,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {gameState.ownedProperties.map((property) => (
+                {sortedOwnedProperties.map((property) => (
                    <PropertyCard
                      key={property.id}
                      property={property}
