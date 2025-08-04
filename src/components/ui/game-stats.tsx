@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, DollarSign, Home, AlertTriangle, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Home, AlertTriangle, Calendar, CreditCard } from "lucide-react";
+import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide";
 import { cn } from "@/lib/utils";
 
 interface GameStatsProps {
@@ -105,9 +106,18 @@ export function GameStats({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{ownedPropertiesCount}</div>
-          <p className="text-xs text-muted-foreground">
-            Credit Score: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
-          </p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs text-muted-foreground">
+              Credit Score: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
+            </p>
+            <CreditImprovementGuide
+              creditScore={creditScore}
+              mortgageCount={ownedPropertiesCount}
+              monthsPlayed={monthsPlayed}
+              totalDebt={totalDebt}
+              cash={cash}
+            />
+          </div>
         </CardContent>
       </Card>
 

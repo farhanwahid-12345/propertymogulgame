@@ -80,7 +80,7 @@ interface GameState {
   propertyListings: PropertyListing[];
 }
 
-const INITIAL_CASH = 100000; // £100K starting cash
+const INITIAL_CASH = 1000000; // £1M starting cash
 const EXPERIENCE_BASE = 1000;
 const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
 const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
@@ -591,7 +591,7 @@ export function useGameState() {
         const totalExpenses = mortgagePayments + propertyTax + maintenance;
         const netIncome = monthlyIncome - totalExpenses;
         
-        // Update mortgage balances and check for payoffs
+        // Update mortgage balances, check for payoffs, and improve credit score
         const updatedMortgages = prev.mortgages.map(mortgage => {
           const interest = mortgage.remainingBalance * (mortgage.interestRate / 12);
           let principal = 0;
@@ -609,6 +609,12 @@ export function useGameState() {
           };
         });
 
+        // Improve credit score for consistent payments and mortgage payoffs
+        let creditScoreImprovement = 0;
+        if (prev.mortgages.length > 0) {
+          creditScoreImprovement += 1; // +1 for each month with mortgage payments
+        }
+
         // Check for paid-off mortgages
         const paidOffMortgages = updatedMortgages.filter(m => 
           prev.mortgages.find(old => old.id === m.id)?.remainingBalance > 0 && m.remainingBalance === 0
@@ -617,9 +623,10 @@ export function useGameState() {
         paidOffMortgages.forEach(mortgage => {
           const property = prev.ownedProperties.find(p => p.id === mortgage.propertyId);
           if (property) {
+            creditScoreImprovement += 15; // +15 credit score for paying off a mortgage
             toast({
               title: "Mortgage Paid Off! 🎉",
-              description: `${property.name} is now fully owned! No more monthly payments of £${mortgage.monthlyPayment.toLocaleString()}.`,
+              description: `${property.name} is now fully owned! No more monthly payments of £${mortgage.monthlyPayment.toLocaleString()}. Credit score improved!`,
             });
           }
         });
@@ -658,7 +665,8 @@ export function useGameState() {
           experienceToNext: newExperienceToNext,
           monthsPlayed: prev.monthsPlayed + 1,
           timeUntilNextMonth: 60, // Reset to 1 minute
-          isBankrupt
+          isBankrupt,
+          creditScore: Math.min(850, prev.creditScore + creditScoreImprovement)
         };
       });
     }, 60000); // Every 1 minute = 1 month
@@ -788,7 +796,7 @@ export function useGameState() {
     
     toast({
       title: "Game Reset",
-      description: "Started fresh with £100K. Good luck building your empire!",
+      description: "Started fresh with £1M. Good luck building your empire!",
     });
   }, []);
 
@@ -1090,6 +1098,49 @@ export function useGameState() {
     return Math.max(400, Math.min(850, Math.floor(score)));
   };
 
+  const handleEstateAgentSale = useCallback((propertyId: string, offer: any) => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+
+      const mortgage = prev.mortgages.find(m => m.propertyId === propertyId);
+      const salePrice = offer.amount;
+      const estateAgentFees = salePrice * ESTATE_AGENT_RATE;
+      const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
+      const netProceeds = salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
+
+      return {
+        ...prev,
+        cash: prev.cash + netProceeds,
+        ownedProperties: prev.ownedProperties.filter(p => p.id !== propertyId),
+        mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
+        tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
+        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId)
+      };
+    });
+  }, []);
+
+  const handleAuctionSale = useCallback((propertyId: string, salePrice: number) => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+
+      const mortgage = prev.mortgages.find(m => m.propertyId === propertyId);
+      const auctionFees = salePrice * 0.02; // 2% auction house commission
+      const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
+      const netProceeds = salePrice - auctionFees - mortgagePayoff;
+
+      return {
+        ...prev,
+        cash: prev.cash + netProceeds,
+        ownedProperties: prev.ownedProperties.filter(p => p.id !== propertyId),
+        mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
+        tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
+        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId)
+      };
+    });
+  }, []);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1106,6 +1157,8 @@ export function useGameState() {
     startRenovation,
     settleMortgage,
     remortgageProperty,
+    handleEstateAgentSale,
+    handleAuctionSale,
     resetGame
   };
 }

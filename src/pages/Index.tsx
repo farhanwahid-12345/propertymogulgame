@@ -6,6 +6,8 @@ import { PropertyCard } from "@/components/ui/property-card";
 import { GameClock } from "@/components/ui/game-clock";
 import { GameStats } from "@/components/ui/game-stats";
 import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
+import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
+import { AuctionHouse } from "@/components/ui/auction-house";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw, Building, Home, Crown } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
@@ -44,7 +46,7 @@ const Index = () => {
           </h1>
           <p className="text-xl max-w-2xl mx-auto">
             Build your real estate empire in Middlesbrough, England. 
-            Start with £100K and become the ultimate property mogul!
+            Start with £1M and become the ultimate property mogul!
           </p>
         </div>
       </div>
@@ -78,6 +80,16 @@ const Index = () => {
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold text-white">Property Market</h2>
           <div className="flex gap-2">
+            <EstateAgentWindow
+              ownedProperties={gameState.ownedProperties}
+              onAcceptOffer={gameState.handleEstateAgentSale}
+              cash={gameState.cash}
+            />
+            <AuctionHouse
+              ownedProperties={gameState.ownedProperties}
+              onAuctionSale={gameState.handleAuctionSale}
+              monthsPlayed={gameState.monthsPlayed}
+            />
             <MortgageSettlement 
               ownedProperties={gameState.ownedProperties}
               mortgages={gameState.mortgages}
