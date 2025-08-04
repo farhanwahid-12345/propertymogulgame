@@ -37,6 +37,8 @@ export function EstateAgentWindow({ ownedProperties, onAcceptOffer, cash }: Esta
   const [offers, setOffers] = useState<PropertyOffer[]>([]);
   const [newListingPrice, setNewListingPrice] = useState("");
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [editingListing, setEditingListing] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState("");
 
   // Generate realistic offers for listed properties
   useEffect(() => {
@@ -137,6 +139,53 @@ export function EstateAgentWindow({ ownedProperties, onAcceptOffer, cash }: Esta
     });
   };
 
+  const handleCancelListing = (propertyId: string) => {
+    setListings(prev => prev.filter(l => l.property.id !== propertyId));
+    
+    // Remove any pending offers for this property
+    setOffers(prev => prev.filter(o => o.propertyId !== propertyId));
+    
+    toast({
+      title: "Listing Cancelled",
+      description: "Property removed from sale.",
+    });
+  };
+
+  const handleUpdatePrice = (propertyId: string) => {
+    const price = parseInt(editPrice);
+    if (isNaN(price) || price <= 0) {
+      toast({
+        title: "Invalid Price",
+        description: "Please enter a valid price.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setListings(prev => prev.map(l => 
+      l.property.id === propertyId ? { ...l, askingPrice: price } : l
+    ));
+    
+    setEditingListing(null);
+    setEditPrice("");
+    
+    toast({
+      title: "Price Updated",
+      description: `New asking price: £${price.toLocaleString()}`,
+    });
+  };
+
+  const setPriceQuickly = (value: number) => {
+    setNewListingPrice(value.toString());
+  };
+
+  const setPriceFromEstimate = (percentage: number) => {
+    if (selectedProperty) {
+      const price = Math.floor(selectedProperty.value * percentage);
+      setNewListingPrice(price.toString());
+    }
+  };
+
   const unlistedProperties = ownedProperties.filter(prop => 
     !listings.some(listing => listing.property.id === prop.id)
   );
@@ -189,14 +238,41 @@ export function EstateAgentWindow({ ownedProperties, onAcceptOffer, cash }: Esta
                 </div>
                 
                 {selectedProperty && (
-                  <div className="grid gap-2">
+                  <div className="grid gap-3">
                     <Label>Asking Price (£)</Label>
+                    
+                    {/* Quick price buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setPriceFromEstimate(0.95)}
+                      >
+                        95% Est.
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setPriceFromEstimate(1.0)}
+                      >
+                        100% Est.
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setPriceFromEstimate(1.05)}
+                      >
+                        105% Est.
+                      </Button>
+                    </div>
+                    
                     <Input
                       type="number"
                       value={newListingPrice}
                       onChange={(e) => setNewListingPrice(e.target.value)}
                       placeholder="Enter asking price"
                     />
+                    
                     <Button onClick={handleListProperty} className="w-full">
                       List Property
                     </Button>
@@ -214,15 +290,67 @@ export function EstateAgentWindow({ ownedProperties, onAcceptOffer, cash }: Esta
                 {listings.map(listing => (
                   <Card key={listing.property.id}>
                     <CardContent className="p-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">{listing.property.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Listed for £{listing.askingPrice.toLocaleString()}
-                          </p>
+                      {editingListing === listing.property.id ? (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="font-medium">{listing.property.name}</p>
+                            <Label>New Price (£)</Label>
+                            <Input
+                              type="number"
+                              value={editPrice}
+                              onChange={(e) => setEditPrice(e.target.value)}
+                              placeholder="Enter new price"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleUpdatePrice(listing.property.id)}
+                            >
+                              Update
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                setEditingListing(null);
+                                setEditPrice("");
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
-                        <Badge variant="outline">For Sale</Badge>
-                      </div>
+                      ) : (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{listing.property.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Listed for £{listing.askingPrice.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">For Sale</Badge>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingListing(listing.property.id);
+                                setEditPrice(listing.askingPrice.toString());
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => handleCancelListing(listing.property.id)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
