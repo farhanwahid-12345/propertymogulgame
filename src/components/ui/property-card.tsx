@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
-import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,13 +28,11 @@ interface PropertyCardProps {
   onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
   onSell?: (property: Property, isAuction?: boolean) => void;
   onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
-  onRenovate?: (propertyId: string, renovation: RenovationType) => void;
   onRemortgage?: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   playerCash?: number;
   creditScore?: number;
   mortgageProviders?: any[];
   currentTenant?: Tenant;
-  activeRenovations?: string[];
   propertyListings?: any[];
   removeTenant?: (propertyId: string) => void;
 }
@@ -57,13 +54,11 @@ export function PropertyCard({
   onBuy, 
   onSell,
   onSelectTenant,
-  onRenovate,
   onRemortgage,
   playerCash = 0, 
   creditScore = 600,
   mortgageProviders = [],
   currentTenant,
-  activeRenovations = [],
   propertyListings = [],
   removeTenant
 }: PropertyCardProps) {
@@ -189,17 +184,6 @@ export function PropertyCard({
                   baseRent={property.monthlyIncome}
                   onSelectTenant={onSelectTenant}
                   currentTenant={currentTenant}
-                />
-              )}
-              
-              {onRenovate && (
-                <RenovationDialog
-                  propertyId={property.id}
-                  propertyValue={property.value}
-                  currentRent={property.monthlyIncome}
-                  playerCash={playerCash}
-                  onRenovate={onRenovate}
-                  activeRenovations={activeRenovations}
                 />
               )}
             </div>

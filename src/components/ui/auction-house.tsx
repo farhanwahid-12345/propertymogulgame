@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Property } from "@/components/ui/property-card";
-import { Gavel, Clock, TrendingUp } from "lucide-react";
+import { Gavel, Clock, TrendingUp, ShoppingCart, Building2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface AuctionListing {
@@ -23,14 +24,25 @@ interface AuctionHouseProps {
   ownedProperties: Property[];
   onAuctionSale: (propertyId: string, salePrice: number) => void;
   monthsPlayed: number;
+  auctionProperties: Property[];
+  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
+  cash: number;
+  mortgageProviders: any[];
+  level: number;
 }
 
-export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed }: AuctionHouseProps) {
+export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auctionProperties, onBuyProperty, cash, mortgageProviders, level }: AuctionHouseProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [listings, setListings] = useState<AuctionListing[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [reservePrice, setReservePrice] = useState("");
   const [guidePrice, setGuidePrice] = useState("");
+  const [activeTab, setActiveTab] = useState("buy");
+
+  // Get properties that aren't already listed
+  const unlistedProperties = ownedProperties.filter(
+    prop => !listings.some(listing => listing.property.id === prop.id)
+  );
 
   // Monthly auction cycle
   useEffect(() => {
@@ -49,29 +61,27 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed }: A
           onAuctionSale(listing.property.id, finalPrice);
           toast({
             title: "Auction Complete!",
-            description: `${listing.property.name} sold for £${finalPrice.toLocaleString()} (${listing.bidderCount} bidders)`,
+            description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
           });
         }, 1000);
         
-        return listing;
+        return null; // Mark for removal
       }
       
-      // Generate realistic bidding activity
-      if (Math.random() < 0.4) { // 40% chance of new bid
-        const bidIncrease = listing.guidePrice * (0.02 + Math.random() * 0.08); // 2-10% increases
+      // Simulate bidding activity
+      if (Math.random() > 0.7) {
+        const bidIncrease = listing.guidePrice * (0.01 + Math.random() * 0.05); // 1-6% increase
         return {
           ...listing,
-          highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice * 0.8),
-          bidderCount: listing.bidderCount + (Math.random() < 0.3 ? 1 : 0)
+          highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
+          bidderCount: listing.bidderCount + 1
         };
       }
       
       return listing;
-    }));
-  }, [monthsPlayed, onAuctionSale]);
+    }).filter(Boolean) as AuctionListing[]);
 
-  // Remove completed auctions
-  useEffect(() => {
+    // Clean up completed auctions
     setListings(prev => prev.filter(listing => listing.auctionDate > Date.now()));
   }, [monthsPlayed]);
 
@@ -99,16 +109,14 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed }: A
       return;
     }
 
-    const auctionDate = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days from now
-
     const newListing: AuctionListing = {
       property: selectedProperty,
       reservePrice: reserve,
       guidePrice: guide,
       listDate: Date.now(),
-      auctionDate,
-      highestBid: guide * 0.7, // Start at 70% of guide price
-      bidderCount: Math.floor(Math.random() * 5) + 2 // 2-6 initial bidders
+      auctionDate: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 days from now
+      highestBid: reserve * 0.8, // Start below reserve
+      bidderCount: Math.floor(Math.random() * 3) + 1
     };
 
     setListings(prev => [...prev, newListing]);
@@ -117,30 +125,31 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed }: A
     setGuidePrice("");
 
     toast({
-      title: "Property Listed for Auction",
-      description: `${selectedProperty.name} will be auctioned in 30 days`,
+      title: "Property Listed!",
+      description: `${selectedProperty.name} has been listed for auction.`,
     });
   };
 
-  const unlistedProperties = ownedProperties.filter(prop => 
-    !listings.some(listing => listing.property.id === prop.id)
-  );
-
-  const formatTimeUntilAuction = (auctionDate: number) => {
-    const timeLeft = auctionDate - Date.now();
-    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const handleBuyAtAuction = (property: Property) => {
+    const bidAmount = property.price; // Use guide price as bid
+    onBuyProperty(property, bidAmount, 0); // Cash purchase for simplicity at auction
+    setIsOpen(false);
     
-    if (days > 0) {
-      return `${days}d ${hours}h`;
-    }
-    return `${hours}h`;
+    toast({
+      title: "Auction Purchase!",
+      description: `You've won ${property.name} for £${bidAmount.toLocaleString()}!`,
+    });
+  };
+
+  const getDaysUntilAuction = (auctionDate: number) => {
+    const timeDiff = auctionDate - Date.now();
+    return Math.max(0, Math.ceil(timeDiff / (24 * 60 * 60 * 1000)));
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+        <Button variant="outline" className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100">
           <Gavel className="h-4 w-4 mr-2" />
           Auction House
         </Button>
@@ -153,134 +162,228 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed }: A
           </DialogTitle>
         </DialogHeader>
         
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* List Property for Auction */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">List Property for Auction</h3>
-            
-            {unlistedProperties.length > 0 ? (
-              <div className="space-y-3">
-                <div className="grid gap-2">
-                  <Label>Select Property</Label>
-                  <select 
-                    className="w-full p-2 border rounded-md"
-                    value={selectedProperty?.id || ""}
-                    onChange={(e) => {
-                      const prop = unlistedProperties.find(p => p.id === e.target.value);
-                      setSelectedProperty(prop || null);
-                      if (prop) {
-                        setGuidePrice(prop.value.toString());
-                        setReservePrice((prop.value * 0.85).toString());
-                      }
-                    }}
-                  >
-                    <option value="">Choose a property...</option>
-                    {unlistedProperties.map(prop => (
-                      <option key={prop.id} value={prop.id}>
-                        {prop.name} (Est. £{prop.value.toLocaleString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                {selectedProperty && (
-                  <div className="space-y-3">
-                    <div className="grid gap-2">
-                      <Label>Guide Price (£)</Label>
-                      <Input
-                        type="number"
-                        value={guidePrice}
-                        onChange={(e) => setGuidePrice(e.target.value)}
-                        placeholder="Expected selling price"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        This is the expected selling price shown to bidders
-                      </p>
-                    </div>
-                    
-                    <div className="grid gap-2">
-                      <Label>Reserve Price (£)</Label>
-                      <Input
-                        type="number"
-                        value={reservePrice}
-                        onChange={(e) => setReservePrice(e.target.value)}
-                        placeholder="Minimum acceptable price"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Minimum price you'll accept (not shown to bidders)
-                      </p>
-                    </div>
-                    
-                    <Button onClick={handleListForAuction} className="w-full">
-                      List for Auction
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No properties available for auction</p>
-            )}
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="buy" className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Buy Properties
+            </TabsTrigger>
+            <TabsTrigger value="sell" className="flex items-center gap-2">
+              <Gavel className="h-4 w-4" />
+              List for Auction
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Current Auction Listings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Your Auction Listings</h3>
-            
-            {listings.length > 0 ? (
-              <div className="space-y-3">
-                {listings.map(listing => (
-                  <Card key={listing.property.id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{listing.property.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+          <TabsContent value="buy" className="space-y-4">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Gavel className="h-5 w-5" />
+                Available Auction Properties
+              </h3>
+              <div className="grid gap-4">
+                {auctionProperties.map((property) => (
+                  <Card key={property.id} className="border-orange-200">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="font-medium">Guide Price</p>
-                          <p className="text-muted-foreground">£{listing.guidePrice.toLocaleString()}</p>
+                          <h4 className="font-semibold">{property.name}</h4>
+                          <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                          <Badge variant="outline" className="mt-1">
+                            {property.type}
+                          </Badge>
                         </div>
-                        <div>
-                          <p className="font-medium">Current Bid</p>
-                          <p className="text-primary font-bold">£{listing.highestBid.toLocaleString()}</p>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">
+                            £{property.price.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Guide Price
+                          </p>
                         </div>
                       </div>
                       
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{formatTimeUntilAuction(listing.auctionDate)}</span>
+                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                        <div>
+                          <span className="text-muted-foreground">Reserve:</span>
+                          <span className="ml-1 font-medium">
+                            £{Math.floor(property.price * 0.85).toLocaleString()}
+                          </span>
                         </div>
-                        <Badge variant="outline">
-                          {listing.bidderCount} bidders
-                        </Badge>
+                        <div>
+                          <span className="text-muted-foreground">Monthly Income:</span>
+                          <span className="ml-1 font-medium">
+                            £{property.monthlyIncome.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <TrendingUp className="h-4 w-4 text-success" />
-                        <span className={listing.highestBid >= listing.reservePrice ? "text-success" : "text-warning"}>
-                          {listing.highestBid >= listing.reservePrice ? "Reserve met" : "Below reserve"}
-                        </span>
-                      </div>
+
+                      <Button 
+                        className="w-full bg-orange-600 hover:bg-orange-700"
+                        onClick={() => handleBuyAtAuction(property)}
+                        disabled={cash < property.price}
+                      >
+                        {cash < property.price ? "Insufficient Funds" : "Bid at Guide Price"}
+                      </Button>
                     </CardContent>
                   </Card>
                 ))}
+                {auctionProperties.length === 0 && (
+                  <Card className="border-dashed">
+                    <CardContent className="p-8 text-center text-muted-foreground">
+                      <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No properties available for auction at the moment.</p>
+                      <p className="text-sm">Check back next month!</p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-            ) : (
-              <p className="text-muted-foreground">No properties currently listed for auction</p>
-            )}
-          </div>
-        </div>
+            </div>
+          </TabsContent>
 
-        <div className="mt-6 p-4 bg-muted rounded-lg">
-          <h4 className="font-medium mb-2">How Auctions Work</h4>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• Auctions run monthly with properties listed 30 days in advance</li>
-            <li>• Guide price is shown to bidders, reserve price is confidential</li>
-            <li>• Bidding activity increases as auction date approaches</li>
-            <li>• Properties sell for the highest bid above reserve price</li>
-            <li>• No estate agent fees, but 2% auction house commission applies</li>
-          </ul>
-        </div>
+          <TabsContent value="sell" className="space-y-4">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* List Property for Auction */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">List Property for Auction</h3>
+                
+                {unlistedProperties.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-2">
+                      <Label>Select Property</Label>
+                      <select 
+                        className="w-full p-2 border rounded-md"
+                        value={selectedProperty?.id || ""}
+                        onChange={(e) => {
+                          const prop = unlistedProperties.find(p => p.id === e.target.value);
+                          setSelectedProperty(prop || null);
+                          if (prop) {
+                            setGuidePrice(prop.value.toString());
+                            setReservePrice((prop.value * 0.85).toString());
+                          }
+                        }}
+                      >
+                        <option value="">Choose a property...</option>
+                        {unlistedProperties.map(prop => (
+                          <option key={prop.id} value={prop.id}>
+                            {prop.name} (Est. £{prop.value.toLocaleString()})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {selectedProperty && (
+                      <div className="space-y-3">
+                        <div className="grid gap-2">
+                          <Label>Guide Price (£)</Label>
+                          <Input
+                            type="number"
+                            value={guidePrice}
+                            onChange={(e) => setGuidePrice(e.target.value)}
+                            placeholder="Expected selling price"
+                          />
+                        </div>
+                        
+                        <div className="grid gap-2">
+                          <Label>Reserve Price (£)</Label>
+                          <Input
+                            type="number"
+                            value={reservePrice}
+                            onChange={(e) => setReservePrice(e.target.value)}
+                            placeholder="Minimum acceptable price"
+                          />
+                        </div>
+                        
+                        <Button 
+                          onClick={handleListForAuction}
+                          className="w-full bg-orange-600 hover:bg-orange-700"
+                        >
+                          List for Auction
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No properties available to list.</p>
+                    <p className="text-sm">Buy some properties first or your current properties may already be listed.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Current Auction Listings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Your Auction Listings</h3>
+                
+                {listings.length > 0 ? (
+                  <div className="space-y-3">
+                    {listings.map((listing) => {
+                      const daysUntilAuction = getDaysUntilAuction(listing.auctionDate);
+                      const isActive = daysUntilAuction > 0;
+                      
+                      return (
+                        <Card key={listing.property.id} className={`${isActive ? 'border-orange-200' : 'border-green-200'}`}>
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-medium">{listing.property.name}</h4>
+                                <p className="text-sm text-muted-foreground">{listing.property.neighborhood}</p>
+                              </div>
+                              <Badge variant={isActive ? "secondary" : "default"}>
+                                {isActive ? (
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {daysUntilAuction} days
+                                  </div>
+                                ) : (
+                                  "Sold"
+                                )}
+                              </Badge>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Guide:</span>
+                                <span className="ml-1">£{listing.guidePrice.toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Reserve:</span>
+                                <span className="ml-1">£{listing.reservePrice.toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Current Bid:</span>
+                                <span className="ml-1 font-medium text-green-600">
+                                  £{listing.highestBid.toLocaleString()}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Bidders:</span>
+                                <span className="ml-1">{listing.bidderCount}</span>
+                              </div>
+                            </div>
+                            
+                            {listing.highestBid >= listing.reservePrice && (
+                              <div className="mt-2 flex items-center text-green-600 text-sm">
+                                <TrendingUp className="h-4 w-4 mr-1" />
+                                Reserve met!
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No active auction listings.</p>
+                    <p className="text-sm">List a property to get started.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

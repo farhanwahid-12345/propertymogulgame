@@ -9,26 +9,12 @@ import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { useGameState } from "@/hooks/useGameState";
-import { RotateCcw, Building, Home, Crown } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 
 const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
-
-  const handleEstateAgentBuy = (property: any, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => {
-    gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType);
-  };
-
-  const filteredProperties = (type?: string) => {
-    let properties = type ? gameState.availableProperties.filter(p => p.type === type) : gameState.availableProperties;
-    // Sort by yield (monthly income / price * 12 * 100 for percentage)
-    return properties.sort((a, b) => {
-      const yieldA = (a.monthlyIncome / a.price) * 12 * 100;
-      const yieldB = (b.monthlyIncome / b.price) * 12 * 100;
-      return yieldB - yieldA;
-    });
-  };
 
   const sortedOwnedProperties = gameState.ownedProperties.sort((a, b) => {
     const yieldA = (a.monthlyIncome / a.value) * 12 * 100;
@@ -89,7 +75,9 @@ const Index = () => {
               onAcceptOffer={gameState.handleEstateAgentSale}
               cash={gameState.cash}
               availableProperties={gameState.availableProperties}
-              onBuyProperty={handleEstateAgentBuy}
+              onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
+                gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
+              }
               getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
               getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
               getMaxPropertyValue={gameState.getMaxPropertyValue}
@@ -100,6 +88,13 @@ const Index = () => {
               ownedProperties={gameState.ownedProperties}
               onAuctionSale={gameState.handleAuctionSale}
               monthsPlayed={gameState.monthsPlayed}
+              auctionProperties={gameState.auctionProperties}
+              onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
+                gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
+              }
+              cash={gameState.cash}
+              mortgageProviders={gameState.mortgageProviders}
+              level={gameState.level}
             />
             <MortgageSettlement 
               ownedProperties={gameState.ownedProperties}
@@ -118,94 +113,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Property Market */}
-        <Card className="bg-white/95 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl">Available Properties</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="market">
-                  <Building className="h-4 w-4 mr-2" />
-                  All Properties
-                </TabsTrigger>
-                <TabsTrigger value="residential">
-                  <Home className="h-4 w-4 mr-2" />
-                  Residential
-                </TabsTrigger>
-                <TabsTrigger value="commercial">
-                  <Building className="h-4 w-4 mr-2" />
-                  Commercial
-                </TabsTrigger>
-                <TabsTrigger value="luxury">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Luxury
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="market" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProperties().map((property) => (
-                     <PropertyCard
-                       key={property.id}
-                       property={property}
-                       onBuy={gameState.buyProperty}
-                       playerCash={gameState.cash}
-                       creditScore={gameState.creditScore}
-                       mortgageProviders={gameState.mortgageProviders}
-                     />
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="residential" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProperties("residential").map((property) => (
-                     <PropertyCard
-                       key={property.id}
-                       property={property}
-                       onBuy={gameState.buyProperty}
-                       playerCash={gameState.cash}
-                       creditScore={gameState.creditScore}
-                       mortgageProviders={gameState.mortgageProviders}
-                     />
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="commercial" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProperties("commercial").map((property) => (
-                     <PropertyCard
-                       key={property.id}
-                       property={property}
-                       onBuy={gameState.buyProperty}
-                       playerCash={gameState.cash}
-                       creditScore={gameState.creditScore}
-                       mortgageProviders={gameState.mortgageProviders}
-                     />
-                  ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="luxury" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProperties("luxury").map((property) => (
-                     <PropertyCard
-                       key={property.id}
-                       property={property}
-                       onBuy={gameState.buyProperty}
-                       playerCash={gameState.cash}
-                       creditScore={gameState.creditScore}
-                       mortgageProviders={gameState.mortgageProviders}
-                     />
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
 
         {/* Player Portfolio */}
         {gameState.ownedProperties.length > 0 && (
@@ -221,10 +128,8 @@ const Index = () => {
                      property={property}
                      onSell={gameState.sellProperty}
                      onSelectTenant={gameState.selectTenant}
-                     onRenovate={gameState.startRenovation}
                      playerCash={gameState.cash}
                      currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
-                     activeRenovations={gameState.renovations.filter(r => r.propertyId === property.id && r.completionDate > Date.now()).map(r => r.type.id)}
                    />
                 ))}
               </div>

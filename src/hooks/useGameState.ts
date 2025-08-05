@@ -407,7 +407,23 @@ export function useGameState() {
     };
   });
 
-  const [availableProperties, setAvailableProperties] = useState<Property[]>(AVAILABLE_PROPERTIES);
+  const [availableProperties, setAvailableProperties] = useState<Property[]>([]);
+  const [estateAgentProperties, setEstateAgentProperties] = useState<Property[]>([]);
+  const [auctionProperties, setAuctionProperties] = useState<Property[]>([]);
+
+  // Split properties between estate agent and auction on first load
+  useEffect(() => {
+    const splitProperties = () => {
+      const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
+      const midpoint = Math.floor(shuffled.length / 2);
+      setEstateAgentProperties(shuffled.slice(0, midpoint));
+      setAuctionProperties(shuffled.slice(midpoint));
+    };
+    
+    if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
+      splitProperties();
+    }
+  }, []);
 
   // Save to localStorage whenever game state changes
   useEffect(() => {
@@ -545,7 +561,22 @@ export function useGameState() {
         };
       });
 
-      setAvailableProperties(prev => 
+      setEstateAgentProperties(prev => 
+        prev.map(property => ({
+          ...property,
+          price: Math.max(
+            property.price * 0.8, // Minimum 80% of original price  
+            property.price * (0.985 + Math.random() * 0.03) // -1.5% to +1.5% change
+          ),
+          value: Math.max(
+            property.price * 0.8,
+            property.value * (0.985 + Math.random() * 0.03)
+          ),
+          marketTrend: Math.random() > 0.7 ? (Math.random() > 0.5 ? "up" : "down") : "stable"
+        }))
+      );
+
+      setAuctionProperties(prev => 
         prev.map(property => ({
           ...property,
           price: Math.max(
@@ -794,7 +825,8 @@ export function useGameState() {
       };
     });
 
-    setAvailableProperties(prev => prev.filter(p => p.id !== property.id));
+    setEstateAgentProperties(prev => prev.filter(p => p.id !== property.id));
+    setAuctionProperties(prev => prev.filter(p => p.id !== property.id));
   }, []);
 
   const sellProperty = useCallback((property: Property, isAuction: boolean = false) => {
@@ -840,7 +872,10 @@ export function useGameState() {
       propertyListings: []
     };
     setGameState(newState);
-    setAvailableProperties(AVAILABLE_PROPERTIES);
+    const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
+    const midpoint = Math.floor(shuffled.length / 2);
+    setEstateAgentProperties(shuffled.slice(0, midpoint));
+    setAuctionProperties(shuffled.slice(midpoint));
     localStorage.removeItem("propertyTycoonSave");
     
     toast({
@@ -1198,7 +1233,9 @@ export function useGameState() {
     totalDebt,
     creditScore: calculateCreditScore(),
     mortgageProviders: MORTGAGE_PROVIDERS,
-    availableProperties,
+    availableProperties: estateAgentProperties,
+    estateAgentProperties,
+    auctionProperties,
     getMaxPropertiesForLevel,
     getAvailablePropertyTypes,
     getMaxPropertyValue,
