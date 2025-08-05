@@ -345,6 +345,23 @@ const AVAILABLE_PROPERTIES: Property[] = [
   }
 ];
 
+const getMaxPropertiesForLevel = (level: number) => 10;
+
+const getAvailablePropertyTypes = (level: number) => {
+  if (level >= 5) return ['all'];
+  if (level >= 4) return ['residential', 'commercial', 'luxury'];
+  if (level >= 3) return ['residential', 'commercial'];
+  return ['residential'];
+};
+
+const getMaxPropertyValue = (level: number) => {
+  if (level >= 5) return Infinity;
+  if (level >= 4) return 2000000;
+  if (level >= 3) return 1000000;
+  if (level >= 2) return 500000;
+  return 300000;
+};
+
 export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(() => {
     const saved = localStorage.getItem("propertyTycoonSave");
@@ -680,6 +697,38 @@ export function useGameState() {
         toast({
           title: "Bankrupt",
           description: "You cannot purchase properties while bankrupt!",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      // Check property limit
+      if (prev.ownedProperties.length >= getMaxPropertiesForLevel(prev.level)) {
+        toast({
+          title: "Property Limit Reached",
+          description: `You can only own ${getMaxPropertiesForLevel(prev.level)} properties at level ${prev.level}!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      // Check level restrictions
+      const allowedTypes = getAvailablePropertyTypes(prev.level);
+      const maxValue = getMaxPropertyValue(prev.level);
+      
+      if (!allowedTypes.includes('all') && !allowedTypes.includes(property.type)) {
+        toast({
+          title: "Level Restriction",
+          description: `You need level ${property.type === 'commercial' ? 3 : property.type === 'luxury' ? 4 : 1} to buy ${property.type} properties!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      if (property.price > maxValue) {
+        toast({
+          title: "Level Restriction", 
+          description: `You can only buy properties up to £${maxValue.toLocaleString()} at level ${prev.level}!`,
           variant: "destructive"
         });
         return prev;
@@ -1150,6 +1199,9 @@ export function useGameState() {
     creditScore: calculateCreditScore(),
     mortgageProviders: MORTGAGE_PROVIDERS,
     availableProperties,
+    getMaxPropertiesForLevel,
+    getAvailablePropertyTypes,
+    getMaxPropertyValue,
     buyProperty,
     sellProperty,
     selectTenant,
