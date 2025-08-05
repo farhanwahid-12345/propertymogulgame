@@ -16,6 +16,10 @@ const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
+  const handleEstateAgentBuy = (property: any, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => {
+    gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType);
+  };
+
   const filteredProperties = (type?: string) => {
     let properties = type ? gameState.availableProperties.filter(p => p.type === type) : gameState.availableProperties;
     // Sort by yield (monthly income / price * 12 * 100 for percentage)
@@ -84,6 +88,13 @@ const Index = () => {
               ownedProperties={gameState.ownedProperties}
               onAcceptOffer={gameState.handleEstateAgentSale}
               cash={gameState.cash}
+              availableProperties={gameState.availableProperties}
+              onBuyProperty={handleEstateAgentBuy}
+              getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
+              getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
+              getMaxPropertyValue={gameState.getMaxPropertyValue}
+              level={gameState.level}
+              mortgageProviders={gameState.mortgageProviders}
             />
             <AuctionHouse
               ownedProperties={gameState.ownedProperties}
