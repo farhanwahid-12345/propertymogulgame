@@ -78,6 +78,8 @@ interface GameState {
   tenantEvents: TenantEvent[];
   voidPeriods: VoidPeriod[];
   propertyListings: PropertyListing[];
+  overdraftLimit: number;
+  overdraftUsed: number;
 }
 
 const INITIAL_CASH = 1000000; // £1M starting cash
@@ -384,7 +386,9 @@ export function useGameState() {
       currentMarketRate: parsedState.currentMarketRate || BASE_MARKET_RATE,
       tenantEvents: parsedState.tenantEvents || [],
       voidPeriods: parsedState.voidPeriods || [],
-      propertyListings: parsedState.propertyListings || []
+      propertyListings: parsedState.propertyListings || [],
+      overdraftLimit: parsedState.overdraftLimit || 0,
+      overdraftUsed: parsedState.overdraftUsed || 0,
     };
     }
     return {
@@ -403,7 +407,9 @@ export function useGameState() {
       currentMarketRate: BASE_MARKET_RATE,
       tenantEvents: [],
       voidPeriods: [],
-      propertyListings: []
+      propertyListings: [],
+      overdraftLimit: 0,
+      overdraftUsed: 0,
     };
   });
 
@@ -869,7 +875,9 @@ export function useGameState() {
       currentMarketRate: BASE_MARKET_RATE,
       tenantEvents: [],
       voidPeriods: [],
-      propertyListings: []
+      propertyListings: [],
+      overdraftLimit: 0,
+      overdraftUsed: 0,
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1225,6 +1233,82 @@ export function useGameState() {
     });
   }, []);
 
+  // Mortgage refinancing
+  const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      const existingMortgage = prev.mortgages.find(m => m.propertyId === propertyId);
+      
+      if (!property) return prev;
+
+      const currentMortgage = existingMortgage?.remainingBalance || 0;
+      const cashFromRefinance = newLoanAmount - currentMortgage;
+      
+      const updatedProperties = prev.ownedProperties.map(p => 
+        p.id === propertyId ? { ...p, mortgageRemaining: newLoanAmount } : p
+      );
+
+      const updatedMortgages = existingMortgage 
+        ? prev.mortgages.map(m => m.propertyId === propertyId 
+            ? { ...m, remainingBalance: newLoanAmount, providerId, termYears, mortgageType }
+            : m)
+        : prev.mortgages;
+
+      return {
+        ...prev,
+        cash: prev.cash + Math.max(0, cashFromRefinance),
+        ownedProperties: updatedProperties,
+        mortgages: updatedMortgages
+      };
+    });
+  }, []);
+
+  // Portfolio mortgage
+  const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
+    setGameState(prev => {
+      const totalCurrentMortgages = selectedPropertyIds.reduce((total, id) => {
+        const mortgage = prev.mortgages.find(m => m.propertyId === id);
+        return total + (mortgage?.remainingBalance || 0);
+      }, 0);
+      
+      const cashFromMortgage = loanAmount - totalCurrentMortgages;
+      
+      const updatedProperties = prev.ownedProperties.map(property => 
+        selectedPropertyIds.includes(property.id) 
+          ? { ...property, mortgageRemaining: loanAmount / selectedPropertyIds.length }
+          : property
+      );
+
+      return {
+        ...prev,
+        cash: prev.cash + Math.max(0, cashFromMortgage),
+        ownedProperties: updatedProperties
+      };
+    });
+  }, []);
+
+  // Overdraft functions
+  const handleApplyOverdraft = useCallback((requestedLimit: number) => {
+    setGameState(prev => ({
+      ...prev,
+      overdraftLimit: requestedLimit
+    }));
+  }, []);
+
+  const setCash = useCallback((newCash: number) => {
+    setGameState(prev => ({
+      ...prev,
+      cash: newCash
+    }));
+  }, []);
+
+  const setOverdraftUsed = useCallback((used: number) => {
+    setGameState(prev => ({
+      ...prev,
+      overdraftUsed: used
+    }));
+  }, []);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1248,6 +1332,11 @@ export function useGameState() {
     remortgageProperty,
     handleEstateAgentSale,
     handleAuctionSale,
+    handleRefinance,
+    handlePortfolioMortgage,
+    handleApplyOverdraft,
+    setCash,
+    setOverdraftUsed,
     resetGame
   };
 }

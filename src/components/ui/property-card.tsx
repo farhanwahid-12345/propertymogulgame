@@ -21,6 +21,7 @@ export interface Property {
   image: string;
   owned?: boolean;
   marketTrend: "up" | "down" | "stable";
+  mortgageRemaining?: number; // For refinancing purposes
 }
 
 interface PropertyCardProps {

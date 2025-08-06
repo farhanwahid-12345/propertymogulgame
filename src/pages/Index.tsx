@@ -6,6 +6,9 @@ import { PropertyCard } from "@/components/ui/property-card";
 import { GameClock } from "@/components/ui/game-clock";
 import { GameStats } from "@/components/ui/game-stats";
 import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
+import { MortgageRefinance } from "@/components/ui/mortgage-refinance";
+import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
+import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { useGameState } from "@/hooks/useGameState";
@@ -101,6 +104,31 @@ const Index = () => {
               mortgages={gameState.mortgages}
               cash={gameState.cash}
               onSettleMortgage={gameState.settleMortgage}
+            />
+            <MortgageRefinance
+              ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
+              mortgageProviders={gameState.mortgageProviders}
+              onRefinance={gameState.handleRefinance}
+              cash={gameState.cash}
+              setCash={gameState.setCash}
+            />
+            <PortfolioMortgage
+              ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
+              mortgageProviders={gameState.mortgageProviders}
+              onPortfolioMortgage={gameState.handlePortfolioMortgage}
+              cash={gameState.cash}
+              setCash={gameState.setCash}
+            />
+            <CreditOverdraft
+              creditScore={gameState.creditScore}
+              overdraftLimit={gameState.overdraftLimit}
+              overdraftUsed={gameState.overdraftUsed}
+              cash={gameState.cash}
+              setCash={gameState.setCash}
+              setOverdraftUsed={gameState.setOverdraftUsed}
+              onApplyOverdraft={gameState.handleApplyOverdraft}
+              monthlyIncome={gameState.totalMonthlyIncome}
+              totalMortgagePayments={gameState.totalMonthlyExpenses}
             />
             <Button 
               variant="outline" 
