@@ -437,8 +437,20 @@ export function EstateAgentWindow({
                     </div>
                     
                     {selectedProperty && (
-                      <div className="grid gap-3">
-                        <Label>Asking Price (£)</Label>
+                      <div className="space-y-3">
+                        <Label>Asking Price: £{parseInt(newListingPrice || "0").toLocaleString()}</Label>
+                        <Slider
+                          value={[parseInt(newListingPrice || "0")]}
+                          onValueChange={(value) => setNewListingPrice(value[0].toString())}
+                          min={selectedProperty ? selectedProperty.value * 0.8 : 0}
+                          max={selectedProperty ? selectedProperty.value * 1.3 : 1000000}
+                          step={1000}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>80% (£{selectedProperty ? Math.floor(selectedProperty.value * 0.8).toLocaleString() : "0"})</span>
+                          <span>130% (£{selectedProperty ? Math.floor(selectedProperty.value * 1.3).toLocaleString() : "0"})</span>
+                        </div>
                         
                         {/* Quick price buttons */}
                         <div className="grid grid-cols-3 gap-2">
@@ -464,13 +476,6 @@ export function EstateAgentWindow({
                             105% Est.
                           </Button>
                         </div>
-                        
-                        <Input
-                          type="number"
-                          value={newListingPrice}
-                          onChange={(e) => setNewListingPrice(e.target.value)}
-                          placeholder="Enter asking price"
-                        />
                         
                         <Button onClick={handleListProperty} className="w-full">
                           List Property

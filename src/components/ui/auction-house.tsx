@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
 import { Property } from "@/components/ui/property-card";
 import { Gavel, Clock, TrendingUp, ShoppingCart, Building2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -38,6 +39,10 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [reservePrice, setReservePrice] = useState("");
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
+  
+  // Bidding state
+  const [selectedBidProperty, setSelectedBidProperty] = useState<Property | null>(null);
+  const [bidAmount, setBidAmount] = useState<number[]>([0]);
 
   // Get properties that aren't already listed
   const unlistedProperties = ownedProperties.filter(
@@ -130,14 +135,19 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     });
   };
 
-  const handleBuyAtAuction = (property: Property) => {
-    const bidAmount = property.price; // Use guide price as bid
-    onBuyProperty(property, bidAmount, 0); // Cash purchase for simplicity at auction
-    setIsOpen(false);
+  const handleBuyAtAuction = () => {
+    if (!selectedBidProperty) return;
+    
+    const finalBidAmount = bidAmount[0];
+    onBuyProperty(selectedBidProperty, finalBidAmount, 0); // Cash purchase for simplicity at auction
+    
+    // Remove from available properties
+    setSelectedBidProperty(null);
+    setBidAmount([0]);
     
     toast({
       title: "Auction Purchase!",
-      description: `You've won ${property.name} for £${bidAmount.toLocaleString()}!`,
+      description: `You've won ${selectedBidProperty.name} for £${finalBidAmount.toLocaleString()}!`,
     });
   };
 
@@ -175,66 +185,125 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Gavel className="h-5 w-5" />
-                Available Auction Properties
-              </h3>
-              <div className="grid gap-4">
-                {auctionProperties.map((property) => (
-                  <Card key={property.id} className="border-orange-200">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold">{property.name}</h4>
-                          <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                          <Badge variant="outline" className="mt-1">
-                            {property.type}
-                          </Badge>
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Available Properties */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Gavel className="h-5 w-5" />
+                  Available Auction Properties
+                </h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {auctionProperties.map((property) => (
+                    <Card 
+                      key={property.id} 
+                      className={`cursor-pointer transition-colors border-orange-200 ${
+                        selectedBidProperty?.id === property.id ? 'ring-2 ring-orange-500' : ''
+                      }`}
+                      onClick={() => {
+                        setSelectedBidProperty(property);
+                        setBidAmount([property.price]);
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h4 className="font-semibold">{property.name}</h4>
+                            <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                            <Badge variant="outline" className="mt-1">
+                              {property.type}
+                            </Badge>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-orange-600">
+                              £{property.price.toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Guide Price
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-orange-600">
-                            £{property.price.toLocaleString()}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Guide Price
-                          </p>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Reserve:</span>
+                            <span className="ml-1 font-medium">
+                              £{Math.floor(property.price * 0.85).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Monthly Income:</span>
+                            <span className="ml-1 font-medium">
+                              £{property.monthlyIncome.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {auctionProperties.length === 0 && (
+                    <Card className="border-dashed">
+                      <CardContent className="p-8 text-center text-muted-foreground">
+                        <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No properties available for auction at the moment.</p>
+                        <p className="text-sm">Check back next month!</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+              
+              {/* Bidding Panel */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Place Your Bid</h3>
+                
+                {selectedBidProperty ? (
+                  <div className="space-y-4">
+                    <Card className="border-orange-200">
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold">{selectedBidProperty.name}</h4>
+                        <p className="text-sm text-muted-foreground">{selectedBidProperty.neighborhood}</p>
+                        <p className="text-sm">Guide: £{selectedBidProperty.price.toLocaleString()}</p>
+                        <p className="text-sm">Reserve: £{Math.floor(selectedBidProperty.price * 0.85).toLocaleString()}</p>
+                      </CardContent>
+                    </Card>
+                    
+                    <div className="space-y-3">
+                      <Label>Your Bid: £{bidAmount[0].toLocaleString()}</Label>
+                      <Slider
+                        value={bidAmount}
+                        onValueChange={setBidAmount}
+                        min={Math.floor(selectedBidProperty.price * 0.7)}
+                        max={Math.floor(selectedBidProperty.price * 1.5)}
+                        step={1000}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>70% (£{Math.floor(selectedBidProperty.price * 0.7).toLocaleString()})</span>
+                        <span>150% (£{Math.floor(selectedBidProperty.price * 1.5).toLocaleString()})</span>
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                        <div>
-                          <span className="text-muted-foreground">Reserve:</span>
-                          <span className="ml-1 font-medium">
-                            £{Math.floor(property.price * 0.85).toLocaleString()}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Monthly Income:</span>
-                          <span className="ml-1 font-medium">
-                            £{property.monthlyIncome.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      <Button 
-                        className="w-full bg-orange-600 hover:bg-orange-700"
-                        onClick={() => handleBuyAtAuction(property)}
-                        disabled={cash < property.price}
-                      >
-                        {cash < property.price ? "Insufficient Funds" : "Bid at Guide Price"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-                {auctionProperties.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No properties available for auction at the moment.</p>
-                      <p className="text-sm">Check back next month!</p>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    
+                    <div className="text-sm p-3 bg-orange-50 rounded-md border border-orange-200">
+                      <p className="font-medium text-orange-800">Auction Terms:</p>
+                      <ul className="text-orange-700 mt-1 space-y-1">
+                        <li>• Cash purchase only</li>
+                        <li>• Bid must meet reserve price</li>
+                        <li>• Sale completes immediately</li>
+                      </ul>
+                    </div>
+                    
+                    <Button 
+                      className="w-full bg-orange-600 hover:bg-orange-700"
+                      onClick={handleBuyAtAuction}
+                      disabled={cash < bidAmount[0] || bidAmount[0] < Math.floor(selectedBidProperty.price * 0.85)}
+                    >
+                      {cash < bidAmount[0] ? "Insufficient Funds" : 
+                       bidAmount[0] < Math.floor(selectedBidProperty.price * 0.85) ? "Below Reserve Price" :
+                       `Submit Bid: £${bidAmount[0].toLocaleString()}`}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Select a property to place your bid</p>
                 )}
               </div>
             </div>
@@ -273,24 +342,36 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     
                     {selectedProperty && (
                       <div className="space-y-3">
-                        <div className="grid gap-2">
-                          <Label>Guide Price (£)</Label>
-                          <Input
-                            type="number"
-                            value={guidePrice}
-                            onChange={(e) => setGuidePrice(e.target.value)}
-                            placeholder="Expected selling price"
+                        <div className="space-y-3">
+                          <Label>Guide Price: £{parseInt(guidePrice || "0").toLocaleString()}</Label>
+                          <Slider
+                            value={[parseInt(guidePrice || "0")]}
+                            onValueChange={(value) => setGuidePrice(value[0].toString())}
+                            min={selectedProperty ? selectedProperty.value * 0.8 : 0}
+                            max={selectedProperty ? selectedProperty.value * 1.3 : 1000000}
+                            step={1000}
+                            className="w-full"
                           />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>80%</span>
+                            <span>130%</span>
+                          </div>
                         </div>
                         
-                        <div className="grid gap-2">
-                          <Label>Reserve Price (£)</Label>
-                          <Input
-                            type="number"
-                            value={reservePrice}
-                            onChange={(e) => setReservePrice(e.target.value)}
-                            placeholder="Minimum acceptable price"
+                        <div className="space-y-3">
+                          <Label>Reserve Price: £{parseInt(reservePrice || "0").toLocaleString()}</Label>
+                          <Slider
+                            value={[parseInt(reservePrice || "0")]}
+                            onValueChange={(value) => setReservePrice(value[0].toString())}
+                            min={selectedProperty ? selectedProperty.value * 0.6 : 0}
+                            max={parseInt(guidePrice || "0") || (selectedProperty ? selectedProperty.value : 1000000)}
+                            step={1000}
+                            className="w-full"
                           />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>60%</span>
+                            <span>Guide Price</span>
+                          </div>
                         </div>
                         
                         <Button 
