@@ -21,6 +21,17 @@ interface AuctionListing {
   bidderCount: number;
 }
 
+interface LiveAuction {
+  property: Property;
+  reservePrice: number;
+  currentBid: number;
+  bidderCount: number;
+  timeRemaining: number;
+  isActive: boolean;
+  bidHistory: { bidder: string; amount: number; timestamp: number; isUser?: boolean }[];
+  lastBidTime: number;
+}
+
 interface AuctionHouseProps {
   ownedProperties: Property[];
   onAuctionSale: (propertyId: string, salePrice: number) => void;
@@ -40,26 +51,99 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
   
-  // Bidding state
-  const [selectedBidProperty, setSelectedBidProperty] = useState<Property | null>(null);
-  const [bidAmount, setBidAmount] = useState<number[]>([0]);
+  // Live auction state
+  const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
+  const [userBidAmount, setUserBidAmount] = useState<number[]>([0]);
+  const [auctioneerMessage, setAuctioneerMessage] = useState("");
 
   // Get properties that aren't already listed
   const unlistedProperties = ownedProperties.filter(
     prop => !listings.some(listing => listing.property.id === prop.id)
   );
 
-  // Monthly auction cycle
+  // Live auction timer and AI bidders
   useEffect(() => {
-    // Check if it's auction month (every month)
-    const auctionTime = Date.now() + (7 * 24 * 60 * 60 * 1000); // Auction in 7 days
-    
-    // Update existing listings with bids
+    if (!liveAuction || !liveAuction.isActive) return;
+
+    const interval = setInterval(() => {
+      setLiveAuction(prev => {
+        if (!prev || !prev.isActive) return prev;
+
+        const newTimeRemaining = Math.max(0, prev.timeRemaining - 1);
+        
+        // Auction ended
+        if (newTimeRemaining === 0) {
+          if (prev.currentBid >= prev.reservePrice) {
+            const isUserWinner = prev.bidHistory[prev.bidHistory.length - 1]?.isUser;
+            
+            if (isUserWinner) {
+              onBuyProperty(prev.property, prev.currentBid, 0);
+              toast({
+                title: "Auction Won!",
+                description: `Congratulations! You won ${prev.property.name} for £${prev.currentBid.toLocaleString()}!`,
+              });
+            } else {
+              toast({
+                title: "Auction Lost",
+                description: `${prev.property.name} sold to another bidder for £${prev.currentBid.toLocaleString()}`,
+                variant: "destructive"
+              });
+            }
+          } else {
+            toast({
+              title: "Auction Failed",
+              description: `${prev.property.name} failed to meet reserve price of £${prev.reservePrice.toLocaleString()}`,
+              variant: "destructive"
+            });
+          }
+          
+          setAuctioneerMessage("Auction ended!");
+          return { ...prev, isActive: false };
+        }
+
+        // AI bidding logic
+        const timeSinceLastBid = Date.now() - prev.lastBidTime;
+        const shouldAIBid = Math.random() < 0.3 && timeSinceLastBid > 3000; // 30% chance every 3+ seconds
+        
+        if (shouldAIBid && newTimeRemaining > 10) {
+          const bidIncrement = Math.floor(prev.property.price * (0.01 + Math.random() * 0.03)); // 1-4% increment
+          const newBid = prev.currentBid + bidIncrement;
+          
+          const bidderNames = ["Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", "Emma R.", "David L."];
+          const bidderName = bidderNames[Math.floor(Math.random() * bidderNames.length)];
+          
+          const newHistory = [...prev.bidHistory, {
+            bidder: bidderName,
+            amount: newBid,
+            timestamp: Date.now(),
+            isUser: false
+          }];
+          
+          setAuctioneerMessage(`${bidderName} bids £${newBid.toLocaleString()}`);
+          setUserBidAmount([newBid + Math.floor(bidIncrement * 0.5)]); // Suggest next bid
+          
+          return {
+            ...prev,
+            currentBid: newBid,
+            bidHistory: newHistory,
+            lastBidTime: Date.now(),
+            timeRemaining: newTimeRemaining
+          };
+        }
+
+        return { ...prev, timeRemaining: newTimeRemaining };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [liveAuction, onBuyProperty]);
+
+  // Monthly auction cycle for property listings
+  useEffect(() => {
     setListings(prev => prev.map(listing => {
       const timeToAuction = listing.auctionDate - Date.now();
       
       if (timeToAuction <= 0) {
-        // Auction has ended, process sale
         const finalPrice = Math.max(listing.highestBid, listing.reservePrice);
         
         setTimeout(() => {
@@ -70,12 +154,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           });
         }, 1000);
         
-        return null; // Mark for removal
+        return null;
       }
       
-      // Simulate bidding activity
       if (Math.random() > 0.7) {
-        const bidIncrease = listing.guidePrice * (0.01 + Math.random() * 0.05); // 1-6% increase
+        const bidIncrease = listing.guidePrice * (0.01 + Math.random() * 0.05);
         return {
           ...listing,
           highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
@@ -86,7 +169,6 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       return listing;
     }).filter(Boolean) as AuctionListing[]);
 
-    // Clean up completed auctions
     setListings(prev => prev.filter(listing => listing.auctionDate > Date.now()));
   }, [monthsPlayed]);
 
@@ -135,37 +217,69 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     });
   };
 
-  const handleBuyAtAuction = () => {
-    if (!selectedBidProperty) return;
+  const startLiveAuction = (property: Property) => {
+    const reservePrice = Math.floor(property.price * 0.85);
+    const startingBid = Math.floor(reservePrice * 0.9);
     
-    const finalBidAmount = bidAmount[0];
-    const reservePrice = Math.floor(selectedBidProperty.price * 0.85);
+    setLiveAuction({
+      property,
+      reservePrice,
+      currentBid: startingBid,
+      bidderCount: Math.floor(Math.random() * 5) + 3, // 3-7 bidders
+      timeRemaining: 120, // 2 minutes
+      isActive: true,
+      bidHistory: [{
+        bidder: "Auctioneer",
+        amount: startingBid,
+        timestamp: Date.now(),
+        isUser: false
+      }],
+      lastBidTime: Date.now()
+    });
     
-    // Simulate auction competition
-    const competitionBid = reservePrice + (Math.random() * (selectedBidProperty.price * 0.3));
+    setUserBidAmount([startingBid + Math.floor(property.price * 0.02)]);
+    setAuctioneerMessage(`Lot ${property.id}: ${property.name}. Starting at £${startingBid.toLocaleString()}`);
+  };
+
+  const placeBid = () => {
+    if (!liveAuction || !liveAuction.isActive || userBidAmount[0] <= liveAuction.currentBid) return;
     
-    if (finalBidAmount >= Math.max(reservePrice, competitionBid)) {
-      onBuyProperty(selectedBidProperty, finalBidAmount, 0); // Cash purchase for simplicity at auction
-      
-      setSelectedBidProperty(null);
-      setBidAmount([0]);
-      
+    if (cash < userBidAmount[0]) {
       toast({
-        title: "Auction Won!",
-        description: `You've won ${selectedBidProperty.name} for £${finalBidAmount.toLocaleString()}!`,
-      });
-    } else {
-      toast({
-        title: "Outbid!",
-        description: `Your bid of £${finalBidAmount.toLocaleString()} was outbid. Final price: £${Math.floor(competitionBid).toLocaleString()}`,
+        title: "Insufficient Funds",
+        description: "You don't have enough cash for this bid.",
         variant: "destructive"
       });
+      return;
     }
+
+    const newHistory = [...liveAuction.bidHistory, {
+      bidder: "You",
+      amount: userBidAmount[0],
+      timestamp: Date.now(),
+      isUser: true
+    }];
+
+    setLiveAuction(prev => prev ? {
+      ...prev,
+      currentBid: userBidAmount[0],
+      bidHistory: newHistory,
+      lastBidTime: Date.now()
+    } : null);
+
+    setAuctioneerMessage(`You bid £${userBidAmount[0].toLocaleString()}`);
+    setUserBidAmount([userBidAmount[0] + Math.floor(liveAuction.property.price * 0.02)]);
   };
 
   const getDaysUntilAuction = (auctionDate: number) => {
     const timeDiff = auctionDate - Date.now();
     return Math.max(0, Math.ceil(timeDiff / (24 * 60 * 60 * 1000)));
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -197,24 +311,106 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Available Properties */}
+            {/* Live Auction Interface */}
+            {liveAuction && (
+              <Card className="border-red-500 border-2 bg-red-50">
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-xl text-red-700">
+                      🔴 LIVE AUCTION - Lot {liveAuction.property.id}
+                    </CardTitle>
+                    <div className="text-2xl font-bold text-red-600">
+                      {formatTime(liveAuction.timeRemaining)}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-bold text-lg">{liveAuction.property.name}</h3>
+                      <p className="text-sm text-muted-foreground">{liveAuction.property.neighborhood}</p>
+                      <p className="text-sm">Guide: £{liveAuction.property.price.toLocaleString()}</p>
+                      <p className="text-sm">Reserve: £{liveAuction.reservePrice.toLocaleString()}</p>
+                      <Badge variant={liveAuction.currentBid >= liveAuction.reservePrice ? "default" : "destructive"}>
+                        {liveAuction.currentBid >= liveAuction.reservePrice ? "Reserve Met" : "Below Reserve"}
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Current Bid</p>
+                        <p className="text-3xl font-bold text-green-600">
+                          £{liveAuction.currentBid.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {liveAuction.bidderCount} bidders registered
+                        </p>
+                      </div>
+                      
+                      {liveAuction.isActive && (
+                        <div className="space-y-2">
+                          <Label>Your Next Bid: £{userBidAmount[0].toLocaleString()}</Label>
+                          <Slider
+                            value={userBidAmount}
+                            onValueChange={setUserBidAmount}
+                            min={liveAuction.currentBid + Math.floor(liveAuction.property.price * 0.01)}
+                            max={Math.min(cash, liveAuction.property.price * 2)}
+                            step={Math.floor(liveAuction.property.price * 0.005) || 1000}
+                            className="w-full"
+                          />
+                          <Button 
+                            onClick={placeBid}
+                            disabled={userBidAmount[0] <= liveAuction.currentBid || cash < userBidAmount[0]}
+                            className="w-full bg-red-600 hover:bg-red-700"
+                          >
+                            Place Bid: £{userBidAmount[0].toLocaleString()}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-3 rounded border">
+                    <p className="font-medium text-center">{auctioneerMessage}</p>
+                  </div>
+                  
+                  {/* Bid History */}
+                  <div className="bg-white rounded border max-h-32 overflow-y-auto">
+                    <div className="p-2 border-b font-medium text-sm">Bid History</div>
+                    <div className="space-y-1 p-2">
+                      {liveAuction.bidHistory.slice(-5).reverse().map((bid, index) => (
+                        <div key={index} className={`flex justify-between text-sm ${bid.isUser ? 'font-bold text-blue-600' : ''}`}>
+                          <span>{bid.bidder}</span>
+                          <span>£{bid.amount.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setLiveAuction(null)}
+                    className="w-full"
+                  >
+                    Leave Auction
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Available Properties List */}
+            {!liveAuction && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <Gavel className="h-5 w-5" />
                   Available Auction Properties
                 </h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="grid gap-3 max-h-96 overflow-y-auto">
                   {auctionProperties.map((property) => (
                     <Card 
                       key={property.id} 
-                      className={`cursor-pointer transition-colors border-orange-200 ${
-                        selectedBidProperty?.id === property.id ? 'ring-2 ring-orange-500' : ''
-                      }`}
-                      onClick={() => {
-                        setSelectedBidProperty(property);
-                        setBidAmount([property.price]);
-                      }}
+                      className="cursor-pointer transition-colors border-orange-200 hover:border-orange-400"
+                      onClick={() => startLiveAuction(property)}
                     >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
@@ -249,6 +445,10 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </span>
                           </div>
                         </div>
+                        
+                        <div className="mt-3 p-2 bg-orange-50 rounded text-center">
+                          <p className="text-sm font-medium text-orange-700">Click to Join Live Auction</p>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -263,62 +463,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                   )}
                 </div>
               </div>
-              
-              {/* Bidding Panel */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Place Your Bid</h3>
-                
-                {selectedBidProperty ? (
-                  <div className="space-y-4">
-                    <Card className="border-orange-200">
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold">{selectedBidProperty.name}</h4>
-                        <p className="text-sm text-muted-foreground">{selectedBidProperty.neighborhood}</p>
-                        <p className="text-sm">Guide: £{selectedBidProperty.price.toLocaleString()}</p>
-                        <p className="text-sm">Reserve: £{Math.floor(selectedBidProperty.price * 0.85).toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <div className="space-y-3">
-                      <Label>Your Bid: £{bidAmount[0].toLocaleString()}</Label>
-                      <Slider
-                        value={bidAmount}
-                        onValueChange={setBidAmount}
-                        min={Math.floor(selectedBidProperty.price * 0.7)}
-                        max={Math.floor(selectedBidProperty.price * 1.5)}
-                        step={1000}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>70% (£{Math.floor(selectedBidProperty.price * 0.7).toLocaleString()})</span>
-                        <span>150% (£{Math.floor(selectedBidProperty.price * 1.5).toLocaleString()})</span>
-                      </div>
-                    </div>
-                    
-                    <div className="text-sm p-3 bg-orange-50 rounded-md border border-orange-200">
-                      <p className="font-medium text-orange-800">Auction Terms:</p>
-                      <ul className="text-orange-700 mt-1 space-y-1">
-                        <li>• Cash purchase only</li>
-                        <li>• Bid must meet reserve price</li>
-                        <li>• Sale completes immediately</li>
-                      </ul>
-                    </div>
-                    
-                    <Button 
-                      className="w-full bg-orange-600 hover:bg-orange-700"
-                      onClick={handleBuyAtAuction}
-                      disabled={cash < bidAmount[0] || bidAmount[0] < Math.floor(selectedBidProperty.price * 0.85)}
-                    >
-                      {cash < bidAmount[0] ? "Insufficient Funds" : 
-                       bidAmount[0] < Math.floor(selectedBidProperty.price * 0.85) ? "Below Reserve Price" :
-                       `Place Bid: £${bidAmount[0].toLocaleString()}`}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">Select a property to place your bid</p>
-                )}
-              </div>
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="sell" className="space-y-4">
