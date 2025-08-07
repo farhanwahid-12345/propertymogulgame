@@ -19,6 +19,7 @@ interface CreditOverdraftProps {
   onApplyOverdraft: (requestedLimit: number) => void;
   monthlyIncome: number;
   totalMortgagePayments: number;
+  netWorth: number;
 }
 
 export function CreditOverdraft({ 
@@ -30,7 +31,8 @@ export function CreditOverdraft({
   setOverdraftUsed, 
   onApplyOverdraft,
   monthlyIncome,
-  totalMortgagePayments
+  totalMortgagePayments,
+  netWorth
 }: CreditOverdraftProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [requestedLimit, setRequestedLimit] = useState<number[]>([0]);
@@ -48,21 +50,30 @@ export function CreditOverdraft({
     return { rating: 'Very Poor', color: 'red', description: 'Severe credit problems' };
   };
 
-  const getMaxOverdraftEligible = () => {
-    if (creditScore >= 700) return monthlyIncome * 2;
-    if (creditScore >= 580) return monthlyIncome * 1.5;
-    if (creditScore >= 500) return monthlyIncome;
-    return monthlyIncome * 0.5;
+  const getMaxOverdraftEligible = (netWorth: number) => {
+    let baseLimit = monthlyIncome * 2;
+    
+    // Increase limit based on net worth
+    if (netWorth >= 1000000) baseLimit *= 3; // £1M+ net worth
+    else if (netWorth >= 500000) baseLimit *= 2.5; // £500K+ net worth
+    else if (netWorth >= 250000) baseLimit *= 2; // £250K+ net worth
+    else if (netWorth >= 100000) baseLimit *= 1.5; // £100K+ net worth
+    
+    // Apply credit score multiplier
+    if (creditScore >= 700) return baseLimit;
+    if (creditScore >= 580) return baseLimit * 0.8;
+    if (creditScore >= 500) return baseLimit * 0.6;
+    return baseLimit * 0.4;
   };
 
   const handleApplyOverdraft = () => {
     const newLimit = requestedLimit[0];
-    const maxEligible = getMaxOverdraftEligible();
+    const maxEligible = getMaxOverdraftEligible(netWorth);
     
     if (newLimit > maxEligible) {
       toast({
         title: "Application Declined",
-        description: `Based on your credit score, maximum eligible limit is £${maxEligible.toLocaleString()}`,
+        description: `Based on your credit score and net worth, maximum eligible limit is £${maxEligible.toLocaleString()}`,
         variant: "destructive"
       });
       return;
@@ -262,8 +273,8 @@ export function CreditOverdraft({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-sm text-muted-foreground">
-                <p>Based on your credit score and income, you may be eligible for an overdraft facility.</p>
-                <p className="mt-1">Maximum eligible: £{getMaxOverdraftEligible().toLocaleString()}</p>
+                <p>Based on your credit score, income, and net worth, you may be eligible for an overdraft facility.</p>
+                <p className="mt-1">Maximum eligible: £{getMaxOverdraftEligible(netWorth).toLocaleString()}</p>
               </div>
               
               <div className="space-y-3">
@@ -272,13 +283,13 @@ export function CreditOverdraft({
                   value={requestedLimit}
                   onValueChange={setRequestedLimit}
                   min={0}
-                  max={Math.max(getMaxOverdraftEligible(), overdraftLimit)}
+                  max={Math.max(getMaxOverdraftEligible(netWorth), overdraftLimit)}
                   step={500}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>£0</span>
-                  <span>£{getMaxOverdraftEligible().toLocaleString()} max eligible</span>
+                  <span>£{getMaxOverdraftEligible(netWorth).toLocaleString()} max eligible</span>
                 </div>
               </div>
               

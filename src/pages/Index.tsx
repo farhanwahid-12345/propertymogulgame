@@ -129,6 +129,7 @@ const Index = () => {
               onApplyOverdraft={gameState.handleApplyOverdraft}
               monthlyIncome={gameState.totalMonthlyIncome}
               totalMortgagePayments={gameState.totalMonthlyExpenses}
+              netWorth={gameState.netWorth}
             />
             <Button 
               variant="outline" 

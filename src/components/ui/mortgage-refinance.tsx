@@ -44,15 +44,20 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
     const currentMortgage = selectedProperty.mortgageRemaining || 0;
     const cashFromRefinance = loanAmount[0] - currentMortgage;
     
+    // Update property immediately in state
     onRefinance(selectedProperty.id, loanAmount[0], selectedProvider, termYears, mortgageType);
     
+    // Update cash if extracting equity
     if (cashFromRefinance > 0) {
       setCash(cash + cashFromRefinance);
     }
 
+    // Reset form
     setSelectedProperty(null);
     setLoanAmount([0]);
     setSelectedProvider("");
+    setTermYears(25);
+    setMortgageType('repayment');
     
     toast({
       title: "Mortgage Refinanced!",

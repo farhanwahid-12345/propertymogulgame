@@ -78,13 +78,32 @@ export function EstateAgentWindow({
         // Remove expired offers
         const activeOffers = prev.filter(offer => currentTime < offer.expiresAt);
         
-        // Generate new offers for listed properties
+        // Generate new offers for listed properties (more realistic)
         const newOffers: PropertyOffer[] = [];
         listings.forEach(listing => {
-          if (Math.random() < 0.3) { // 30% chance per check
-            const baseOffer = listing.askingPrice;
-            const variation = (Math.random() - 0.5) * 0.3; // ±15% variation
-            const offerAmount = Math.floor(baseOffer * (1 + variation));
+          const marketValue = listing.property.value;
+          const priceRatio = listing.askingPrice / marketValue;
+          
+          // Lower chance for overpriced properties
+          let offerChance = 0.15; // Base 15% chance
+          if (priceRatio <= 0.9) offerChance = 0.4; // Well priced
+          else if (priceRatio <= 1.0) offerChance = 0.25; // Fair price
+          else if (priceRatio <= 1.1) offerChance = 0.15; // Slightly overpriced
+          else offerChance = 0.05; // Overpriced
+          
+          if (Math.random() < offerChance) {
+            // More realistic offer generation
+            let offerAmount: number;
+            if (priceRatio >= 1.1) {
+              // Overpriced: offers 10-20% below asking
+              offerAmount = listing.askingPrice * (0.8 + Math.random() * 0.1);
+            } else if (priceRatio >= 1.0) {
+              // Fair: offers 5-10% below asking
+              offerAmount = listing.askingPrice * (0.9 + Math.random() * 0.05);
+            } else {
+              // Well priced: offers close to asking or above
+              offerAmount = listing.askingPrice * (0.95 + Math.random() * 0.08);
+            }
             
             const buyerNames = [
               "John Smith", "Sarah Johnson", "Mike Wilson", "Emma Davis",
@@ -97,7 +116,7 @@ export function EstateAgentWindow({
             newOffers.push({
               id: `offer_${Date.now()}_${Math.random()}`,
               propertyId: listing.property.id,
-              amount: offerAmount,
+              amount: Math.floor(offerAmount),
               buyerName,
               offerDate: currentTime,
               expiresAt: currentTime + (24 * 60 * 60 * 1000), // Expires in 24 hours
@@ -108,7 +127,7 @@ export function EstateAgentWindow({
         
         return [...activeOffers, ...newOffers];
       });
-    }, 30000); // Check every 30 seconds
+    }, 45000); // Check every 45 seconds
 
     return () => clearInterval(interval);
   }, [listings]);
@@ -384,15 +403,37 @@ export function EstateAgentWindow({
                     <Button 
                       className="w-full" 
                       onClick={() => {
-                        onBuyProperty(
-                          selectedBuyProperty, 
-                          offerAmount[0], 
-                          mortgagePercentage[0], 
-                          selectedProvider || undefined, 
-                          termYears, 
-                          mortgageType
-                        );
-                        setSelectedBuyProperty(null);
+                        // Simulate offer acceptance/rejection based on offer amount
+                        const offerRatio = offerAmount[0] / selectedBuyProperty.price;
+                        let acceptanceChance = 0;
+                        
+                        if (offerRatio >= 1.05) acceptanceChance = 0.95; // 5%+ over asking
+                        else if (offerRatio >= 1.0) acceptanceChance = 0.85; // At or above asking
+                        else if (offerRatio >= 0.95) acceptanceChance = 0.65; // 5% below asking
+                        else if (offerRatio >= 0.9) acceptanceChance = 0.35; // 10% below asking
+                        else acceptanceChance = 0.1; // More than 10% below
+                        
+                        if (Math.random() < acceptanceChance) {
+                          onBuyProperty(
+                            selectedBuyProperty, 
+                            offerAmount[0], 
+                            mortgagePercentage[0], 
+                            selectedProvider || undefined, 
+                            termYears, 
+                            mortgageType
+                          );
+                          setSelectedBuyProperty(null);
+                          toast({
+                            title: "Offer Accepted!",
+                            description: `Your offer of £${offerAmount[0].toLocaleString()} has been accepted!`,
+                          });
+                        } else {
+                          toast({
+                            title: "Offer Rejected",
+                            description: `The seller rejected your offer of £${offerAmount[0].toLocaleString()}. Try a higher amount.`,
+                            variant: "destructive"
+                          });
+                        }
                       }}
                       disabled={ownedProperties.length >= getMaxPropertiesForLevel(level) || 
                                (mortgagePercentage[0] > 0 && !selectedProvider)}

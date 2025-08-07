@@ -139,16 +139,28 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     if (!selectedBidProperty) return;
     
     const finalBidAmount = bidAmount[0];
-    onBuyProperty(selectedBidProperty, finalBidAmount, 0); // Cash purchase for simplicity at auction
+    const reservePrice = Math.floor(selectedBidProperty.price * 0.85);
     
-    // Remove from available properties
-    setSelectedBidProperty(null);
-    setBidAmount([0]);
+    // Simulate auction competition
+    const competitionBid = reservePrice + (Math.random() * (selectedBidProperty.price * 0.3));
     
-    toast({
-      title: "Auction Purchase!",
-      description: `You've won ${selectedBidProperty.name} for £${finalBidAmount.toLocaleString()}!`,
-    });
+    if (finalBidAmount >= Math.max(reservePrice, competitionBid)) {
+      onBuyProperty(selectedBidProperty, finalBidAmount, 0); // Cash purchase for simplicity at auction
+      
+      setSelectedBidProperty(null);
+      setBidAmount([0]);
+      
+      toast({
+        title: "Auction Won!",
+        description: `You've won ${selectedBidProperty.name} for £${finalBidAmount.toLocaleString()}!`,
+      });
+    } else {
+      toast({
+        title: "Outbid!",
+        description: `Your bid of £${finalBidAmount.toLocaleString()} was outbid. Final price: £${Math.floor(competitionBid).toLocaleString()}`,
+        variant: "destructive"
+      });
+    }
   };
 
   const getDaysUntilAuction = (auctionDate: number) => {
@@ -299,7 +311,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     >
                       {cash < bidAmount[0] ? "Insufficient Funds" : 
                        bidAmount[0] < Math.floor(selectedBidProperty.price * 0.85) ? "Below Reserve Price" :
-                       `Submit Bid: £${bidAmount[0].toLocaleString()}`}
+                       `Place Bid: £${bidAmount[0].toLocaleString()}`}
                     </Button>
                   </div>
                 ) : (
