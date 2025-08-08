@@ -739,6 +739,16 @@ export function useGameState() {
         return prev;
       }
 
+      // Prevent buying the same property twice
+      if (prev.ownedProperties.some(p => p.id === property.id)) {
+        toast({
+          title: "Already Owned",
+          description: "You already own this property.",
+          variant: "destructive"
+        });
+        return prev;
+      }
+
       // Check property limit
       if (prev.ownedProperties.length >= getMaxPropertiesForLevel(prev.level)) {
         toast({
@@ -1309,6 +1319,12 @@ export function useGameState() {
     }));
   }, []);
 
+  // Remove an auction property from market when sold externally
+  const removeAuctionProperty = useCallback((propertyId: string) => {
+    setAuctionProperties(prev => prev.filter(p => p.id !== propertyId));
+    setEstateAgentProperties(prev => prev.filter(p => p.id !== propertyId));
+  }, []);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1337,6 +1353,7 @@ export function useGameState() {
     handleApplyOverdraft,
     setCash,
     setOverdraftUsed,
+    removeAuctionProperty,
     resetGame
   };
 }

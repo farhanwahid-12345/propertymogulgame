@@ -30,6 +30,8 @@ interface LiveAuction {
   isActive: boolean;
   bidHistory: { bidder: string; amount: number; timestamp: number; isUser?: boolean }[];
   lastBidTime: number;
+  endTime: number; // absolute end timestamp
+  aiBidders: { name: string; valuation: number; aggression: number; overbidChance: number }[];
 }
 
 interface AuctionHouseProps {
@@ -41,9 +43,10 @@ interface AuctionHouseProps {
   cash: number;
   mortgageProviders: any[];
   level: number;
+  onAuctionPropertySold: (propertyId: string) => void;
 }
 
-export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auctionProperties, onBuyProperty, cash, mortgageProviders, level }: AuctionHouseProps) {
+export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auctionProperties, onBuyProperty, cash, mortgageProviders, level, onAuctionPropertySold }: AuctionHouseProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [listings, setListings] = useState<AuctionListing[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -54,7 +57,8 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
   const [userBidAmount, setUserBidAmount] = useState<number[]>([0]);
-  const [auctioneerMessage, setAuctioneerMessage] = useState("");
+const [auctioneerMessage, setAuctioneerMessage] = useState("");
+  const [userMaxAutoBid, setUserMaxAutoBid] = useState<number | null>(null);
 
   // Get properties that aren't already listed
   const unlistedProperties = ownedProperties.filter(
@@ -69,13 +73,15 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       setLiveAuction(prev => {
         if (!prev || !prev.isActive) return prev;
 
-        const newTimeRemaining = Math.max(0, prev.timeRemaining - 1);
-        
+        const remainingMs = Math.max(0, prev.endTime - Date.now());
+        const newSeconds = Math.ceil(remainingMs / 1000);
+
         // Auction ended
-        if (newTimeRemaining === 0) {
+        if (remainingMs <= 0) {
+          const lastBid = prev.bidHistory[prev.bidHistory.length - 1];
+          const isUserWinner = !!lastBid?.isUser && prev.currentBid >= prev.reservePrice;
+
           if (prev.currentBid >= prev.reservePrice) {
-            const isUserWinner = prev.bidHistory[prev.bidHistory.length - 1]?.isUser;
-            
             if (isUserWinner) {
               onBuyProperty(prev.property, prev.currentBid, 0);
               toast({
@@ -88,55 +94,64 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                 description: `${prev.property.name} sold to another bidder for £${prev.currentBid.toLocaleString()}`,
                 variant: "destructive"
               });
+              onAuctionPropertySold(prev.property.id);
             }
           } else {
             toast({
-              title: "Auction Failed",
-              description: `${prev.property.name} failed to meet reserve price of £${prev.reservePrice.toLocaleString()}`,
+              title: "Auction Ended",
+              description: `${prev.property.name} did not meet reserve (reserve £${prev.reservePrice.toLocaleString()}). Removed from market.`,
               variant: "destructive"
             });
+            onAuctionPropertySold(prev.property.id);
           }
-          
+
           setAuctioneerMessage("Auction ended!");
-          return { ...prev, isActive: false };
+          return { ...prev, isActive: false, timeRemaining: 0 };
         }
 
-        // AI bidding logic
         const timeSinceLastBid = Date.now() - prev.lastBidTime;
-        const shouldAIBid = Math.random() < 0.3 && timeSinceLastBid > 3000; // 30% chance every 3+ seconds
-        
-        if (shouldAIBid && newTimeRemaining > 10) {
-          const bidIncrement = Math.floor(prev.property.price * (0.01 + Math.random() * 0.03)); // 1-4% increment
-          const newBid = prev.currentBid + bidIncrement;
-          
-          const bidderNames = ["Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", "Emma R.", "David L."];
-          const bidderName = bidderNames[Math.floor(Math.random() * bidderNames.length)];
-          
-          const newHistory = [...prev.bidHistory, {
-            bidder: bidderName,
-            amount: newBid,
-            timestamp: Date.now(),
-            isUser: false
-          }];
-          
-          setAuctioneerMessage(`${bidderName} bids £${newBid.toLocaleString()}`);
-          setUserBidAmount([newBid + Math.floor(bidIncrement * 0.5)]); // Suggest next bid
-          
-          return {
-            ...prev,
-            currentBid: newBid,
-            bidHistory: newHistory,
-            lastBidTime: Date.now(),
-            timeRemaining: newTimeRemaining
-          };
+        const endgameBoost = newSeconds <= 5 ? 0.2 : newSeconds <= 10 ? 0.1 : 0;
+
+        let newState = { ...prev };
+        if (timeSinceLastBid > 800 && Math.random() < 0.9) {
+          const minInc = Math.max(1000, Math.floor(prev.property.price * 0.005));
+          const maxInc = Math.max(minInc, Math.floor(prev.property.price * 0.02));
+
+          const ai = prev.aiBidders[Math.floor(Math.random() * prev.aiBidders.length)];
+          const bidProb = 0.12 + ai.aggression * 0.25 + endgameBoost;
+
+          if (Math.random() < bidProb) {
+            const inc = minInc + Math.floor(Math.random() * (maxInc - minInc + 1));
+            const candidateBid = prev.currentBid + inc;
+            const maxWilling = ai.valuation * (Math.random() < ai.overbidChance ? 1.05 + Math.random() * 0.05 : 1);
+
+            if (candidateBid <= maxWilling) {
+              const bidderName = ai.name;
+              const aiHistory = [...prev.bidHistory, { bidder: bidderName, amount: candidateBid, timestamp: Date.now(), isUser: false }];
+              newState = { ...newState, currentBid: candidateBid, bidHistory: aiHistory, lastBidTime: Date.now() };
+              setAuctioneerMessage(`${bidderName} bids £${candidateBid.toLocaleString()}`);
+
+              // Auto-bid if user set a max
+              const minAutoInc = minInc;
+              const autoBid = candidateBid + minAutoInc;
+              if (userMaxAutoBid && autoBid <= userMaxAutoBid && cash >= autoBid) {
+                const userHistory = [...aiHistory, { bidder: "You (auto)", amount: autoBid, timestamp: Date.now(), isUser: true }];
+                newState = { ...newState, currentBid: autoBid, bidHistory: userHistory, lastBidTime: Date.now() };
+                setAuctioneerMessage(`Auto-bid: You bid £${autoBid.toLocaleString()}`);
+              }
+            }
+          }
         }
 
-        return { ...prev, timeRemaining: newTimeRemaining };
+        if (newSeconds !== prev.timeRemaining) {
+          newState.timeRemaining = newSeconds;
+        }
+        return newState;
       });
-    }, 1000);
+    }, 250);
 
     return () => clearInterval(interval);
-  }, [liveAuction, onBuyProperty]);
+  }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold]);
 
   // Monthly auction cycle for property listings
   useEffect(() => {
@@ -220,21 +235,29 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const startLiveAuction = (property: Property) => {
     const reservePrice = Math.floor(property.price * 0.85);
     const startingBid = Math.floor(reservePrice * 0.9);
+    const endTime = Date.now() + 30_000; // 30 seconds
+
+    const bidderNames = ["Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", "Emma R.", "David L.", "Trinity Homes", "North East Holdings"];
+    const bidderCount = Math.floor(Math.random() * 5) + 3; // 3-7 bidders
+    const aiBidders = Array.from({ length: bidderCount }, (_, i) => {
+      const name = bidderNames[i % bidderNames.length];
+      const valuation = property.price * (0.9 + Math.random() * 0.25); // 90% - 115% of guide
+      const aggression = Math.random(); // 0-1
+      const overbidChance = Math.random() * 0.2; // up to 20% chance they'll go irrational
+      return { name, valuation, aggression, overbidChance };
+    });
     
     setLiveAuction({
       property,
       reservePrice,
       currentBid: startingBid,
-      bidderCount: Math.floor(Math.random() * 5) + 3, // 3-7 bidders
-      timeRemaining: 120, // 2 minutes
+      bidderCount,
+      timeRemaining: 30,
       isActive: true,
-      bidHistory: [{
-        bidder: "Auctioneer",
-        amount: startingBid,
-        timestamp: Date.now(),
-        isUser: false
-      }],
-      lastBidTime: Date.now()
+      bidHistory: [{ bidder: "Auctioneer", amount: startingBid, timestamp: Date.now(), isUser: false }],
+      lastBidTime: Date.now(),
+      endTime,
+      aiBidders
     });
     
     setUserBidAmount([startingBid + Math.floor(property.price * 0.02)]);
@@ -348,23 +371,35 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                       </div>
                       
                       {liveAuction.isActive && (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           <Label>Your Next Bid: £{userBidAmount[0].toLocaleString()}</Label>
                           <Slider
                             value={userBidAmount}
                             onValueChange={setUserBidAmount}
-                            min={liveAuction.currentBid + Math.floor(liveAuction.property.price * 0.01)}
+                            min={liveAuction.currentBid + Math.max(1000, Math.floor(liveAuction.property.price * 0.005))}
                             max={Math.min(cash, liveAuction.property.price * 2)}
-                            step={Math.floor(liveAuction.property.price * 0.005) || 1000}
+                            step={Math.max(1000, Math.floor(liveAuction.property.price * 0.005))}
                             className="w-full"
                           />
-                          <Button 
-                            onClick={placeBid}
-                            disabled={userBidAmount[0] <= liveAuction.currentBid || cash < userBidAmount[0]}
-                            className="w-full bg-red-600 hover:bg-red-700"
-                          >
-                            Place Bid: £{userBidAmount[0].toLocaleString()}
-                          </Button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button 
+                              onClick={placeBid}
+                              disabled={userBidAmount[0] <= liveAuction.currentBid || cash < userBidAmount[0]}
+                              className="w-full bg-red-600 hover:bg-red-700"
+                            >
+                              Place Bid: £{userBidAmount[0].toLocaleString()}
+                            </Button>
+                            <div className="flex items-center">
+                              <Input
+                                type="number"
+                                placeholder="Max auto-bid (£)"
+                                value={userMaxAutoBid ?? ''}
+                                onChange={(e) => setUserMaxAutoBid(e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Auto-bid will outbid up to your max when outbid, if you have cash.</p>
                         </div>
                       )}
                     </div>

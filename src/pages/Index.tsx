@@ -70,76 +70,93 @@ const Index = () => {
         />
 
         {/* Game Controls */}
-        <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-bold text-white">Property Market</h2>
-          <div className="flex gap-2">
-            <EstateAgentWindow
-              ownedProperties={gameState.ownedProperties}
-              onAcceptOffer={gameState.handleEstateAgentSale}
-              cash={gameState.cash}
-              availableProperties={gameState.availableProperties}
-              onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
-                gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
-              }
-              getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
-              getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
-              getMaxPropertyValue={gameState.getMaxPropertyValue}
-              level={gameState.level}
-              mortgageProviders={gameState.mortgageProviders}
-            />
-            <AuctionHouse
-              ownedProperties={gameState.ownedProperties}
-              onAuctionSale={gameState.handleAuctionSale}
-              monthsPlayed={gameState.monthsPlayed}
-              auctionProperties={gameState.auctionProperties}
-              onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
-                gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
-              }
-              cash={gameState.cash}
-              mortgageProviders={gameState.mortgageProviders}
-              level={gameState.level}
-            />
-            <MortgageSettlement 
-              ownedProperties={gameState.ownedProperties}
-              mortgages={gameState.mortgages}
-              cash={gameState.cash}
-              onSettleMortgage={gameState.settleMortgage}
-            />
-            <MortgageRefinance
-              ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
-              mortgageProviders={gameState.mortgageProviders}
-              onRefinance={gameState.handleRefinance}
-              cash={gameState.cash}
-              setCash={gameState.setCash}
-            />
-            <PortfolioMortgage
-              ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
-              mortgageProviders={gameState.mortgageProviders}
-              onPortfolioMortgage={gameState.handlePortfolioMortgage}
-              cash={gameState.cash}
-              setCash={gameState.setCash}
-            />
-            <CreditOverdraft
-              creditScore={gameState.creditScore}
-              overdraftLimit={gameState.overdraftLimit}
-              overdraftUsed={gameState.overdraftUsed}
-              cash={gameState.cash}
-              setCash={gameState.setCash}
-              setOverdraftUsed={gameState.setOverdraftUsed}
-              onApplyOverdraft={gameState.handleApplyOverdraft}
-              monthlyIncome={gameState.totalMonthlyIncome}
-              totalMortgagePayments={gameState.totalMonthlyExpenses}
-              netWorth={gameState.netWorth}
-            />
-            <Button 
-              variant="outline" 
-              onClick={gameState.resetGame}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Reset Game
-            </Button>
-          </div>
+        <div className="space-y-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="market">Market</TabsTrigger>
+              <TabsTrigger value="bank">Bank</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="market">
+              <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-bold text-white">Property Market</h2>
+                <div className="flex gap-2">
+                  <EstateAgentWindow
+                    ownedProperties={gameState.ownedProperties}
+                    onAcceptOffer={gameState.handleEstateAgentSale}
+                    cash={gameState.cash}
+                    availableProperties={gameState.availableProperties}
+                    onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
+                      gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
+                    }
+                    getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
+                    getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
+                    getMaxPropertyValue={gameState.getMaxPropertyValue}
+                    level={gameState.level}
+                    mortgageProviders={gameState.mortgageProviders}
+                  />
+                  <AuctionHouse
+                    ownedProperties={gameState.ownedProperties}
+                    onAuctionSale={gameState.handleAuctionSale}
+                    monthsPlayed={gameState.monthsPlayed}
+                    auctionProperties={gameState.auctionProperties}
+                    onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
+                      gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
+                    }
+                    cash={gameState.cash}
+                    mortgageProviders={gameState.mortgageProviders}
+                    level={gameState.level}
+                    onAuctionPropertySold={gameState.removeAuctionProperty}
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={gameState.resetGame}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Game
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="bank">
+              <div className="flex flex-wrap gap-2">
+                <MortgageSettlement 
+                  ownedProperties={gameState.ownedProperties}
+                  mortgages={gameState.mortgages}
+                  cash={gameState.cash}
+                  onSettleMortgage={gameState.settleMortgage}
+                />
+                <MortgageRefinance
+                  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
+                  mortgageProviders={gameState.mortgageProviders}
+                  onRefinance={gameState.handleRefinance}
+                  cash={gameState.cash}
+                  setCash={gameState.setCash}
+                />
+                <PortfolioMortgage
+                  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
+                  mortgageProviders={gameState.mortgageProviders}
+                  onPortfolioMortgage={gameState.handlePortfolioMortgage}
+                  cash={gameState.cash}
+                  setCash={gameState.setCash}
+                />
+                <CreditOverdraft
+                  creditScore={gameState.creditScore}
+                  overdraftLimit={gameState.overdraftLimit}
+                  overdraftUsed={gameState.overdraftUsed}
+                  cash={gameState.cash}
+                  setCash={gameState.setCash}
+                  setOverdraftUsed={gameState.setOverdraftUsed}
+                  onApplyOverdraft={gameState.handleApplyOverdraft}
+                  monthlyIncome={gameState.totalMonthlyIncome}
+                  totalMortgagePayments={gameState.totalMonthlyExpenses}
+                  netWorth={gameState.netWorth}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
 
