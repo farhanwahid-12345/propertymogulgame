@@ -30,7 +30,7 @@ interface LiveAuction {
   isActive: boolean;
   bidHistory: { bidder: string; amount: number; timestamp: number; isUser?: boolean }[];
   lastBidTime: number;
-  endTime: number; // absolute end timestamp
+  endTime: number;
   aiBidders: { name: string; valuation: number; aggression: number; overbidChance: number }[];
 }
 
@@ -57,7 +57,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
   const [userBidAmount, setUserBidAmount] = useState<number[]>([0]);
-const [auctioneerMessage, setAuctioneerMessage] = useState("");
+  const [auctioneerMessage, setAuctioneerMessage] = useState("");
   const [userMaxAutoBid, setUserMaxAutoBid] = useState<number | null>(null);
 
   // Get properties that aren't already listed
@@ -65,7 +65,7 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
     prop => !listings.some(listing => listing.property.id === prop.id)
   );
 
-  // Live auction timer and AI bidders
+  // Live auction timer with precise 30-second timing
   useEffect(() => {
     if (!liveAuction || !liveAuction.isActive) return;
 
@@ -99,46 +99,86 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
           } else {
             toast({
               title: "Auction Ended",
-              description: `${prev.property.name} did not meet reserve (reserve £${prev.reservePrice.toLocaleString()}). Removed from market.`,
+              description: `${prev.property.name} did not meet reserve (£${prev.reservePrice.toLocaleString()}). Removed from market.`,
               variant: "destructive"
             });
             onAuctionPropertySold(prev.property.id);
           }
 
           setAuctioneerMessage("Auction ended!");
+          setUserMaxAutoBid(null);
           return { ...prev, isActive: false, timeRemaining: 0 };
         }
 
+        // Realistic AI bidding with individual bidder behavior
         const timeSinceLastBid = Date.now() - prev.lastBidTime;
-        const endgameBoost = newSeconds <= 5 ? 0.2 : newSeconds <= 10 ? 0.1 : 0;
+        const endgameBoost = newSeconds <= 5 ? 0.3 : newSeconds <= 10 ? 0.15 : 0;
 
         let newState = { ...prev };
-        if (timeSinceLastBid > 800 && Math.random() < 0.9) {
+        
+        // AI bidding logic - more frequent but realistic
+        if (timeSinceLastBid > 800 && Math.random() < 0.85) {
           const minInc = Math.max(1000, Math.floor(prev.property.price * 0.005));
-          const maxInc = Math.max(minInc, Math.floor(prev.property.price * 0.02));
+          const maxInc = Math.max(minInc, Math.floor(prev.property.price * 0.025));
 
+          // Select random AI bidder with their own behavior
           const ai = prev.aiBidders[Math.floor(Math.random() * prev.aiBidders.length)];
-          const bidProb = 0.12 + ai.aggression * 0.25 + endgameBoost;
+          const bidProb = 0.12 + (ai.aggression * 0.25) + endgameBoost;
 
           if (Math.random() < bidProb) {
-            const inc = minInc + Math.floor(Math.random() * (maxInc - minInc + 1));
+            // Calculate bid increment with some randomness
+            const baseInc = minInc + Math.floor(Math.random() * (maxInc - minInc + 1));
+            const varianceMultiplier = 0.8 + Math.random() * 0.4; // 80% to 120%
+            const inc = Math.floor(baseInc * varianceMultiplier);
             const candidateBid = prev.currentBid + inc;
-            const maxWilling = ai.valuation * (Math.random() < ai.overbidChance ? 1.05 + Math.random() * 0.05 : 1);
+            
+            // Each AI has their own max valuation and overbid tendency
+            const maxWilling = ai.valuation * (Math.random() < ai.overbidChance ? 1.05 + Math.random() * 0.1 : 1);
 
-            if (candidateBid <= maxWilling) {
+            if (candidateBid <= maxWilling && candidateBid > prev.currentBid) {
               const bidderName = ai.name;
-              const aiHistory = [...prev.bidHistory, { bidder: bidderName, amount: candidateBid, timestamp: Date.now(), isUser: false }];
-              newState = { ...newState, currentBid: candidateBid, bidHistory: aiHistory, lastBidTime: Date.now() };
+              const aiHistory = [...prev.bidHistory, { 
+                bidder: bidderName, 
+                amount: candidateBid, 
+                timestamp: Date.now(), 
+                isUser: false 
+              }];
+              
+              newState = { 
+                ...newState, 
+                currentBid: candidateBid, 
+                bidHistory: aiHistory, 
+                lastBidTime: Date.now() 
+              };
+              
               setAuctioneerMessage(`${bidderName} bids £${candidateBid.toLocaleString()}`);
 
-              // Auto-bid if user set a max
-              const minAutoInc = minInc;
-              const autoBid = candidateBid + minAutoInc;
-              if (userMaxAutoBid && autoBid <= userMaxAutoBid && cash >= autoBid) {
-                const userHistory = [...aiHistory, { bidder: "You (auto)", amount: autoBid, timestamp: Date.now(), isUser: true }];
-                newState = { ...newState, currentBid: autoBid, bidHistory: userHistory, lastBidTime: Date.now() };
-                setAuctioneerMessage(`Auto-bid: You bid £${autoBid.toLocaleString()}`);
-              }
+              // Auto-bid logic for user
+              setTimeout(() => {
+                const minAutoInc = Math.max(1000, Math.floor(prev.property.price * 0.005));
+                const autoBid = candidateBid + minAutoInc;
+                
+                if (userMaxAutoBid && autoBid <= userMaxAutoBid && cash >= autoBid) {
+                  setLiveAuction(current => {
+                    if (!current || !current.isActive || current.currentBid !== candidateBid) return current;
+                    
+                    const userHistory = [...current.bidHistory, { 
+                      bidder: "You (auto)", 
+                      amount: autoBid, 
+                      timestamp: Date.now(), 
+                      isUser: true 
+                    }];
+                    
+                    setAuctioneerMessage(`Auto-bid: You bid £${autoBid.toLocaleString()}`);
+                    return { 
+                      ...current, 
+                      currentBid: autoBid, 
+                      bidHistory: userHistory, 
+                      lastBidTime: Date.now() 
+                    };
+                  });
+                }
+              }, 500); // Half second delay for auto-bid
             }
           }
         }
@@ -146,9 +186,10 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
         if (newSeconds !== prev.timeRemaining) {
           newState.timeRemaining = newSeconds;
         }
+        
         return newState;
       });
-    }, 250);
+    }, 100); // Update every 100ms for smooth countdown
 
     return () => clearInterval(interval);
   }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold]);
@@ -235,15 +276,22 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
   const startLiveAuction = (property: Property) => {
     const reservePrice = Math.floor(property.price * 0.85);
     const startingBid = Math.floor(reservePrice * 0.9);
-    const endTime = Date.now() + 30_000; // 30 seconds
+    const endTime = Date.now() + 30_000; // Exactly 30 seconds
 
-    const bidderNames = ["Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", "Emma R.", "David L.", "Trinity Homes", "North East Holdings"];
+    // Generate realistic AI bidders with individual characteristics
+    const bidderNames = [
+      "Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", 
+      "Emma R.", "David L.", "Trinity Homes", "North East Holdings",
+      "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
+    ];
+    
     const bidderCount = Math.floor(Math.random() * 5) + 3; // 3-7 bidders
     const aiBidders = Array.from({ length: bidderCount }, (_, i) => {
       const name = bidderNames[i % bidderNames.length];
-      const valuation = property.price * (0.9 + Math.random() * 0.25); // 90% - 115% of guide
-      const aggression = Math.random(); // 0-1
-      const overbidChance = Math.random() * 0.2; // up to 20% chance they'll go irrational
+      // Each bidder has different valuation and behavior
+      const valuation = property.price * (0.85 + Math.random() * 0.3); // 85% - 115% of guide
+      const aggression = Math.random(); // How likely to bid
+      const overbidChance = Math.random() * 0.25; // Chance to go over their valuation
       return { name, valuation, aggression, overbidChance };
     });
     
@@ -254,13 +302,19 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
       bidderCount,
       timeRemaining: 30,
       isActive: true,
-      bidHistory: [{ bidder: "Auctioneer", amount: startingBid, timestamp: Date.now(), isUser: false }],
+      bidHistory: [{ 
+        bidder: "Auctioneer", 
+        amount: startingBid, 
+        timestamp: Date.now(), 
+        isUser: false 
+      }],
       lastBidTime: Date.now(),
       endTime,
       aiBidders
     });
     
     setUserBidAmount([startingBid + Math.floor(property.price * 0.02)]);
+    setUserMaxAutoBid(null);
     setAuctioneerMessage(`Lot ${property.id}: ${property.name}. Starting at £${startingBid.toLocaleString()}`);
   };
 
@@ -389,17 +443,18 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
                             >
                               Place Bid: £{userBidAmount[0].toLocaleString()}
                             </Button>
-                            <div className="flex items-center">
+                            <div className="flex flex-col">
+                              <Label className="text-xs mb-1">Max Auto-Bid (£)</Label>
                               <Input
                                 type="number"
-                                placeholder="Max auto-bid (£)"
+                                placeholder="Optional"
                                 value={userMaxAutoBid ?? ''}
                                 onChange={(e) => setUserMaxAutoBid(e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
-                                className="w-full"
+                                className="h-8 text-xs"
                               />
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">Auto-bid will outbid up to your max when outbid, if you have cash.</p>
+                          <p className="text-xs text-muted-foreground">Auto-bid will outbid others up to your max when you're outbid.</p>
                         </div>
                       )}
                     </div>
@@ -424,7 +479,10 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
                   
                   <Button 
                     variant="outline" 
-                    onClick={() => setLiveAuction(null)}
+                    onClick={() => {
+                      setLiveAuction(null);
+                      setUserMaxAutoBid(null);
+                    }}
                     className="w-full"
                   >
                     Leave Auction
@@ -475,186 +533,137 @@ const [auctioneerMessage, setAuctioneerMessage] = useState("");
                           </div>
                           <div>
                             <span className="text-muted-foreground">Monthly Income:</span>
-                            <span className="ml-1 font-medium">
-                              £{property.monthlyIncome.toLocaleString()}
+                            <span className="ml-1 font-medium text-green-600">
+                              £{property.monthlyIncome.toLocaleString()}/mo
                             </span>
                           </div>
                         </div>
                         
-                        <div className="mt-3 p-2 bg-orange-50 rounded text-center">
-                          <p className="text-sm font-medium text-orange-700">Click to Join Live Auction</p>
+                        <div className="mt-3 text-center">
+                          <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+                            Join Live Auction (30s)
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
-                  {auctionProperties.length === 0 && (
-                    <Card className="border-dashed">
-                      <CardContent className="p-8 text-center text-muted-foreground">
-                        <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No properties available for auction at the moment.</p>
-                        <p className="text-sm">Check back next month!</p>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
+                
+                {auctionProperties.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No properties available for auction at the moment.</p>
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="sell" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* List Property for Auction */}
+            <h3 className="text-lg font-semibold">List Your Properties for Auction</h3>
+            
+            {unlistedProperties.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No properties available to list for auction.</p>
+              </div>
+            ) : (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">List Property for Auction</h3>
-                
-                {unlistedProperties.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="grid gap-2">
-                      <Label>Select Property</Label>
-                      <select 
-                        className="w-full p-2 border rounded-md"
-                        value={selectedProperty?.id || ""}
-                        onChange={(e) => {
-                          const prop = unlistedProperties.find(p => p.id === e.target.value);
-                          setSelectedProperty(prop || null);
-                          if (prop) {
-                            setGuidePrice(prop.value.toString());
-                            setReservePrice((prop.value * 0.85).toString());
-                          }
+                <div className="space-y-3">
+                  <Label>Select Property to List:</Label>
+                  <div className="grid gap-2 max-h-40 overflow-y-auto">
+                    {unlistedProperties.map(property => (
+                      <div 
+                        key={property.id}
+                        className={`p-3 border rounded cursor-pointer transition-colors ${
+                          selectedProperty?.id === property.id ? 'border-primary bg-primary/10' : 'border-border'
+                        }`}
+                        onClick={() => {
+                          setSelectedProperty(property);
+                          setReservePrice(Math.floor(property.value * 0.8).toString());
+                          setGuidePrice(property.value.toString());
                         }}
                       >
-                        <option value="">Choose a property...</option>
-                        {unlistedProperties.map(prop => (
-                          <option key={prop.id} value={prop.id}>
-                            {prop.name} (Est. £{prop.value.toLocaleString()})
-                          </option>
-                        ))}
-                      </select>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium">{property.name}</p>
+                            <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">£{property.value.toLocaleString()}</p>
+                            <Badge variant="outline">{property.type}</Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedProperty && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Reserve Price (£)</Label>
+                        <Input
+                          type="number"
+                          value={reservePrice}
+                          onChange={(e) => setReservePrice(e.target.value)}
+                          placeholder="Minimum acceptable price"
+                        />
+                      </div>
+                      <div>
+                        <Label>Guide Price (£)</Label>
+                        <Input
+                          type="number"
+                          value={guidePrice}
+                          onChange={(e) => setGuidePrice(e.target.value)}
+                          placeholder="Expected sale price"
+                        />
+                      </div>
                     </div>
                     
-                    {selectedProperty && (
-                      <div className="space-y-3">
-                        <div className="space-y-3">
-                          <Label>Guide Price: £{parseInt(guidePrice || "0").toLocaleString()}</Label>
-                          <Slider
-                            value={[parseInt(guidePrice || "0")]}
-                            onValueChange={(value) => setGuidePrice(value[0].toString())}
-                            min={selectedProperty ? selectedProperty.value * 0.8 : 0}
-                            max={selectedProperty ? selectedProperty.value * 1.3 : 1000000}
-                            step={1000}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>80%</span>
-                            <span>130%</span>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <Label>Reserve Price: £{parseInt(reservePrice || "0").toLocaleString()}</Label>
-                          <Slider
-                            value={[parseInt(reservePrice || "0")]}
-                            onValueChange={(value) => setReservePrice(value[0].toString())}
-                            min={selectedProperty ? selectedProperty.value * 0.6 : 0}
-                            max={parseInt(guidePrice || "0") || (selectedProperty ? selectedProperty.value : 1000000)}
-                            step={1000}
-                            className="w-full"
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>60%</span>
-                            <span>Guide Price</span>
-                          </div>
-                        </div>
-                        
-                        <Button 
-                          onClick={handleListForAuction}
-                          className="w-full bg-orange-600 hover:bg-orange-700"
-                        >
-                          List for Auction
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No properties available to list.</p>
-                    <p className="text-sm">Buy some properties first or your current properties may already be listed.</p>
+                    <Button onClick={handleListForAuction} className="w-full">
+                      List for Auction
+                    </Button>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Current Auction Listings */}
+            {/* Current Listings */}
+            {listings.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Your Auction Listings</h3>
-                
-                {listings.length > 0 ? (
-                  <div className="space-y-3">
-                    {listings.map((listing) => {
-                      const daysUntilAuction = getDaysUntilAuction(listing.auctionDate);
-                      const isActive = daysUntilAuction > 0;
-                      
-                      return (
-                        <Card key={listing.property.id} className={`${isActive ? 'border-orange-200' : 'border-green-200'}`}>
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-medium">{listing.property.name}</h4>
-                                <p className="text-sm text-muted-foreground">{listing.property.neighborhood}</p>
-                              </div>
-                              <Badge variant={isActive ? "secondary" : "default"}>
-                                {isActive ? (
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {daysUntilAuction} days
-                                  </div>
-                                ) : (
-                                  "Sold"
-                                )}
-                              </Badge>
+                <h4 className="font-semibold">Your Auction Listings</h4>
+                <div className="space-y-3">
+                  {listings.map((listing, index) => (
+                    <Card key={index}>
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h5 className="font-medium">{listing.property.name}</h5>
+                            <p className="text-sm text-muted-foreground">{listing.property.neighborhood}</p>
+                            <div className="flex gap-4 text-sm mt-2">
+                              <span>Reserve: £{listing.reservePrice.toLocaleString()}</span>
+                              <span>Guide: £{listing.guidePrice.toLocaleString()}</span>
                             </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Guide:</span>
-                                <span className="ml-1">£{listing.guidePrice.toLocaleString()}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Reserve:</span>
-                                <span className="ml-1">£{listing.reservePrice.toLocaleString()}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Current Bid:</span>
-                                <span className="ml-1 font-medium text-green-600">
-                                  £{listing.highestBid.toLocaleString()}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Bidders:</span>
-                                <span className="ml-1">{listing.bidderCount}</span>
-                              </div>
-                            </div>
-                            
-                            {listing.highestBid >= listing.reservePrice && (
-                              <div className="mt-2 flex items-center text-green-600 text-sm">
-                                <TrendingUp className="h-4 w-4 mr-1" />
-                                Reserve met!
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Gavel className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No active auction listings.</p>
-                    <p className="text-sm">List a property to get started.</p>
-                  </div>
-                )}
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-green-600">
+                              £{listing.highestBid.toLocaleString()}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Current bid</p>
+                            <Badge variant="outline" className="mt-1">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {getDaysUntilAuction(listing.auctionDate)} days
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

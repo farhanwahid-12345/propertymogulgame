@@ -798,6 +798,7 @@ export function useGameState() {
       let newMortgage: Mortgage | null = null;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+        // Dynamic rate based on current market conditions
         const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
           (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = dynamicRate / 12;
@@ -818,8 +819,7 @@ export function useGameState() {
           principal: mortgageAmount,
           monthlyPayment,
           remainingBalance: mortgageAmount,
-          interestRate: provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
-            (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0),
+          interestRate: dynamicRate, // Use dynamic rate
           termYears,
           mortgageType,
           providerId: providerId || "halifax",
