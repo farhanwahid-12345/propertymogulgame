@@ -82,7 +82,7 @@ interface GameState {
   overdraftUsed: number;
 }
 
-const INITIAL_CASH = 1000000; // £1M starting cash
+const INITIAL_CASH = 250000; // £250K starting cash
 const EXPERIENCE_BASE = 1000;
 const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
 const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
@@ -347,6 +347,32 @@ const AVAILABLE_PROPERTIES: Property[] = [
   }
 ];
 
+// Generate a new property when market needs more inventory
+const generateRandomProperty = (): Property => {
+  const id = `gen_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  const types: Property['type'][] = ['residential', 'commercial', 'luxury'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const basePrice = type === 'residential' ? 60000 + Math.random() * 140000
+                   : type === 'commercial' ? 150000 + Math.random() * 250000
+                   : 250000 + Math.random() * 500000;
+  const price = Math.floor(basePrice / 1000) * 1000;
+  const value = price;
+  const monthlyIncome = Math.floor((price * (type === 'luxury' ? 0.05 : type === 'commercial' ? 0.06 : 0.07)) / 12);
+  const neighborhoods = ["Linthorpe","Acklam","Marton","Nunthorpe","Middlesbrough Centre","Hemlington","South Bank"];
+  const neighborhood = neighborhoods[Math.floor(Math.random()*neighborhoods.length)];
+  return {
+    id,
+    name: `${Math.floor(10 + Math.random()*89)} New Street`,
+    type,
+    price,
+    value,
+    neighborhood,
+    monthlyIncome: Math.max(400, monthlyIncome),
+    image: "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400&h=300&fit=crop",
+    marketTrend: "stable",
+  };
+};
+
 const getMaxPropertiesForLevel = (level: number) => 10;
 
 const getAvailablePropertyTypes = (level: number) => {
@@ -421,15 +447,70 @@ export function useGameState() {
   useEffect(() => {
     const splitProperties = () => {
       const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-      const midpoint = Math.floor(shuffled.length / 2);
-      setEstateAgentProperties(shuffled.slice(0, midpoint));
-      setAuctionProperties(shuffled.slice(midpoint));
+      const first = shuffled[0];
+      setAuctionProperties(first ? [first] : []);
+      setEstateAgentProperties(shuffled.slice(1));
     };
     
     if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
       splitProperties();
     }
   }, []);
+
+  // Ensure a single live auction property and replenish market inventory
+  useEffect(() => {
+    // Enforce exactly one property in auction
+    setAuctionProperties(prev => {
+      let next = prev;
+      if (prev.length === 0) {
+        let moved: Property | undefined;
+        setEstateAgentProperties(est => {
+          if (est.length > 0) {
+            moved = est[0];
+            return est.slice(1);
+          }
+          return est;
+        });
+        if (moved) next = [moved];
+      } else if (prev.length > 1) {
+        const [keep, ...rest] = prev;
+        setEstateAgentProperties(est => {
+          const merged = [...est];
+          rest.forEach(p => {
+            if (!merged.find(x => x.id === p.id)) merged.push(p);
+          });
+          return merged;
+        });
+        next = [keep];
+      }
+      return next;
+    });
+
+    // Top up estate agent properties if portfolio not full
+    if (gameState.ownedProperties.length < getMaxPropertiesForLevel(gameState.level)) {
+      setEstateAgentProperties(prev => {
+        let list = prev.slice();
+        const usedIds = new Set([
+          ...gameState.ownedProperties.map(p => p.id),
+          ...auctionProperties.map(p => p.id),
+          ...list.map(p => p.id),
+        ]);
+        while (list.length < 6) {
+          const candidates = AVAILABLE_PROPERTIES.filter(p => !usedIds.has(p.id));
+          const pick = candidates.length > 0
+            ? candidates[Math.floor(Math.random() * candidates.length)]
+            : generateRandomProperty();
+          if (!usedIds.has(pick.id)) {
+            list.push({ ...pick });
+            usedIds.add(pick.id);
+          } else {
+            break;
+          }
+        }
+        return list;
+      });
+    }
+  }, [auctionProperties.length, estateAgentProperties.length, gameState.ownedProperties.length, gameState.level]);
 
   // Save to localStorage whenever game state changes
   useEffect(() => {
@@ -845,6 +926,60 @@ export function useGameState() {
     setAuctionProperties(prev => prev.filter(p => p.id !== property.id));
   }, []);
 
+  // Purchase a property at a specific price (e.g., auction win)
+  const buyPropertyAtPrice = useCallback((property: Property, purchasePrice: number, mortgagePercentage: number = 0, providerId?: string, termYears: number = 25, mortgageType: 'repayment' | 'interest-only' = 'repayment') => {
+    setGameState(prev => {
+      if (prev.isBankrupt) return prev;
+      if (prev.ownedProperties.some(p => p.id === property.id)) return prev;
+      if (prev.ownedProperties.length >= getMaxPropertiesForLevel(prev.level)) return prev;
+
+      const mortgageAmount = (purchasePrice * mortgagePercentage) / 100;
+      const stampDuty = purchasePrice * STAMP_DUTY_RATE;
+      const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + (mortgageAmount > 0 ? MORTGAGE_BROKER_FEE : 0);
+      if (prev.cash < cashRequired) return prev;
+
+      let newMortgage: Mortgage | null = null;
+      if (mortgageAmount > 0) {
+        const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+        const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+        const monthlyRate = dynamicRate / 12;
+        const totalPayments = termYears * 12;
+        const monthlyPayment = mortgageType === 'interest-only'
+          ? mortgageAmount * monthlyRate
+          : mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+        newMortgage = {
+          id: `${property.id}_${Date.now()}`,
+          propertyId: property.id,
+          principal: mortgageAmount,
+          monthlyPayment,
+          remainingBalance: mortgageAmount,
+          interestRate: dynamicRate,
+          termYears,
+          mortgageType,
+          providerId: providerId || "halifax",
+          startDate: Date.now()
+        };
+      }
+
+      toast({
+        title: "Property Purchased!",
+        description: `You bought ${property.name} for £${purchasePrice.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}.`,
+      });
+
+      const purchased = { ...property, price: purchasePrice, value: purchasePrice, owned: true };
+      return {
+        ...prev,
+        cash: prev.cash - cashRequired,
+        ownedProperties: [...prev.ownedProperties, purchased],
+        mortgages: newMortgage ? [...prev.mortgages, newMortgage] : prev.mortgages,
+        experience: prev.experience + Math.floor(purchasePrice / 10000)
+      };
+    });
+
+    setEstateAgentProperties(prev => prev.filter(p => p.id !== property.id));
+    setAuctionProperties(prev => prev.filter(p => p.id !== property.id));
+  }, []);
+
   const sellProperty = useCallback((property: Property, isAuction: boolean = false) => {
     setGameState(prev => {
       const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60); // Auction: 1 day, Market: 30-90 days
@@ -891,14 +1026,13 @@ export function useGameState() {
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-    const midpoint = Math.floor(shuffled.length / 2);
-    setEstateAgentProperties(shuffled.slice(0, midpoint));
-    setAuctionProperties(shuffled.slice(midpoint));
+    setAuctionProperties(shuffled.length ? [shuffled[0]] : []);
+    setEstateAgentProperties(shuffled.slice(1));
     localStorage.removeItem("propertyTycoonSave");
     
     toast({
       title: "Game Reset",
-      description: "Started fresh with £1M. Good luck building your empire!",
+      description: "Started fresh with £250K. Good luck building your empire!",
     });
   }, []);
 
@@ -1189,10 +1323,11 @@ export function useGameState() {
     // Increase based on level
     score += gameState.level * 10;
     
-    // Decrease if high debt-to-income ratio
-    const debtToIncomeRatio = totalDebt / Math.max(totalMonthlyIncome * 12, 1);
-    if (debtToIncomeRatio > 0.5) score -= 100;
-    if (debtToIncomeRatio > 0.3) score -= 50;
+    // Decrease if high debt-to-value (portfolio LTV) ratio
+    const portfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
+    const debtToValue = portfolioValue > 0 ? totalDebt / portfolioValue : 0;
+    if (debtToValue > 0.8) score -= 100;
+    if (debtToValue > 0.6) score -= 50;
     
     // Decrease if bankrupt history
     if (gameState.isBankrupt) score -= 150;
@@ -1280,19 +1415,41 @@ export function useGameState() {
         const mortgage = prev.mortgages.find(m => m.propertyId === id);
         return total + (mortgage?.remainingBalance || 0);
       }, 0);
-      
+
+      const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+      const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
+      const monthlyRate = dynamicRate / 12;
+      const totalPayments = termYears * 12;
+      const monthlyPayment = mortgageType === 'interest-only'
+        ? loanAmount * monthlyRate
+        : loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+
       const cashFromMortgage = loanAmount - totalCurrentMortgages;
-      
-      const updatedProperties = prev.ownedProperties.map(property => 
-        selectedPropertyIds.includes(property.id) 
+
+      const updatedProperties = prev.ownedProperties.map(property =>
+        selectedPropertyIds.includes(property.id)
           ? { ...property, mortgageRemaining: loanAmount / selectedPropertyIds.length }
           : property
       );
 
+      const portfolioMortgage: Mortgage = {
+        id: `portfolio_${Date.now()}`,
+        propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
+        principal: loanAmount,
+        monthlyPayment,
+        remainingBalance: loanAmount,
+        interestRate: dynamicRate,
+        termYears,
+        mortgageType,
+        providerId: provider.id,
+        startDate: Date.now()
+      };
+
       return {
         ...prev,
         cash: prev.cash + Math.max(0, cashFromMortgage),
-        ownedProperties: updatedProperties
+        ownedProperties: updatedProperties,
+        mortgages: [...prev.mortgages, portfolioMortgage]
       };
     });
   }, []);
@@ -1340,6 +1497,7 @@ export function useGameState() {
     getAvailablePropertyTypes,
     getMaxPropertyValue,
     buyProperty,
+    buyPropertyAtPrice,
     sellProperty,
     selectTenant,
     removeTenant,
