@@ -23,6 +23,8 @@ interface Mortgage {
   termYears: number; // 5, 10, 15, 20, 25, 30
   mortgageType: 'repayment' | 'interest-only';
   providerId: string;
+  // If set, this mortgage is secured against multiple properties (portfolio mortgage)
+  collateralPropertyIds?: string[];
   startDate: number;
 }
 
@@ -1378,81 +1380,115 @@ export function useGameState() {
     });
   }, []);
 
-  // Mortgage refinancing
-  const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
-    setGameState(prev => {
-      const property = prev.ownedProperties.find(p => p.id === propertyId);
-      const existingMortgage = prev.mortgages.find(m => m.propertyId === propertyId);
-      
-      if (!property) return prev;
+// Mortgage refinancing
+const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
+  setGameState(prev => {
+    const property = prev.ownedProperties.find(p => p.id === propertyId);
+    if (!property) return prev;
 
-      const currentMortgage = existingMortgage?.remainingBalance || 0;
-      const cashFromRefinance = newLoanAmount - currentMortgage;
-      
-      const updatedProperties = prev.ownedProperties.map(p => 
-        p.id === propertyId ? { ...p, mortgageRemaining: newLoanAmount } : p
-      );
+    // Block refinance if property is part of an active portfolio mortgage
+    const inPortfolio = prev.mortgages.some(m => m.collateralPropertyIds?.includes(propertyId));
+    if (inPortfolio) {
+      toast({
+        title: "Refinance Not Allowed",
+        description: "This property is part of a portfolio mortgage. Settle or adjust the portfolio loan first.",
+        variant: "destructive"
+      });
+      return prev;
+    }
 
-      const updatedMortgages = existingMortgage 
-        ? prev.mortgages.map(m => m.propertyId === propertyId 
-            ? { ...m, remainingBalance: newLoanAmount, providerId, termYears, mortgageType }
-            : m)
-        : prev.mortgages;
+    const existingMortgage = prev.mortgages.find(m => m.propertyId === propertyId);
+    const currentMortgage = existingMortgage?.remainingBalance || 0;
+    const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
 
-      return {
-        ...prev,
-        cash: prev.cash + Math.max(0, cashFromRefinance),
-        ownedProperties: updatedProperties,
-        mortgages: updatedMortgages
-      };
-    });
-  }, []);
+    // Recalculate rate and monthly payment
+    const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+    const monthlyRate = dynamicRate / 12;
+    const totalPayments = termYears * 12;
+    const monthlyPayment = mortgageType === 'interest-only'
+      ? newLoanAmount * monthlyRate
+      : newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
 
-  // Portfolio mortgage
-  const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
-    setGameState(prev => {
-      const totalCurrentMortgages = selectedPropertyIds.reduce((total, id) => {
-        const mortgage = prev.mortgages.find(m => m.propertyId === id);
-        return total + (mortgage?.remainingBalance || 0);
-      }, 0);
+    const newMortgage: Mortgage = {
+      id: `${propertyId}_${Date.now()}`,
+      propertyId,
+      principal: newLoanAmount,
+      monthlyPayment,
+      remainingBalance: newLoanAmount,
+      interestRate: dynamicRate,
+      termYears,
+      mortgageType,
+      providerId: provider.id,
+      startDate: Date.now(),
+    };
 
-      const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-      const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
-      const monthlyRate = dynamicRate / 12;
-      const totalPayments = termYears * 12;
-      const monthlyPayment = mortgageType === 'interest-only'
-        ? loanAmount * monthlyRate
-        : loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+    const updatedMortgages = existingMortgage
+      ? prev.mortgages.map(m => (m.propertyId === propertyId ? newMortgage : m))
+      : [...prev.mortgages, newMortgage];
 
-      const cashFromMortgage = loanAmount - totalCurrentMortgages;
+    const cashFromRefinance = newLoanAmount - currentMortgage;
 
-      const updatedProperties = prev.ownedProperties.map(property =>
-        selectedPropertyIds.includes(property.id)
-          ? { ...property, mortgageRemaining: loanAmount / selectedPropertyIds.length }
-          : property
-      );
+    return {
+      ...prev,
+      cash: prev.cash + Math.max(0, cashFromRefinance),
+      mortgages: updatedMortgages,
+    };
+  });
+}, []);
 
-      const portfolioMortgage: Mortgage = {
-        id: `portfolio_${Date.now()}`,
-        propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
-        principal: loanAmount,
-        monthlyPayment,
-        remainingBalance: loanAmount,
-        interestRate: dynamicRate,
-        termYears,
-        mortgageType,
-        providerId: provider.id,
-        startDate: Date.now()
-      };
+// Portfolio mortgage
+const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
+  setGameState(prev => {
+    // Prevent overlapping portfolio loans on the same properties
+    const hasExistingPortfolio = prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)));
+    if (hasExistingPortfolio) {
+      toast({
+        title: "Cannot Create Portfolio Mortgage",
+        description: "One or more selected properties are already part of a portfolio mortgage.",
+        variant: "destructive"
+      });
+      return prev;
+    }
 
-      return {
-        ...prev,
-        cash: prev.cash + Math.max(0, cashFromMortgage),
-        ownedProperties: updatedProperties,
-        mortgages: [...prev.mortgages, portfolioMortgage]
-      };
-    });
-  }, []);
+    // Sum all existing individual mortgages for these properties
+    const totalCurrentMortgages = prev.mortgages
+      .filter(m => selectedPropertyIds.includes(m.propertyId))
+      .reduce((sum, m) => sum + m.remainingBalance, 0);
+
+    const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+    const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
+    const monthlyRate = dynamicRate / 12;
+    const totalPayments = termYears * 12;
+    const monthlyPayment = mortgageType === 'interest-only'
+      ? loanAmount * monthlyRate
+      : loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+
+    const portfolioMortgage: Mortgage = {
+      id: `portfolio_${Date.now()}`,
+      propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
+      principal: loanAmount,
+      monthlyPayment,
+      remainingBalance: loanAmount,
+      interestRate: dynamicRate,
+      termYears,
+      mortgageType,
+      providerId: provider.id,
+      collateralPropertyIds: [...selectedPropertyIds],
+      startDate: Date.now()
+    };
+
+    // Remove existing individual mortgages for these properties before adding the portfolio loan
+    const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
+
+    const cashDelta = loanAmount - totalCurrentMortgages;
+
+    return {
+      ...prev,
+      cash: prev.cash + cashDelta,
+      mortgages: [...remainingMortgages, portfolioMortgage]
+    };
+  });
+}, []);
 
   // Overdraft functions
   const handleApplyOverdraft = useCallback((requestedLimit: number) => {

@@ -19,6 +19,17 @@ const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
+  const getDebtForProperty = (propertyId: string) => {
+    return gameState.mortgages.reduce((sum, m) => {
+      if (m.propertyId === propertyId) return sum + m.remainingBalance;
+      if (m.collateralPropertyIds?.includes(propertyId)) {
+        const share = m.remainingBalance / (m.collateralPropertyIds.length || 1);
+        return sum + share;
+      }
+      return sum;
+    }, 0);
+  };
+
   const sortedOwnedProperties = gameState.ownedProperties.sort((a, b) => {
     const yieldA = (a.monthlyIncome / a.value) * 12 * 100;
     const yieldB = (b.monthlyIncome / b.value) * 12 * 100;
@@ -128,20 +139,20 @@ const Index = () => {
                   cash={gameState.cash}
                   onSettleMortgage={gameState.settleMortgage}
                 />
-                <MortgageRefinance
-                  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
-                  mortgageProviders={gameState.mortgageProviders}
-                  onRefinance={gameState.handleRefinance}
-                  cash={gameState.cash}
-                  setCash={gameState.setCash}
-                />
-                <PortfolioMortgage
-                  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: gameState.mortgages.find(m => m.propertyId === p.id)?.remainingBalance || 0 }))}
-                  mortgageProviders={gameState.mortgageProviders}
-                  onPortfolioMortgage={gameState.handlePortfolioMortgage}
-                  cash={gameState.cash}
-                  setCash={gameState.setCash}
-                />
+<MortgageRefinance
+  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
+  mortgageProviders={gameState.mortgageProviders}
+  onRefinance={gameState.handleRefinance}
+  cash={gameState.cash}
+  setCash={gameState.setCash}
+/>
+<PortfolioMortgage
+  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
+  mortgageProviders={gameState.mortgageProviders}
+  onPortfolioMortgage={gameState.handlePortfolioMortgage}
+  cash={gameState.cash}
+  setCash={gameState.setCash}
+/>
                 <CreditOverdraft
                   creditScore={gameState.creditScore}
                   overdraftLimit={gameState.overdraftLimit}
