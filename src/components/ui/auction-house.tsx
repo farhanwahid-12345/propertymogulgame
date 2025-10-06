@@ -83,11 +83,9 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
           if (prev.currentBid >= prev.reservePrice) {
             if (isUserWinner) {
+              // Purchase will validate funds and ownership in buyPropertyAtPrice
               onBuyProperty(prev.property, prev.currentBid, 0);
-              toast({
-                title: "Auction Won!",
-                description: `Congratulations! You won ${prev.property.name} for £${prev.currentBid.toLocaleString()}!`,
-              });
+              // Don't remove from auction properties yet - let buyPropertyAtPrice handle it
             } else {
               toast({
                 title: "Auction Lost",

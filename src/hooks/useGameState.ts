@@ -938,13 +938,40 @@ export function useGameState() {
   const buyPropertyAtPrice = useCallback((property: Property, purchasePrice: number, mortgagePercentage: number = 0, providerId?: string, termYears: number = 25, mortgageType: 'repayment' | 'interest-only' = 'repayment') => {
     setGameState(prev => {
       if (prev.isBankrupt) return prev;
-      if (prev.ownedProperties.some(p => p.id === property.id)) return prev;
-      if (prev.ownedProperties.length >= getMaxPropertiesForLevel(prev.level)) return prev;
+      
+      // Check if already owned
+      if (prev.ownedProperties.some(p => p.id === property.id)) {
+        toast({
+          title: "Already Owned",
+          description: `You already own ${property.name}!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+      
+      // Check max properties
+      if (prev.ownedProperties.length >= getMaxPropertiesForLevel(prev.level)) {
+        toast({
+          title: "Portfolio Limit Reached",
+          description: `You can only own ${getMaxPropertiesForLevel(prev.level)} properties at level ${prev.level}!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
 
       const mortgageAmount = (purchasePrice * mortgagePercentage) / 100;
       const stampDuty = purchasePrice * STAMP_DUTY_RATE;
       const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + (mortgageAmount > 0 ? MORTGAGE_BROKER_FEE : 0);
-      if (prev.cash < cashRequired) return prev;
+      
+      // Check cash
+      if (prev.cash < cashRequired) {
+        toast({
+          title: "Insufficient Funds",
+          description: `You need £${cashRequired.toLocaleString()} to complete this purchase (£${purchasePrice.toLocaleString()} + £${(cashRequired - purchasePrice + mortgageAmount).toLocaleString()} fees)!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
 
       let newMortgage: Mortgage | null = null;
       if (mortgageAmount > 0) {
