@@ -408,7 +408,7 @@ export function useGameState() {
       experience: parsedState.experience || 0,
       experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
       monthsPlayed: parsedState.monthsPlayed || 0,
-      timeUntilNextMonth: parsedState.timeUntilNextMonth || 60,
+      timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
       isBankrupt: parsedState.isBankrupt || false,
       creditScore: parsedState.creditScore || 650,
       currentMarketRate: parsedState.currentMarketRate || BASE_MARKET_RATE,
@@ -429,7 +429,7 @@ export function useGameState() {
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
-      timeUntilNextMonth: 60,
+      timeUntilNextMonth: 180,
       isBankrupt: false,
       creditScore: 650,
       currentMarketRate: BASE_MARKET_RATE,
@@ -488,29 +488,35 @@ export function useGameState() {
       return next;
     });
 
-    // Top up estate agent properties if portfolio not full
+    // Always maintain 10 total properties for sale if portfolio not full
     if (gameState.ownedProperties.length < getMaxPropertiesForLevel(gameState.level)) {
-      setEstateAgentProperties(prev => {
-        let list = prev.slice();
-        const usedIds = new Set([
-          ...gameState.ownedProperties.map(p => p.id),
-          ...auctionProperties.map(p => p.id),
-          ...list.map(p => p.id),
-        ]);
-        while (list.length < 6) {
-          const candidates = AVAILABLE_PROPERTIES.filter(p => !usedIds.has(p.id));
-          const pick = candidates.length > 0
-            ? candidates[Math.floor(Math.random() * candidates.length)]
-            : generateRandomProperty();
-          if (!usedIds.has(pick.id)) {
-            list.push({ ...pick });
-            usedIds.add(pick.id);
-          } else {
-            break;
+      const totalAvailable = auctionProperties.length + estateAgentProperties.length;
+      const targetTotal = 10;
+      
+      if (totalAvailable < targetTotal) {
+        setEstateAgentProperties(prev => {
+          let list = prev.slice();
+          const usedIds = new Set([
+            ...gameState.ownedProperties.map(p => p.id),
+            ...auctionProperties.map(p => p.id),
+            ...list.map(p => p.id),
+          ]);
+          
+          // Need to add (targetTotal - totalAvailable) properties
+          const needed = targetTotal - totalAvailable;
+          for (let i = 0; i < needed; i++) {
+            const candidates = AVAILABLE_PROPERTIES.filter(p => !usedIds.has(p.id));
+            const pick = candidates.length > 0
+              ? candidates[Math.floor(Math.random() * candidates.length)]
+              : generateRandomProperty();
+            if (!usedIds.has(pick.id)) {
+              list.push({ ...pick });
+              usedIds.add(pick.id);
+            }
           }
-        }
-        return list;
-      });
+          return list;
+        });
+      }
     }
   }, [auctionProperties.length, estateAgentProperties.length, gameState.ownedProperties.length, gameState.level]);
 
@@ -801,12 +807,12 @@ export function useGameState() {
           level: newLevel,
           experienceToNext: newExperienceToNext,
           monthsPlayed: prev.monthsPlayed + 1,
-          timeUntilNextMonth: 60, // Reset to 1 minute
+          timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
           creditScore: Math.min(850, prev.creditScore + creditScoreImprovement)
         };
       });
-    }, 60000); // Every 1 minute = 1 month
+    }, 180000); // Every 3 minutes = 1 month (180 seconds)
 
     return () => clearInterval(monthlyInterval);
   }, []);
@@ -1016,7 +1022,7 @@ export function useGameState() {
       experience: 0,
       experienceToNext: EXPERIENCE_BASE,
       monthsPlayed: 0,
-      timeUntilNextMonth: 60,
+      timeUntilNextMonth: 180,
       isBankrupt: false,
       creditScore: 650,
       currentMarketRate: BASE_MARKET_RATE,
