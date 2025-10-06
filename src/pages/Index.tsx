@@ -6,8 +6,7 @@ import { PropertyCard } from "@/components/ui/property-card";
 import { GameClock } from "@/components/ui/game-clock";
 import { GameStats } from "@/components/ui/game-stats";
 import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
-import { MortgageRefinance } from "@/components/ui/mortgage-refinance";
-import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
+import { MortgageManagement } from "@/components/ui/mortgage-management";
 import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
@@ -139,20 +138,14 @@ const Index = () => {
                   cash={gameState.cash}
                   onSettleMortgage={gameState.settleMortgage}
                 />
-<MortgageRefinance
-  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
-  mortgageProviders={gameState.mortgageProviders}
-  onRefinance={gameState.handleRefinance}
-  cash={gameState.cash}
-  setCash={gameState.setCash}
-/>
-<PortfolioMortgage
-  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
-  mortgageProviders={gameState.mortgageProviders}
-  onPortfolioMortgage={gameState.handlePortfolioMortgage}
-  cash={gameState.cash}
-  setCash={gameState.setCash}
-/>
+                <MortgageManagement
+                  ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
+                  mortgageProviders={gameState.mortgageProviders}
+                  onRefinance={gameState.handleRefinance}
+                  onPortfolioMortgage={gameState.handlePortfolioMortgage}
+                  cash={gameState.cash}
+                  setCash={gameState.setCash}
+                />
                 <CreditOverdraft
                   creditScore={gameState.creditScore}
                   overdraftLimit={gameState.overdraftLimit}
