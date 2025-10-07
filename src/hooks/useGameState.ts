@@ -350,13 +350,29 @@ const AVAILABLE_PROPERTIES: Property[] = [
 ];
 
 // Generate a new property when market needs more inventory
-const generateRandomProperty = (): Property => {
+const getPropertyValueRangeForLevel = (level: number): { min: number; max: number } => {
+  switch (level) {
+    case 1: return { min: 0, max: 100000 };
+    case 2: return { min: 100000, max: 250000 };
+    case 3: return { min: 250000, max: 500000 };
+    case 4: return { min: 500000, max: 750000 };
+    case 5: return { min: 750000, max: 1000000 };
+    case 6: return { min: 1000000, max: 2500000 };
+    case 7: return { min: 2500000, max: 5000000 };
+    case 8: return { min: 5000000, max: 10000000 };
+    case 9: return { min: 10000000, max: 20000000 };
+    case 10: return { min: 20000000, max: 30000000 };
+    default: return { min: 0, max: 100000 };
+  }
+};
+
+const generateRandomProperty = (level: number): Property => {
   const id = `gen_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const types: Property['type'][] = ['residential', 'commercial', 'luxury'];
   const type = types[Math.floor(Math.random() * types.length)];
-  const basePrice = type === 'residential' ? 60000 + Math.random() * 140000
-                   : type === 'commercial' ? 150000 + Math.random() * 250000
-                   : 250000 + Math.random() * 500000;
+  
+  const { min, max } = getPropertyValueRangeForLevel(level);
+  const basePrice = min + Math.random() * (max - min);
   const price = Math.floor(basePrice / 1000) * 1000;
   const value = price;
   const monthlyIncome = Math.floor((price * (type === 'luxury' ? 0.05 : type === 'commercial' ? 0.06 : 0.07)) / 12);
@@ -385,11 +401,8 @@ const getAvailablePropertyTypes = (level: number) => {
 };
 
 const getMaxPropertyValue = (level: number) => {
-  if (level >= 5) return Infinity;
-  if (level >= 4) return 2000000;
-  if (level >= 3) return 1000000;
-  if (level >= 2) return 500000;
-  return 300000;
+  const range = getPropertyValueRangeForLevel(level);
+  return range.max;
 };
 
 export function useGameState() {
@@ -488,28 +501,36 @@ export function useGameState() {
       return next;
     });
 
-    // Always maintain 10 total properties for sale if portfolio not full
+    // Always maintain 20 total properties for sale if portfolio not full
     if (gameState.ownedProperties.length < getMaxPropertiesForLevel(gameState.level)) {
       const totalAvailable = auctionProperties.length + estateAgentProperties.length;
-      const targetTotal = 10;
+      const targetTotal = 20;
       
       if (totalAvailable < targetTotal) {
         setEstateAgentProperties(prev => {
           let list = prev.slice();
+          const ownedIds = new Set(gameState.ownedProperties.map(p => p.id));
           const usedIds = new Set([
-            ...gameState.ownedProperties.map(p => p.id),
             ...auctionProperties.map(p => p.id),
             ...list.map(p => p.id),
           ]);
           
+          const { min, max } = getPropertyValueRangeForLevel(gameState.level);
+          
           // Need to add (targetTotal - totalAvailable) properties
           const needed = targetTotal - totalAvailable;
           for (let i = 0; i < needed; i++) {
-            const candidates = AVAILABLE_PROPERTIES.filter(p => !usedIds.has(p.id));
+            // Filter available properties by level range and exclude owned properties
+            const candidates = AVAILABLE_PROPERTIES.filter(p => 
+              !usedIds.has(p.id) && 
+              !ownedIds.has(p.id) &&
+              p.price >= min && 
+              p.price <= max
+            );
             const pick = candidates.length > 0
               ? candidates[Math.floor(Math.random() * candidates.length)]
-              : generateRandomProperty();
-            if (!usedIds.has(pick.id)) {
+              : generateRandomProperty(gameState.level);
+            if (!usedIds.has(pick.id) && !ownedIds.has(pick.id)) {
               list.push({ ...pick });
               usedIds.add(pick.id);
             }
