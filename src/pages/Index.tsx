@@ -142,7 +142,6 @@ const Index = () => {
                   ownedProperties={gameState.ownedProperties.map(p => ({ ...p, mortgageRemaining: getDebtForProperty(p.id) }))}
                   mortgageProviders={gameState.mortgageProviders}
                   onRefinance={gameState.handleRefinance}
-                  onPortfolioMortgage={gameState.handlePortfolioMortgage}
                   cash={gameState.cash}
                   setCash={gameState.setCash}
                 />

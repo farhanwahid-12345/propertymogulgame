@@ -124,14 +124,6 @@ export function PropertyCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-          <img 
-            src={property.image} 
-            alt={property.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
-
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Price:</span>
