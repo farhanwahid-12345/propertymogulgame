@@ -657,6 +657,16 @@ export function useGameState() {
           return total;
         }, 0);
 
+        // Calculate property value growth: 2-4% annually, applied gradually
+        // Each interval is ~10 seconds, so ~8640 intervals per day, ~3.15M per year
+        // To get 2-4% annual growth, we apply tiny increments each interval
+        const annualGrowthRate = 0.02 + Math.random() * 0.02; // 2-4% per year
+        const intervalsPerYear = (365 * 24 * 60 * 60) / 10; // ~3.15M intervals
+        const intervalGrowthFactor = Math.pow(1 + annualGrowthRate, 1 / intervalsPerYear);
+        
+        // Add small random fluctuation (-0.5% to +0.5% per interval) on top of growth
+        const fluctuation = 0.995 + Math.random() * 0.01;
+
         return {
           ...prev,
           cash: prev.cash + saleCashGained,
@@ -664,7 +674,7 @@ export function useGameState() {
             ...property,
             value: Math.max(
               property.price * 0.5, // Minimum 50% of original price
-              property.value * (0.98 + Math.random() * 0.04) // -2% to +2% change
+              property.value * intervalGrowthFactor * fluctuation
             )
           })),
           mortgages: remainingMortgages,
@@ -677,16 +687,22 @@ export function useGameState() {
         };
       });
 
+      // Market properties also grow 2-4% annually with gradual application
+      const annualGrowthRate = 0.02 + Math.random() * 0.02;
+      const intervalsPerYear = (365 * 24 * 60 * 60) / 10;
+      const intervalGrowthFactor = Math.pow(1 + annualGrowthRate, 1 / intervalsPerYear);
+      const fluctuation = 0.995 + Math.random() * 0.01;
+
       setEstateAgentProperties(prev => 
         prev.map(property => ({
           ...property,
           price: Math.max(
             property.price * 0.8, // Minimum 80% of original price  
-            property.price * (0.985 + Math.random() * 0.03) // -1.5% to +1.5% change
+            property.price * intervalGrowthFactor * fluctuation
           ),
           value: Math.max(
             property.price * 0.8,
-            property.value * (0.985 + Math.random() * 0.03)
+            property.value * intervalGrowthFactor * fluctuation
           ),
           marketTrend: Math.random() > 0.7 ? (Math.random() > 0.5 ? "up" : "down") : "stable"
         }))
@@ -697,7 +713,7 @@ export function useGameState() {
           ...property,
           price: Math.max(
             property.price * 0.8, // Minimum 80% of original price  
-            property.price * (0.985 + Math.random() * 0.03) // -1.5% to +1.5% change
+            property.price * intervalGrowthFactor * fluctuation
           ),
           value: Math.max(
             property.price * 0.8,
