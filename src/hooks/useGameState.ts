@@ -1318,7 +1318,8 @@ export function useGameState() {
         ownedProperties: prev.ownedProperties.filter(p => p.id !== propertyId),
         mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
         tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
-        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId)
+        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId),
+        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
       };
     });
   }, []);
@@ -1339,7 +1340,8 @@ export function useGameState() {
         ownedProperties: prev.ownedProperties.filter(p => p.id !== propertyId),
         mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
         tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
-        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId)
+        voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId),
+        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
       };
     });
   }, []);

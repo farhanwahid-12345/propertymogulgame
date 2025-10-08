@@ -69,7 +69,7 @@ export function EstateAgentWindow({
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
 
-  // Generate realistic offers for listed properties
+  // Generate offers for listed properties - much faster
   useEffect(() => {
     const interval = setInterval(() => {
       setOffers(prev => {
@@ -78,18 +78,18 @@ export function EstateAgentWindow({
         // Remove expired offers
         const activeOffers = prev.filter(offer => currentTime < offer.expiresAt);
         
-        // Generate new offers for listed properties (more realistic)
+        // Generate new offers for listed properties (very fast and realistic)
         const newOffers: PropertyOffer[] = [];
         listings.forEach(listing => {
           const marketValue = listing.property.value;
           const priceRatio = listing.askingPrice / marketValue;
           
-          // Lower chance for overpriced properties
-          let offerChance = 0.15; // Base 15% chance
-          if (priceRatio <= 0.9) offerChance = 0.4; // Well priced
-          else if (priceRatio <= 1.0) offerChance = 0.25; // Fair price
-          else if (priceRatio <= 1.1) offerChance = 0.15; // Slightly overpriced
-          else offerChance = 0.05; // Overpriced
+          // Much higher chance of offers, especially for well-priced properties
+          let offerChance = 0.4; // Base 40% chance
+          if (priceRatio <= 0.9) offerChance = 0.9; // Well priced - 90% chance
+          else if (priceRatio <= 1.0) offerChance = 0.7; // Fair price - 70% chance
+          else if (priceRatio <= 1.1) offerChance = 0.5; // Slightly overpriced - 50% chance
+          else offerChance = 0.2; // Overpriced - 20% chance
           
           if (Math.random() < offerChance) {
             // More realistic offer generation
@@ -98,11 +98,11 @@ export function EstateAgentWindow({
               // Overpriced: offers 10-20% below asking
               offerAmount = listing.askingPrice * (0.8 + Math.random() * 0.1);
             } else if (priceRatio >= 1.0) {
-              // Fair: offers 5-10% below asking
-              offerAmount = listing.askingPrice * (0.9 + Math.random() * 0.05);
+              // Fair: offers 0-5% below asking or at asking
+              offerAmount = listing.askingPrice * (0.95 + Math.random() * 0.05);
             } else {
-              // Well priced: offers close to asking or above
-              offerAmount = listing.askingPrice * (0.95 + Math.random() * 0.08);
+              // Well priced: offers at or above asking
+              offerAmount = listing.askingPrice * (1.0 + Math.random() * 0.05);
             }
             
             const buyerNames = [
@@ -119,7 +119,7 @@ export function EstateAgentWindow({
               amount: Math.floor(offerAmount),
               buyerName,
               offerDate: currentTime,
-              expiresAt: currentTime + (24 * 60 * 60 * 1000), // Expires in 24 hours
+              expiresAt: currentTime + (2 * 60 * 60 * 1000), // Expires in 2 hours (faster)
               status: 'pending'
             });
           }
@@ -127,7 +127,7 @@ export function EstateAgentWindow({
         
         return [...activeOffers, ...newOffers];
       });
-    }, 45000); // Check every 45 seconds
+    }, 10000); // Check every 10 seconds (much faster)
 
     return () => clearInterval(interval);
   }, [listings]);
@@ -403,22 +403,21 @@ export function EstateAgentWindow({
                     <Button 
                       className="w-full" 
                       onClick={() => {
-                        // Simulate offer acceptance/rejection based on offer amount
+                        // Instant acceptance if offer is at or above asking price
                         const offerRatio = offerAmount[0] / selectedBuyProperty.price;
                         let acceptanceChance = 0;
                         
-                        if (offerRatio >= 1.05) acceptanceChance = 0.95; // 5%+ over asking
-                        else if (offerRatio >= 1.0) acceptanceChance = 0.85; // At or above asking
-                        else if (offerRatio >= 0.95) acceptanceChance = 0.65; // 5% below asking
-                        else if (offerRatio >= 0.9) acceptanceChance = 0.35; // 10% below asking
-                        else acceptanceChance = 0.1; // More than 10% below
+                        if (offerRatio >= 1.0) acceptanceChance = 1.0; // Instant acceptance at/above asking
+                        else if (offerRatio >= 0.95) acceptanceChance = 0.8; // 5% below asking - high chance
+                        else if (offerRatio >= 0.9) acceptanceChance = 0.5; // 10% below asking - medium chance
+                        else acceptanceChance = 0.2; // More than 10% below - low chance
                         
                         if (Math.random() < acceptanceChance) {
                           onBuyProperty(
                             selectedBuyProperty, 
                             offerAmount[0], 
                             mortgagePercentage[0], 
-                            selectedProvider || undefined, 
+                            selectedProvider || undefined,
                             termYears, 
                             mortgageType
                           );

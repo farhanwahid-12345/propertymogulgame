@@ -180,31 +180,24 @@ export function PropertyCard({
                 />
               )}
             </div>
-            
-            {propertyListings?.some(l => l.propertyId === property.id) ? (
-              <div className="text-center py-2 text-muted-foreground">
-                Property listed for sale
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => handleAction(() => onSell?.(property, false))}
-                  disabled={isLoading}
-                >
-                  List for Sale
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => handleAction(() => onSell?.(property, true))}
-                  disabled={isLoading}
-                >
-                  Auction (Fast)
-                </Button>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => handleAction(() => onSell?.(property, false))}
+                disabled={isLoading}
+              >
+                List for Sale
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => handleAction(() => onSell?.(property, true))}
+                disabled={isLoading}
+              >
+                Auction (Fast)
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
