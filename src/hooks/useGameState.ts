@@ -143,210 +143,47 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
 ];
 
 // Expanded Middlesbrough properties with real street names and addresses
+const MIDDLESBROUGH_STREETS = [
+  "Linthorpe Road", "Park Road South", "Acklam Road", "Borough Road", "Marton Road",
+  "Roman Road", "Trimdon Avenue", "Southfield Road", "Albert Road", "Newport Road",
+  "Cargo Fleet Lane", "Vulcan Street", "The Crescent", "The Avenue", "Stokesley Road",
+  "Parliament Road", "Corporation Road", "Cambridge Road", "Oxford Road", "Ormesby Road",
+  "Mandale Road", "Ayresome Street", "Waterloo Road", "Grange Road", "Cypress Road",
+  "Stainton Way", "Ladgate Lane", "The Greenway", "Tollesby Road", "Marton Burn Road",
+  "Grove Hill Road", "Longlands Road", "Valley Road", "The Grove", "Clairville Road",
+  "Cargo Fleet Road", "Saltersgill Avenue", "Hemlington Village Road", "Stainsby Road",
+  "Ormesby Road", "Trunk Road", "Marton Moor Road", "Nunthorpe Avenue", "Green Lane"
+];
+
 const AVAILABLE_PROPERTIES: Property[] = [
-  // Residential Properties
-  {
-    id: "1",
-    name: "45 Linthorpe Road",
-    type: "residential",
-    price: 75000,
-    value: 75000,
-    neighborhood: "Linthorpe",
-    monthlyIncome: 600,
-    image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "2",
-    name: "12 Park Road South",
-    type: "residential",
-    price: 68000,
-    value: 68000,
-    neighborhood: "Linthorpe",
-    monthlyIncome: 550,
-    image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "3",
-    name: "78 Acklam Road",
-    type: "residential",
-    price: 95000,
-    value: 95000,
-    neighborhood: "Acklam",
-    monthlyIncome: 725,
-    image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "4",
-    name: "156 Cargo Fleet Lane",
-    type: "residential",
-    price: 58000,
-    value: 58000,
-    neighborhood: "Port Clarence",
-    monthlyIncome: 475,
-    image: "https://images.unsplash.com/photo-1459767129954-1b1c1f9b9ace?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "5",
-    name: "23 Marton Road",
-    type: "residential",
-    price: 120000,
-    value: 120000,
-    neighborhood: "Marton",
-    monthlyIncome: 850,
-    image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "6",
-    name: "67 Roman Road",
-    type: "residential",
-    price: 82000,
-    value: 82000,
-    neighborhood: "Pallister Park",
-    monthlyIncome: 625,
-    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&h=300&fit=crop",
-    marketTrend: "down"
-  },
-  {
-    id: "7",
-    name: "91 Trimdon Avenue",
-    type: "residential",
-    price: 72000,
-    value: 72000,
-    neighborhood: "Acklam",
-    monthlyIncome: 575,
-    image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "8",
-    name: "34 Southfield Road",
-    type: "residential",
-    price: 145000,
-    value: 145000,
-    neighborhood: "Middlesbrough Centre",
-    monthlyIncome: 950,
-    image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-
-  // Commercial Properties
-  {
-    id: "9",
-    name: "Unit 5 Albert Road",
-    type: "commercial",
-    price: 180000,
-    value: 180000,
-    neighborhood: "Middlesbrough Centre",
-    monthlyIncome: 1200,
-    image: "https://images.unsplash.com/photo-1497604401993-f2e922e5cb0a?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "10",
-    name: "Shop A, Linthorpe Road",
-    type: "commercial",
-    price: 165000,
-    value: 165000,
-    neighborhood: "Linthorpe",
-    monthlyIncome: 1100,
-    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "11",
-    name: "Captain Cook Square Unit",
-    type: "commercial",
-    price: 250000,
-    value: 250000,
-    neighborhood: "Captain Cook Square",
-    monthlyIncome: 1800,
-    image: "https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&h=300&fit=crop",
-    marketTrend: "down"
-  },
-  {
-    id: "12",
-    name: "Warehouse, Vulcan Street",
-    type: "commercial",
-    price: 320000,
-    value: 320000,
-    neighborhood: "South Bank",
-    monthlyIncome: 2100,
-    image: "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-
-  // Luxury Properties
-  {
-    id: "13",
-    name: "8 The Avenue, Nunthorpe",
-    type: "luxury",
-    price: 385000,
-    value: 385000,
-    neighborhood: "Nunthorpe",
-    monthlyIncome: 2400,
-    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "14",
-    name: "Manor House, Stokesley Road",
-    type: "luxury",
-    price: 520000,
-    value: 520000,
-    neighborhood: "Marton",
-    monthlyIncome: 3200,
-    image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "15",
-    name: "Executive Home, Grey Towers",
-    type: "luxury",
-    price: 675000,
-    value: 675000,
-    neighborhood: "Nunthorpe",
-    monthlyIncome: 4100,
-    image: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  },
-  {
-    id: "16",
-    name: "Penthouse, Centre Square",
-    type: "luxury",
-    price: 450000,
-    value: 450000,
-    neighborhood: "Middlesbrough Centre",
-    monthlyIncome: 2800,
-    image: "https://images.unsplash.com/photo-1493397212122-2b85dda8106b?w=400&h=300&fit=crop",
-    marketTrend: "down"
-  },
-  {
-    id: "17",
-    name: "Historic Villa, The Crescent",
-    type: "luxury",
-    price: 750000,
-    value: 750000,
-    neighborhood: "Linthorpe",
-    monthlyIncome: 4500,
-    image: "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&h=300&fit=crop",
-    marketTrend: "stable"
-  },
-  {
-    id: "18",
-    name: "Modern Townhouse, Hemlington",
-    type: "luxury",
-    price: 295000,
-    value: 295000,
-    neighborhood: "Hemlington",
-    monthlyIncome: 1950,
-    image: "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=400&h=300&fit=crop",
-    marketTrend: "up"
-  }
+  // Level 1: £40k-100k Residential
+  { id: "1", name: "45 Linthorpe Road", type: "residential", price: 75000, value: 75000, neighborhood: "Linthorpe", monthlyIncome: 600, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "2", name: "12 Park Road South", type: "residential", price: 68000, value: 68000, neighborhood: "Linthorpe", monthlyIncome: 550, image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "3", name: "78 Acklam Road", type: "residential", price: 95000, value: 95000, neighborhood: "Acklam", monthlyIncome: 725, image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "4", name: "156 Cargo Fleet Lane", type: "residential", price: 58000, value: 58000, neighborhood: "Port Clarence", monthlyIncome: 475, image: "https://images.unsplash.com/photo-1459767129954-1b1c1f9b9ace?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "5", name: "89 Borough Road", type: "residential", price: 52000, value: 52000, neighborhood: "North Ormesby", monthlyIncome: 425, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "6", name: "67 Roman Road", type: "residential", price: 82000, value: 82000, neighborhood: "Pallister Park", monthlyIncome: 625, image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&h=300&fit=crop", marketTrend: "down" },
+  { id: "7", name: "91 Trimdon Avenue", type: "residential", price: 72000, value: 72000, neighborhood: "Acklam", monthlyIncome: 575, image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "8", name: "23 Newport Road", type: "residential", price: 64000, value: 64000, neighborhood: "Middlesbrough Centre", monthlyIncome: 520, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up" },
+  
+  // Level 2: £100k-250k Mixed
+  { id: "9", name: "23 Marton Road", type: "residential", price: 120000, value: 120000, neighborhood: "Marton", monthlyIncome: 850, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "10", name: "34 Southfield Road", type: "residential", price: 145000, value: 145000, neighborhood: "Middlesbrough Centre", monthlyIncome: 950, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "11", name: "Unit 5 Albert Road", type: "commercial", price: 180000, value: 180000, neighborhood: "Middlesbrough Centre", monthlyIncome: 1200, image: "https://images.unsplash.com/photo-1497604401993-f2e922e5cb0a?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "12", name: "Shop A, Linthorpe Road", type: "commercial", price: 165000, value: 165000, neighborhood: "Linthorpe", monthlyIncome: 1100, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "13", name: "45 Parliament Road", type: "residential", price: 135000, value: 135000, neighborhood: "Linthorpe", monthlyIncome: 900, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up" },
+  
+  // Level 3: £250k-500k
+  { id: "14", name: "Captain Cook Square Unit", type: "commercial", price: 250000, value: 250000, neighborhood: "Captain Cook Square", monthlyIncome: 1800, image: "https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&h=300&fit=crop", marketTrend: "down" },
+  { id: "15", name: "Warehouse, Vulcan Street", type: "commercial", price: 320000, value: 320000, neighborhood: "South Bank", monthlyIncome: 2100, image: "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "16", name: "8 The Avenue, Nunthorpe", type: "luxury", price: 385000, value: 385000, neighborhood: "Nunthorpe", monthlyIncome: 2400, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "17", name: "Modern Townhouse, Hemlington", type: "luxury", price: 295000, value: 295000, neighborhood: "Hemlington", monthlyIncome: 1950, image: "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "18", name: "Penthouse, Centre Square", type: "luxury", price: 450000, value: 450000, neighborhood: "Middlesbrough Centre", monthlyIncome: 2800, image: "https://images.unsplash.com/photo-1493397212122-2b85dda8106b?w=400&h=300&fit=crop", marketTrend: "down" },
+  
+  // Level 4+: £500k+
+  { id: "19", name: "Manor House, Stokesby Road", type: "luxury", price: 520000, value: 520000, neighborhood: "Marton", monthlyIncome: 3200, image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400&h=300&fit=crop", marketTrend: "stable" },
+  { id: "20", name: "Executive Home, Grey Towers", type: "luxury", price: 675000, value: 675000, neighborhood: "Nunthorpe", monthlyIncome: 4100, image: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "21", name: "Historic Villa, The Crescent", type: "luxury", price: 750000, value: 750000, neighborhood: "Linthorpe", monthlyIncome: 4500, image: "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&h=300&fit=crop", marketTrend: "stable" },
 ];
 
 // Generate a new property when market needs more inventory
@@ -372,15 +209,22 @@ const generateRandomProperty = (level: number): Property => {
   const type = types[Math.floor(Math.random() * types.length)];
   
   const { min, max } = getPropertyValueRangeForLevel(level);
-  const basePrice = min + Math.random() * (max - min);
+  // Ensure minimum realistic value of £40,000
+  const actualMin = Math.max(40000, min);
+  const basePrice = actualMin + Math.random() * (max - actualMin);
   const price = Math.floor(basePrice / 1000) * 1000;
   const value = price;
   const monthlyIncome = Math.floor((price * (type === 'luxury' ? 0.05 : type === 'commercial' ? 0.06 : 0.07)) / 12);
-  const neighborhoods = ["Linthorpe","Acklam","Marton","Nunthorpe","Middlesbrough Centre","Hemlington","South Bank"];
-  const neighborhood = neighborhoods[Math.floor(Math.random()*neighborhoods.length)];
+  
+  const neighborhoods = ["Linthorpe", "Acklam", "Marton", "Nunthorpe", "Middlesbrough Centre", "Hemlington", "South Bank", "Pallister Park", "North Ormesby", "Port Clarence"];
+  const neighborhood = neighborhoods[Math.floor(Math.random() * neighborhoods.length)];
+  
+  const streetName = MIDDLESBROUGH_STREETS[Math.floor(Math.random() * MIDDLESBROUGH_STREETS.length)];
+  const houseNumber = Math.floor(1 + Math.random() * 200);
+  
   return {
     id,
-    name: `${Math.floor(10 + Math.random()*89)} New Street`,
+    name: `${houseNumber} ${streetName}`,
     type,
     price,
     value,
@@ -474,19 +318,55 @@ export function useGameState() {
 
   // Ensure a single live auction property and replenish market inventory
   useEffect(() => {
-    // Enforce exactly one property in auction
+    const { min, max } = getPropertyValueRangeForLevel(gameState.level);
+    
+    // Enforce exactly one property in auction that matches current level
     setAuctionProperties(prev => {
-      let next = prev;
-      if (prev.length === 0) {
-        let moved: Property | undefined;
+      // If current auction property is outside level range, replace it
+      if (prev.length > 0 && (prev[0].price < min || prev[0].price > max)) {
+        let replacement: Property | undefined;
         setEstateAgentProperties(est => {
-          if (est.length > 0) {
-            moved = est[0];
-            return est.slice(1);
+          // Try to find a property from estate agent that matches level
+          const validProperty = est.find(p => p.price >= min && p.price <= max);
+          if (validProperty) {
+            replacement = validProperty;
+            return est.filter(p => p.id !== validProperty.id);
           }
           return est;
         });
-        if (moved) next = [moved];
+        
+        // If no valid property found in estate agent, generate one
+        if (!replacement) {
+          replacement = generateRandomProperty(gameState.level);
+        }
+        
+        // Move old auction property back to estate agent
+        const old = prev[0];
+        setEstateAgentProperties(est => {
+          if (!est.find(p => p.id === old.id)) {
+            return [...est, old];
+          }
+          return est;
+        });
+        
+        return [replacement];
+      }
+      
+      // If no auction property, get one that matches level
+      if (prev.length === 0) {
+        let moved: Property | undefined;
+        setEstateAgentProperties(est => {
+          const validProperty = est.find(p => p.price >= min && p.price <= max);
+          if (validProperty) {
+            moved = validProperty;
+            return est.filter(p => p.id !== validProperty.id);
+          }
+          return est;
+        });
+        if (!moved) {
+          moved = generateRandomProperty(gameState.level);
+        }
+        return [moved];
       } else if (prev.length > 1) {
         const [keep, ...rest] = prev;
         setEstateAgentProperties(est => {
@@ -496,15 +376,15 @@ export function useGameState() {
           });
           return merged;
         });
-        next = [keep];
+        return [keep];
       }
-      return next;
+      return prev;
     });
 
-    // Always maintain 20 total properties for sale if portfolio not full
+    // Always maintain 30 total properties for sale if portfolio not full
     if (gameState.ownedProperties.length < getMaxPropertiesForLevel(gameState.level)) {
       const totalAvailable = auctionProperties.length + estateAgentProperties.length;
-      const targetTotal = 20;
+      const targetTotal = 30;
       
       if (totalAvailable < targetTotal) {
         setEstateAgentProperties(prev => {
@@ -514,8 +394,6 @@ export function useGameState() {
             ...auctionProperties.map(p => p.id),
             ...list.map(p => p.id),
           ]);
-          
-          const { min, max } = getPropertyValueRangeForLevel(gameState.level);
           
           // Need to add (targetTotal - totalAvailable) properties
           const needed = targetTotal - totalAvailable;
@@ -824,15 +702,31 @@ export function useGameState() {
           });
         }
         
-        const newExperience = prev.experience + Math.floor(monthlyIncome / 100);
-        const newLevel = prev.level + (newExperience >= prev.experienceToNext ? 1 : 0);
-        const newExperienceToNext = newLevel > prev.level ? 
-          EXPERIENCE_BASE * Math.pow(1.5, newLevel - 1) : prev.experienceToNext;
+        // Calculate net worth for level progression
+        const propertyEquity = prev.ownedProperties.reduce((total, property) => {
+          const mortgage = finalMortgages.find(m => m.propertyId === property.id);
+          const equity = property.value - (mortgage?.remainingBalance || 0);
+          return total + equity;
+        }, 0);
+        const netWorth = newCash + propertyEquity;
+        
+        // Net worth-based level progression: Level 1 = start, Level 2 = £250k, then doubles each level
+        const getRequiredNetWorth = (level: number): number => {
+          if (level <= 1) return 0;
+          if (level === 2) return 250000;
+          // Level 3 = £500k, Level 4 = £1M, Level 5 = £2M, etc.
+          return 250000 * Math.pow(2, level - 2);
+        };
+        
+        let newLevel = prev.level;
+        while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) {
+          newLevel++;
+        }
 
         if (newLevel > prev.level) {
           toast({
             title: "Level Up!",
-            description: `Congratulations! You reached level ${newLevel}!`,
+            description: `Congratulations! You reached level ${newLevel}! Net worth: £${netWorth.toLocaleString()}`,
           });
         }
 
@@ -840,9 +734,9 @@ export function useGameState() {
           ...prev,
           cash: Math.max(0, newCash),
           mortgages: finalMortgages,
-          experience: newLevel > prev.level ? 0 : newExperience,
+          experience: prev.experience,
           level: newLevel,
-          experienceToNext: newExperienceToNext,
+          experienceToNext: prev.experienceToNext,
           monthsPlayed: prev.monthsPlayed + 1,
           timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
