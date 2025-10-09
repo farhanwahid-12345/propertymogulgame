@@ -617,9 +617,9 @@ export function useGameState() {
     return () => clearInterval(clockInterval);
   }, []);
 
-  // Monthly income, expenses and progression
+  // Monthly income, expenses and progression - triggered by timeUntilNextMonth reaching 0
   useEffect(() => {
-    const monthlyInterval = setInterval(() => {
+    if (gameState.timeUntilNextMonth === 0) {
       setGameState(prev => {
         if (prev.isBankrupt) return prev;
 
@@ -743,10 +743,8 @@ export function useGameState() {
           creditScore: Math.min(850, prev.creditScore + creditScoreImprovement)
         };
       });
-    }, 180000); // Every 3 minutes = 1 month (180 seconds)
-
-    return () => clearInterval(monthlyInterval);
-  }, []);
+    }
+  }, [gameState.timeUntilNextMonth]);
 
   const buyProperty = useCallback((property: Property, mortgagePercentage: number = 0, providerId?: string, termYears: number = 25, mortgageType: 'repayment' | 'interest-only' = 'repayment') => {
     setGameState(prev => {
