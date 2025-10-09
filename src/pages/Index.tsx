@@ -10,6 +10,7 @@ import { MortgageManagement } from "@/components/ui/mortgage-management";
 import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
+import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
@@ -34,6 +35,31 @@ const Index = () => {
     const yieldB = (b.monthlyIncome / b.value) * 12 * 100;
     return yieldB - yieldA;
   });
+
+  // Get the first pending damage to show in dialog
+  const currentDamage = gameState.pendingDamages?.[0];
+
+  const handlePayDamage = () => {
+    if (currentDamage) {
+      if (gameState.cash >= currentDamage.repairCost) {
+        gameState.payDamageWithCash(currentDamage.id);
+      } else {
+        gameState.payDamageWithLoan(currentDamage.id);
+      }
+    }
+  };
+
+  const handleTakeLoan = () => {
+    if (currentDamage) {
+      gameState.payDamageWithLoan(currentDamage.id);
+    }
+  };
+
+  const handleDismissDamage = () => {
+    if (currentDamage) {
+      gameState.dismissDamage(currentDamage.id);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-city">
@@ -186,6 +212,19 @@ const Index = () => {
           </Card>
         )}
       </div>
+
+      {/* Property Damage Dialog */}
+      {currentDamage && (
+        <PropertyDamageDialog
+          open={!!currentDamage}
+          propertyName={currentDamage.propertyName}
+          repairCost={currentDamage.repairCost}
+          playerCash={gameState.cash}
+          onPayCash={handlePayDamage}
+          onTakeLoan={handleTakeLoan}
+          onCancel={handleDismissDamage}
+        />
+      )}
     </div>
   );
 };

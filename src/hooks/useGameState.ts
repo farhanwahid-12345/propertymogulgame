@@ -63,6 +63,20 @@ interface TenantEvent {
   month: number;
 }
 
+interface PropertyDamage {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  repairCost: number;
+  timestamp: number;
+}
+
+interface AnnualRepairCost {
+  propertyId: string;
+  year: number;
+  totalCost: number;
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
@@ -82,6 +96,8 @@ interface GameState {
   propertyListings: PropertyListing[];
   overdraftLimit: number;
   overdraftUsed: number;
+  pendingDamages: PropertyDamage[];
+  annualRepairCosts: AnnualRepairCost[];
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -272,6 +288,8 @@ export function useGameState() {
       tenantEvents: parsedState.tenantEvents || [],
       voidPeriods: parsedState.voidPeriods || [],
       propertyListings: parsedState.propertyListings || [],
+      pendingDamages: parsedState.pendingDamages || [],
+      annualRepairCosts: parsedState.annualRepairCosts || [],
       overdraftLimit: parsedState.overdraftLimit || 0,
       overdraftUsed: parsedState.overdraftUsed || 0,
     };
@@ -295,6 +313,8 @@ export function useGameState() {
       propertyListings: [],
       overdraftLimit: 0,
       overdraftUsed: 0,
+      pendingDamages: [],
+      annualRepairCosts: [],
     };
   });
 
@@ -492,22 +512,38 @@ export function useGameState() {
           });
         });
         
-        // Check for tenant events
-        const newTenantEvents: TenantEvent[] = [];
+        // Check for tenant events - only damage events now, shown as prompts
+        const newPendingDamages: PropertyDamage[] = [];
+        const currentYear = Math.floor(prev.monthsPlayed / 12);
+        
         prev.tenants.forEach(({ propertyId, tenant }) => {
-          if (Math.random() < (tenant.defaultRisk + tenant.damageRisk) / 200) {
-            const eventType = Math.random() < 0.4 ? 'default' : Math.random() < 0.7 ? 'damage' : 'early_exit';
+          if (Math.random() < tenant.damageRisk / 100) {
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (property) {
-              const amount = eventType === 'damage' ? property.value * (0.05 + Math.random() * 0.15) :
-                            eventType === 'default' ? property.monthlyIncome * (1 + Math.random() * 2) :
-                            0;
-              newTenantEvents.push({
-                propertyId,
-                type: eventType,
-                amount,
-                month: prev.monthsPlayed
-              });
+              // Check annual repair cost cap (2% of property value)
+              const annualCap = property.value * 0.02;
+              const existingAnnualCost = prev.annualRepairCosts.find(
+                arc => arc.propertyId === propertyId && arc.year === currentYear
+              );
+              const currentYearCost = existingAnnualCost?.totalCost || 0;
+              
+              // Only create damage if under the annual cap
+              if (currentYearCost < annualCap) {
+                const maxDamage = Math.min(
+                  property.value * (0.01 + Math.random() * 0.01), // 1-2% of property value
+                  annualCap - currentYearCost // Don't exceed annual cap
+                );
+                
+                if (maxDamage > 0) {
+                  newPendingDamages.push({
+                    id: `damage_${Date.now()}_${propertyId}`,
+                    propertyId,
+                    propertyName: property.name,
+                    repairCost: Math.floor(maxDamage),
+                    timestamp: Date.now()
+                  });
+                }
+              }
             }
           }
         });
@@ -559,9 +595,11 @@ export function useGameState() {
           tenants: remainingTenants,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
-          tenantEvents: [...prev.tenantEvents, ...newTenantEvents],
+          tenantEvents: prev.tenantEvents,
           voidPeriods: activeVoidPeriods,
-          propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0)
+          propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0),
+          pendingDamages: [...prev.pendingDamages, ...newPendingDamages],
+          annualRepairCosts: prev.annualRepairCosts
         };
       });
 
@@ -987,6 +1025,8 @@ export function useGameState() {
       propertyListings: [],
       overdraftLimit: 0,
       overdraftUsed: 0,
+      pendingDamages: [],
+      annualRepairCosts: [],
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1482,6 +1522,91 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     setEstateAgentProperties(prev => prev.filter(p => p.id !== propertyId));
   }, []);
 
+  // Pay for property damage with cash
+  const payDamageWithCash = useCallback((damageId: string) => {
+    setGameState(prev => {
+      const damage = prev.pendingDamages.find(d => d.id === damageId);
+      if (!damage) return prev;
+
+      const currentYear = Math.floor(prev.monthsPlayed / 12);
+      const existingAnnualCost = prev.annualRepairCosts.find(
+        arc => arc.propertyId === damage.propertyId && arc.year === currentYear
+      );
+
+      const updatedAnnualCosts = existingAnnualCost
+        ? prev.annualRepairCosts.map(arc =>
+            arc.propertyId === damage.propertyId && arc.year === currentYear
+              ? { ...arc, totalCost: arc.totalCost + damage.repairCost }
+              : arc
+          )
+        : [...prev.annualRepairCosts, {
+            propertyId: damage.propertyId,
+            year: currentYear,
+            totalCost: damage.repairCost
+          }];
+
+      toast({
+        title: "Repairs Paid",
+        description: `Paid £${damage.repairCost.toLocaleString()} to repair ${damage.propertyName}`,
+      });
+
+      return {
+        ...prev,
+        cash: prev.cash - damage.repairCost,
+        pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
+        annualRepairCosts: updatedAnnualCosts
+      };
+    });
+  }, []);
+
+  // Take a loan to pay for property damage
+  const payDamageWithLoan = useCallback((damageId: string) => {
+    setGameState(prev => {
+      const damage = prev.pendingDamages.find(d => d.id === damageId);
+      if (!damage) return prev;
+
+      const currentYear = Math.floor(prev.monthsPlayed / 12);
+      const existingAnnualCost = prev.annualRepairCosts.find(
+        arc => arc.propertyId === damage.propertyId && arc.year === currentYear
+      );
+
+      const updatedAnnualCosts = existingAnnualCost
+        ? prev.annualRepairCosts.map(arc =>
+            arc.propertyId === damage.propertyId && arc.year === currentYear
+              ? { ...arc, totalCost: arc.totalCost + damage.repairCost }
+              : arc
+          )
+        : [...prev.annualRepairCosts, {
+            propertyId: damage.propertyId,
+            year: currentYear,
+            totalCost: damage.repairCost
+          }];
+
+      // Add to cash (as a loan) - credit score will take a hit
+      toast({
+        title: "Bank Loan Taken",
+        description: `Borrowed £${damage.repairCost.toLocaleString()} to repair ${damage.propertyName}. Credit score reduced.`,
+        variant: "destructive"
+      });
+
+      return {
+        ...prev,
+        cash: prev.cash + damage.repairCost,
+        pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
+        annualRepairCosts: updatedAnnualCosts,
+        creditScore: Math.max(300, prev.creditScore - 10) // Reduce credit score for emergency loan
+      };
+    });
+  }, []);
+
+  // Dismiss damage without paying
+  const dismissDamage = useCallback((damageId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId)
+    }));
+  }, []);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1512,6 +1637,9 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     setCash,
     setOverdraftUsed,
     removeAuctionProperty,
+    payDamageWithCash,
+    payDamageWithLoan,
+    dismissDamage,
     resetGame
   };
 }
