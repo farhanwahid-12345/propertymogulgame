@@ -255,7 +255,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       reservePrice: reserve,
       guidePrice: guide,
       listDate: Date.now(),
-      auctionDate: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 days from now
+      auctionDate: Date.now() + (1 * 24 * 60 * 60 * 1000), // 1 day from now
       highestBid: reserve * 0.8, // Start below reserve
       bidderCount: Math.floor(Math.random() * 3) + 1
     };
