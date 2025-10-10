@@ -1173,7 +1173,7 @@ export function useGameState() {
     });
   }, []);
 
-  const settleMortgage = useCallback((mortgagePropertyId: string, useCash: boolean = false, settlementPropertyId?: string) => {
+  const settleMortgage = useCallback((mortgagePropertyId: string, useCash: boolean = false, settlementPropertyId?: string, partialAmount?: number) => {
     setGameState(prev => {
       const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
       
@@ -1187,6 +1187,49 @@ export function useGameState() {
       }
 
       if (useCash) {
+        // Handle partial payment if specified
+        if (partialAmount && partialAmount > 0) {
+          if (prev.cash < partialAmount) {
+            toast({
+              title: "Insufficient Cash",
+              description: `You need £${partialAmount.toLocaleString()} to make this payment!`,
+              variant: "destructive"
+            });
+            return prev;
+          }
+
+          const newBalance = mortgage.remainingBalance - partialAmount;
+          
+          // If payment pays off the mortgage completely, remove it
+          if (newBalance <= 0) {
+            toast({
+              title: "Mortgage Paid Off!",
+              description: `Mortgage fully paid off with £${partialAmount.toLocaleString()}`,
+            });
+
+            return {
+              ...prev,
+              cash: prev.cash - partialAmount,
+              mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
+              creditScore: Math.min(850, prev.creditScore + 5) // Improve credit for paying off
+            };
+          }
+
+          // Update mortgage with new balance
+          const updatedMortgages = prev.mortgages.map(m => 
+            m.propertyId === mortgagePropertyId 
+              ? { ...m, remainingBalance: newBalance }
+              : m
+          );
+
+          return {
+            ...prev,
+            cash: prev.cash - partialAmount,
+            mortgages: updatedMortgages
+          };
+        }
+
+        // Full payment
         if (prev.cash < mortgage.remainingBalance) {
           toast({
             title: "Insufficient Cash",
@@ -1204,7 +1247,8 @@ export function useGameState() {
         return {
           ...prev,
           cash: prev.cash - mortgage.remainingBalance,
-          mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId)
+          mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
+          creditScore: Math.min(850, prev.creditScore + 5) // Improve credit for paying off
         };
       } else {
         const settlementProperty = prev.ownedProperties.find(p => p.id === settlementPropertyId);
@@ -1275,7 +1319,9 @@ export function useGameState() {
       const existingBalance = existingMortgage ? existingMortgage.remainingBalance : 0;
       const cashRaised = newLoanAmount - existingBalance - totalFees;
 
-      if (cashRaised < 0) {
+      // Only require cash if fees exceed the new loan minus existing balance
+      // When refinancing, the new loan covers the old mortgage, so no cash needed
+      if (newLoanAmount < existingBalance) {
         toast({
           title: "Remortgage Failed",
           description: "New loan amount must cover existing mortgage and fees!",
@@ -1425,6 +1471,16 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
     const currentMortgage = existingMortgage?.remainingBalance || 0;
     const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
 
+    // Check if new loan amount covers the existing mortgage
+    if (newLoanAmount < currentMortgage) {
+      toast({
+        title: "Refinance Failed",
+        description: "New loan amount must be at least equal to current mortgage balance!",
+        variant: "destructive"
+      });
+      return prev;
+    }
+
     // Recalculate rate and monthly payment
     const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
     const monthlyRate = dynamicRate / 12;
@@ -1452,9 +1508,16 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
 
     const cashFromRefinance = newLoanAmount - currentMortgage;
 
+    toast({
+      title: "Refinance Complete!",
+      description: cashFromRefinance > 0 
+        ? `Property refinanced! £${cashFromRefinance.toLocaleString()} cash released.`
+        : `Property refinanced for £${newLoanAmount.toLocaleString()}`,
+    });
+
     return {
       ...prev,
-      cash: prev.cash + Math.max(0, cashFromRefinance),
+      cash: prev.cash + cashFromRefinance, // Add cash (can be positive or negative after fees)
       mortgages: updatedMortgages,
     };
   });
