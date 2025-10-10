@@ -77,6 +77,11 @@ interface AnnualRepairCost {
   totalCost: number;
 }
 
+interface PropertyDamageHistory {
+  propertyId: string;
+  lastDamageMonth: number; // Month when last damage occurred
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
@@ -98,6 +103,7 @@ interface GameState {
   overdraftUsed: number;
   pendingDamages: PropertyDamage[];
   annualRepairCosts: AnnualRepairCost[];
+  damageHistory: PropertyDamageHistory[];
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -290,6 +296,7 @@ export function useGameState() {
       propertyListings: parsedState.propertyListings || [],
       pendingDamages: parsedState.pendingDamages || [],
       annualRepairCosts: parsedState.annualRepairCosts || [],
+      damageHistory: parsedState.damageHistory || [],
       overdraftLimit: parsedState.overdraftLimit || 0,
       overdraftUsed: parsedState.overdraftUsed || 0,
     };
@@ -315,6 +322,7 @@ export function useGameState() {
       overdraftUsed: 0,
       pendingDamages: [],
       annualRepairCosts: [],
+      damageHistory: [],
     };
   });
 
@@ -513,6 +521,7 @@ export function useGameState() {
         });
         
         // Check for tenant events - only damage events now, shown as prompts
+        // Restrict to one damage event every 24 months (2 years) per property
         const newPendingDamages: PropertyDamage[] = [];
         const currentYear = Math.floor(prev.monthsPlayed / 12);
         
@@ -520,28 +529,37 @@ export function useGameState() {
           if (Math.random() < tenant.damageRisk / 100) {
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (property) {
-              // Check annual repair cost cap (2% of property value)
-              const annualCap = property.value * 0.02;
-              const existingAnnualCost = prev.annualRepairCosts.find(
-                arc => arc.propertyId === propertyId && arc.year === currentYear
-              );
-              const currentYearCost = existingAnnualCost?.totalCost || 0;
+              // Check if 24 months have passed since last damage
+              const damageHistory = prev.damageHistory.find(dh => dh.propertyId === propertyId);
+              const monthsSinceLastDamage = damageHistory 
+                ? prev.monthsPlayed - damageHistory.lastDamageMonth 
+                : 999; // No previous damage
               
-              // Only create damage if under the annual cap
-              if (currentYearCost < annualCap) {
-                const maxDamage = Math.min(
-                  property.value * (0.01 + Math.random() * 0.01), // 1-2% of property value
-                  annualCap - currentYearCost // Don't exceed annual cap
+              // Only allow damage if 24+ months since last damage
+              if (monthsSinceLastDamage >= 24) {
+                // Check annual repair cost cap (2% of property value)
+                const annualCap = property.value * 0.02;
+                const existingAnnualCost = prev.annualRepairCosts.find(
+                  arc => arc.propertyId === propertyId && arc.year === currentYear
                 );
+                const currentYearCost = existingAnnualCost?.totalCost || 0;
                 
-                if (maxDamage > 0) {
-                  newPendingDamages.push({
-                    id: `damage_${Date.now()}_${propertyId}`,
-                    propertyId,
-                    propertyName: property.name,
-                    repairCost: Math.floor(maxDamage),
-                    timestamp: Date.now()
-                  });
+                // Only create damage if under the annual cap
+                if (currentYearCost < annualCap) {
+                  const maxDamage = Math.min(
+                    property.value * (0.01 + Math.random() * 0.01), // 1-2% of property value
+                    annualCap - currentYearCost // Don't exceed annual cap
+                  );
+                  
+                  if (maxDamage > 0) {
+                    newPendingDamages.push({
+                      id: `damage_${Date.now()}_${propertyId}`,
+                      propertyId,
+                      propertyName: property.name,
+                      repairCost: Math.floor(maxDamage),
+                      timestamp: Date.now()
+                    });
+                  }
                 }
               }
             }
@@ -599,7 +617,8 @@ export function useGameState() {
           voidPeriods: activeVoidPeriods,
           propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0),
           pendingDamages: [...prev.pendingDamages, ...newPendingDamages],
-          annualRepairCosts: prev.annualRepairCosts
+          annualRepairCosts: prev.annualRepairCosts,
+          damageHistory: prev.damageHistory
         };
       });
 
@@ -1027,6 +1046,7 @@ export function useGameState() {
       overdraftUsed: 0,
       pendingDamages: [],
       annualRepairCosts: [],
+      damageHistory: [],
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1545,6 +1565,15 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
             totalCost: damage.repairCost
           }];
 
+      // Update damage history to record when this property last had damage
+      const updatedDamageHistory = prev.damageHistory.find(dh => dh.propertyId === damage.propertyId)
+        ? prev.damageHistory.map(dh =>
+            dh.propertyId === damage.propertyId
+              ? { ...dh, lastDamageMonth: prev.monthsPlayed }
+              : dh
+          )
+        : [...prev.damageHistory, { propertyId: damage.propertyId, lastDamageMonth: prev.monthsPlayed }];
+
       toast({
         title: "Repairs Paid",
         description: `Paid £${damage.repairCost.toLocaleString()} to repair ${damage.propertyName}`,
@@ -1554,7 +1583,8 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
         ...prev,
         cash: prev.cash - damage.repairCost,
         pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
-        annualRepairCosts: updatedAnnualCosts
+        annualRepairCosts: updatedAnnualCosts,
+        damageHistory: updatedDamageHistory
       };
     });
   }, []);
@@ -1582,6 +1612,15 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
             totalCost: damage.repairCost
           }];
 
+      // Update damage history to record when this property last had damage
+      const updatedDamageHistory = prev.damageHistory.find(dh => dh.propertyId === damage.propertyId)
+        ? prev.damageHistory.map(dh =>
+            dh.propertyId === damage.propertyId
+              ? { ...dh, lastDamageMonth: prev.monthsPlayed }
+              : dh
+          )
+        : [...prev.damageHistory, { propertyId: damage.propertyId, lastDamageMonth: prev.monthsPlayed }];
+
       // Add to cash (as a loan) - credit score will take a hit
       toast({
         title: "Bank Loan Taken",
@@ -1594,7 +1633,8 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
         cash: prev.cash + damage.repairCost,
         pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
         annualRepairCosts: updatedAnnualCosts,
-        creditScore: Math.max(300, prev.creditScore - 10) // Reduce credit score for emergency loan
+        creditScore: Math.max(300, prev.creditScore - 10), // Reduce credit score for emergency loan
+        damageHistory: updatedDamageHistory
       };
     });
   }, []);
