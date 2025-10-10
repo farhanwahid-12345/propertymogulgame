@@ -205,6 +205,7 @@ const Index = () => {
                      onSelectTenant={gameState.selectTenant}
                      playerCash={gameState.cash}
                      currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
+                     mortgages={gameState.mortgages}
                    />
                 ))}
               </div>

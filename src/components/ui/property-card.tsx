@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
-import { Building2, Home, Crown, TrendingUp, TrendingDown } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Property {
@@ -36,6 +36,11 @@ interface PropertyCardProps {
   currentTenant?: Tenant;
   propertyListings?: any[];
   removeTenant?: (propertyId: string) => void;
+  mortgages?: Array<{
+    propertyId: string;
+    monthlyPayment: number;
+    remainingBalance: number;
+  }>;
 }
 
 const PropertyTypeIcon = {
@@ -61,10 +66,12 @@ export function PropertyCard({
   mortgageProviders = [],
   currentTenant,
   propertyListings = [],
-  removeTenant
+  removeTenant,
+  mortgages = []
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
+  const [showMonthlyCosts, setShowMonthlyCosts] = useState(false);
   const [mortgagePercentage, setMortgagePercentage] = useState([60]);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
@@ -77,6 +84,16 @@ export function PropertyCard({
   const canAffordMortgage = playerCash >= cashRequired;
   const profitLoss = property.value - property.price;
   const profitPercent = ((profitLoss / property.price) * 100).toFixed(1);
+
+  // Calculate monthly costs for owned properties
+  const propertyMortgage = mortgages.find(m => m.propertyId === property.id);
+  const monthlyMortgagePayment = propertyMortgage?.monthlyPayment || 0;
+  const PROPERTY_TAX_RATE = 0.012; // 1.2% annual
+  const MAINTENANCE_RATE = 0.008; // 0.8% annual
+  const monthlyPropertyTax = (property.value * PROPERTY_TAX_RATE) / 12;
+  const monthlyMaintenance = (property.value * MAINTENANCE_RATE) / 12;
+  const totalMonthlyExpenses = monthlyMortgagePayment + monthlyPropertyTax + monthlyMaintenance;
+  const netMonthlyIncome = property.monthlyIncome - totalMonthlyExpenses;
 
   const handleAction = async (action: () => void) => {
     setIsLoading(true);
@@ -160,12 +177,71 @@ export function PropertyCard({
             </span>
           </div>
 
+          {property.owned && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMonthlyCosts(!showMonthlyCosts)}
+                className="w-full justify-between text-xs h-7"
+              >
+                <span className="flex items-center gap-1">
+                  <Calculator className="h-3 w-3" />
+                  Monthly Cost Breakdown
+                </span>
+                <span className={cn(
+                  "font-semibold",
+                  netMonthlyIncome >= 0 ? "text-success" : "text-danger"
+                )}>
+                  Net: £{netMonthlyIncome.toLocaleString()}/mo
+                </span>
+              </Button>
+
+              {showMonthlyCosts && (
+                <div className="space-y-1.5 pt-2 border-t text-xs">
+                  <div className="flex justify-between items-center text-success">
+                    <span>+ Rental Income:</span>
+                    <span className="font-medium">£{property.monthlyIncome.toLocaleString()}</span>
+                  </div>
+                  
+                  {monthlyMortgagePayment > 0 && (
+                    <div className="flex justify-between items-center text-danger">
+                      <span>- Mortgage Payment:</span>
+                      <span className="font-medium">£{monthlyMortgagePayment.toLocaleString()}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>- Property Tax (1.2%):</span>
+                    <span className="font-medium">£{monthlyPropertyTax.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-muted-foreground">
+                    <span>- Maintenance (0.8%):</span>
+                    <span className="font-medium">£{monthlyMaintenance.toLocaleString()}</span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-1.5 border-t font-semibold">
+                    <span>Net Monthly Income:</span>
+                    <span className={cn(
+                      netMonthlyIncome >= 0 ? "text-success" : "text-danger"
+                    )}>
+                      £{netMonthlyIncome.toLocaleString()}/mo
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {!property.owned && (
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Annual Yield:</span>
               <span className="font-semibold text-accent">
-                {((property.monthlyIncome * 12 / (property.owned ? property.value : property.price)) * 100).toFixed(2)}%
+                {((property.monthlyIncome * 12 / property.price) * 100).toFixed(2)}%
               </span>
             </div>
+          )}
         </div>
 
         {property.owned ? (
