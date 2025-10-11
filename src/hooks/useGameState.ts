@@ -1212,6 +1212,11 @@ export function useGameState() {
               : m
           );
 
+          toast({
+            title: "Partial Payment Made!",
+            description: `Paid £${partialAmount.toLocaleString()}. Remaining balance: £${newBalance.toLocaleString()}`,
+          });
+
           return {
             ...prev,
             cash: prev.cash - partialAmount,
