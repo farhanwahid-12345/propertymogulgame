@@ -1093,20 +1093,25 @@ export function useGameState() {
       }
 
       // Update property monthly income based on tenant
-      const updatedProperties = prev.ownedProperties.map(property => {
-        if (property.id === propertyId) {
-          const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || property.monthlyIncome;
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      const updatedProperties = prev.ownedProperties.map(prop => {
+        if (prop.id === propertyId) {
+          const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || prop.monthlyIncome;
           return {
-            ...property,
+            ...prop,
             monthlyIncome: Math.floor(baseRent * tenant.rentMultiplier)
           };
         }
-        return property;
+        return prop;
       });
+
+      // Calculate actual rent for toast notification
+      const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || property?.monthlyIncome || 0;
+      const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
 
       toast({
         title: "Tenant Selected!",
-        description: `${tenant.name} is now renting your property at £${Math.floor((AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || 0) * tenant.rentMultiplier)}/mo`,
+        description: `${tenant.name} is now renting your property at £${actualRent}/mo`,
       });
 
       return {
