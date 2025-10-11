@@ -104,6 +104,7 @@ interface GameState {
   pendingDamages: PropertyDamage[];
   annualRepairCosts: AnnualRepairCost[];
   damageHistory: PropertyDamageHistory[];
+  lastYearlyGrowth: number; // Tracks when we last applied yearly property value growth
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -278,27 +279,28 @@ export function useGameState() {
       const parsedState = JSON.parse(saved);
       // Ensure all required properties exist for backward compatibility
     return {
-      cash: parsedState.cash || INITIAL_CASH,
-      ownedProperties: parsedState.ownedProperties || [],
-      mortgages: parsedState.mortgages || [],
-      tenants: parsedState.tenants || [],
-      renovations: parsedState.renovations || [],
-      level: parsedState.level || 1,
-      experience: parsedState.experience || 0,
-      experienceToNext: parsedState.experienceToNext || EXPERIENCE_BASE,
-      monthsPlayed: parsedState.monthsPlayed || 0,
-      timeUntilNextMonth: parsedState.timeUntilNextMonth || 180,
-      isBankrupt: parsedState.isBankrupt || false,
-      creditScore: parsedState.creditScore || 650,
-      currentMarketRate: parsedState.currentMarketRate || BASE_MARKET_RATE,
-      tenantEvents: parsedState.tenantEvents || [],
-      voidPeriods: parsedState.voidPeriods || [],
-      propertyListings: parsedState.propertyListings || [],
-      pendingDamages: parsedState.pendingDamages || [],
-      annualRepairCosts: parsedState.annualRepairCosts || [],
-      damageHistory: parsedState.damageHistory || [],
-      overdraftLimit: parsedState.overdraftLimit || 0,
-      overdraftUsed: parsedState.overdraftUsed || 0,
+      cash: parsedState.cash ?? INITIAL_CASH,
+      ownedProperties: parsedState.ownedProperties ?? [],
+      mortgages: parsedState.mortgages ?? [],
+      tenants: parsedState.tenants ?? [],
+      renovations: parsedState.renovations ?? [],
+      level: parsedState.level ?? 1,
+      experience: parsedState.experience ?? 0,
+      experienceToNext: parsedState.experienceToNext ?? EXPERIENCE_BASE,
+      monthsPlayed: parsedState.monthsPlayed ?? 0,
+      timeUntilNextMonth: parsedState.timeUntilNextMonth ?? 180,
+      isBankrupt: parsedState.isBankrupt ?? false,
+      creditScore: parsedState.creditScore ?? 650,
+      currentMarketRate: parsedState.currentMarketRate ?? BASE_MARKET_RATE,
+      tenantEvents: parsedState.tenantEvents ?? [],
+      voidPeriods: parsedState.voidPeriods ?? [],
+      propertyListings: parsedState.propertyListings ?? [],
+      pendingDamages: parsedState.pendingDamages ?? [],
+      annualRepairCosts: parsedState.annualRepairCosts ?? [],
+      damageHistory: parsedState.damageHistory ?? [],
+      lastYearlyGrowth: parsedState.lastYearlyGrowth ?? 0,
+      overdraftLimit: parsedState.overdraftLimit ?? 0,
+      overdraftUsed: parsedState.overdraftUsed ?? 0,
     };
     }
     return {
@@ -323,6 +325,7 @@ export function useGameState() {
       pendingDamages: [],
       annualRepairCosts: [],
       damageHistory: [],
+      lastYearlyGrowth: 0,
     };
   });
 
@@ -589,26 +592,10 @@ export function useGameState() {
           return total;
         }, 0);
 
-        // Calculate property value growth: 2-4% annually, applied gradually
-        // Each interval is ~10 seconds, so ~8640 intervals per day, ~3.15M per year
-        // To get 2-4% annual growth, we apply tiny increments each interval
-        const annualGrowthRate = 0.02 + Math.random() * 0.02; // 2-4% per year
-        const intervalsPerYear = (365 * 24 * 60 * 60) / 10; // ~3.15M intervals
-        const intervalGrowthFactor = Math.pow(1 + annualGrowthRate, 1 / intervalsPerYear);
-        
-        // Add small random fluctuation (-0.5% to +0.5% per interval) on top of growth
-        const fluctuation = 0.995 + Math.random() * 0.01;
-
         return {
           ...prev,
           cash: prev.cash + saleCashGained,
-          ownedProperties: remainingProperties.map(property => ({
-            ...property,
-            value: Math.max(
-              property.price * 0.5, // Minimum 50% of original price
-              property.value * intervalGrowthFactor * fluctuation
-            )
-          })),
+          ownedProperties: remainingProperties,
           mortgages: remainingMortgages,
           tenants: remainingTenants,
           renovations: activeRenovations,
@@ -621,42 +608,6 @@ export function useGameState() {
           damageHistory: prev.damageHistory
         };
       });
-
-      // Market properties also grow 2-4% annually with gradual application
-      const annualGrowthRate = 0.02 + Math.random() * 0.02;
-      const intervalsPerYear = (365 * 24 * 60 * 60) / 10;
-      const intervalGrowthFactor = Math.pow(1 + annualGrowthRate, 1 / intervalsPerYear);
-      const fluctuation = 0.995 + Math.random() * 0.01;
-
-      setEstateAgentProperties(prev => 
-        prev.map(property => ({
-          ...property,
-          price: Math.max(
-            property.price * 0.8, // Minimum 80% of original price  
-            property.price * intervalGrowthFactor * fluctuation
-          ),
-          value: Math.max(
-            property.price * 0.8,
-            property.value * intervalGrowthFactor * fluctuation
-          ),
-          marketTrend: Math.random() > 0.7 ? (Math.random() > 0.5 ? "up" : "down") : "stable"
-        }))
-      );
-
-      setAuctionProperties(prev => 
-        prev.map(property => ({
-          ...property,
-          price: Math.max(
-            property.price * 0.8, // Minimum 80% of original price  
-            property.price * intervalGrowthFactor * fluctuation
-          ),
-          value: Math.max(
-            property.price * 0.8,
-            property.value * (0.985 + Math.random() * 0.03)
-          ),
-          marketTrend: Math.random() > 0.7 ? (Math.random() > 0.5 ? "up" : "down") : "stable"
-        }))
-      );
     }, 10000); // Update every 10 seconds
 
     return () => clearInterval(interval);
@@ -787,9 +738,31 @@ export function useGameState() {
           });
         }
 
+        // Apply yearly property value growth (2-4% compounded annually)
+        // Check if 12 months have passed since last yearly growth
+        const shouldApplyYearlyGrowth = prev.monthsPlayed > 0 && (prev.monthsPlayed - prev.lastYearlyGrowth) >= 12;
+        let updatedOwnedProperties = prev.ownedProperties;
+        let newLastYearlyGrowth = prev.lastYearlyGrowth;
+
+        if (shouldApplyYearlyGrowth) {
+          const annualGrowthRate = 0.02 + Math.random() * 0.02; // 2-4% per year
+          updatedOwnedProperties = prev.ownedProperties.map(property => ({
+            ...property,
+            value: property.value * (1 + annualGrowthRate),
+            marketValue: (property.marketValue || property.value) * (1 + annualGrowthRate)
+          }));
+          newLastYearlyGrowth = prev.monthsPlayed;
+          
+          toast({
+            title: "Annual Property Growth!",
+            description: `Your properties increased in value by ${(annualGrowthRate * 100).toFixed(1)}%`,
+          });
+        }
+
         return {
           ...prev,
           cash: Math.max(0, newCash),
+          ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           experience: prev.experience,
           level: newLevel,
@@ -797,7 +770,8 @@ export function useGameState() {
           monthsPlayed: prev.monthsPlayed + 1,
           timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
-          creditScore: Math.min(850, prev.creditScore + creditScoreImprovement)
+          creditScore: Math.min(850, prev.creditScore + creditScoreImprovement),
+          lastYearlyGrowth: newLastYearlyGrowth
         };
       });
     }
@@ -907,10 +881,17 @@ export function useGameState() {
         description: `You bought ${property.name} for £${property.price.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}. Total cost: £${cashRequired.toLocaleString()}`,
       });
 
+      // Track market value separately for profit calculation
+      const purchasedProperty = { 
+        ...property, 
+        owned: true,
+        marketValue: property.value // Store original market value
+      };
+
       return {
         ...prev,
         cash: prev.cash - cashRequired,
-        ownedProperties: [...prev.ownedProperties, { ...property, owned: true }],
+        ownedProperties: [...prev.ownedProperties, purchasedProperty],
         mortgages: newMortgage ? [...prev.mortgages, newMortgage] : prev.mortgages,
         experience: prev.experience + Math.floor(property.price / 10000)
       };
@@ -987,7 +968,15 @@ export function useGameState() {
         description: `You bought ${property.name} for £${purchasePrice.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}.`,
       });
 
-      const purchased = { ...property, price: purchasePrice, value: purchasePrice, owned: true };
+      // Track market value separately - use property.value as true market value
+      const purchased = { 
+        ...property, 
+        price: purchasePrice, 
+        value: purchasePrice, 
+        owned: true,
+        marketValue: property.value // Store original market value (could be higher if bought below market)
+      };
+      
       return {
         ...prev,
         cash: prev.cash - cashRequired,
@@ -1047,6 +1036,7 @@ export function useGameState() {
       pendingDamages: [],
       annualRepairCosts: [],
       damageHistory: [],
+      lastYearlyGrowth: 0,
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);

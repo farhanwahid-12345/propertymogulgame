@@ -22,6 +22,7 @@ export interface Property {
   owned?: boolean;
   marketTrend: "up" | "down" | "stable";
   mortgageRemaining?: number; // For refinancing purposes
+  marketValue?: number; // True market value (for tracking profit on below-market purchases)
 }
 
 interface PropertyCardProps {
@@ -82,7 +83,10 @@ export function PropertyCard({
   const cashRequired = property.price - mortgageAmount;
   const canAffordCash = playerCash >= property.price;
   const canAffordMortgage = playerCash >= cashRequired;
-  const profitLoss = property.value - property.price;
+  
+  // Calculate profit/loss based on true market value if available (for below-market purchases)
+  const marketValueToUse = property.marketValue || property.value;
+  const profitLoss = marketValueToUse - property.price;
   const profitPercent = ((profitLoss / property.price) * 100).toFixed(1);
 
   // Calculate monthly costs for owned properties
@@ -152,9 +156,9 @@ export function PropertyCard({
           {property.owned && (
             <>
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Current Value:</span>
+                <span className="text-sm font-medium">Market Value:</span>
                 <span className="font-bold">
-                  £{property.value.toLocaleString()}
+                  £{marketValueToUse.toLocaleString()}
                 </span>
               </div>
               
@@ -167,6 +171,12 @@ export function PropertyCard({
                   {profitLoss >= 0 ? "+" : ""}£{profitLoss.toLocaleString()} ({profitPercent}%)
                 </span>
               </div>
+              
+              {property.marketValue && property.marketValue > property.price && (
+                <div className="text-xs text-muted-foreground italic">
+                  * Purchased £{(property.marketValue - property.price).toLocaleString()} below market
+                </div>
+              )}
             </>
           )}
 
