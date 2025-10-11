@@ -810,12 +810,22 @@ export function useGameState() {
 
       // Check level restrictions
       const allowedTypes = getAvailablePropertyTypes(prev.level);
-      const maxValue = getMaxPropertyValue(prev.level);
+      const { min: minValue, max: maxValue } = getPropertyValueRangeForLevel(prev.level);
       
       if (!allowedTypes.includes('all') && !allowedTypes.includes(property.type)) {
         toast({
           title: "Level Restriction",
           description: `You need level ${property.type === 'commercial' ? 3 : property.type === 'luxury' ? 4 : 1} to buy ${property.type} properties!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      // Prevent buying properties below current level minimum
+      if (property.price < minValue) {
+        toast({
+          title: "Property Too Cheap",
+          description: `At level ${prev.level}, you can only buy properties worth £${minValue.toLocaleString()} or more!`,
           variant: "destructive"
         });
         return prev;
@@ -921,6 +931,17 @@ export function useGameState() {
         toast({
           title: "Portfolio Limit Reached",
           description: `You can only own ${getMaxPropertiesForLevel(prev.level)} properties at level ${prev.level}!`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      // Check level restrictions for minimum value
+      const { min: minValue } = getPropertyValueRangeForLevel(prev.level);
+      if (purchasePrice < minValue) {
+        toast({
+          title: "Property Too Cheap",
+          description: `At level ${prev.level}, you can only buy properties worth £${minValue.toLocaleString()} or more!`,
           variant: "destructive"
         });
         return prev;
