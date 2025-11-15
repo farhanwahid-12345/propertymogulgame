@@ -105,6 +105,7 @@ interface GameState {
   annualRepairCosts: AnnualRepairCost[];
   damageHistory: PropertyDamageHistory[];
   lastYearlyGrowth: number; // Tracks when we last applied yearly property value growth
+  mortgageProviderRates: Record<string, number>; // Dynamic rates for each provider
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -122,46 +123,47 @@ const MORTGAGE_BROKER_FEE = 500; // Fixed broker fee
 const AUCTION_SELLER_FEE = 0.05; // 5% for quick auction sales
 
 // Mortgage providers with different risk profiles
+// Note: Cheaper providers have stricter requirements (higher credit scores, lower LTV)
 const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "hsbc",
     name: "HSBC",
-    baseRate: 0.045, // 4.5%
-    maxLTV: 0.8, // 80%
-    minCreditScore: 700,
-    description: "Premier high street bank with strict lending criteria"
-  },
-  {
-    id: "halifax",
-    name: "Halifax",
-    baseRate: 0.052, // 5.2%
-    maxLTV: 0.85, // 85%
-    minCreditScore: 650,
-    description: "Popular building society with competitive rates"
+    baseRate: 0.042, // 4.2% - Lowest base rate
+    maxLTV: 0.75, // 75% - Strictest LTV
+    minCreditScore: 720, // Highest credit requirement
+    description: "Premier bank with the best rates but strictest criteria"
   },
   {
     id: "nationwide",
     name: "Nationwide",
     baseRate: 0.048, // 4.8%
-    maxLTV: 0.85, // 85%
+    maxLTV: 0.80, // 80%
     minCreditScore: 680,
-    description: "Member-owned building society"
+    description: "Building society with competitive rates"
+  },
+  {
+    id: "halifax",
+    name: "Halifax",
+    baseRate: 0.055, // 5.5%
+    maxLTV: 0.85, // 85%
+    minCreditScore: 640,
+    description: "Flexible lending with moderate rates"
   },
   {
     id: "quickcash",
     name: "QuickCash Mortgages",
     baseRate: 0.089, // 8.9%
-    maxLTV: 0.95, // 95%
-    minCreditScore: 500,
-    description: "Fast approval but high rates"
+    maxLTV: 0.90, // 90%
+    minCreditScore: 550,
+    description: "Fast approval with higher rates"
   },
   {
-    id: "shadylender",
+    id: "easyloan",
     name: "Easy Finance Ltd",
-    baseRate: 0.125, // 12.5%
-    maxLTV: 0.95, // 95%
-    minCreditScore: 400,
-    description: "Last resort lender with very high rates"
+    baseRate: 0.135, // 13.5% - Highest base rate
+    maxLTV: 0.95, // 95% - Most lenient LTV
+    minCreditScore: 450, // Lowest credit requirement
+    description: "Last resort lender - approves almost anyone"
   }
 ];
 
@@ -272,6 +274,34 @@ const getMaxPropertyValue = (level: number) => {
   return range.max;
 };
 
+// Initialize mortgage provider rates from base rates
+const getInitialProviderRates = (): Record<string, number> => {
+  const rates: Record<string, number> = {};
+  MORTGAGE_PROVIDERS.forEach(provider => {
+    rates[provider.id] = provider.baseRate;
+  });
+  return rates;
+};
+
+// Fluctuate mortgage rates slightly each month
+const fluctuateProviderRates = (currentRates: Record<string, number>): Record<string, number> => {
+  const newRates: Record<string, number> = {};
+  MORTGAGE_PROVIDERS.forEach(provider => {
+    const currentRate = currentRates[provider.id] || provider.baseRate;
+    // Rates can fluctuate +/- 0.3% from current rate, but stay within reasonable bounds
+    const fluctuation = (Math.random() - 0.5) * 0.006; // +/- 0.3%
+    let newRate = currentRate + fluctuation;
+    
+    // Keep rates within 0.5% of base rate
+    const minRate = provider.baseRate - 0.005;
+    const maxRate = provider.baseRate + 0.005;
+    newRate = Math.max(minRate, Math.min(maxRate, newRate));
+    
+    newRates[provider.id] = newRate;
+  });
+  return newRates;
+};
+
 export function useGameState() {
   const [gameState, setGameState] = useState<GameState>(() => {
     const saved = localStorage.getItem("propertyTycoonSave");
@@ -301,6 +331,7 @@ export function useGameState() {
       lastYearlyGrowth: parsedState.lastYearlyGrowth ?? 0,
       overdraftLimit: parsedState.overdraftLimit ?? 0,
       overdraftUsed: parsedState.overdraftUsed ?? 0,
+      mortgageProviderRates: parsedState.mortgageProviderRates ?? getInitialProviderRates(),
     };
     }
     return {
@@ -326,6 +357,7 @@ export function useGameState() {
       annualRepairCosts: [],
       damageHistory: [],
       lastYearlyGrowth: 0,
+      mortgageProviderRates: getInitialProviderRates(),
     };
   });
 
@@ -759,6 +791,9 @@ export function useGameState() {
           });
         }
 
+        // Fluctuate mortgage provider rates monthly
+        const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
+
         return {
           ...prev,
           cash: Math.max(0, newCash),
@@ -771,7 +806,8 @@ export function useGameState() {
           timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
           creditScore: Math.min(850, prev.creditScore + creditScoreImprovement),
-          lastYearlyGrowth: newLastYearlyGrowth
+          lastYearlyGrowth: newLastYearlyGrowth,
+          mortgageProviderRates: newProviderRates,
         };
       });
     }
@@ -857,8 +893,9 @@ export function useGameState() {
       let newMortgage: Mortgage | null = null;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-        // Dynamic rate based on current market conditions
-        const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
+        // Use dynamic rate from game state
+        const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+        const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + 
           (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = dynamicRate / 12;
         
@@ -964,7 +1001,9 @@ export function useGameState() {
       let newMortgage: Mortgage | null = null;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-        const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+        // Use dynamic rate from game state
+        const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+        const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = dynamicRate / 12;
         const totalPayments = termYears * 12;
         const monthlyPayment = mortgageType === 'interest-only'
@@ -1058,6 +1097,7 @@ export function useGameState() {
       annualRepairCosts: [],
       damageHistory: [],
       lastYearlyGrowth: 0,
+      mortgageProviderRates: getInitialProviderRates(),
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1351,7 +1391,7 @@ export function useGameState() {
         return prev;
       }
 
-      const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 
+      const dynamicRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE + 
         (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
       const termMonths = 300; // 25 years
       const monthlyRate = dynamicRate / 12;
@@ -1503,7 +1543,7 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
     }
 
     // Recalculate rate and monthly payment
-    const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+    const dynamicRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
     const monthlyRate = dynamicRate / 12;
     const totalPayments = termYears * 12;
     const monthlyPayment = mortgageType === 'interest-only'
@@ -1564,7 +1604,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       .reduce((sum, m) => sum + m.remainingBalance, 0);
 
     const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-    const dynamicRate = provider.baseRate + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
+    const dynamicRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
     const monthlyRate = dynamicRate / 12;
     const totalPayments = termYears * 12;
     const monthlyPayment = mortgageType === 'interest-only'
@@ -1731,6 +1771,14 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     }));
   }, []);
 
+  // Get mortgage providers with dynamic rates
+  const getProvidersWithDynamicRates = useCallback((): MortgageProvider[] => {
+    return MORTGAGE_PROVIDERS.map(provider => ({
+      ...provider,
+      baseRate: gameState.mortgageProviderRates[provider.id] || provider.baseRate
+    }));
+  }, [gameState.mortgageProviderRates]);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1738,7 +1786,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     totalMonthlyExpenses,
     totalDebt,
     creditScore: calculateCreditScore(),
-    mortgageProviders: MORTGAGE_PROVIDERS,
+    mortgageProviders: getProvidersWithDynamicRates(),
     availableProperties: estateAgentProperties,
     estateAgentProperties,
     auctionProperties,
