@@ -11,6 +11,7 @@ import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
+import { ListedProperties } from "@/components/ui/listed-properties";
 import { useGameState } from "@/hooks/useGameState";
 import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
@@ -188,6 +189,12 @@ const Index = () => {
           </Tabs>
         </div>
 
+        {/* Listed Properties Section */}
+        <ListedProperties 
+          propertyListings={gameState.propertyListings}
+          ownedProperties={gameState.ownedProperties}
+          onAcceptOffer={(property, offer) => gameState.handleEstateAgentSale(property.id, offer)}
+        />
 
         {/* Player Portfolio */}
         {gameState.ownedProperties.length > 0 && (

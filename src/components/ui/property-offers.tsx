@@ -32,9 +32,10 @@ interface PropertyOffersProps {
   onClose: () => void;
   onAcceptOffer: (property: Property, offer: PropertyOffer) => void;
   daysOnMarket: number;
+  existingOffers?: PropertyOffer[];
 }
 
-export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysOnMarket }: PropertyOffersProps) {
+export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysOnMarket, existingOffers }: PropertyOffersProps) {
   // Generate realistic offers based on time on market
   const generateOffers = (daysOnMarket: number): PropertyOffer[] => {
     const offers: PropertyOffer[] = [];
@@ -63,7 +64,8 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
     return offers.sort((a, b) => b.amount - a.amount);
   };
 
-  const [offers] = useState(() => generateOffers(daysOnMarket));
+  // Use existing offers if provided, otherwise generate them
+  const [offers] = useState(() => existingOffers && existingOffers.length > 0 ? existingOffers : generateOffers(daysOnMarket));
 
   const handleAcceptOffer = (offer: PropertyOffer) => {
     onAcceptOffer(property, offer);
