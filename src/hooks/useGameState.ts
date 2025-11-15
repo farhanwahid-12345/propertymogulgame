@@ -46,6 +46,18 @@ interface PropertyListing {
   listingDate: number; // timestamp
   isAuction: boolean;
   daysUntilSale: number;
+  offers?: PropertyOffer[]; // Track offers for the listing
+  lastOfferCheck?: number; // Track when we last generated offers
+}
+
+interface PropertyOffer {
+  id: string;
+  buyerName: string;
+  amount: number;
+  daysOnMarket: number;
+  isChainFree: boolean;
+  mortgageApproved: boolean;
+  timestamp: number;
 }
 
 interface Renovation {
@@ -106,6 +118,8 @@ interface GameState {
   damageHistory: PropertyDamageHistory[];
   lastYearlyGrowth: number; // Tracks when we last applied yearly property value growth
   mortgageProviderRates: Record<string, number>; // Dynamic rates for each provider
+  estateAgentPropertyIds: string[]; // Persist which properties are in estate agent
+  auctionPropertyIds: string[]; // Persist which properties are in auction
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -332,6 +346,8 @@ export function useGameState() {
       overdraftLimit: parsedState.overdraftLimit ?? 0,
       overdraftUsed: parsedState.overdraftUsed ?? 0,
       mortgageProviderRates: parsedState.mortgageProviderRates ?? getInitialProviderRates(),
+      estateAgentPropertyIds: parsedState.estateAgentPropertyIds ?? [],
+      auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
     };
     }
     return {
@@ -358,6 +374,8 @@ export function useGameState() {
       damageHistory: [],
       lastYearlyGrowth: 0,
       mortgageProviderRates: getInitialProviderRates(),
+      estateAgentPropertyIds: [],
+      auctionPropertyIds: [],
     };
   });
 
@@ -365,19 +383,40 @@ export function useGameState() {
   const [estateAgentProperties, setEstateAgentProperties] = useState<Property[]>([]);
   const [auctionProperties, setAuctionProperties] = useState<Property[]>([]);
 
-  // Split properties between estate agent and auction on first load
+  // Initialize properties from game state or split on first load
   useEffect(() => {
-    const splitProperties = () => {
+    if (gameState.estateAgentPropertyIds.length > 0 || gameState.auctionPropertyIds.length > 0) {
+      // Load from saved IDs
+      const estate = AVAILABLE_PROPERTIES.filter(p => gameState.estateAgentPropertyIds.includes(p.id));
+      const auction = AVAILABLE_PROPERTIES.filter(p => gameState.auctionPropertyIds.includes(p.id));
+      setEstateAgentProperties(estate);
+      setAuctionProperties(auction);
+    } else if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
+      // First load - split properties
       const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
       const first = shuffled[0];
-      setAuctionProperties(first ? [first] : []);
-      setEstateAgentProperties(shuffled.slice(1));
-    };
-    
-    if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
-      splitProperties();
+      const auctionProps = first ? [first] : [];
+      const estateProps = shuffled.slice(1);
+      setAuctionProperties(auctionProps);
+      setEstateAgentProperties(estateProps);
+      
+      // Save to game state
+      setGameState(prev => ({
+        ...prev,
+        auctionPropertyIds: auctionProps.map(p => p.id),
+        estateAgentPropertyIds: estateProps.map(p => p.id)
+      }));
     }
   }, []);
+
+  // Sync property IDs to game state when they change
+  useEffect(() => {
+    setGameState(prev => ({
+      ...prev,
+      estateAgentPropertyIds: estateAgentProperties.map(p => p.id),
+      auctionPropertyIds: auctionProperties.map(p => p.id)
+    }));
+  }, [estateAgentProperties, auctionProperties]);
 
   // Ensure a single live auction property and replenish market inventory
   useEffect(() => {
@@ -519,10 +558,60 @@ export function useGameState() {
         });
 
         // Update property listings (properties being sold)
-        const updatedListings = prev.propertyListings.map(listing => ({
-          ...listing,
-          daysUntilSale: Math.max(0, listing.daysUntilSale - 1)
-        }));
+        const updatedListings = prev.propertyListings.map(listing => {
+          const daysOnMarket = Math.floor((currentTime - listing.listingDate) / (1000 * 60 * 60 * 24));
+          const property = prev.ownedProperties.find(p => p.id === listing.propertyId);
+          
+          // Generate new offers every 7-14 days for non-auction listings
+          const daysSinceLastCheck = listing.lastOfferCheck 
+            ? Math.floor((currentTime - listing.lastOfferCheck) / (1000 * 60 * 60 * 24))
+            : 0;
+          
+          let newOffers = listing.offers || [];
+          let lastCheck = listing.lastOfferCheck || listing.listingDate;
+          
+          if (!listing.isAuction && property && daysSinceLastCheck >= 7) {
+            // Generate 1-2 new offers
+            const numNewOffers = Math.random() > 0.5 ? 2 : 1;
+            const buyerNames = [
+              "Mr & Mrs Johnson", "Sarah Matthews", "David Chen", "Emma Wilson", 
+              "The Thompson Family", "Investment Properties Ltd", "Michael Brown",
+              "Liverpool Capital Group", "First Time Buyer", "Retirement Home Buyer"
+            ];
+            
+            for (let i = 0; i < numNewOffers; i++) {
+              const priceMultiplier = 0.85 + (Math.random() * 0.2); // 85% to 105%
+              const timeAdjustment = Math.max(0.9, 1 - (daysOnMarket * 0.002));
+              
+              const newOffer = {
+                id: `offer-${Date.now()}-${i}`,
+                buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
+                amount: Math.floor(property.value * priceMultiplier * timeAdjustment),
+                daysOnMarket: daysOnMarket,
+                isChainFree: Math.random() > 0.6,
+                mortgageApproved: Math.random() > 0.3,
+                timestamp: currentTime
+              };
+              
+              newOffers.push(newOffer);
+              
+              // Notify about new offer
+              toast({
+                title: "New Offer Received! 💰",
+                description: `${newOffer.buyerName} offered £${newOffer.amount.toLocaleString()} for ${property.name}`,
+              });
+            }
+            
+            lastCheck = currentTime;
+          }
+          
+          return {
+            ...listing,
+            daysUntilSale: Math.max(0, listing.daysUntilSale - 1),
+            offers: newOffers,
+            lastOfferCheck: lastCheck
+          };
+        });
 
         // Process property sales
         const completedSales = updatedListings.filter(listing => listing.daysUntilSale === 0);
@@ -1058,7 +1147,9 @@ export function useGameState() {
         propertyId: property.id,
         listingDate: Date.now(),
         isAuction,
-        daysUntilSale: daysToSell
+        daysUntilSale: daysToSell,
+        offers: [],
+        lastOfferCheck: Date.now()
       };
 
       toast({
@@ -1098,6 +1189,8 @@ export function useGameState() {
       damageHistory: [],
       lastYearlyGrowth: 0,
       mortgageProviderRates: getInitialProviderRates(),
+      estateAgentPropertyIds: [],
+      auctionPropertyIds: [],
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
