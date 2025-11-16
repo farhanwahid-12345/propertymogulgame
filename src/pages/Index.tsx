@@ -40,19 +40,19 @@ const Index = () => {
   // Get the first pending damage to show in dialog
   const currentDamage = gameState.pendingDamages?.[0];
 
-  const handlePayDamage = () => {
+  const handlePayDamage = (cost: number) => {
     if (currentDamage) {
-      if (gameState.cash >= currentDamage.repairCost) {
-        gameState.payDamageWithCash(currentDamage.id);
+      if (gameState.cash >= cost) {
+        gameState.payDamageWithCash(currentDamage.id, cost);
       } else {
-        gameState.payDamageWithLoan(currentDamage.id);
+        gameState.payDamageWithLoan(currentDamage.id, cost);
       }
     }
   };
 
-  const handleTakeLoan = () => {
+  const handleTakeLoan = (cost: number) => {
     if (currentDamage) {
-      gameState.payDamageWithLoan(currentDamage.id);
+      gameState.payDamageWithLoan(currentDamage.id, cost);
     }
   };
 
