@@ -48,6 +48,7 @@ interface PropertyListing {
   daysUntilSale: number;
   offers?: PropertyOffer[]; // Track offers for the listing
   lastOfferCheck?: number; // Track when we last generated offers
+  autoAcceptThreshold?: number; // Auto-accept offers at or above this amount
 }
 
 interface PropertyOffer {
@@ -595,14 +596,44 @@ export function useGameState() {
               
               newOffers.push(newOffer);
               
-              // Notify about new offer
-              toast({
-                title: "New Offer Received! 💰",
-                description: `${newOffer.buyerName} offered £${newOffer.amount.toLocaleString()} for ${property.name}`,
-              });
+              // Check if offer meets auto-accept threshold
+              if (listing.autoAcceptThreshold && newOffer.amount >= listing.autoAcceptThreshold) {
+                toast({
+                  title: "Offer Auto-Accepted! 🎉",
+                  description: `${newOffer.buyerName}'s offer of £${newOffer.amount.toLocaleString()} for ${property.name} was automatically accepted!`,
+                });
+                // This will be handled by auto-sale logic below
+              } else {
+                // Notify about new offer
+                toast({
+                  title: "New Offer Received! 💰",
+                  description: `${newOffer.buyerName} offered £${newOffer.amount.toLocaleString()} for ${property.name}`,
+                });
+              }
             }
             
             lastCheck = currentTime;
+          }
+          
+          // Check for auto-accepted offers
+          const autoAcceptedOffer = newOffers.find(offer => 
+            listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold
+          );
+          
+          if (autoAcceptedOffer && property) {
+            // Auto-sell the property
+            const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
+            const salePrice = autoAcceptedOffer.amount;
+            const estateAgentFees = listing.isAuction ? salePrice * AUCTION_SELLER_FEE : salePrice * ESTATE_AGENT_RATE;
+            const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
+            const netProceeds = salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
+            
+            return {
+              ...listing,
+              daysUntilSale: 0, // Will be processed immediately
+              offers: newOffers,
+              lastOfferCheck: lastCheck
+            };
           }
           
           return {
@@ -619,13 +650,22 @@ export function useGameState() {
           const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
           if (property) {
             const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
-            const salePrice = sale.isAuction ? property.value * 0.85 : property.value; // 15% discount for auction
+            
+            // Check if this was an auto-accepted sale
+            const autoAcceptedOffer = sale.offers?.find(offer => 
+              sale.autoAcceptThreshold && offer.amount >= sale.autoAcceptThreshold
+            );
+            
+            const salePrice = autoAcceptedOffer 
+              ? autoAcceptedOffer.amount 
+              : (sale.isAuction ? property.value * 0.85 : property.value);
+            
             const estateAgentFees = sale.isAuction ? salePrice * AUCTION_SELLER_FEE : salePrice * ESTATE_AGENT_RATE;
             const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
             const netProceeds = salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
             
             toast({
-              title: `Property Sold ${sale.isAuction ? '(Auction)' : ''}!`,
+              title: `Property Sold ${sale.isAuction ? '(Auction)' : autoAcceptedOffer ? '(Auto-Accepted)' : ''}!`,
               description: `${property.name} sold for £${salePrice.toLocaleString()}. Net proceeds: £${netProceeds.toLocaleString()}`,
             });
             
@@ -705,7 +745,16 @@ export function useGameState() {
           const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
           if (property) {
             const mortgage = prev.mortgages.find(m => m.propertyId === property.id);
-            const salePrice = sale.isAuction ? property.value * 0.85 : property.value;
+            
+            // Check if this was an auto-accepted sale
+            const autoAcceptedOffer = sale.offers?.find(offer => 
+              sale.autoAcceptThreshold && offer.amount >= sale.autoAcceptThreshold
+            );
+            
+            const salePrice = autoAcceptedOffer 
+              ? autoAcceptedOffer.amount 
+              : (sale.isAuction ? property.value * 0.85 : property.value);
+            
             const estateAgentFees = sale.isAuction ? salePrice * AUCTION_SELLER_FEE : salePrice * ESTATE_AGENT_RATE;
             const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
             return total + salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
@@ -1149,7 +1198,8 @@ export function useGameState() {
         isAuction,
         daysUntilSale: daysToSell,
         offers: [],
-        lastOfferCheck: Date.now()
+        lastOfferCheck: Date.now(),
+        autoAcceptThreshold: undefined // User can set this later
       };
 
       toast({
@@ -1876,6 +1926,18 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     }));
   }, [gameState.mortgageProviderRates]);
 
+  // Set auto-accept threshold for a property listing
+  const setAutoAcceptThreshold = useCallback((propertyId: string, threshold: number | undefined) => {
+    setGameState(prev => ({
+      ...prev,
+      propertyListings: prev.propertyListings.map(listing =>
+        listing.propertyId === propertyId
+          ? { ...listing, autoAcceptThreshold: threshold }
+          : listing
+      )
+    }));
+  }, []);
+
   return {
     ...gameState,
     netWorth: netWorth - totalDebt,
@@ -1909,6 +1971,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     payDamageWithCash,
     payDamageWithLoan,
     dismissDamage,
+    setAutoAcceptThreshold,
     resetGame
   };
 }
