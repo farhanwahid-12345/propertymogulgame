@@ -194,6 +194,7 @@ const Index = () => {
           propertyListings={gameState.propertyListings}
           ownedProperties={gameState.ownedProperties}
           onAcceptOffer={(property, offer) => gameState.handleEstateAgentSale(property.id, offer)}
+          onSetAutoAcceptThreshold={gameState.setAutoAcceptThreshold}
         />
 
         {/* Player Portfolio */}
