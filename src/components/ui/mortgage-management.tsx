@@ -47,14 +47,6 @@ export function MortgageManagement({
 
   const handleRefinance = () => {
     if (!selectedProperty || !singleProvider || singleLoanAmount[0] <= 0) return;
-    if (singleLoanAmount[0] > cash + (selectedProperty.mortgageRemaining || 0)) {
-      toast({
-        title: "Insufficient Funds",
-        description: "You cannot borrow more than your available cash plus current mortgage balance.",
-        variant: "destructive"
-      });
-      return;
-    }
 
     const currentMortgage = selectedProperty.mortgageRemaining || 0;
     const cashFromRefinance = singleLoanAmount[0] - currentMortgage;
