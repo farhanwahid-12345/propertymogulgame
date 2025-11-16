@@ -645,7 +645,7 @@ export function useGameState() {
         });
         
         // Check for tenant events - only damage events now, shown as prompts
-        // Restrict to one damage event every 24 months (2 years) per property
+        // Restrict to one damage event every 30 months (2.5 years) per property
         const newPendingDamages: PropertyDamage[] = [];
         const currentYear = Math.floor(prev.monthsPlayed / 12);
         
@@ -653,14 +653,14 @@ export function useGameState() {
           if (Math.random() < tenant.damageRisk / 100) {
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (property) {
-              // Check if 24 months have passed since last damage
+              // Check if 30 months have passed since last damage
               const damageHistory = prev.damageHistory.find(dh => dh.propertyId === propertyId);
               const monthsSinceLastDamage = damageHistory 
                 ? prev.monthsPlayed - damageHistory.lastDamageMonth 
                 : 999; // No previous damage
               
-              // Only allow damage if 24+ months since last damage
-              if (monthsSinceLastDamage >= 24) {
+              // Only allow damage if 30+ months since last damage
+              if (monthsSinceLastDamage >= 30) {
                 // Check annual repair cost cap (2% of property value)
                 const annualCap = property.value * 0.02;
                 const existingAnnualCost = prev.annualRepairCosts.find(
@@ -1760,10 +1760,12 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
   }, []);
 
   // Pay for property damage with cash
-  const payDamageWithCash = useCallback((damageId: string) => {
+  const payDamageWithCash = useCallback((damageId: string, actualCost?: number) => {
     setGameState(prev => {
       const damage = prev.pendingDamages.find(d => d.id === damageId);
       if (!damage) return prev;
+
+      const costToPay = actualCost ?? damage.repairCost;
 
       const currentYear = Math.floor(prev.monthsPlayed / 12);
       const existingAnnualCost = prev.annualRepairCosts.find(
@@ -1773,13 +1775,13 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       const updatedAnnualCosts = existingAnnualCost
         ? prev.annualRepairCosts.map(arc =>
             arc.propertyId === damage.propertyId && arc.year === currentYear
-              ? { ...arc, totalCost: arc.totalCost + damage.repairCost }
+              ? { ...arc, totalCost: arc.totalCost + costToPay }
               : arc
           )
         : [...prev.annualRepairCosts, {
             propertyId: damage.propertyId,
             year: currentYear,
-            totalCost: damage.repairCost
+            totalCost: costToPay
           }];
 
       // Update damage history to record when this property last had damage
@@ -1793,12 +1795,12 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
 
       toast({
         title: "Repairs Paid",
-        description: `Paid £${damage.repairCost.toLocaleString()} to repair ${damage.propertyName}`,
+        description: `Paid £${costToPay.toLocaleString()} to repair ${damage.propertyName}`,
       });
 
       return {
         ...prev,
-        cash: prev.cash - damage.repairCost,
+        cash: prev.cash - costToPay,
         pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
         annualRepairCosts: updatedAnnualCosts,
         damageHistory: updatedDamageHistory
@@ -1807,10 +1809,12 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
   }, []);
 
   // Take a loan to pay for property damage
-  const payDamageWithLoan = useCallback((damageId: string) => {
+  const payDamageWithLoan = useCallback((damageId: string, actualCost?: number) => {
     setGameState(prev => {
       const damage = prev.pendingDamages.find(d => d.id === damageId);
       if (!damage) return prev;
+
+      const costToPay = actualCost ?? damage.repairCost;
 
       const currentYear = Math.floor(prev.monthsPlayed / 12);
       const existingAnnualCost = prev.annualRepairCosts.find(
@@ -1820,13 +1824,13 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       const updatedAnnualCosts = existingAnnualCost
         ? prev.annualRepairCosts.map(arc =>
             arc.propertyId === damage.propertyId && arc.year === currentYear
-              ? { ...arc, totalCost: arc.totalCost + damage.repairCost }
+              ? { ...arc, totalCost: arc.totalCost + costToPay }
               : arc
           )
         : [...prev.annualRepairCosts, {
             propertyId: damage.propertyId,
             year: currentYear,
-            totalCost: damage.repairCost
+            totalCost: costToPay
           }];
 
       // Update damage history to record when this property last had damage
@@ -1841,13 +1845,13 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       // Add to cash (as a loan) - credit score will take a hit
       toast({
         title: "Bank Loan Taken",
-        description: `Borrowed £${damage.repairCost.toLocaleString()} to repair ${damage.propertyName}. Credit score reduced.`,
+        description: `Borrowed £${costToPay.toLocaleString()} to repair ${damage.propertyName}. Credit score reduced.`,
         variant: "destructive"
       });
 
       return {
         ...prev,
-        cash: prev.cash + damage.repairCost,
+        cash: prev.cash + costToPay,
         pendingDamages: prev.pendingDamages.filter(d => d.id !== damageId),
         annualRepairCosts: updatedAnnualCosts,
         creditScore: Math.max(300, prev.creditScore - 10), // Reduce credit score for emergency loan
