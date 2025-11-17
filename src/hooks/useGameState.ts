@@ -1161,18 +1161,22 @@ export function useGameState() {
         };
       }
 
+      // If bought below market price, value instantly increases to market price
+      const actualValue = Math.max(purchasePrice, property.value);
+      const boughtBelowMarket = purchasePrice < property.value;
+      
       toast({
         title: "Property Purchased!",
-        description: `You bought ${property.name} for £${purchasePrice.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}.`,
+        description: `You bought ${property.name} for £${purchasePrice.toLocaleString()}${mortgageAmount > 0 ? ` (£${mortgageAmount.toLocaleString()} mortgage)` : ''}${boughtBelowMarket ? `. Value instantly increased to £${actualValue.toLocaleString()}!` : ''}`,
       });
 
       // Track market value separately - use property.value as true market value
       const purchased = { 
         ...property, 
         price: purchasePrice, 
-        value: purchasePrice, 
+        value: actualValue, // Use market value if bought below market
         owned: true,
-        marketValue: property.value // Store original market value (could be higher if bought below market)
+        marketValue: property.value // Store original market value
       };
       
       return {
