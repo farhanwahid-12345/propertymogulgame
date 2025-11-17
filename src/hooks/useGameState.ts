@@ -121,21 +121,59 @@ interface GameState {
   mortgageProviderRates: Record<string, number>; // Dynamic rates for each provider
   estateAgentPropertyIds: string[]; // Persist which properties are in estate agent
   auctionPropertyIds: string[]; // Persist which properties are in auction
+  yearlyNetProfit: number; // Track net profit for corporation tax
+  lastCorporationTaxMonth: number; // Track when we last paid corporation tax (April = month 4)
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
 const EXPERIENCE_BASE = 1000;
 const MORTGAGE_INTEREST_RATE = 0.055; // 5.5% annual interest rate
-const PROPERTY_TAX_RATE = 0.012; // 1.2% annual property tax
-const MAINTENANCE_RATE = 0.008; // 0.8% annual maintenance costs
 const BASE_MARKET_RATE = 0.035; // 3.5% base market rate
 
-// Transaction costs
-const SOLICITOR_FEES = 1500; // Fixed solicitor fees
+// UK Council Tax (charged monthly on empty properties)
+const COUNCIL_TAX_BAND_D = 150; // £150/month average for Band D (empty properties)
+
+// UK Corporation Tax
+const CORPORATION_TAX_RATE = 0.19; // 19% on net profits (UK small profits rate)
+
+// Transaction costs (UK-based)
+const SOLICITOR_FEES = 600; // £600 solicitor fees
 const ESTATE_AGENT_RATE = 0.015; // 1.5% of sale price
-const STAMP_DUTY_RATE = 0.03; // 3% stamp duty
-const MORTGAGE_BROKER_FEE = 500; // Fixed broker fee
 const AUCTION_SELLER_FEE = 0.05; // 5% for quick auction sales
+
+// UK Stamp Duty Land Tax Calculator
+const calculateStampDuty = (purchasePrice: number): number => {
+  // UK Stamp Duty bands (additional property rates)
+  if (purchasePrice <= 40000) return 0;
+  
+  let stampDuty = 0;
+  
+  // 0-£250,000: 3%
+  if (purchasePrice > 40000) {
+    const band1 = Math.min(purchasePrice, 250000) - 40000;
+    stampDuty += band1 * 0.03;
+  }
+  
+  // £250,001-£925,000: 8%
+  if (purchasePrice > 250000) {
+    const band2 = Math.min(purchasePrice, 925000) - 250000;
+    stampDuty += band2 * 0.08;
+  }
+  
+  // £925,001-£1,500,000: 13%
+  if (purchasePrice > 925000) {
+    const band3 = Math.min(purchasePrice, 1500000) - 925000;
+    stampDuty += band3 * 0.13;
+  }
+  
+  // £1,500,001+: 15%
+  if (purchasePrice > 1500000) {
+    const band4 = purchasePrice - 1500000;
+    stampDuty += band4 * 0.15;
+  }
+  
+  return Math.floor(stampDuty);
+};
 
 // Mortgage providers with different risk profiles
 // Note: Cheaper providers have stricter requirements (higher credit scores, lower LTV)
@@ -349,6 +387,8 @@ export function useGameState() {
       mortgageProviderRates: parsedState.mortgageProviderRates ?? getInitialProviderRates(),
       estateAgentPropertyIds: parsedState.estateAgentPropertyIds ?? [],
       auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
+      yearlyNetProfit: parsedState.yearlyNetProfit ?? 0,
+      lastCorporationTaxMonth: parsedState.lastCorporationTaxMonth ?? 0,
     };
     }
     return {
@@ -377,6 +417,8 @@ export function useGameState() {
       mortgageProviderRates: getInitialProviderRates(),
       estateAgentPropertyIds: [],
       auctionPropertyIds: [],
+      yearlyNetProfit: 0,
+      lastCorporationTaxMonth: 0,
     };
   });
 
@@ -816,15 +858,17 @@ export function useGameState() {
           total + mortgage.monthlyPayment, 0
         );
         
-        const propertyTax = prev.ownedProperties.reduce((total, property) => 
-          total + (property.value * PROPERTY_TAX_RATE / 12), 0
-        );
+        // Council tax for empty properties (no tenant)
+        const councilTax = prev.ownedProperties.reduce((total, property) => {
+          const hasTenant = prev.tenants.some(t => t.propertyId === property.id);
+          const isInVoidPeriod = prev.voidPeriods.some(vp => 
+            vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
+          );
+          // Charge council tax only if property is empty (no tenant and not in void period being prepared)
+          return total + (!hasTenant || isInVoidPeriod ? COUNCIL_TAX_BAND_D : 0);
+        }, 0);
         
-        const maintenance = prev.ownedProperties.reduce((total, property) => 
-          total + (property.value * MAINTENANCE_RATE / 12), 0
-        );
-        
-        const totalExpenses = mortgagePayments + propertyTax + maintenance;
+        const totalExpenses = mortgagePayments + councilTax;
         const netIncome = monthlyIncome - totalExpenses;
         
         // Update mortgage balances, check for payoffs, and improve credit score
@@ -932,9 +976,36 @@ export function useGameState() {
         // Fluctuate mortgage provider rates monthly
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
+        // Track yearly net profit for corporation tax
+        const accumulatedYearlyProfit = prev.yearlyNetProfit + netIncome;
+        
+        // Corporation tax on April 1st (month 4 in 1-12 cycle)
+        const currentMonth = (prev.monthsPlayed + 1) % 12; // 0 = Jan, 3 = April, etc.
+        const isAprilTaxTime = currentMonth === 3; // April
+        const lastTaxYear = Math.floor(prev.lastCorporationTaxMonth / 12);
+        const currentTaxYear = Math.floor((prev.monthsPlayed + 1) / 12);
+        
+        let corporationTaxPaid = 0;
+        let finalYearlyProfit = accumulatedYearlyProfit;
+        let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
+        let finalCash = Math.max(0, newCash);
+        
+        if (isAprilTaxTime && currentTaxYear > lastTaxYear && accumulatedYearlyProfit > 0) {
+          // Calculate 19% corporation tax on net profits
+          corporationTaxPaid = Math.floor(accumulatedYearlyProfit * CORPORATION_TAX_RATE);
+          finalCash = Math.max(0, newCash - corporationTaxPaid);
+          finalYearlyProfit = 0; // Reset for new tax year
+          lastCorpTaxMonth = prev.monthsPlayed + 1;
+          
+          toast({
+            title: "Corporation Tax Due! 📋",
+            description: `Paid £${corporationTaxPaid.toLocaleString()} corporation tax (19%) on £${accumulatedYearlyProfit.toLocaleString()} net profit.`,
+          });
+        }
+
         return {
           ...prev,
-          cash: Math.max(0, newCash),
+          cash: finalCash,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           experience: prev.experience,
@@ -946,6 +1017,8 @@ export function useGameState() {
           creditScore: Math.min(850, prev.creditScore + creditScoreImprovement),
           lastYearlyGrowth: newLastYearlyGrowth,
           mortgageProviderRates: newProviderRates,
+          yearlyNetProfit: finalYearlyProfit,
+          lastCorporationTaxMonth: lastCorpTaxMonth,
         };
       });
     }
@@ -1015,9 +1088,9 @@ export function useGameState() {
       }
 
       const mortgageAmount = (property.price * mortgagePercentage) / 100;
-      const stampDuty = property.price * STAMP_DUTY_RATE;
-      const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + 
-        (mortgageAmount > 0 ? MORTGAGE_BROKER_FEE : 0);
+      const stampDuty = calculateStampDuty(property.price);
+      const mortgageFee = mortgageAmount > 0 ? property.price * 0.01 : 0; // 1% mortgage fee
+      const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
       
       if (prev.cash < cashRequired) {
         toast({
@@ -1123,8 +1196,9 @@ export function useGameState() {
       }
 
       const mortgageAmount = (purchasePrice * mortgagePercentage) / 100;
-      const stampDuty = purchasePrice * STAMP_DUTY_RATE;
-      const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + (mortgageAmount > 0 ? MORTGAGE_BROKER_FEE : 0);
+      const stampDuty = calculateStampDuty(purchasePrice);
+      const mortgageFee = mortgageAmount > 0 ? purchasePrice * 0.01 : 0; // 1% mortgage fee
+      const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
       
       // Check cash
       if (prev.cash < cashRequired) {
@@ -1245,6 +1319,8 @@ export function useGameState() {
       mortgageProviderRates: getInitialProviderRates(),
       estateAgentPropertyIds: [],
       auctionPropertyIds: [],
+      yearlyNetProfit: 0,
+      lastCorporationTaxMonth: 0,
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1523,7 +1599,8 @@ export function useGameState() {
         return prev;
       }
 
-      const totalFees = SOLICITOR_FEES + MORTGAGE_BROKER_FEE;
+      const mortgageFee = newLoanAmount * 0.01; // 1% mortgage fee
+      const totalFees = SOLICITOR_FEES + mortgageFee;
       const existingBalance = existingMortgage ? existingMortgage.remainingBalance : 0;
       const cashRaised = newLoanAmount - existingBalance - totalFees;
 
@@ -1583,9 +1660,11 @@ export function useGameState() {
 
   const totalMonthlyExpenses = gameState.mortgages.reduce((total, mortgage) => 
     total + mortgage.monthlyPayment, 0
-  ) + gameState.ownedProperties.reduce((total, property) => 
-    total + (property.value * (PROPERTY_TAX_RATE + MAINTENANCE_RATE) / 12), 0
-  );
+  ) + gameState.ownedProperties.reduce((total, property) => {
+    // Council tax only for empty properties
+    const hasTenant = gameState.tenants.some(t => t.propertyId === property.id);
+    return total + (!hasTenant ? COUNCIL_TAX_BAND_D : 0);
+  }, 0);
 
   const totalDebt = gameState.mortgages.reduce((total, mortgage) => 
     total + mortgage.remainingBalance, 0
