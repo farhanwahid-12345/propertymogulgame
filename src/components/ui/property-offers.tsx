@@ -65,7 +65,11 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
   };
 
   // Use existing offers if provided, otherwise generate them
-  const [offers] = useState(() => existingOffers && existingOffers.length > 0 ? existingOffers : generateOffers(daysOnMarket));
+  // Always sort by amount (highest first)
+  const [offers] = useState(() => {
+    const offerList = existingOffers && existingOffers.length > 0 ? existingOffers : generateOffers(daysOnMarket);
+    return offerList.sort((a, b) => b.amount - a.amount);
+  });
 
   const handleAcceptOffer = (offer: PropertyOffer) => {
     onAcceptOffer(property, offer);
