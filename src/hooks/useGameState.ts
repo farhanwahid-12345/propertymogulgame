@@ -1658,13 +1658,23 @@ export function useGameState() {
     total + property.monthlyIncome, 0
   );
 
-  const totalMonthlyExpenses = gameState.mortgages.reduce((total, mortgage) => 
+  // Calculate expense breakdown
+  const mortgageExpenses = gameState.mortgages.reduce((total, mortgage) => 
     total + mortgage.monthlyPayment, 0
-  ) + gameState.ownedProperties.reduce((total, property) => {
+  );
+  
+  const councilTaxExpenses = gameState.ownedProperties.reduce((total, property) => {
     // Council tax only for empty properties
     const hasTenant = gameState.tenants.some(t => t.propertyId === property.id);
     return total + (!hasTenant ? COUNCIL_TAX_BAND_D : 0);
   }, 0);
+  
+  const emptyPropertiesCount = gameState.ownedProperties.filter(property => {
+    const hasTenant = gameState.tenants.some(t => t.propertyId === property.id);
+    return !hasTenant;
+  }).length;
+
+  const totalMonthlyExpenses = mortgageExpenses + councilTaxExpenses;
 
   const totalDebt = gameState.mortgages.reduce((total, mortgage) => 
     total + mortgage.remainingBalance, 0
@@ -2026,6 +2036,11 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     netWorth: netWorth - totalDebt,
     totalMonthlyIncome,
     totalMonthlyExpenses,
+    expenseBreakdown: {
+      mortgages: mortgageExpenses,
+      councilTax: councilTaxExpenses,
+      emptyPropertiesCount,
+    },
     totalDebt,
     creditScore: calculateCreditScore(),
     mortgageProviders: getProvidersWithDynamicRates(),

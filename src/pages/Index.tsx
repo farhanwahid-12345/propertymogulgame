@@ -97,6 +97,7 @@ const Index = () => {
           experienceToNext={gameState.experienceToNext}
           totalMonthlyIncome={gameState.totalMonthlyIncome}
           totalMonthlyExpenses={gameState.totalMonthlyExpenses}
+          expenseBreakdown={gameState.expenseBreakdown}
           totalDebt={gameState.totalDebt}
           creditScore={gameState.creditScore}
           ownedPropertiesCount={gameState.ownedProperties.length}
