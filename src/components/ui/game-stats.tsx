@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, DollarSign, Home, AlertTriangle, Calendar, CreditCard } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TrendingUp, TrendingDown, DollarSign, Home, AlertTriangle, Calendar, CreditCard, Info } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface GameStatsProps {
   cash: number;
@@ -13,6 +15,11 @@ interface GameStatsProps {
   experienceToNext: number;
   totalMonthlyIncome: number;
   totalMonthlyExpenses: number;
+  expenseBreakdown: {
+    mortgages: number;
+    councilTax: number;
+    emptyPropertiesCount: number;
+  };
   totalDebt: number;
   creditScore: number;
   ownedPropertiesCount: number;
@@ -35,6 +42,7 @@ export function GameStats({
   experienceToNext,
   totalMonthlyIncome,
   totalMonthlyExpenses,
+  expenseBreakdown,
   totalDebt,
   creditScore,
   ownedPropertiesCount,
@@ -92,10 +100,43 @@ export function GameStats({
           )}>
             £{netMonthlyIncome.toLocaleString()}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Income: £{totalMonthlyIncome.toLocaleString()} | 
-            Expenses: £{totalMonthlyExpenses.toLocaleString()}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Income: £{totalMonthlyIncome.toLocaleString()} | 
+              Expenses: £{totalMonthlyExpenses.toLocaleString()}
+            </p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <Info className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Monthly Cost Breakdown</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Mortgage Payments:</span>
+                      <span className="font-semibold">£{expenseBreakdown.mortgages.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        Council Tax ({expenseBreakdown.emptyPropertiesCount} empty):
+                      </span>
+                      <span className="font-semibold">£{expenseBreakdown.councilTax.toLocaleString()}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-2 flex justify-between items-center">
+                      <span className="text-sm font-medium">Total Expenses:</span>
+                      <span className="font-bold">£{totalMonthlyExpenses.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Council tax (£150/month) is only charged on empty properties. Fill vacancies to reduce costs!
+                  </p>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </CardContent>
       </Card>
 
