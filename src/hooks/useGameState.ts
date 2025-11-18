@@ -1713,6 +1713,11 @@ export function useGameState() {
       const mortgagePayoff = mortgage ? mortgage.remainingBalance : 0;
       const netProceeds = salePrice - estateAgentFees - SOLICITOR_FEES - mortgagePayoff;
 
+      toast({
+        title: "Property Sold!",
+        description: `${property.name} sold to ${offer.buyerName} for £${salePrice.toLocaleString()}. Net proceeds: £${netProceeds.toLocaleString()} (after fees & mortgage payoff)`,
+      });
+
       return {
         ...prev,
         cash: prev.cash + netProceeds,
@@ -1745,6 +1750,108 @@ export function useGameState() {
         propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
       };
     });
+  }, []);
+
+  // Estate agent listing management
+  const listPropertyForSale = useCallback((propertyId: string, askingPrice: number) => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+
+      // Check if already listed
+      if (prev.propertyListings.some(l => l.propertyId === propertyId)) {
+        toast({
+          title: "Already Listed",
+          description: `${property.name} is already listed for sale.`,
+          variant: "destructive"
+        });
+        return prev;
+      }
+
+      const newListing: PropertyListing = {
+        propertyId,
+        listingDate: Date.now(),
+        isAuction: false,
+        daysUntilSale: 30,
+        offers: [],
+        lastOfferCheck: Date.now(),
+      };
+
+      toast({
+        title: "Property Listed",
+        description: `${property.name} listed for £${askingPrice.toLocaleString()}`,
+      });
+
+      return {
+        ...prev,
+        propertyListings: [...prev.propertyListings, newListing]
+      };
+    });
+  }, []);
+
+  const cancelPropertyListing = useCallback((propertyId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
+    }));
+  }, []);
+
+  const updatePropertyListingPrice = useCallback((propertyId: string, newPrice: number) => {
+    setGameState(prev => ({
+      ...prev,
+      propertyListings: prev.propertyListings.map(l =>
+        l.propertyId === propertyId ? { ...l } : l
+      )
+    }));
+  }, []);
+
+  const addOfferToListing = useCallback((propertyId: string, offer: PropertyOffer) => {
+    setGameState(prev => {
+      const listing = prev.propertyListings.find(l => l.propertyId === propertyId);
+      if (!listing) return prev;
+
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+
+      const updatedListings = prev.propertyListings.map(l => {
+        if (l.propertyId === propertyId) {
+          const newOffers = [...(l.offers || []), offer].sort((a, b) => b.amount - a.amount);
+          
+          // Check auto-accept threshold
+          if (l.autoAcceptThreshold && offer.amount >= l.autoAcceptThreshold) {
+            // Auto-accept this offer
+            setTimeout(() => {
+              handleEstateAgentSale(propertyId, offer);
+            }, 100);
+          } else {
+            // Show notification for new offer
+            toast({
+              title: "New Offer Received!",
+              description: `${offer.buyerName} offered £${offer.amount.toLocaleString()} for ${property.name}`,
+            });
+          }
+          
+          return { ...l, offers: newOffers, lastOfferCheck: Date.now() };
+        }
+        return l;
+      });
+
+      return {
+        ...prev,
+        propertyListings: updatedListings
+      };
+    });
+  }, [handleEstateAgentSale]);
+
+  const rejectPropertyOffer = useCallback((propertyId: string, offerId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      propertyListings: prev.propertyListings.map(l =>
+        l.propertyId === propertyId
+          ? { ...l, offers: (l.offers || []).filter(o => o.id !== offerId) }
+          : l
+      )
+    }));
   }, []);
 
 // Mortgage refinancing
@@ -2068,8 +2175,13 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     removeAuctionProperty,
     payDamageWithCash,
     payDamageWithLoan,
-    dismissDamage,
+    listPropertyForSale,
+    cancelPropertyListing,
+    updatePropertyListingPrice,
     setAutoAcceptThreshold,
+    addOfferToListing,
+    rejectPropertyOffer,
+    dismissDamage,
     resetGame
   };
 }

@@ -9,28 +9,39 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Clock, Check, X, Building2, ShoppingCart } from "lucide-react";
+import { Clock, Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface PropertyOffer {
   id: string;
-  propertyId: string;
-  amount: number;
   buyerName: string;
-  offerDate: number;
-  expiresAt: number;
-  status: 'pending' | 'accepted' | 'rejected';
+  amount: number;
+  daysOnMarket: number;
+  isChainFree: boolean;
+  mortgageApproved: boolean;
+  timestamp: number;
 }
 
 interface PropertyListing {
-  property: Property;
-  askingPrice: number;
-  listDate: number;
+  propertyId: string;
+  listingDate: number;
+  isAuction: boolean;
+  daysUntilSale: number;
+  offers?: PropertyOffer[];
+  lastOfferCheck?: number;
+  autoAcceptThreshold?: number;
 }
 
 interface EstateAgentWindowProps {
   ownedProperties: Property[];
+  propertyListings: PropertyListing[];
+  onListProperty: (propertyId: string, askingPrice: number) => void;
+  onCancelListing: (propertyId: string) => void;
+  onUpdateListingPrice: (propertyId: string, newPrice: number) => void;
+  onSetAutoAccept: (propertyId: string, threshold: number | undefined) => void;
   onAcceptOffer: (propertyId: string, offer: PropertyOffer) => void;
+  onRejectOffer: (propertyId: string, offerId: string) => void;
+  onAddOffer: (propertyId: string, offer: PropertyOffer) => void;
   cash: number;
   availableProperties: Property[];
   onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
@@ -42,8 +53,15 @@ interface EstateAgentWindowProps {
 }
 
 export function EstateAgentWindow({ 
-  ownedProperties, 
+  ownedProperties,
+  propertyListings,
+  onListProperty,
+  onCancelListing,
+  onUpdateListingPrice,
+  onSetAutoAccept,
   onAcceptOffer, 
+  onRejectOffer,
+  onAddOffer,
   cash, 
   availableProperties, 
   onBuyProperty, 
@@ -54,12 +72,12 @@ export function EstateAgentWindow({
   mortgageProviders 
 }: EstateAgentWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [listings, setListings] = useState<PropertyListing[]>([]);
-  const [offers, setOffers] = useState<PropertyOffer[]>([]);
   const [newListingPrice, setNewListingPrice] = useState("");
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [editingListing, setEditingListing] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
+  const [editingThreshold, setEditingThreshold] = useState<string | null>(null);
+  const [thresholdValue, setThresholdValue] = useState("");
   
   // Property buying state
   const [selectedBuyProperty, setSelectedBuyProperty] = useState<Property | null>(null);
@@ -69,68 +87,67 @@ export function EstateAgentWindow({
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
 
-  // Generate offers for listed properties - much faster
+  // Generate offers for listed properties
   useEffect(() => {
     const interval = setInterval(() => {
-      setOffers(prev => {
+      propertyListings.forEach(listing => {
+        const property = ownedProperties.find(p => p.id === listing.propertyId);
+        if (!property) return;
+
         const currentTime = Date.now();
+        const timeSinceListing = (currentTime - listing.listingDate) / (1000 * 60 * 60 * 24); // days
+        const lastCheck = listing.lastOfferCheck || listing.listingDate;
+        const timeSinceLastCheck = (currentTime - lastCheck) / (1000 * 60 * 60); // hours
+
+        // Only check every 2 hours minimum
+        if (timeSinceLastCheck < 2) return;
+
+        const marketValue = property.value;
+        const askingPrice = property.price; // Using property.price as asking price
+        const priceRatio = askingPrice / marketValue;
         
-        // Remove expired offers
-        const activeOffers = prev.filter(offer => currentTime < offer.expiresAt);
+        // Calculate offer chance based on pricing
+        let offerChance = 0.3;
+        if (priceRatio <= 0.9) offerChance = 0.8;
+        else if (priceRatio <= 1.0) offerChance = 0.6;
+        else if (priceRatio <= 1.1) offerChance = 0.4;
+        else offerChance = 0.15;
         
-        // Generate new offers for listed properties (very fast and realistic)
-        const newOffers: PropertyOffer[] = [];
-        listings.forEach(listing => {
-          const marketValue = listing.property.value;
-          const priceRatio = listing.askingPrice / marketValue;
-          
-          // Much higher chance of offers, especially for well-priced properties
-          let offerChance = 0.4; // Base 40% chance
-          if (priceRatio <= 0.9) offerChance = 0.9; // Well priced - 90% chance
-          else if (priceRatio <= 1.0) offerChance = 0.7; // Fair price - 70% chance
-          else if (priceRatio <= 1.1) offerChance = 0.5; // Slightly overpriced - 50% chance
-          else offerChance = 0.2; // Overpriced - 20% chance
-          
-          if (Math.random() < offerChance) {
-            // More realistic offer generation
-            let offerAmount: number;
-            if (priceRatio >= 1.1) {
-              // Overpriced: offers 10-20% below asking
-              offerAmount = listing.askingPrice * (0.8 + Math.random() * 0.1);
-            } else if (priceRatio >= 1.0) {
-              // Fair: offers 0-5% below asking or at asking
-              offerAmount = listing.askingPrice * (0.95 + Math.random() * 0.05);
-            } else {
-              // Well priced: offers at or above asking
-              offerAmount = listing.askingPrice * (1.0 + Math.random() * 0.05);
-            }
-            
-            const buyerNames = [
-              "John Smith", "Sarah Johnson", "Mike Wilson", "Emma Davis",
-              "James Brown", "Lisa Taylor", "David Anderson", "Rachel White",
-              "Tom Clark", "Anna Lewis", "Chris Martin", "Sophie Evans"
-            ];
-            
-            const buyerName = buyerNames[Math.floor(Math.random() * buyerNames.length)];
-            
-            newOffers.push({
-              id: `offer_${Date.now()}_${Math.random()}`,
-              propertyId: listing.property.id,
-              amount: Math.floor(offerAmount),
-              buyerName,
-              offerDate: currentTime,
-              expiresAt: currentTime + (2 * 60 * 60 * 1000), // Expires in 2 hours (faster)
-              status: 'pending'
-            });
+        if (Math.random() < offerChance) {
+          let offerAmount: number;
+          if (priceRatio > 1.1) {
+            offerAmount = askingPrice * (0.85 + Math.random() * 0.1);
+          } else if (priceRatio >= 1.0) {
+            offerAmount = askingPrice * (0.95 + Math.random() * 0.05);
+          } else {
+            offerAmount = askingPrice * (1.0 + Math.random() * 0.05);
           }
-        });
-        
-        return [...activeOffers, ...newOffers];
+          
+          const buyerNames = [
+            "John Smith", "Sarah Johnson", "Mike Wilson", "Emma Davis",
+            "James Brown", "Lisa Taylor", "David Anderson", "Rachel White",
+            "Tom Clark", "Anna Lewis", "Chris Martin", "Sophie Evans"
+          ];
+          
+          const buyerName = buyerNames[Math.floor(Math.random() * buyerNames.length)];
+          
+          const newOffer: PropertyOffer = {
+            id: `offer_${Date.now()}_${Math.random()}`,
+            buyerName,
+            amount: Math.floor(offerAmount),
+            daysOnMarket: Math.floor(timeSinceListing),
+            isChainFree: Math.random() > 0.6,
+            mortgageApproved: Math.random() > 0.3,
+            timestamp: currentTime
+          };
+
+          onAddOffer(listing.propertyId, newOffer);
+        }
       });
-    }, 10000); // Check every 10 seconds (much faster)
+    }, 10000); // Check every 10 seconds
 
     return () => clearInterval(interval);
-  }, [listings]);
+  }, [propertyListings, ownedProperties, onAddOffer]);
 
   const handleListProperty = () => {
     if (!selectedProperty || !newListingPrice) return;
@@ -145,58 +162,9 @@ export function EstateAgentWindow({
       return;
     }
 
-    const newListing: PropertyListing = {
-      property: selectedProperty,
-      askingPrice: price,
-      listDate: Date.now()
-    };
-
-    setListings(prev => [...prev, newListing]);
+    onListProperty(selectedProperty.id, price);
     setSelectedProperty(null);
     setNewListingPrice("");
-
-    toast({
-      title: "Property Listed",
-      description: `${selectedProperty.name} listed for £${price.toLocaleString()}`,
-    });
-  };
-
-  const handleAcceptOffer = (offer: PropertyOffer) => {
-    setOffers(prev => prev.map(o => 
-      o.id === offer.id ? { ...o, status: 'accepted' } : o
-    ));
-    
-    setListings(prev => prev.filter(l => l.property.id !== offer.propertyId));
-    
-    onAcceptOffer(offer.propertyId, offer);
-    
-    toast({
-      title: "Offer Accepted!",
-      description: `Sold to ${offer.buyerName} for £${offer.amount.toLocaleString()}`,
-    });
-  };
-
-  const handleRejectOffer = (offerId: string) => {
-    setOffers(prev => prev.map(o => 
-      o.id === offerId ? { ...o, status: 'rejected' } : o
-    ));
-    
-    toast({
-      title: "Offer Rejected",
-      description: "The offer has been declined.",
-    });
-  };
-
-  const handleCancelListing = (propertyId: string) => {
-    setListings(prev => prev.filter(l => l.property.id !== propertyId));
-    
-    // Remove any pending offers for this property
-    setOffers(prev => prev.filter(o => o.propertyId !== propertyId));
-    
-    toast({
-      title: "Listing Cancelled",
-      description: "Property removed from sale.",
-    });
   };
 
   const handleUpdatePrice = (propertyId: string) => {
@@ -210,153 +178,163 @@ export function EstateAgentWindow({
       return;
     }
 
-    setListings(prev => prev.map(l => 
-      l.property.id === propertyId ? { ...l, askingPrice: price } : l
-    ));
-    
+    onUpdateListingPrice(propertyId, price);
     setEditingListing(null);
     setEditPrice("");
     
     toast({
       title: "Price Updated",
-      description: `New asking price: £${price.toLocaleString()}`,
+      description: `Asking price updated to £${price.toLocaleString()}`,
     });
   };
 
-  const setPriceFromEstimate = (percentage: number) => {
+  const handleSetThreshold = (propertyId: string) => {
+    const threshold = parseInt(thresholdValue);
+    if (isNaN(threshold) || threshold <= 0) {
+      toast({
+        title: "Invalid Threshold",
+        description: "Please enter a valid threshold amount.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    onSetAutoAccept(propertyId, threshold);
+    setEditingThreshold(null);
+    setThresholdValue("");
+    
+    toast({
+      title: "Auto-Accept Set",
+      description: `Offers at or above £${threshold.toLocaleString()} will be automatically accepted.`,
+    });
+  };
+
+  const handleRemoveThreshold = (propertyId: string) => {
+    onSetAutoAccept(propertyId, undefined);
+    toast({
+      title: "Auto-Accept Removed",
+      description: "All offers now require manual review.",
+    });
+  };
+
+  const setPriceFromEstimate = (multiplier: number) => {
     if (selectedProperty) {
-      const price = Math.floor(selectedProperty.value * percentage);
-      setNewListingPrice(price.toString());
+      setNewListingPrice(Math.floor(selectedProperty.value * multiplier).toString());
     }
   };
 
-  const unlistedProperties = ownedProperties.filter(prop => 
-    !listings.some(listing => listing.property.id === prop.id)
+  const unlistedProperties = ownedProperties.filter(
+    p => !propertyListings.some(l => l.propertyId === p.id)
   );
 
-  const formatTimeLeft = (expiresAt: number) => {
-    const timeLeft = expiresAt - Date.now();
-    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
+  const getPropertyById = (propertyId: string) => {
+    return ownedProperties.find(p => p.id === propertyId);
+  };
+
+  const getBadgeVariant = (offer: PropertyOffer, property: Property) => {
+    const ratio = offer.amount / property.value;
+    if (ratio >= 1.0) return "default";
+    if (ratio >= 0.95) return "secondary";
+    return "destructive";
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+        <Button className="bg-white/10 border-white/20 text-white hover:bg-white/20">
           <Building2 className="h-4 w-4 mr-2" />
           Estate Agent
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Estate Agent Office</DialogTitle>
+          <DialogTitle className="text-2xl">Estate Agent</DialogTitle>
         </DialogHeader>
-        
+
         <Tabs defaultValue="buy" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy">Buy Properties</TabsTrigger>
             <TabsTrigger value="sell">Sell Properties</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="buy" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Available Properties */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Available Properties</h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {availableProperties
-                    .filter(property => {
-                      const allowedTypes = getAvailablePropertyTypes(level);
-                      const maxValue = getMaxPropertyValue(level);
-                      return (allowedTypes.includes('all') || allowedTypes.includes(property.type)) && 
-                             property.price <= maxValue;
-                    })
-                    .map(property => (
-                      <Card 
-                        key={property.id} 
-                        className={`cursor-pointer transition-colors ${
-                          selectedBuyProperty?.id === property.id ? 'ring-2 ring-primary' : ''
-                        }`}
-                        onClick={() => {
-                          setSelectedBuyProperty(property);
-                          setOfferAmount([property.price]);
-                        }}
-                      >
-                        <CardContent className="p-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{property.name}</p>
-                              <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                              <p className="text-sm">£{property.monthlyIncome}/mo income</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold">£{property.price.toLocaleString()}</p>
-                              <Badge variant="outline">{property.type}</Badge>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-                {ownedProperties.length >= getMaxPropertiesForLevel(level) && (
-                  <p className="text-sm text-amber-600">
-                    Property limit reached! ({ownedProperties.length}/{getMaxPropertiesForLevel(level)})
-                  </p>
-                )}
-              </div>
-              
-              {/* Purchase Details */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Make Offer</h3>
-                
-                {selectedBuyProperty ? (
-                  <div className="space-y-4">
-                    <Card>
-                      <CardContent className="p-3">
-                        <p className="font-medium">{selectedBuyProperty.name}</p>
-                        <p className="text-sm text-muted-foreground">Asking: £{selectedBuyProperty.price.toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                    
-                    <div className="space-y-3">
-                      <Label>Offer Amount: £{offerAmount[0].toLocaleString()}</Label>
-                      <Slider
-                        value={offerAmount}
-                        onValueChange={setOfferAmount}
-                        min={selectedBuyProperty.price * 0.8}
-                        max={selectedBuyProperty.price * 1.1}
-                        step={1000}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>80% (£{Math.floor(selectedBuyProperty.price * 0.8).toLocaleString()})</span>
-                        <span>110% (£{Math.floor(selectedBuyProperty.price * 1.1).toLocaleString()})</span>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableProperties.slice(0, 12).map((property) => (
+                <Card 
+                  key={property.id}
+                  className={`cursor-pointer transition-all ${
+                    selectedBuyProperty?.id === property.id 
+                      ? 'ring-2 ring-primary' 
+                      : 'hover:shadow-lg'
+                  }`}
+                  onClick={() => {
+                    setSelectedBuyProperty(property);
+                    setOfferAmount([property.value]);
+                  }}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-lg">{property.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm">Price:</span>
+                        <span className="font-bold">£{property.value.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Type:</span>
+                        <span className="text-sm font-medium">{property.type}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Rent:</span>
+                        <span className="text-sm text-green-600">£{property.monthlyIncome}/mo</span>
                       </div>
                     </div>
-                    
-                    <div className="space-y-3">
-                      <Label>Mortgage: {mortgagePercentage[0]}%</Label>
-                      <Slider
-                        value={mortgagePercentage}
-                        onValueChange={setMortgagePercentage}
-                        min={0}
-                        max={95}
-                        step={5}
-                        className="w-full"
-                      />
-                      <div className="text-sm text-muted-foreground">
-                        Cash required: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100) + 3500).toLocaleString()}
-                      </div>
-                    </div>
-                    
-                    {mortgagePercentage[0] > 0 && (
-                      <div className="space-y-3">
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {selectedBuyProperty && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Offer Amount: £{offerAmount[0].toLocaleString()}</Label>
+                    <Slider
+                      value={offerAmount}
+                      onValueChange={setOfferAmount}
+                      min={Math.floor(selectedBuyProperty.value * 0.85)}
+                      max={Math.floor(selectedBuyProperty.value * 1.05)}
+                      step={1000}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Mortgage: {mortgagePercentage[0]}%</Label>
+                    <Slider
+                      value={mortgagePercentage}
+                      onValueChange={setMortgagePercentage}
+                      min={0}
+                      max={75}
+                      step={5}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {mortgagePercentage[0] > 0 && (
+                    <>
+                      <div className="space-y-2">
                         <Label>Mortgage Provider</Label>
                         <Select value={selectedProvider} onValueChange={setSelectedProvider}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose provider..." />
+                            <SelectValue placeholder="Select provider" />
                           </SelectTrigger>
                           <SelectContent>
                             {mortgageProviders.map(provider => (
@@ -366,324 +344,326 @@ export function EstateAgentWindow({
                             ))}
                           </SelectContent>
                         </Select>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label>Term (years)</Label>
-                            <Select value={termYears.toString()} onValueChange={(value) => setTermYears(Number(value))}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5">5 years</SelectItem>
-                                <SelectItem value="10">10 years</SelectItem>
-                                <SelectItem value="15">15 years</SelectItem>
-                                <SelectItem value="20">20 years</SelectItem>
-                                <SelectItem value="25">25 years</SelectItem>
-                                <SelectItem value="30">30 years</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Type</Label>
-                            <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => setMortgageType(value)}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="repayment">Repayment</SelectItem>
-                                <SelectItem value="interest-only">Interest Only</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
                       </div>
-                    )}
-                    
-                    <Button 
-                      className="w-full" 
-                      onClick={() => {
-                        // Instant acceptance if offer is at or above asking price
-                        const offerRatio = offerAmount[0] / selectedBuyProperty.price;
-                        let acceptanceChance = 0;
-                        
-                        if (offerRatio >= 1.0) acceptanceChance = 1.0; // Instant acceptance at/above asking
-                        else if (offerRatio >= 0.95) acceptanceChance = 0.8; // 5% below asking - high chance
-                        else if (offerRatio >= 0.9) acceptanceChance = 0.5; // 10% below asking - medium chance
-                        else acceptanceChance = 0.2; // More than 10% below - low chance
-                        
-                        if (Math.random() < acceptanceChance) {
-                          onBuyProperty(
-                            selectedBuyProperty, 
-                            offerAmount[0], 
-                            mortgagePercentage[0], 
-                            selectedProvider || undefined,
-                            termYears, 
-                            mortgageType
-                          );
-                          setSelectedBuyProperty(null);
-                          toast({
-                            title: "Offer Accepted!",
-                            description: `Your offer of £${offerAmount[0].toLocaleString()} has been accepted!`,
-                          });
-                        } else {
-                          toast({
-                            title: "Offer Rejected",
-                            description: `The seller rejected your offer of £${offerAmount[0].toLocaleString()}. Try a higher amount.`,
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                      disabled={ownedProperties.length >= getMaxPropertiesForLevel(level) || 
-                               (mortgagePercentage[0] > 0 && !selectedProvider)}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Make Offer
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">Select a property to make an offer</p>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="sell" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Property Listings */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">List Property for Sale</h3>
-                
-                {unlistedProperties.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="grid gap-2">
-                      <Label>Select Property</Label>
-                      <select 
-                        className="w-full p-2 border rounded-md"
-                        value={selectedProperty?.id || ""}
-                        onChange={(e) => {
-                          const prop = unlistedProperties.find(p => p.id === e.target.value);
-                          setSelectedProperty(prop || null);
-                          setNewListingPrice(prop ? prop.value.toString() : "");
-                        }}
-                      >
-                        <option value="">Choose a property...</option>
-                        {unlistedProperties.map(prop => (
-                          <option key={prop.id} value={prop.id}>
-                            {prop.name} (Est. £{prop.value.toLocaleString()})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    {selectedProperty && (
-                      <div className="space-y-3">
-                        <Label>Asking Price: £{parseInt(newListingPrice || "0").toLocaleString()}</Label>
-                        <Slider
-                          value={[parseInt(newListingPrice || "0")]}
-                          onValueChange={(value) => setNewListingPrice(value[0].toString())}
-                          min={selectedProperty ? selectedProperty.value * 0.8 : 0}
-                          max={selectedProperty ? selectedProperty.value * 1.3 : 1000000}
-                          step={1000}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>80% (£{selectedProperty ? Math.floor(selectedProperty.value * 0.8).toLocaleString() : "0"})</span>
-                          <span>130% (£{selectedProperty ? Math.floor(selectedProperty.value * 1.3).toLocaleString() : "0"})</span>
-                        </div>
-                        
-                        {/* Quick price buttons */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setPriceFromEstimate(0.95)}
-                          >
-                            95% Est.
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setPriceFromEstimate(1.0)}
-                          >
-                            100% Est.
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setPriceFromEstimate(1.05)}
-                          >
-                            105% Est.
-                          </Button>
-                        </div>
-                        
-                        <Button onClick={handleListProperty} className="w-full">
-                          List Property
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">No properties available to list</p>
-                )}
 
-                {/* Current Listings */}
-                {listings.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium">Current Listings</h4>
-                    {listings.map(listing => (
-                      <Card key={listing.property.id}>
-                        <CardContent className="p-3">
-                          {editingListing === listing.property.id ? (
-                            <div className="space-y-3">
-                              <div>
-                                <p className="font-medium">{listing.property.name}</p>
-                                <Label>New Price (£)</Label>
+                      <div className="space-y-2">
+                        <Label>Term: {termYears} years</Label>
+                        <Slider
+                          value={[termYears]}
+                          onValueChange={(v) => setTermYears(v[0])}
+                          min={5}
+                          max={30}
+                          step={5}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Mortgage Type</Label>
+                        <Select value={mortgageType} onValueChange={(v: any) => setMortgageType(v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="repayment">Repayment</SelectItem>
+                            <SelectItem value="interest-only">Interest Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      onBuyProperty(
+                        selectedBuyProperty,
+                        offerAmount[0],
+                        mortgagePercentage[0],
+                        selectedProvider,
+                        termYears,
+                        mortgageType
+                      );
+                      setSelectedBuyProperty(null);
+                      setIsOpen(false);
+                    }}
+                    disabled={mortgagePercentage[0] > 0 && !selectedProvider}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Buy Property
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="sell" className="space-y-6">
+            {/* List New Property */}
+            {unlistedProperties.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>List a Property for Sale</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Select Property</Label>
+                    <Select
+                      value={selectedProperty?.id || ""}
+                      onValueChange={(id) => {
+                        const prop = unlistedProperties.find(p => p.id === id);
+                        setSelectedProperty(prop || null);
+                        if (prop) setNewListingPrice(prop.value.toString());
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a property" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unlistedProperties.map(property => (
+                          <SelectItem key={property.id} value={property.id}>
+                            {property.name} (Value: £{property.value.toLocaleString()})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedProperty && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Asking Price</Label>
+                        <Input
+                          type="number"
+                          value={newListingPrice}
+                          onChange={(e) => setNewListingPrice(e.target.value)}
+                          placeholder="Enter asking price"
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(0.95)}>
+                            95% (£{Math.floor(selectedProperty.value * 0.95).toLocaleString()})
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(1.0)}>
+                            100% (£{selectedProperty.value.toLocaleString()})
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(1.05)}>
+                            105% (£{Math.floor(selectedProperty.value * 1.05).toLocaleString()})
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button onClick={handleListProperty} className="w-full">
+                        List Property
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Current Listings */}
+            {propertyListings.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Current Listings ({propertyListings.length})</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {propertyListings.map(listing => {
+                    const property = getPropertyById(listing.propertyId);
+                    if (!property) return null;
+
+                    const offers = listing.offers || [];
+                    const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
+
+                    return (
+                      <Card key={listing.propertyId} className="border-2">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">{property.name}</CardTitle>
+                              <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                            </div>
+                            <Badge variant="secondary">{daysOnMarket} days on market</Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">Asking Price:</span>
+                            {editingListing === listing.propertyId ? (
+                              <div className="flex gap-2">
                                 <Input
                                   type="number"
                                   value={editPrice}
                                   onChange={(e) => setEditPrice(e.target.value)}
-                                  placeholder="Enter new price"
+                                  className="w-32"
                                 />
-                              </div>
-                              <div className="flex gap-2">
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => handleUpdatePrice(listing.property.id)}
-                                >
-                                  Update
+                                <Button size="sm" onClick={() => handleUpdatePrice(listing.propertyId)}>
+                                  <Check className="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingListing(null);
-                                    setEditPrice("");
-                                  }}
-                                >
-                                  Cancel
+                                <Button size="sm" variant="ghost" onClick={() => setEditingListing(null)}>
+                                  <X className="h-4 w-4" />
                                 </Button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="font-medium">{listing.property.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Listed for £{listing.askingPrice.toLocaleString()}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">For Sale</Badge>
-                                <Button 
-                                  size="sm" 
+                            ) : (
+                              <div className="flex gap-2 items-center">
+                                <span className="font-bold">£{property.price.toLocaleString()}</span>
+                                <Button
+                                  size="sm"
                                   variant="ghost"
                                   onClick={() => {
-                                    setEditingListing(listing.property.id);
-                                    setEditPrice(listing.askingPrice.toString());
+                                    setEditingListing(listing.propertyId);
+                                    setEditPrice(property.price.toString());
                                   }}
                                 >
                                   Edit
                                 </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  onClick={() => handleCancelListing(listing.property.id)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Auto-Accept Threshold */}
+                          <div className="border-t pt-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-green-600" />
+                                <span className="text-sm font-medium">Auto-Accept Threshold:</span>
+                              </div>
+                              {listing.autoAcceptThreshold ? (
+                                <div className="flex gap-2 items-center">
+                                  <Badge variant="default">£{listing.autoAcceptThreshold.toLocaleString()}</Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleRemoveThreshold(listing.propertyId)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : editingThreshold === listing.propertyId ? (
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="number"
+                                    value={thresholdValue}
+                                    onChange={(e) => setThresholdValue(e.target.value)}
+                                    placeholder="Amount"
+                                    className="w-32"
+                                  />
+                                  <Button size="sm" onClick={() => handleSetThreshold(listing.propertyId)}>
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingThreshold(null)}>
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingThreshold(listing.propertyId);
+                                    setThresholdValue(property.value.toString());
+                                  }}
                                 >
-                                  Cancel
+                                  Set Threshold
                                 </Button>
+                              )}
+                            </div>
+                            {listing.autoAcceptThreshold && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Offers at or above this amount will be automatically accepted
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Offers */}
+                          {offers.length > 0 ? (
+                            <div className="space-y-3 border-t pt-3">
+                              <h4 className="font-semibold text-sm">
+                                Offers ({offers.length})
+                              </h4>
+                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {offers.map(offer => (
+                                  <Card key={offer.id} className="bg-muted/50">
+                                    <CardContent className="p-3">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                          <p className="font-semibold">{offer.buyerName}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {offer.daysOnMarket} days on market
+                                          </p>
+                                        </div>
+                                        <Badge variant={getBadgeVariant(offer, property)}>
+                                          £{offer.amount.toLocaleString()}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex gap-1 mb-2">
+                                        {offer.isChainFree && (
+                                          <Badge variant="secondary" className="text-xs">Chain Free</Badge>
+                                        )}
+                                        {offer.mortgageApproved && (
+                                          <Badge variant="secondary" className="text-xs">Mortgage Approved</Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          className="flex-1"
+                                          onClick={() => {
+                                            onAcceptOffer(listing.propertyId, offer);
+                                            setIsOpen(false);
+                                          }}
+                                        >
+                                          <Check className="h-4 w-4 mr-1" />
+                                          Accept
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => onRejectOffer(listing.propertyId, offer.id)}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
                               </div>
                             </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              No offers yet
+                            </p>
                           )}
+
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                              onCancelListing(listing.propertyId);
+                              toast({
+                                title: "Listing Cancelled",
+                                description: "Property removed from sale.",
+                              });
+                            }}
+                          >
+                            Cancel Listing
+                          </Button>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Incoming Offers */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Incoming Offers</h3>
-                
-                {offers.filter(o => o.status === 'pending').length > 0 ? (
-                  <div className="space-y-3">
-                    {offers
-                      .filter(offer => offer.status === 'pending')
-                      .map(offer => {
-                        const property = listings.find(l => l.property.id === offer.propertyId)?.property;
-                        if (!property) return null;
-                        
-                        return (
-                          <Card key={offer.id}>
-                            <CardContent className="p-4">
-                              <div className="space-y-3">
-                                <div>
-                                  <p className="font-medium">{property.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Offer from {offer.buyerName}
-                                  </p>
-                                </div>
-                                
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <p className="text-lg font-bold text-primary">
-                                      £{offer.amount.toLocaleString()}
-                                    </p>
-                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                      <Clock className="h-3 w-3" />
-                                      {formatTimeLeft(offer.expiresAt)} left
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex gap-2">
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      onClick={() => handleRejectOffer(offer.id)}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                    <Button 
-                                      size="sm"
-                                      onClick={() => handleAcceptOffer(offer)}
-                                    >
-                                      <Check className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">No pending offers</p>
-                )}
-
-                {/* Recent Activity */}
-                {offers.filter(o => o.status !== 'pending').length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Recent Activity</h4>
-                    {offers
-                      .filter(offer => offer.status !== 'pending')
-                      .slice(-3)
-                      .map(offer => {
-                        const property = ownedProperties.find(p => p.id === offer.propertyId);
-                        return (
-                          <div key={offer.id} className="flex justify-between items-center p-2 bg-muted rounded">
-                            <span className="text-sm">{property?.name}</span>
-                            <Badge variant={offer.status === 'accepted' ? 'default' : 'secondary'}>
-                              {offer.status === 'accepted' ? 'Sold' : 'Declined'}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            </div>
+            {unlistedProperties.length === 0 && propertyListings.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No properties available to sell. Purchase properties from the market first!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>
