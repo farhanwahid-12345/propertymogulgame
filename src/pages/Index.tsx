@@ -121,7 +121,14 @@ const Index = () => {
                 <div className="flex gap-2">
                   <EstateAgentWindow
                     ownedProperties={gameState.ownedProperties}
+                    propertyListings={gameState.propertyListings}
+                    onListProperty={gameState.listPropertyForSale}
+                    onCancelListing={gameState.cancelPropertyListing}
+                    onUpdateListingPrice={gameState.updatePropertyListingPrice}
+                    onSetAutoAccept={gameState.setAutoAcceptThreshold}
                     onAcceptOffer={gameState.handleEstateAgentSale}
+                    onRejectOffer={gameState.rejectPropertyOffer}
+                    onAddOffer={gameState.addOfferToListing}
                     cash={gameState.cash}
                     availableProperties={gameState.availableProperties}
                     onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
