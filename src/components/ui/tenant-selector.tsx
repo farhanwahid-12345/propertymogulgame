@@ -154,7 +154,12 @@ export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTe
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
             const Icon = ProfileIcons[tenant.profile];
-            const potentialRent = Math.floor(baseRent * tenant.rentMultiplier);
+            // Calculate rent adjustment (±10%) based on tenant profile
+            let adjustment = 1.0;
+            if (tenant.profile === 'premium') adjustment = 1.10;
+            else if (tenant.profile === 'budget') adjustment = 0.90;
+            else if (tenant.profile === 'risky') adjustment = 1.05;
+            const potentialRent = Math.floor(baseRent * adjustment);
             const isSelected = selectedTenant?.id === tenant.id;
             
             return (

@@ -979,13 +979,17 @@ export function useGameState() {
         if (shouldApplyYearlyGrowth) {
           const annualGrowthRate = 0.02 + Math.random() * 0.02; // 2-4% per year
           const rentIncreaseRate = 0.03; // Fixed 3% annual rent increase
-          updatedOwnedProperties = prev.ownedProperties.map(property => ({
-            ...property,
-            value: property.value * (1 + annualGrowthRate),
-            marketValue: (property.marketValue || property.value) * (1 + annualGrowthRate),
-            monthlyIncome: Math.floor(property.monthlyIncome * (1 + rentIncreaseRate)),
-            lastRentIncrease: prev.monthsPlayed,
-          }));
+          updatedOwnedProperties = prev.ownedProperties.map(property => {
+            const newBaseRent = Math.floor((property.baseRent || property.monthlyIncome) * (1 + rentIncreaseRate));
+            return {
+              ...property,
+              value: property.value * (1 + annualGrowthRate),
+              marketValue: (property.marketValue || property.value) * (1 + annualGrowthRate),
+              monthlyIncome: Math.floor(property.monthlyIncome * (1 + rentIncreaseRate)),
+              baseRent: newBaseRent, // Update base rent for tenant switches
+              lastRentIncrease: prev.monthsPlayed,
+            };
+          });
           newLastYearlyGrowth = prev.monthsPlayed;
           
           toast({
@@ -1169,6 +1173,7 @@ export function useGameState() {
         marketValue: property.value, // Store original market value
         yield: yieldPercentage,
         lastRentIncrease: prev.monthsPlayed,
+        baseRent: property.monthlyIncome, // Set initial base rent
       };
 
       return {
@@ -1280,6 +1285,7 @@ export function useGameState() {
         marketValue: property.value, // Store original market value
         yield: yieldPercentage,
         lastRentIncrease: prev.monthsPlayed,
+        baseRent: property.monthlyIncome, // Set initial base rent
       };
       
       return {
@@ -1385,24 +1391,38 @@ export function useGameState() {
       }
 
       // Update property monthly income based on tenant multiplier
+      // Use small adjustments (±10%) from current base rent to prevent dramatic jumps
       const property = prev.ownedProperties.find(p => p.id === propertyId);
       const updatedProperties = prev.ownedProperties.map(prop => {
         if (prop.id === propertyId) {
-          // Calculate base rent from property value and average yield
-          const baseRent = Math.floor((prop.value * ((prop.yield || 8) / 100)) / 12);
-          // Apply tenant multiplier to get actual rent
-          const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
+          // Use current baseRent (which includes annual increases) or fall back to monthlyIncome
+          const currentBaseRent = prop.baseRent || prop.monthlyIncome;
+          
+          // Apply tenant adjustment: ±10% based on tenant profile
+          // Premium: +10%, Standard: 0%, Budget: -10%, Risky: +5%
+          let adjustment = 1.0;
+          if (tenant.profile === 'premium') adjustment = 1.10;
+          else if (tenant.profile === 'budget') adjustment = 0.90;
+          else if (tenant.profile === 'risky') adjustment = 1.05;
+          
+          const actualRent = Math.floor(currentBaseRent * adjustment);
+          
           return {
             ...prop,
-            monthlyIncome: actualRent
+            monthlyIncome: actualRent,
+            baseRent: currentBaseRent, // Keep base rent for future increases
           };
         }
         return prop;
       });
 
       // Calculate actual rent for toast notification
-      const baseRent = Math.floor((property?.value || 0) * ((property?.yield || 8) / 100) / 12);
-      const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
+      const currentBaseRent = property?.baseRent || property?.monthlyIncome || 0;
+      let adjustment = 1.0;
+      if (tenant.profile === 'premium') adjustment = 1.10;
+      else if (tenant.profile === 'budget') adjustment = 0.90;
+      else if (tenant.profile === 'risky') adjustment = 1.05;
+      const actualRent = Math.floor(currentBaseRent * adjustment);
 
       toast({
         title: "Tenant Selected!",

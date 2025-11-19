@@ -25,6 +25,7 @@ export interface Property {
   marketValue?: number; // True market value (for tracking profit on below-market purchases)
   yield?: number; // Annual yield percentage (6-15%)
   lastRentIncrease?: number; // Tracks when rent was last increased (month)
+  baseRent?: number; // Current base rent level (increases 3% annually, prevents dramatic tenant switch jumps)
 }
 
 interface PropertyCardProps {
