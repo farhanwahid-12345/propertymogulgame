@@ -288,8 +288,14 @@ export function EstateAgentWindow({
                         <span className="text-sm font-medium">{property.type}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm">Rent:</span>
-                        <span className="text-sm text-green-600">£{property.monthlyIncome}/mo</span>
+                        <span className="text-sm">Annual Yield:</span>
+                        <Badge variant="secondary" className="text-sm">
+                          {property.yield ? `${property.yield.toFixed(1)}%` : 'N/A'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm">Monthly Rent:</span>
+                        <span className="text-sm text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
                       </div>
                     </div>
                   </CardContent>

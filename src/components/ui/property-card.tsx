@@ -23,6 +23,8 @@ export interface Property {
   marketTrend: "up" | "down" | "stable";
   mortgageRemaining?: number; // For refinancing purposes
   marketValue?: number; // True market value (for tracking profit on below-market purchases)
+  yield?: number; // Annual yield percentage (6-15%)
+  lastRentIncrease?: number; // Tracks when rent was last increased (month)
 }
 
 interface PropertyCardProps {

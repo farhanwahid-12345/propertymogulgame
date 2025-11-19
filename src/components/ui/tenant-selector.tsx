@@ -146,12 +146,14 @@ export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTe
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Choose Tenant for Property</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-2">
+            All tenants will pay £{baseRent}/mo (fixed based on property yield). Rent increases 3% annually.
+          </p>
         </DialogHeader>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
             const Icon = ProfileIcons[tenant.profile];
-            const potentialRent = Math.floor(baseRent * tenant.rentMultiplier);
             const isSelected = selectedTenant?.id === tenant.id;
             
             return (
@@ -204,10 +206,10 @@ export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTe
                     </div>
                     
                     <div>
-                      <span className="font-medium">Potential Rent:</span>
+                      <span className="font-medium">Fixed Rent:</span>
                       <br />
                       <span className="text-success font-semibold">
-                        £{potentialRent}/mo
+                        £{baseRent}/mo
                       </span>
                     </div>
                   </div>
