@@ -284,6 +284,15 @@ const getPropertyValueRangeForLevel = (level: number): { min: number; max: numbe
   }
 };
 
+// Calculate average tenant yield (based on tenant multipliers)
+const calculateAverageYield = () => {
+  // Average of tenant multipliers: premium ~1.2, standard ~1.0, budget ~0.85, risky ~1.3
+  const avgMultiplier = (1.2 + 1.0 + 0.85 + 1.3) / 4; // ~1.09
+  // Base yield range 6-15%, adjusted by average multiplier
+  const baseYield = 6 + Math.random() * 9;
+  return baseYield;
+};
+
 const generateRandomProperty = (level: number): Property => {
   const id = `gen_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const types: Property['type'][] = ['residential', 'commercial', 'luxury'];
@@ -296,9 +305,10 @@ const generateRandomProperty = (level: number): Property => {
   const price = Math.floor(basePrice / 1000) * 1000;
   const value = price;
   
-  // Generate random yield between 6-15%
-  const yieldPercentage = 6 + Math.random() * 9; // 6-15%
-  const monthlyIncome = Math.floor((price * (yieldPercentage / 100)) / 12);
+  // Generate average yield between 6-15% (represents average of all tenant types)
+  const averageYield = calculateAverageYield();
+  // Base monthly income calculated from average yield
+  const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
   
   const neighborhoods = ["Linthorpe", "Acklam", "Marton", "Nunthorpe", "Middlesbrough Centre", "Hemlington", "South Bank", "Pallister Park", "North Ormesby", "Port Clarence"];
   const neighborhood = neighborhoods[Math.floor(Math.random() * neighborhoods.length)];
@@ -313,10 +323,10 @@ const generateRandomProperty = (level: number): Property => {
     price,
     value,
     neighborhood,
-    monthlyIncome: Math.max(400, monthlyIncome),
+    monthlyIncome: Math.max(400, baseMonthlyIncome),
     image: "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400&h=300&fit=crop",
     marketTrend: "stable",
-    yield: yieldPercentage,
+    yield: averageYield,
     lastRentIncrease: 0,
   };
 };
@@ -1374,18 +1384,35 @@ export function useGameState() {
         updatedTenants = [...prev.tenants, newTenant];
       }
 
-      // Update property monthly income based on yield (not tenant)
-      // Tenants no longer affect rent - rent is fixed based on property yield
+      // Update property monthly income based on tenant multiplier
       const property = prev.ownedProperties.find(p => p.id === propertyId);
-      
+      const updatedProperties = prev.ownedProperties.map(prop => {
+        if (prop.id === propertyId) {
+          // Calculate base rent from property value and average yield
+          const baseRent = Math.floor((prop.value * ((prop.yield || 8) / 100)) / 12);
+          // Apply tenant multiplier to get actual rent
+          const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
+          return {
+            ...prop,
+            monthlyIncome: actualRent
+          };
+        }
+        return prop;
+      });
+
+      // Calculate actual rent for toast notification
+      const baseRent = Math.floor((property?.value || 0) * ((property?.yield || 8) / 100) / 12);
+      const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
+
       toast({
         title: "Tenant Selected!",
-        description: `${tenant.name} is now renting your property at £${property?.monthlyIncome || 0}/mo`,
+        description: `${tenant.name} is now renting your property at £${actualRent}/mo`,
       });
 
       return {
         ...prev,
         tenants: updatedTenants,
+        ownedProperties: updatedProperties,
         voidPeriods: updatedVoidPeriods
       };
     });
