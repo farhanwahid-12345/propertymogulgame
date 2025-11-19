@@ -235,33 +235,36 @@ const MIDDLESBROUGH_STREETS = [
 
 const AVAILABLE_PROPERTIES: Property[] = [
   // Level 1: £40k-100k Residential
-  { id: "1", name: "45 Linthorpe Road", type: "residential", price: 75000, value: 75000, neighborhood: "Linthorpe", monthlyIncome: 600, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "2", name: "12 Park Road South", type: "residential", price: 68000, value: 68000, neighborhood: "Linthorpe", monthlyIncome: 550, image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "3", name: "78 Acklam Road", type: "residential", price: 95000, value: 95000, neighborhood: "Acklam", monthlyIncome: 725, image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "4", name: "156 Cargo Fleet Lane", type: "residential", price: 58000, value: 58000, neighborhood: "Port Clarence", monthlyIncome: 475, image: "https://images.unsplash.com/photo-1459767129954-1b1c1f9b9ace?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "5", name: "89 Borough Road", type: "residential", price: 52000, value: 52000, neighborhood: "North Ormesby", monthlyIncome: 425, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "6", name: "67 Roman Road", type: "residential", price: 82000, value: 82000, neighborhood: "Pallister Park", monthlyIncome: 625, image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&h=300&fit=crop", marketTrend: "down" },
-  { id: "7", name: "91 Trimdon Avenue", type: "residential", price: 72000, value: 72000, neighborhood: "Acklam", monthlyIncome: 575, image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "8", name: "23 Newport Road", type: "residential", price: 64000, value: 64000, neighborhood: "Middlesbrough Centre", monthlyIncome: 520, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "1", name: "45 Linthorpe Road", type: "residential", price: 75000, value: 75000, neighborhood: "Linthorpe", monthlyIncome: 600, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up", yield: 9.6, lastRentIncrease: 0 },
+  { id: "2", name: "12 Park Road South", type: "residential", price: 68000, value: 68000, neighborhood: "Linthorpe", monthlyIncome: 550, image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=300&fit=crop", marketTrend: "stable", yield: 9.7, lastRentIncrease: 0 },
+  { id: "3", name: "78 Acklam Road", type: "residential", price: 95000, value: 95000, neighborhood: "Acklam", monthlyIncome: 725, image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=400&h=300&fit=crop", marketTrend: "up", yield: 9.2, lastRentIncrease: 0 },
+  { id: "4", name: "156 Cargo Fleet Lane", type: "residential", price: 58000, value: 58000, neighborhood: "Port Clarence", monthlyIncome: 475, image: "https://images.unsplash.com/photo-1459767129954-1b1c1f9b9ace?w=400&h=300&fit=crop", marketTrend: "stable", yield: 9.8, lastRentIncrease: 0 },
+  { id: "5", name: "89 Borough Road", type: "residential", price: 52000, value: 52000, neighborhood: "North Ormesby", monthlyIncome: 425, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "stable", yield: 9.8, lastRentIncrease: 0 },
+  { id: "6", name: "67 Roman Road", type: "residential", price: 82000, value: 82000, neighborhood: "Pallister Park", monthlyIncome: 625, image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&h=300&fit=crop", marketTrend: "down", yield: 9.1, lastRentIncrease: 0 },
+  { id: "7", name: "91 Trimdon Avenue", type: "residential", price: 72000, value: 72000, neighborhood: "Acklam", monthlyIncome: 575, image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=400&h=300&fit=crop", marketTrend: "stable", yield: 9.6, lastRentIncrease: 0 },
+  { id: "8", name: "23 Newport Road", type: "residential", price: 64000, value: 64000, neighborhood: "Middlesbrough Centre", monthlyIncome: 520, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up", yield: 9.8, lastRentIncrease: 0 },
   
   // Level 2: £100k-250k Mixed
-  { id: "9", name: "23 Marton Road", type: "residential", price: 120000, value: 120000, neighborhood: "Marton", monthlyIncome: 850, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "10", name: "34 Southfield Road", type: "residential", price: 145000, value: 145000, neighborhood: "Middlesbrough Centre", monthlyIncome: 950, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "11", name: "Unit 5 Albert Road", type: "commercial", price: 180000, value: 180000, neighborhood: "Middlesbrough Centre", monthlyIncome: 1200, image: "https://images.unsplash.com/photo-1497604401993-f2e922e5cb0a?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "12", name: "Shop A, Linthorpe Road", type: "commercial", price: 165000, value: 165000, neighborhood: "Linthorpe", monthlyIncome: 1100, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "13", name: "45 Parliament Road", type: "residential", price: 135000, value: 135000, neighborhood: "Linthorpe", monthlyIncome: 900, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up" },
+  { id: "9", name: "23 Marton Road", type: "residential", price: 120000, value: 120000, neighborhood: "Marton", monthlyIncome: 850, image: "https://images.unsplash.com/photo-1460574283810-2aab119d8511?w=400&h=300&fit=crop", marketTrend: "up", yield: 8.5, lastRentIncrease: 0 },
+  { id: "10", name: "34 Southfield Road", type: "residential", price: 145000, value: 145000, neighborhood: "Middlesbrough Centre", monthlyIncome: 950, image: "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=400&h=300&fit=crop", marketTrend: "up", yield: 7.9, lastRentIncrease: 0 },
+  { id: "11", name: "Unit 5 Albert Road", type: "commercial", price: 180000, value: 180000, neighborhood: "Middlesbrough Centre", monthlyIncome: 1200, image: "https://images.unsplash.com/photo-1497604401993-f2e922e5cb0a?w=400&h=300&fit=crop", marketTrend: "up", yield: 8.0, lastRentIncrease: 0 },
+  { id: "12", name: "Shop A, Linthorpe Road", type: "commercial", price: 165000, value: 165000, neighborhood: "Linthorpe", monthlyIncome: 1100, image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=300&fit=crop", marketTrend: "stable", yield: 8.0, lastRentIncrease: 0 },
+  { id: "13", name: "45 Parliament Road", type: "residential", price: 135000, value: 135000, neighborhood: "Linthorpe", monthlyIncome: 900, image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop", marketTrend: "up", yield: 8.0, lastRentIncrease: 0 },
   
   // Level 3: £250k-500k
-  { id: "14", name: "Captain Cook Square Unit", type: "commercial", price: 250000, value: 250000, neighborhood: "Captain Cook Square", monthlyIncome: 1800, image: "https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&h=300&fit=crop", marketTrend: "down" },
-  { id: "15", name: "Warehouse, Vulcan Street", type: "commercial", price: 320000, value: 320000, neighborhood: "South Bank", monthlyIncome: 2100, image: "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "16", name: "8 The Avenue, Nunthorpe", type: "luxury", price: 385000, value: 385000, neighborhood: "Nunthorpe", monthlyIncome: 2400, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "17", name: "Modern Townhouse, Hemlington", type: "luxury", price: 295000, value: 295000, neighborhood: "Hemlington", monthlyIncome: 1950, image: "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "18", name: "Penthouse, Centre Square", type: "luxury", price: 450000, value: 450000, neighborhood: "Middlesbrough Centre", monthlyIncome: 2800, image: "https://images.unsplash.com/photo-1493397212122-2b85dda8106b?w=400&h=300&fit=crop", marketTrend: "down" },
+  { id: "14", name: "Captain Cook Square Unit", type: "commercial", price: 250000, value: 250000, neighborhood: "Captain Cook Square", monthlyIncome: 1800, image: "https://images.unsplash.com/photo-1527576539890-dfa815648363?w=400&h=300&fit=crop", marketTrend: "down", yield: 8.6, lastRentIncrease: 0 },
+  { id: "15", name: "Warehouse, Vulcan Street", type: "commercial", price: 320000, value: 320000, neighborhood: "South Bank", monthlyIncome: 2100, image: "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=400&h=300&fit=crop", marketTrend: "stable", yield: 7.9, lastRentIncrease: 0 },
+  { id: "16", name: "8 The Avenue, Nunthorpe", type: "luxury", price: 385000, value: 385000, neighborhood: "Nunthorpe", monthlyIncome: 2400, image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop", marketTrend: "up", yield: 7.5, lastRentIncrease: 0 },
+  { id: "17", name: "Modern Townhouse, Hemlington", type: "luxury", price: 295000, value: 295000, neighborhood: "Hemlington", monthlyIncome: 1950, image: "https://images.unsplash.com/photo-1492321936769-b49830bc1d1e?w=400&h=300&fit=crop", marketTrend: "up", yield: 7.9, lastRentIncrease: 0 },
   
-  // Level 4+: £500k+
-  { id: "19", name: "Manor House, Stokesby Road", type: "luxury", price: 520000, value: 520000, neighborhood: "Marton", monthlyIncome: 3200, image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400&h=300&fit=crop", marketTrend: "stable" },
-  { id: "20", name: "Executive Home, Grey Towers", type: "luxury", price: 675000, value: 675000, neighborhood: "Nunthorpe", monthlyIncome: 4100, image: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?w=400&h=300&fit=crop", marketTrend: "up" },
-  { id: "21", name: "Historic Villa, The Crescent", type: "luxury", price: 750000, value: 750000, neighborhood: "Linthorpe", monthlyIncome: 4500, image: "https://images.unsplash.com/photo-1466442929976-97f336a657be?w=400&h=300&fit=crop", marketTrend: "stable" },
+  // Level 4: £500k-1M
+  { id: "18", name: "Executive Home, Nunthorpe", type: "luxury", price: 550000, value: 550000, neighborhood: "Nunthorpe", monthlyIncome: 3200, image: "https://images.unsplash.com/photo-1567496898869-502f2927b367?w=400&h=300&fit=crop", marketTrend: "stable", yield: 7.0, lastRentIncrease: 0 },
+  { id: "19", name: "Luxury Penthouse", type: "luxury", price: 625000, value: 625000, neighborhood: "Middlesbrough Centre", monthlyIncome: 3500, image: "https://images.unsplash.com/photo-1514676487445-a8bde7ea2817?w=400&h=300&fit=crop", marketTrend: "up", yield: 6.7, lastRentIncrease: 0 },
+  { id: "20", name: "Prime Commercial Unit", type: "commercial", price: 720000, value: 720000, neighborhood: "Middlesbrough Centre", monthlyIncome: 4200, image: "https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=400&h=300&fit=crop", marketTrend: "up", yield: 7.0, lastRentIncrease: 0 },
+  
+  // Level 5: £1M+
+  { id: "21", name: "Waterfront Development", type: "luxury", price: 1200000, value: 1200000, neighborhood: "Middlesbrough Centre", monthlyIncome: 7000, image: "https://images.unsplash.com/photo-1600607686527-6fb886090705?w=400&h=300&fit=crop", marketTrend: "stable", yield: 7.0, lastRentIncrease: 0 },
+  { id: "22", name: "Historic Mansion", type: "luxury", price: 1500000, value: 1500000, neighborhood: "Nunthorpe", monthlyIncome: 8500, image: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?w=400&h=300&fit=crop", marketTrend: "up", yield: 6.8, lastRentIncrease: 0 },
 ];
 
 // Generate a new property when market needs more inventory
@@ -292,7 +295,10 @@ const generateRandomProperty = (level: number): Property => {
   const basePrice = actualMin + Math.random() * (max - actualMin);
   const price = Math.floor(basePrice / 1000) * 1000;
   const value = price;
-  const monthlyIncome = Math.floor((price * (type === 'luxury' ? 0.05 : type === 'commercial' ? 0.06 : 0.07)) / 12);
+  
+  // Generate random yield between 6-15%
+  const yieldPercentage = 6 + Math.random() * 9; // 6-15%
+  const monthlyIncome = Math.floor((price * (yieldPercentage / 100)) / 12);
   
   const neighborhoods = ["Linthorpe", "Acklam", "Marton", "Nunthorpe", "Middlesbrough Centre", "Hemlington", "South Bank", "Pallister Park", "North Ormesby", "Port Clarence"];
   const neighborhood = neighborhoods[Math.floor(Math.random() * neighborhoods.length)];
@@ -310,6 +316,8 @@ const generateRandomProperty = (level: number): Property => {
     monthlyIncome: Math.max(400, monthlyIncome),
     image: "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400&h=300&fit=crop",
     marketTrend: "stable",
+    yield: yieldPercentage,
+    lastRentIncrease: 0,
   };
 };
 
@@ -952,7 +960,7 @@ export function useGameState() {
           });
         }
 
-        // Apply yearly property value growth (2-4% compounded annually)
+        // Apply yearly property value growth (2-4% compounded annually) + 3% rent increases
         // Check if 12 months have passed since last yearly growth
         const shouldApplyYearlyGrowth = prev.monthsPlayed > 0 && (prev.monthsPlayed - prev.lastYearlyGrowth) >= 12;
         let updatedOwnedProperties = prev.ownedProperties;
@@ -960,16 +968,19 @@ export function useGameState() {
 
         if (shouldApplyYearlyGrowth) {
           const annualGrowthRate = 0.02 + Math.random() * 0.02; // 2-4% per year
+          const rentIncreaseRate = 0.03; // Fixed 3% annual rent increase
           updatedOwnedProperties = prev.ownedProperties.map(property => ({
             ...property,
             value: property.value * (1 + annualGrowthRate),
-            marketValue: (property.marketValue || property.value) * (1 + annualGrowthRate)
+            marketValue: (property.marketValue || property.value) * (1 + annualGrowthRate),
+            monthlyIncome: Math.floor(property.monthlyIncome * (1 + rentIncreaseRate)),
+            lastRentIncrease: prev.monthsPlayed,
           }));
           newLastYearlyGrowth = prev.monthsPlayed;
           
           toast({
             title: "Annual Property Growth!",
-            description: `Your properties increased in value by ${(annualGrowthRate * 100).toFixed(1)}%`,
+            description: `Your properties increased in value by ${(annualGrowthRate * 100).toFixed(1)}% and rents increased by 3%`,
           });
         }
 
@@ -1140,10 +1151,14 @@ export function useGameState() {
       });
 
       // Track market value separately for profit calculation
+      // If property doesn't have a yield, assign one (6-15%)
+      const yieldPercentage = property.yield || (6 + Math.random() * 9);
       const purchasedProperty = { 
         ...property, 
         owned: true,
-        marketValue: property.value // Store original market value
+        marketValue: property.value, // Store original market value
+        yield: yieldPercentage,
+        lastRentIncrease: prev.monthsPlayed,
       };
 
       return {
@@ -1245,12 +1260,16 @@ export function useGameState() {
       });
 
       // Track market value separately - use property.value as true market value
+      // If property doesn't have a yield, assign one (6-15%)
+      const yieldPercentage = property.yield || (6 + Math.random() * 9);
       const purchased = { 
         ...property, 
         price: purchasePrice, 
         value: actualValue, // Use market value if bought below market
         owned: true,
-        marketValue: property.value // Store original market value
+        marketValue: property.value, // Store original market value
+        yield: yieldPercentage,
+        lastRentIncrease: prev.monthsPlayed,
       };
       
       return {
@@ -1355,32 +1374,18 @@ export function useGameState() {
         updatedTenants = [...prev.tenants, newTenant];
       }
 
-      // Update property monthly income based on tenant
+      // Update property monthly income based on yield (not tenant)
+      // Tenants no longer affect rent - rent is fixed based on property yield
       const property = prev.ownedProperties.find(p => p.id === propertyId);
-      const updatedProperties = prev.ownedProperties.map(prop => {
-        if (prop.id === propertyId) {
-          const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || prop.monthlyIncome;
-          return {
-            ...prop,
-            monthlyIncome: Math.floor(baseRent * tenant.rentMultiplier)
-          };
-        }
-        return prop;
-      });
-
-      // Calculate actual rent for toast notification
-      const baseRent = AVAILABLE_PROPERTIES.find(p => p.id === propertyId)?.monthlyIncome || property?.monthlyIncome || 0;
-      const actualRent = Math.floor(baseRent * tenant.rentMultiplier);
-
+      
       toast({
         title: "Tenant Selected!",
-        description: `${tenant.name} is now renting your property at £${actualRent}/mo`,
+        description: `${tenant.name} is now renting your property at £${property?.monthlyIncome || 0}/mo`,
       });
 
       return {
         ...prev,
         tenants: updatedTenants,
-        ownedProperties: updatedProperties,
         voidPeriods: updatedVoidPeriods
       };
     });
