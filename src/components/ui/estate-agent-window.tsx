@@ -50,6 +50,7 @@ interface EstateAgentWindowProps {
   getMaxPropertyValue: (level: number) => number;
   level: number;
   mortgageProviders: any[];
+  creditScore: number;
 }
 
 export function EstateAgentWindow({ 
@@ -69,7 +70,8 @@ export function EstateAgentWindow({
   getAvailablePropertyTypes, 
   getMaxPropertyValue, 
   level, 
-  mortgageProviders 
+  mortgageProviders,
+  creditScore = 650
 }: EstateAgentWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [newListingPrice, setNewListingPrice] = useState("");
@@ -86,6 +88,27 @@ export function EstateAgentWindow({
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+
+  // Calculate affordability for each property
+  const calculateAffordability = (property: Property) => {
+    // Find the best LTV the player qualifies for
+    const eligibleProviders = mortgageProviders.filter(p => creditScore >= p.minCreditScore);
+    const maxLTV = eligibleProviders.length > 0 
+      ? Math.max(...eligibleProviders.map(p => p.maxLTV))
+      : 0;
+    
+    const maxMortgage = property.value * maxLTV;
+    const stampDuty = property.value <= 250000 ? property.value * 0.03 :
+      (250000 * 0.03) + ((property.value - 250000) * 0.08);
+    const fees = 600 + (property.value * 0.01) + stampDuty; // Solicitor + mortgage fee + stamp duty
+    const cashNeeded = (property.value - maxMortgage) + fees;
+    
+    return cash >= cashNeeded;
+  };
+
+  // Filter properties by affordability
+  const affordableProperties = availableProperties.filter(calculateAffordability);
+  const unaffordableCount = availableProperties.length - affordableProperties.length;
 
   // Generate offers for listed properties
   useEffect(() => {
@@ -258,9 +281,15 @@ export function EstateAgentWindow({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
+            {unaffordableCount > 0 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                <AlertCircle className="h-4 w-4" />
+                <span>{unaffordableCount} properties hidden (cannot afford with current cash + max mortgage)</span>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableProperties.slice(0, 12).map((property) => (
+              {affordableProperties.slice(0, 12).map((property) => (
                 <Card 
                   key={property.id}
                   className={`cursor-pointer transition-all ${

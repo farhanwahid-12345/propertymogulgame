@@ -283,13 +283,22 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
     ];
     
-    const bidderCount = Math.floor(Math.random() * 5) + 3; // 3-7 bidders
+    // 30% chance of a "cold auction" with fewer bidders and lower valuations
+    const isColdAuction = Math.random() < 0.3;
+    const bidderCount = isColdAuction 
+      ? Math.floor(Math.random() * 2) + 2 // 2-3 bidders for cold auctions
+      : Math.floor(Math.random() * 5) + 3; // 3-7 bidders normally
+    
+    const coldAuctionPenalty = isColdAuction ? 0.10 : 0; // Reduce valuations by 10% for cold auctions
+    
     const aiBidders = Array.from({ length: bidderCount }, (_, i) => {
       const name = bidderNames[i % bidderNames.length];
       // Each bidder has different valuation and behavior
-      const valuation = property.price * (0.85 + Math.random() * 0.3); // 85% - 115% of guide
-      const aggression = Math.random(); // How likely to bid
-      const overbidChance = Math.random() * 0.25; // Chance to go over their valuation
+      // UPDATED: 70% - 110% of guide price instead of 85% - 115%
+      const baseValuation = property.price * (0.70 + Math.random() * 0.40);
+      const valuation = baseValuation * (1 - coldAuctionPenalty); // Apply cold auction penalty
+      const aggression = isColdAuction ? Math.random() * 0.7 : Math.random(); // Less aggressive in cold auctions
+      const overbidChance = isColdAuction ? Math.random() * 0.1 : Math.random() * 0.25; // Lower overbid chance
       return { name, valuation, aggression, overbidChance };
     });
     

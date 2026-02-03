@@ -24,6 +24,9 @@ interface TenantSelectorProps {
   baseRent: number;
   onSelectTenant: (propertyId: string, tenant: Tenant) => void;
   currentTenant?: Tenant;
+  currentMonthlyRent?: number;
+  lastTenantChange?: number;
+  monthsPlayed?: number;
 }
 
 // Generate dynamic tenant pools
@@ -112,7 +115,15 @@ const ProfileIcons = {
   risky: AlertTriangle
 };
 
-export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTenant }: TenantSelectorProps) {
+export function TenantSelector({ 
+  propertyId, 
+  baseRent, 
+  onSelectTenant, 
+  currentTenant,
+  currentMonthlyRent,
+  lastTenantChange,
+  monthsPlayed = 0
+}: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles] = useState(() => generateTenantProfiles());
@@ -148,6 +159,11 @@ export function TenantSelector({ propertyId, baseRent, onSelectTenant, currentTe
           <DialogTitle>Choose Tenant for Property</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
             Different tenants pay different rents based on their profile. Rent increases 3% annually.
+            {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
+              <span className="text-warning block mt-1">
+                ⚠️ Higher-rent tenants unavailable for {3 - (monthsPlayed - lastTenantChange)} more month(s)
+              </span>
+            )}
           </p>
         </DialogHeader>
         
