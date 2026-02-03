@@ -549,7 +549,33 @@ export function useGameState() {
       const totalAvailable = auctionProperties.length + estateAgentProperties.length;
       const targetTotal = 30;
       
-      if (totalAvailable < targetTotal) {
+      // Calculate affordability for a property
+      const isAffordable = (property: Property, cash: number, creditScore: number) => {
+        // Find best LTV player qualifies for
+        const eligibleProviders = MORTGAGE_PROVIDERS.filter(p => creditScore >= p.minCreditScore);
+        const maxLTV = eligibleProviders.length > 0 
+          ? Math.max(...eligibleProviders.map(p => p.maxLTV))
+          : 0;
+        
+        const maxMortgage = property.price * maxLTV;
+        const stampDuty = property.price <= 250000 ? property.price * 0.03 :
+          (250000 * 0.03) + ((property.price - 250000) * 0.08);
+        const fees = 600 + (property.price * 0.01) + stampDuty;
+        const cashNeeded = (property.price - maxMortgage) + fees;
+        
+        return cash >= cashNeeded;
+      };
+      
+      // Count affordable properties
+      const affordableCount = estateAgentProperties.filter(p => 
+        isAffordable(p, gameState.cash, gameState.creditScore)
+      ).length;
+      
+      // Ensure minimum 5 affordable properties
+      const minAffordable = 5;
+      const needsMoreAffordable = affordableCount < minAffordable;
+      
+      if (totalAvailable < targetTotal || needsMoreAffordable) {
         setEstateAgentProperties(prev => {
           let list = prev.slice();
           const ownedIds = new Set(gameState.ownedProperties.map(p => p.id));
@@ -558,8 +584,33 @@ export function useGameState() {
             ...list.map(p => p.id),
           ]);
           
+          // First, ensure we have minimum affordable properties
+          if (needsMoreAffordable) {
+            const currentAffordable = list.filter(p => isAffordable(p, gameState.cash, gameState.creditScore)).length;
+            const affordableNeeded = minAffordable - currentAffordable;
+            
+            for (let i = 0; i < affordableNeeded; i++) {
+              // Generate properties at the lower end of the level range to be more affordable
+              const { min: levelMin } = getPropertyValueRangeForLevel(gameState.level);
+              const affordableMax = Math.min(levelMin + (levelMin * 0.3), gameState.cash * 4); // Properties within affordable range
+              
+              // Generate a cheaper property
+              const affordableProperty = generateRandomProperty(gameState.level);
+              // Adjust price to be more affordable
+              const adjustedPrice = Math.max(40000, Math.floor(levelMin + Math.random() * (affordableMax - levelMin)));
+              affordableProperty.price = adjustedPrice;
+              affordableProperty.value = adjustedPrice;
+              affordableProperty.monthlyIncome = Math.floor((adjustedPrice * (6 + Math.random() * 9) / 100) / 12);
+              
+              if (!usedIds.has(affordableProperty.id)) {
+                list.push(affordableProperty);
+                usedIds.add(affordableProperty.id);
+              }
+            }
+          }
+          
           // Need to add (targetTotal - totalAvailable) properties
-          const needed = targetTotal - totalAvailable;
+          const needed = Math.max(0, targetTotal - list.length - auctionProperties.length);
           for (let i = 0; i < needed; i++) {
             // Filter available properties by level range and exclude owned properties
             const candidates = AVAILABLE_PROPERTIES.filter(p => 
@@ -580,7 +631,7 @@ export function useGameState() {
         });
       }
     }
-  }, [auctionProperties.length, estateAgentProperties.length, gameState.ownedProperties.length, gameState.level]);
+  }, [auctionProperties.length, estateAgentProperties.length, gameState.ownedProperties.length, gameState.level, gameState.cash, gameState.creditScore]);
 
   // Save to localStorage whenever game state changes
   useEffect(() => {
@@ -623,7 +674,7 @@ export function useGameState() {
           const daysOnMarket = Math.floor((currentTime - listing.listingDate) / (1000 * 60 * 60 * 24));
           const property = prev.ownedProperties.find(p => p.id === listing.propertyId);
           
-          // Generate new offers every 7-14 days for non-auction listings
+          // Generate new offers every 3-5 days for non-auction listings (faster sales)
           const daysSinceLastCheck = listing.lastOfferCheck 
             ? Math.floor((currentTime - listing.lastOfferCheck) / (1000 * 60 * 60 * 24))
             : 0;
@@ -631,7 +682,8 @@ export function useGameState() {
           let newOffers = listing.offers || [];
           let lastCheck = listing.lastOfferCheck || listing.listingDate;
           
-          if (!listing.isAuction && property && daysSinceLastCheck >= 7) {
+          // Faster offer generation: every 3-5 days instead of 7-14
+          if (!listing.isAuction && property && daysSinceLastCheck >= 3) {
             // Generate 1-2 new offers
             const numNewOffers = Math.random() > 0.5 ? 2 : 1;
             const buyerNames = [
@@ -1371,11 +1423,38 @@ export function useGameState() {
 
   const selectTenant = useCallback((propertyId: string, tenant: Tenant) => {
     setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+      
+      // Check if this is a rent upgrade (higher paying tenant)
+      const currentBaseRent = property.baseRent || property.monthlyIncome;
+      let newAdjustment = 1.0;
+      if (tenant.profile === 'premium') newAdjustment = 1.10;
+      else if (tenant.profile === 'budget') newAdjustment = 0.90;
+      else if (tenant.profile === 'risky') newAdjustment = 1.05;
+      
+      const newRent = Math.floor(currentBaseRent * newAdjustment);
+      const currentRent = property.monthlyIncome;
+      const isRentIncrease = newRent > currentRent;
+      
+      // Only allow higher rent tenants after 3+ months since last tenant change
+      if (isRentIncrease && property.lastTenantChange !== undefined) {
+        const monthsSinceChange = prev.monthsPlayed - property.lastTenantChange;
+        if (monthsSinceChange < 3) {
+          toast({
+            title: "Tenant Change Too Soon",
+            description: `You must wait ${3 - monthsSinceChange} more month(s) before selecting a higher-paying tenant.`,
+            variant: "destructive"
+          });
+          return prev;
+        }
+      }
+      
       // Remove any existing void period for this property
       const updatedVoidPeriods = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
       
       const existingTenantIndex = prev.tenants.findIndex(t => t.propertyId === propertyId);
-      const newTenant: PropertyTenant = {
+      const newTenantRecord: PropertyTenant = {
         propertyId,
         tenant,
         rentMultiplier: tenant.rentMultiplier,
@@ -1385,48 +1464,27 @@ export function useGameState() {
       let updatedTenants;
       if (existingTenantIndex >= 0) {
         updatedTenants = [...prev.tenants];
-        updatedTenants[existingTenantIndex] = newTenant;
+        updatedTenants[existingTenantIndex] = newTenantRecord;
       } else {
-        updatedTenants = [...prev.tenants, newTenant];
+        updatedTenants = [...prev.tenants, newTenantRecord];
       }
 
-      // Update property monthly income based on tenant multiplier
-      // Use small adjustments (±10%) from current base rent to prevent dramatic jumps
-      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      // Update property monthly income and track tenant change timing
       const updatedProperties = prev.ownedProperties.map(prop => {
         if (prop.id === propertyId) {
-          // Use current baseRent (which includes annual increases) or fall back to monthlyIncome
-          const currentBaseRent = prop.baseRent || prop.monthlyIncome;
-          
-          // Apply tenant adjustment: ±10% based on tenant profile
-          // Premium: +10%, Standard: 0%, Budget: -10%, Risky: +5%
-          let adjustment = 1.0;
-          if (tenant.profile === 'premium') adjustment = 1.10;
-          else if (tenant.profile === 'budget') adjustment = 0.90;
-          else if (tenant.profile === 'risky') adjustment = 1.05;
-          
-          const actualRent = Math.floor(currentBaseRent * adjustment);
-          
           return {
             ...prop,
-            monthlyIncome: actualRent,
-            baseRent: currentBaseRent, // Keep base rent for future increases
+            monthlyIncome: newRent,
+            baseRent: currentBaseRent,
+            lastTenantChange: prev.monthsPlayed, // Track when tenant was changed
           };
         }
         return prop;
       });
 
-      // Calculate actual rent for toast notification
-      const currentBaseRent = property?.baseRent || property?.monthlyIncome || 0;
-      let adjustment = 1.0;
-      if (tenant.profile === 'premium') adjustment = 1.10;
-      else if (tenant.profile === 'budget') adjustment = 0.90;
-      else if (tenant.profile === 'risky') adjustment = 1.05;
-      const actualRent = Math.floor(currentBaseRent * adjustment);
-
       toast({
         title: "Tenant Selected!",
-        description: `${tenant.name} is now renting your property at £${actualRent}/mo`,
+        description: `${tenant.name} is now renting your property at £${newRent}/mo`,
       });
 
       return {

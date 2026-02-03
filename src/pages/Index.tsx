@@ -131,14 +131,21 @@ const Index = () => {
                     onAddOffer={gameState.addOfferToListing}
                     cash={gameState.cash}
                     availableProperties={gameState.availableProperties}
-                    onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => 
-                      gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType)
+                    onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => {
+                      // Use buyPropertyAtPrice if offer differs from property value
+                      if (offerAmount !== property.value) {
+                        gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType);
+                      } else {
+                        gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType);
+                      }
+                    }
                     }
                     getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
                     getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
                     getMaxPropertyValue={gameState.getMaxPropertyValue}
                     level={gameState.level}
                     mortgageProviders={gameState.mortgageProviders}
+                    creditScore={gameState.creditScore}
                   />
                   <AuctionHouse
                     ownedProperties={gameState.ownedProperties}
@@ -222,6 +229,7 @@ const Index = () => {
                      playerCash={gameState.cash}
                      currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
                      mortgages={gameState.mortgages}
+                     monthsPlayed={gameState.monthsPlayed}
                    />
                 ))}
               </div>

@@ -26,6 +26,7 @@ export interface Property {
   yield?: number; // Annual yield percentage (6-15%)
   lastRentIncrease?: number; // Tracks when rent was last increased (month)
   baseRent?: number; // Current base rent level (increases 3% annually, prevents dramatic tenant switch jumps)
+  lastTenantChange?: number; // Month when tenant was last changed (for rent upgrade timing)
 }
 
 interface PropertyCardProps {
@@ -45,6 +46,7 @@ interface PropertyCardProps {
     monthlyPayment: number;
     remainingBalance: number;
   }>;
+  monthsPlayed?: number;
 }
 
 const PropertyTypeIcon = {
@@ -71,7 +73,8 @@ export function PropertyCard({
   currentTenant,
   propertyListings = [],
   removeTenant,
-  mortgages = []
+  mortgages = [],
+  monthsPlayed = 0
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -263,13 +266,16 @@ export function PropertyCard({
               {onSelectTenant && (
                 <TenantSelector
                   propertyId={property.id}
-                  baseRent={property.monthlyIncome}
+                  baseRent={property.baseRent || property.monthlyIncome}
                   onSelectTenant={onSelectTenant}
                   currentTenant={currentTenant}
+                  currentMonthlyRent={property.monthlyIncome}
+                  lastTenantChange={property.lastTenantChange}
+                  monthsPlayed={monthsPlayed}
                 />
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Button 
                 variant="destructive" 
                 size="sm"
@@ -277,14 +283,6 @@ export function PropertyCard({
                 disabled={isLoading}
               >
                 List for Sale
-              </Button>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => handleAction(() => onSell?.(property, true))}
-                disabled={isLoading}
-              >
-                Auction (Fast)
               </Button>
             </div>
           </div>
