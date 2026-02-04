@@ -59,6 +59,12 @@ interface PropertyOffer {
   isChainFree: boolean;
   mortgageApproved: boolean;
   timestamp: number;
+  // Counter-offer fields
+  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'buyer-countered' | 'walkaway';
+  counterAmount?: number; // Player's counter-offer
+  buyerCounterAmount?: number; // Buyer's response
+  negotiationRound: number; // Track rounds (max 3)
+  counterResponseDate?: number; // When the buyer will respond
 }
 
 interface Renovation {
@@ -696,14 +702,16 @@ export function useGameState() {
               const priceMultiplier = 0.85 + (Math.random() * 0.2); // 85% to 105%
               const timeAdjustment = Math.max(0.9, 1 - (daysOnMarket * 0.002));
               
-              const newOffer = {
+              const newOffer: PropertyOffer = {
                 id: `offer-${Date.now()}-${i}`,
                 buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
                 amount: Math.floor(property.value * priceMultiplier * timeAdjustment),
                 daysOnMarket: daysOnMarket,
                 isChainFree: Math.random() > 0.6,
                 mortgageApproved: Math.random() > 0.3,
-                timestamp: currentTime
+                timestamp: currentTime,
+                status: 'pending',
+                negotiationRound: 0
               };
               
               newOffers.push(newOffer);
@@ -1964,6 +1972,243 @@ export function useGameState() {
     }));
   }, []);
 
+  // Counter-offer functionality
+  const counterOffer = useCallback((propertyId: string, offerId: string, counterAmount: number) => {
+    setGameState(prev => {
+      const listing = prev.propertyListings.find(l => l.propertyId === propertyId);
+      if (!listing) return prev;
+
+      const offer = listing.offers?.find(o => o.id === offerId);
+      if (!offer || offer.status !== 'pending') return prev;
+
+      // Set buyer response time (1-2 in-game days from now, simulated as 5-10 seconds real time)
+      const responseDelay = 5000 + Math.random() * 5000;
+      const counterResponseDate = Date.now() + responseDelay;
+
+      toast({
+        title: "Counter-Offer Sent",
+        description: `You countered £${offer.amount.toLocaleString()} with £${counterAmount.toLocaleString()}. Awaiting buyer response...`,
+      });
+
+      return {
+        ...prev,
+        propertyListings: prev.propertyListings.map(l =>
+          l.propertyId === propertyId
+            ? {
+                ...l,
+                offers: (l.offers || []).map(o =>
+                  o.id === offerId
+                    ? {
+                        ...o,
+                        status: 'countered' as const,
+                        counterAmount,
+                        negotiationRound: o.negotiationRound + 1,
+                        counterResponseDate
+                      }
+                    : o
+                )
+              }
+            : l
+        )
+      };
+    });
+  }, []);
+
+  // Reduce price functionality - drops asking price and generates immediate offers
+  const reducePriceOnListing = useCallback((propertyId: string, reductionPercent: number = 0.07) => {
+    setGameState(prev => {
+      const property = prev.ownedProperties.find(p => p.id === propertyId);
+      if (!property) return prev;
+
+      const newPrice = Math.floor(property.price * (1 - reductionPercent));
+      
+      // Generate 1-2 new immediate offers at the reduced price
+      const numNewOffers = Math.random() > 0.4 ? 2 : 1;
+      const buyerNames = [
+        "Mr & Mrs Johnson", "Sarah Matthews", "David Chen", "Emma Wilson", 
+        "The Thompson Family", "Investment Properties Ltd", "Michael Brown",
+        "Liverpool Capital Group", "First Time Buyer", "Retirement Home Buyer"
+      ];
+      
+      const newOffers: PropertyOffer[] = [];
+      for (let i = 0; i < numNewOffers; i++) {
+        const priceMultiplier = 0.92 + (Math.random() * 0.13); // 92% to 105% of new price
+        newOffers.push({
+          id: `offer-${Date.now()}-reduce-${i}`,
+          buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
+          amount: Math.floor(newPrice * priceMultiplier),
+          daysOnMarket: 0,
+          isChainFree: Math.random() > 0.5,
+          mortgageApproved: Math.random() > 0.25,
+          timestamp: Date.now(),
+          status: 'pending',
+          negotiationRound: 0
+        });
+      }
+
+      toast({
+        title: "Price Reduced!",
+        description: `${property.name} reduced to £${newPrice.toLocaleString()}. ${numNewOffers} new offer(s) generated!`,
+      });
+
+      // Update property price and add new offers
+      return {
+        ...prev,
+        ownedProperties: prev.ownedProperties.map(p =>
+          p.id === propertyId ? { ...p, price: newPrice } : p
+        ),
+        propertyListings: prev.propertyListings.map(l =>
+          l.propertyId === propertyId
+            ? { ...l, offers: [...(l.offers || []), ...newOffers].sort((a, b) => b.amount - a.amount) }
+            : l
+        )
+      };
+    });
+  }, []);
+
+  // Process counter-offer responses from buyers
+  useEffect(() => {
+    const checkCounterResponses = setInterval(() => {
+      setGameState(prev => {
+        let hasChanges = false;
+        const updatedListings = prev.propertyListings.map(listing => {
+          const property = prev.ownedProperties.find(p => p.id === listing.propertyId);
+          if (!property) return listing;
+
+          const updatedOffers = (listing.offers || []).map(offer => {
+            // Check if this is a countered offer awaiting response
+            if (offer.status === 'countered' && offer.counterResponseDate && Date.now() >= offer.counterResponseDate) {
+              hasChanges = true;
+              
+              // Buyer decision based on negotiation round
+              const acceptChance = offer.negotiationRound >= 3 ? 0.8 : 0.6; // Higher accept chance on final round
+              const counterChance = offer.negotiationRound >= 3 ? 0 : 0.25; // No more counters after round 3
+              
+              const roll = Math.random();
+              
+              if (roll < acceptChance) {
+                // Buyer accepts player's counter
+                toast({
+                  title: "Counter-Offer Accepted! 🎉",
+                  description: `${offer.buyerName} accepted your counter of £${offer.counterAmount?.toLocaleString()} for ${property.name}!`,
+                });
+                return {
+                  ...offer,
+                  status: 'accepted' as const,
+                  amount: offer.counterAmount || offer.amount
+                };
+              } else if (roll < acceptChance + counterChance) {
+                // Buyer makes their own counter (split the difference)
+                const difference = (offer.counterAmount || offer.amount) - offer.amount;
+                const buyerCounter = offer.amount + Math.floor(difference * (0.4 + Math.random() * 0.3));
+                
+                toast({
+                  title: "Buyer Counter-Offered",
+                  description: `${offer.buyerName} countered with £${buyerCounter.toLocaleString()} for ${property.name}`,
+                });
+                
+                return {
+                  ...offer,
+                  status: 'buyer-countered' as const,
+                  buyerCounterAmount: buyerCounter,
+                  counterResponseDate: undefined
+                };
+              } else {
+                // Buyer walks away
+                toast({
+                  title: "Buyer Walked Away",
+                  description: `${offer.buyerName} has withdrawn their interest in ${property.name}`,
+                  variant: "destructive"
+                });
+                return {
+                  ...offer,
+                  status: 'walkaway' as const,
+                  counterResponseDate: undefined
+                };
+              }
+            }
+            return offer;
+          });
+
+          return { ...listing, offers: updatedOffers };
+        });
+
+        if (hasChanges) {
+          return { ...prev, propertyListings: updatedListings };
+        }
+        return prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(checkCounterResponses);
+  }, []);
+
+  // Accept buyer's counter-offer
+  const acceptBuyerCounter = useCallback((propertyId: string, offerId: string) => {
+    setGameState(prev => {
+      const listing = prev.propertyListings.find(l => l.propertyId === propertyId);
+      const offer = listing?.offers?.find(o => o.id === offerId);
+      
+      if (!offer || offer.status !== 'buyer-countered' || !offer.buyerCounterAmount) return prev;
+
+      return {
+        ...prev,
+        propertyListings: prev.propertyListings.map(l =>
+          l.propertyId === propertyId
+            ? {
+                ...l,
+                offers: (l.offers || []).map(o =>
+                  o.id === offerId
+                    ? { ...o, status: 'accepted' as const, amount: offer.buyerCounterAmount! }
+                    : o
+                )
+              }
+            : l
+        )
+      };
+    });
+  }, []);
+
+  // Reject buyer's counter and continue negotiation
+  const rejectBuyerCounter = useCallback((propertyId: string, offerId: string, newCounterAmount: number) => {
+    setGameState(prev => {
+      const listing = prev.propertyListings.find(l => l.propertyId === propertyId);
+      const offer = listing?.offers?.find(o => o.id === offerId);
+      
+      if (!offer || offer.status !== 'buyer-countered') return prev;
+
+      const responseDelay = 5000 + Math.random() * 5000;
+      const counterResponseDate = Date.now() + responseDelay;
+
+      toast({
+        title: "Counter-Offer Sent",
+        description: `You countered with £${newCounterAmount.toLocaleString()}. Awaiting buyer response...`,
+      });
+
+      return {
+        ...prev,
+        propertyListings: prev.propertyListings.map(l =>
+          l.propertyId === propertyId
+            ? {
+                ...l,
+                offers: (l.offers || []).map(o =>
+                  o.id === offerId
+                    ? {
+                        ...o,
+                        status: 'countered' as const,
+                        counterAmount: newCounterAmount,
+                        negotiationRound: o.negotiationRound + 1,
+                        counterResponseDate
+                      }
+                    : o
+                )
+              }
+            : l
+        )
+      };
+    });
+  }, []);
+
 // Mortgage refinancing
 const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
   setGameState(prev => {
@@ -2292,6 +2537,10 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
     addOfferToListing,
     rejectPropertyOffer,
     dismissDamage,
-    resetGame
+    resetGame,
+    counterOffer,
+    reducePriceOnListing,
+    acceptBuyerCounter,
+    rejectBuyerCounter
   };
 }

@@ -20,6 +20,11 @@ interface PropertyOffer {
   isChainFree: boolean;
   mortgageApproved: boolean;
   timestamp: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'buyer-countered' | 'walkaway';
+  counterAmount?: number;
+  buyerCounterAmount?: number;
+  negotiationRound: number;
+  counterResponseDate?: number;
 }
 
 interface PropertyListing {
@@ -42,6 +47,10 @@ interface EstateAgentWindowProps {
   onAcceptOffer: (propertyId: string, offer: PropertyOffer) => void;
   onRejectOffer: (propertyId: string, offerId: string) => void;
   onAddOffer: (propertyId: string, offer: PropertyOffer) => void;
+  onCounterOffer: (propertyId: string, offerId: string, counterAmount: number) => void;
+  onReducePrice: (propertyId: string, reductionPercent?: number) => void;
+  onAcceptBuyerCounter: (propertyId: string, offerId: string) => void;
+  onRejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   cash: number;
   availableProperties: Property[];
   onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
@@ -63,6 +72,10 @@ export function EstateAgentWindow({
   onAcceptOffer, 
   onRejectOffer,
   onAddOffer,
+  onCounterOffer,
+  onReducePrice,
+  onAcceptBuyerCounter,
+  onRejectBuyerCounter,
   cash, 
   availableProperties, 
   onBuyProperty, 
@@ -88,6 +101,29 @@ export function EstateAgentWindow({
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  
+  // Counter-offer state
+  const [counteringOfferId, setCounteringOfferId] = useState<string | null>(null);
+  const [counterAmount, setCounterAmount] = useState<string>("");
+
+  // Get level value range for filtering
+  const getLevelRange = (playerLevel: number) => {
+    switch (playerLevel) {
+      case 1: return { min: 0, max: 100000 };
+      case 2: return { min: 100000, max: 250000 };
+      case 3: return { min: 250000, max: 500000 };
+      case 4: return { min: 500000, max: 750000 };
+      case 5: return { min: 750000, max: 1000000 };
+      case 6: return { min: 1000000, max: 2500000 };
+      case 7: return { min: 2500000, max: 5000000 };
+      case 8: return { min: 5000000, max: 10000000 };
+      case 9: return { min: 10000000, max: 20000000 };
+      case 10: return { min: 20000000, max: 30000000 };
+      default: return { min: 0, max: 100000 };
+    }
+  };
+
+  const { min: levelMin, max: levelMax } = getLevelRange(level);
 
   // Calculate affordability for each property
   const calculateAffordability = (property: Property) => {
@@ -106,9 +142,16 @@ export function EstateAgentWindow({
     return cash >= cashNeeded;
   };
 
-  // Filter properties by affordability
-  const affordableProperties = availableProperties.filter(calculateAffordability);
-  const unaffordableCount = availableProperties.length - affordableProperties.length;
+  // Check if property is within player's level range
+  const isWithinLevelRange = (property: Property) => {
+    return property.value >= levelMin && property.value <= levelMax;
+  };
+
+  // Filter properties by BOTH level range AND affordability
+  const levelFilteredProperties = availableProperties.filter(isWithinLevelRange);
+  const affordableProperties = levelFilteredProperties.filter(calculateAffordability);
+  const levelRestrictedCount = availableProperties.length - levelFilteredProperties.length;
+  const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
 
   // Generate offers for listed properties
   useEffect(() => {
@@ -161,7 +204,9 @@ export function EstateAgentWindow({
             daysOnMarket: Math.floor(timeSinceListing),
             isChainFree: Math.random() > 0.6,
             mortgageApproved: Math.random() > 0.3,
-            timestamp: currentTime
+            timestamp: currentTime,
+            status: 'pending',
+            negotiationRound: 0
           };
 
           onAddOffer(listing.propertyId, newOffer);
@@ -281,10 +326,20 @@ export function EstateAgentWindow({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
-            {unaffordableCount > 0 && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                <AlertCircle className="h-4 w-4" />
-                <span>{unaffordableCount} properties hidden (cannot afford with current cash + max mortgage)</span>
+            {(levelRestrictedCount > 0 || unaffordableCount > 0) && (
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                {levelRestrictedCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{levelRestrictedCount} properties hidden (outside Level {level} range: £{levelMin.toLocaleString()}-£{levelMax.toLocaleString()})</span>
+                  </div>
+                )}
+                {unaffordableCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>{unaffordableCount} properties hidden (cannot afford with current cash + max mortgage)</span>
+                  </div>
+                )}
               </div>
             )}
             
@@ -616,22 +671,33 @@ export function EstateAgentWindow({
                           {offers.length > 0 ? (
                             <div className="space-y-3 border-t pt-3">
                               <h4 className="font-semibold text-sm">
-                                Offers ({offers.length})
+                                Offers ({offers.filter(o => o.status !== 'walkaway').length})
                               </h4>
                               <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {offers.map(offer => (
-                                  <Card key={offer.id} className="bg-muted/50">
+                                {offers.filter(o => o.status !== 'walkaway').map(offer => (
+                                  <Card key={offer.id} className={`bg-muted/50 ${offer.status === 'accepted' ? 'border-green-500 border-2' : ''}`}>
                                     <CardContent className="p-3">
                                       <div className="flex justify-between items-start mb-2">
                                         <div>
                                           <p className="font-semibold">{offer.buyerName}</p>
                                           <p className="text-xs text-muted-foreground">
-                                            {offer.daysOnMarket} days on market
+                                            {offer.daysOnMarket} days on market • Round {offer.negotiationRound + 1}
                                           </p>
                                         </div>
-                                        <Badge variant={getBadgeVariant(offer, property)}>
-                                          £{offer.amount.toLocaleString()}
-                                        </Badge>
+                                        <div className="text-right">
+                                          <Badge variant={getBadgeVariant(offer, property)}>
+                                            £{offer.amount.toLocaleString()}
+                                          </Badge>
+                                          {offer.status === 'countered' && (
+                                            <Badge variant="outline" className="ml-1 text-xs">Awaiting Response</Badge>
+                                          )}
+                                          {offer.status === 'buyer-countered' && (
+                                            <Badge variant="secondary" className="ml-1 text-xs">Buyer Counter: £{offer.buyerCounterAmount?.toLocaleString()}</Badge>
+                                          )}
+                                          {offer.status === 'accepted' && (
+                                            <Badge variant="default" className="ml-1 text-xs bg-green-600">Accepted!</Badge>
+                                          )}
+                                        </div>
                                       </div>
                                       <div className="flex gap-1 mb-2">
                                         {offer.isChainFree && (
@@ -640,27 +706,182 @@ export function EstateAgentWindow({
                                         {offer.mortgageApproved && (
                                           <Badge variant="secondary" className="text-xs">Mortgage Approved</Badge>
                                         )}
+                                        {offer.counterAmount && offer.status === 'countered' && (
+                                          <Badge variant="outline" className="text-xs">Your counter: £{offer.counterAmount.toLocaleString()}</Badge>
+                                        )}
                                       </div>
-                                      <div className="flex gap-2">
+                                      
+                                      {/* Action buttons based on offer status */}
+                                      {offer.status === 'pending' && (
+                                        <>
+                                          {counteringOfferId === offer.id ? (
+                                            <div className="space-y-2">
+                                              <div className="flex gap-2">
+                                                <Input
+                                                  type="number"
+                                                  value={counterAmount}
+                                                  onChange={(e) => setCounterAmount(e.target.value)}
+                                                  placeholder="Your counter offer"
+                                                  className="flex-1"
+                                                />
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    const amount = parseInt(counterAmount);
+                                                    if (!isNaN(amount) && amount > offer.amount) {
+                                                      onCounterOffer(listing.propertyId, offer.id, amount);
+                                                      setCounteringOfferId(null);
+                                                      setCounterAmount("");
+                                                    }
+                                                  }}
+                                                  disabled={!counterAmount || parseInt(counterAmount) <= offer.amount}
+                                                >
+                                                  <Check className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => {
+                                                    setCounteringOfferId(null);
+                                                    setCounterAmount("");
+                                                  }}
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                </Button>
+                                              </div>
+                                              <p className="text-xs text-muted-foreground">
+                                                Counter must be higher than £{offer.amount.toLocaleString()}
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <div className="flex gap-2">
+                                              <Button
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={() => {
+                                                  onAcceptOffer(listing.propertyId, offer);
+                                                  setIsOpen(false);
+                                                }}
+                                              >
+                                                <Check className="h-4 w-4 mr-1" />
+                                                Accept
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setCounteringOfferId(offer.id);
+                                                  setCounterAmount(Math.floor(offer.amount * 1.1).toString());
+                                                }}
+                                              >
+                                                Counter
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => onRejectOffer(listing.propertyId, offer.id)}
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                      
+                                      {offer.status === 'countered' && (
+                                        <p className="text-sm text-muted-foreground text-center">
+                                          ⏳ Waiting for {offer.buyerName}'s response...
+                                        </p>
+                                      )}
+                                      
+                                      {offer.status === 'buyer-countered' && offer.buyerCounterAmount && (
+                                        <>
+                                          {counteringOfferId === offer.id ? (
+                                            <div className="space-y-2">
+                                              <div className="flex gap-2">
+                                                <Input
+                                                  type="number"
+                                                  value={counterAmount}
+                                                  onChange={(e) => setCounterAmount(e.target.value)}
+                                                  placeholder="Your counter offer"
+                                                  className="flex-1"
+                                                />
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    const amount = parseInt(counterAmount);
+                                                    if (!isNaN(amount) && amount > offer.buyerCounterAmount!) {
+                                                      onRejectBuyerCounter(listing.propertyId, offer.id, amount);
+                                                      setCounteringOfferId(null);
+                                                      setCounterAmount("");
+                                                    }
+                                                  }}
+                                                  disabled={!counterAmount || parseInt(counterAmount) <= offer.buyerCounterAmount!}
+                                                >
+                                                  <Check className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  onClick={() => {
+                                                    setCounteringOfferId(null);
+                                                    setCounterAmount("");
+                                                  }}
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="flex gap-2">
+                                              <Button
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={() => {
+                                                  onAcceptBuyerCounter(listing.propertyId, offer.id);
+                                                  onAcceptOffer(listing.propertyId, { ...offer, amount: offer.buyerCounterAmount! });
+                                                  setIsOpen(false);
+                                                }}
+                                              >
+                                                <Check className="h-4 w-4 mr-1" />
+                                                Accept £{offer.buyerCounterAmount.toLocaleString()}
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setCounteringOfferId(offer.id);
+                                                  setCounterAmount(Math.floor(((offer.buyerCounterAmount || 0) + (offer.counterAmount || 0)) / 2).toString());
+                                                }}
+                                                disabled={offer.negotiationRound >= 2}
+                                              >
+                                                {offer.negotiationRound >= 2 ? 'Max Rounds' : 'Counter'}
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => onRejectOffer(listing.propertyId, offer.id)}
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                      
+                                      {offer.status === 'accepted' && (
                                         <Button
                                           size="sm"
-                                          className="flex-1"
+                                          className="w-full bg-green-600 hover:bg-green-700"
                                           onClick={() => {
                                             onAcceptOffer(listing.propertyId, offer);
                                             setIsOpen(false);
                                           }}
                                         >
                                           <Check className="h-4 w-4 mr-1" />
-                                          Accept
+                                          Complete Sale for £{offer.amount.toLocaleString()}
                                         </Button>
-                                        <Button
-                                          size="sm"
-                                          variant="destructive"
-                                          onClick={() => onRejectOffer(listing.propertyId, offer.id)}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </div>
+                                      )}
                                     </CardContent>
                                   </Card>
                                 ))}
@@ -672,19 +893,28 @@ export function EstateAgentWindow({
                             </p>
                           )}
 
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => {
-                              onCancelListing(listing.propertyId);
-                              toast({
-                                title: "Listing Cancelled",
-                                description: "Property removed from sale.",
-                              });
-                            }}
-                          >
-                            Cancel Listing
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => onReducePrice(listing.propertyId, 0.07)}
+                            >
+                              Reduce Price 7%
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              className="flex-1"
+                              onClick={() => {
+                                onCancelListing(listing.propertyId);
+                                toast({
+                                  title: "Listing Cancelled",
+                                  description: "Property removed from sale.",
+                                });
+                              }}
+                            >
+                              Cancel Listing
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     );
