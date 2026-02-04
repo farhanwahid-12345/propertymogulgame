@@ -129,6 +129,10 @@ const Index = () => {
                     onAcceptOffer={gameState.handleEstateAgentSale}
                     onRejectOffer={gameState.rejectPropertyOffer}
                     onAddOffer={gameState.addOfferToListing}
+                    onCounterOffer={gameState.counterOffer}
+                    onReducePrice={gameState.reducePriceOnListing}
+                    onAcceptBuyerCounter={gameState.acceptBuyerCounter}
+                    onRejectBuyerCounter={gameState.rejectBuyerCounter}
                     cash={gameState.cash}
                     availableProperties={gameState.availableProperties}
                     onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => {

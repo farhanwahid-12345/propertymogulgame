@@ -271,10 +271,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     });
   };
 
-  const startLiveAuction = (property: Property) => {
-    const reservePrice = Math.floor(property.price * 0.85);
+  const startLiveAuction = (property: Property, isExpress: boolean = false) => {
+    const reservePrice = Math.floor(property.price * (isExpress ? 0.75 : 0.85)); // Lower reserve for express
     const startingBid = Math.floor(reservePrice * 0.9);
-    const endTime = Date.now() + 30_000; // Exactly 30 seconds
+    const auctionDuration = isExpress ? 15_000 : 30_000; // 15 seconds for express, 30 for normal
+    const endTime = Date.now() + auctionDuration;
 
     // Generate realistic AI bidders with individual characteristics
     const bidderNames = [
@@ -283,22 +284,26 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
     ];
     
+    // Express auctions have fewer bidders
     // 30% chance of a "cold auction" with fewer bidders and lower valuations
     const isColdAuction = Math.random() < 0.3;
+    const baseBidderCount = isExpress ? 2 : 3;
+    const maxExtraBidders = isExpress ? 2 : 5;
     const bidderCount = isColdAuction 
-      ? Math.floor(Math.random() * 2) + 2 // 2-3 bidders for cold auctions
-      : Math.floor(Math.random() * 5) + 3; // 3-7 bidders normally
+      ? Math.floor(Math.random() * 2) + baseBidderCount // 2-3 for express cold, 3-4 for normal cold
+      : Math.floor(Math.random() * maxExtraBidders) + baseBidderCount; // 2-4 for express, 3-7 for normal
     
     const coldAuctionPenalty = isColdAuction ? 0.10 : 0; // Reduce valuations by 10% for cold auctions
+    const expressPenalty = isExpress ? 0.05 : 0; // Additional 5% penalty for express
     
     const aiBidders = Array.from({ length: bidderCount }, (_, i) => {
       const name = bidderNames[i % bidderNames.length];
       // Each bidder has different valuation and behavior
-      // UPDATED: 70% - 110% of guide price instead of 85% - 115%
+      // 70% - 110% of guide price
       const baseValuation = property.price * (0.70 + Math.random() * 0.40);
-      const valuation = baseValuation * (1 - coldAuctionPenalty); // Apply cold auction penalty
-      const aggression = isColdAuction ? Math.random() * 0.7 : Math.random(); // Less aggressive in cold auctions
-      const overbidChance = isColdAuction ? Math.random() * 0.1 : Math.random() * 0.25; // Lower overbid chance
+      const valuation = baseValuation * (1 - coldAuctionPenalty - expressPenalty); // Apply penalties
+      const aggression = isColdAuction || isExpress ? Math.random() * 0.7 : Math.random(); // Less aggressive
+      const overbidChance = isColdAuction ? Math.random() * 0.1 : Math.random() * 0.25;
       return { name, valuation, aggression, overbidChance };
     });
     
@@ -307,7 +312,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       reservePrice,
       currentBid: startingBid,
       bidderCount,
-      timeRemaining: 30,
+      timeRemaining: isExpress ? 15 : 30,
       isActive: true,
       bidHistory: [{ 
         bidder: "Auctioneer", 
@@ -322,7 +327,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     
     setUserBidAmount([startingBid + Math.floor(property.price * 0.02)]);
     setUserMaxAutoBid(null);
-    setAuctioneerMessage(`Lot ${property.id}: ${property.name}. Starting at £${startingBid.toLocaleString()}`);
+    setAuctioneerMessage(`${isExpress ? '⚡ EXPRESS: ' : ''}Lot ${property.id}: ${property.name}. Starting at £${startingBid.toLocaleString()}`);
   };
 
   const placeBid = () => {
@@ -510,7 +515,6 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <Card 
                       key={property.id} 
                       className="cursor-pointer transition-colors border-orange-200 hover:border-orange-400"
-                      onClick={() => startLiveAuction(property)}
                     >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
@@ -546,11 +550,26 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           </div>
                         </div>
                         
-                        <div className="mt-3 text-center">
-                          <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
-                            Join Live Auction (30s)
+                        <div className="mt-3 flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-orange-600 hover:bg-orange-700"
+                            onClick={() => startLiveAuction(property, false)}
+                          >
+                            Standard (30s)
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="flex-1 border-orange-400 text-orange-600 hover:bg-orange-50"
+                            onClick={() => startLiveAuction(property, true)}
+                          >
+                            ⚡ Express (15s)
                           </Button>
                         </div>
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          Express: 15s, 75% reserve, fewer bidders
+                        </p>
                       </CardContent>
                     </Card>
                   ))}
