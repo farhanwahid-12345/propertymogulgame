@@ -32,6 +32,7 @@ interface PropertyListing {
   listingDate: number;
   isAuction: boolean;
   daysUntilSale: number;
+  askingPrice: number;
   offers?: PropertyOffer[];
   lastOfferCheck?: number;
   autoAcceptThreshold?: number;
@@ -163,30 +164,57 @@ export function EstateAgentWindow({
         const currentTime = Date.now();
         const timeSinceListing = (currentTime - listing.listingDate) / (1000 * 60 * 60 * 24); // days
         const lastCheck = listing.lastOfferCheck || listing.listingDate;
-        const timeSinceLastCheck = (currentTime - lastCheck) / (1000 * 60 * 60); // hours
-
-        // Only check every 2 hours minimum
-        if (timeSinceLastCheck < 2) return;
+        const timeSinceLastCheckSeconds = (currentTime - lastCheck) / 1000; // seconds
 
         const marketValue = property.value;
-        const askingPrice = property.price; // Using property.price as asking price
+        const askingPrice = listing.askingPrice || property.value;
         const priceRatio = askingPrice / marketValue;
         
-        // Calculate offer chance based on pricing
-        let offerChance = 0.3;
-        if (priceRatio <= 0.9) offerChance = 0.8;
-        else if (priceRatio <= 1.0) offerChance = 0.6;
-        else if (priceRatio <= 1.1) offerChance = 0.4;
-        else offerChance = 0.15;
+        // Dynamic timing: check interval based on pricing
+        // Below market: check every 3-5 seconds (fast offers)
+        // At market: check every 8-12 seconds
+        // Above market: check every 15-30 seconds (slow offers)
+        // Way above market (>120%): check every 30-60 seconds
+        let minCheckInterval: number;
+        if (priceRatio <= 0.9) minCheckInterval = 3;
+        else if (priceRatio <= 1.0) minCheckInterval = 5;
+        else if (priceRatio <= 1.1) minCheckInterval = 10;
+        else if (priceRatio <= 1.2) minCheckInterval = 20;
+        else minCheckInterval = 40;
+        
+        if (timeSinceLastCheckSeconds < minCheckInterval) return;
+        
+        // Calculate offer chance - still higher for lower prices
+        let offerChance = 0.6; // Base 60% chance when check happens
+        if (priceRatio <= 0.9) offerChance = 0.85;
+        else if (priceRatio <= 1.0) offerChance = 0.75;
+        else if (priceRatio <= 1.1) offerChance = 0.55;
+        else if (priceRatio <= 1.2) offerChance = 0.35;
+        else offerChance = 0.20;
         
         if (Math.random() < offerChance) {
+          // Offers should gravitate toward market value
+          // The higher the asking price above market, the lower the offers relative to asking
           let offerAmount: number;
-          if (priceRatio > 1.1) {
-            offerAmount = askingPrice * (0.85 + Math.random() * 0.1);
+          
+          if (priceRatio > 1.3) {
+            // Way overpriced: offers cluster around 85-95% of market value
+            offerAmount = marketValue * (0.85 + Math.random() * 0.10);
+          } else if (priceRatio > 1.2) {
+            // Very overpriced: offers around 90-100% of market value
+            offerAmount = marketValue * (0.90 + Math.random() * 0.10);
+          } else if (priceRatio > 1.1) {
+            // Overpriced: offers around 92-102% of market value
+            offerAmount = marketValue * (0.92 + Math.random() * 0.10);
           } else if (priceRatio >= 1.0) {
-            offerAmount = askingPrice * (0.95 + Math.random() * 0.05);
+            // At or slightly above market: offers 95-103% of market value
+            offerAmount = marketValue * (0.95 + Math.random() * 0.08);
+          } else if (priceRatio >= 0.95) {
+            // Slightly below market: offers at asking or slightly above
+            offerAmount = askingPrice * (0.98 + Math.random() * 0.07);
           } else {
-            offerAmount = askingPrice * (1.0 + Math.random() * 0.05);
+            // Priced below market: competitive offers at or above asking
+            offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
           }
           
           const buyerNames = [
@@ -565,6 +593,12 @@ export function EstateAgentWindow({
 
                     const offers = listing.offers || [];
                     const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
+                    const askingPrice = listing.askingPrice || property.value;
+                    const priceRatio = askingPrice / property.value;
+                    const priceIndicator = priceRatio > 1.1 ? 'Overpriced - slow offers' 
+                      : priceRatio > 1.0 ? 'Above market'
+                      : priceRatio >= 0.95 ? 'At market'
+                      : 'Below market - fast offers';
 
                     return (
                       <Card key={listing.propertyId} className="border-2">
@@ -578,6 +612,12 @@ export function EstateAgentWindow({
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                          {/* Market Value Info */}
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Market Value:</span>
+                            <span className="font-medium">£{property.value.toLocaleString()}</span>
+                          </div>
+                          
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">Asking Price:</span>
                             {editingListing === listing.propertyId ? (
@@ -597,19 +637,27 @@ export function EstateAgentWindow({
                               </div>
                             ) : (
                               <div className="flex gap-2 items-center">
-                                <span className="font-bold">£{property.price.toLocaleString()}</span>
+                                <span className="font-bold">£{askingPrice.toLocaleString()}</span>
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => {
                                     setEditingListing(listing.propertyId);
-                                    setEditPrice(property.price.toString());
+                                    setEditPrice(askingPrice.toString());
                                   }}
                                 >
                                   Edit
                                 </Button>
                               </div>
                             )}
+                          </div>
+                          
+                          {/* Pricing indicator */}
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted-foreground">Pricing Strategy:</span>
+                            <Badge variant={priceRatio > 1.1 ? 'destructive' : priceRatio < 0.95 ? 'default' : 'secondary'}>
+                              {priceIndicator} ({Math.round(priceRatio * 100)}%)
+                            </Badge>
                           </div>
 
                           {/* Auto-Accept Threshold */}
