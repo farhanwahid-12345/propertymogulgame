@@ -46,6 +46,7 @@ interface PropertyListing {
   listingDate: number; // timestamp
   isAuction: boolean;
   daysUntilSale: number;
+  askingPrice: number; // The price the player set for listing
   offers?: PropertyOffer[]; // Track offers for the listing
   lastOfferCheck?: number; // Track when we last generated offers
   autoAcceptThreshold?: number; // Auto-accept offers at or above this amount
@@ -1370,6 +1371,7 @@ export function useGameState() {
         listingDate: Date.now(),
         isAuction,
         daysUntilSale: daysToSell,
+        askingPrice: property.value,
         offers: [],
         lastOfferCheck: Date.now(),
         autoAcceptThreshold: undefined // User can set this later
@@ -1891,6 +1893,7 @@ export function useGameState() {
         listingDate: Date.now(),
         isAuction: false,
         daysUntilSale: 30,
+        askingPrice: askingPrice,
         offers: [],
         lastOfferCheck: Date.now(),
       };
@@ -1918,9 +1921,13 @@ export function useGameState() {
     setGameState(prev => ({
       ...prev,
       propertyListings: prev.propertyListings.map(l =>
-        l.propertyId === propertyId ? { ...l } : l
+        l.propertyId === propertyId ? { ...l, askingPrice: newPrice } : l
       )
     }));
+    toast({
+      title: "Price Updated",
+      description: `Asking price updated to £${newPrice.toLocaleString()}`,
+    });
   }, []);
 
   const addOfferToListing = useCallback((propertyId: string, offer: PropertyOffer) => {
@@ -2018,9 +2025,11 @@ export function useGameState() {
   const reducePriceOnListing = useCallback((propertyId: string, reductionPercent: number = 0.07) => {
     setGameState(prev => {
       const property = prev.ownedProperties.find(p => p.id === propertyId);
-      if (!property) return prev;
+      const listing = prev.propertyListings.find(l => l.propertyId === propertyId);
+      if (!property || !listing) return prev;
 
-      const newPrice = Math.floor(property.price * (1 - reductionPercent));
+      const currentAskingPrice = listing.askingPrice || property.value;
+      const newPrice = Math.floor(currentAskingPrice * (1 - reductionPercent));
       
       // Generate 1-2 new immediate offers at the reduced price
       const numNewOffers = Math.random() > 0.4 ? 2 : 1;
@@ -2051,15 +2060,12 @@ export function useGameState() {
         description: `${property.name} reduced to £${newPrice.toLocaleString()}. ${numNewOffers} new offer(s) generated!`,
       });
 
-      // Update property price and add new offers
+      // Update listing asking price and add new offers
       return {
         ...prev,
-        ownedProperties: prev.ownedProperties.map(p =>
-          p.id === propertyId ? { ...p, price: newPrice } : p
-        ),
         propertyListings: prev.propertyListings.map(l =>
           l.propertyId === propertyId
-            ? { ...l, offers: [...(l.offers || []), ...newOffers].sort((a, b) => b.amount - a.amount) }
+            ? { ...l, askingPrice: newPrice, offers: [...(l.offers || []), ...newOffers].sort((a, b) => b.amount - a.amount) }
             : l
         )
       };
