@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Property } from "@/components/ui/property-card";
 import { Tenant } from "@/components/ui/tenant-selector";
 import { RenovationType } from "@/components/ui/renovation-dialog";
@@ -486,6 +486,39 @@ export function useGameState() {
     }));
   }, [estateAgentProperties, auctionProperties]);
 
+  // Track level changes and regenerate properties when level changes
+  const prevLevelRef = useRef(gameState.level);
+  useEffect(() => {
+    if (prevLevelRef.current !== gameState.level) {
+      // Level changed - clear out-of-range properties and generate fresh ones
+      const { min, max } = getPropertyValueRangeForLevel(gameState.level);
+      
+      // Filter out properties outside new level range
+      setEstateAgentProperties(prev => {
+        const validProperties = prev.filter(p => p.price >= min && p.price <= max);
+        
+        // If we have very few valid properties, generate new ones immediately
+        if (validProperties.length < 8) {
+          const newProperties: Property[] = [];
+          for (let i = validProperties.length; i < 10; i++) {
+            const prop = generateRandomProperty(gameState.level);
+            // Ensure price is at lower end of level range for affordability
+            const targetPrice = min + Math.random() * (min * 0.5);
+            prop.price = Math.max(min, Math.min(max, Math.floor(targetPrice)));
+            prop.value = prop.price;
+            prop.monthlyIncome = Math.floor((prop.price * (6 + Math.random() * 9) / 100) / 12);
+            newProperties.push(prop);
+          }
+          return [...validProperties, ...newProperties];
+        }
+        
+        return validProperties;
+      });
+      
+      prevLevelRef.current = gameState.level;
+    }
+  }, [gameState.level]);
+
   // Ensure a single live auction property and replenish market inventory
   useEffect(() => {
     const { min, max } = getPropertyValueRangeForLevel(gameState.level);
@@ -556,6 +589,9 @@ export function useGameState() {
       const totalAvailable = auctionProperties.length + estateAgentProperties.length;
       const targetTotal = 30;
       
+      // Get current level range
+      const { min: levelMin, max: levelMax } = getPropertyValueRangeForLevel(gameState.level);
+      
       // Calculate affordability for a property
       const isAffordable = (property: Property, cash: number, creditScore: number) => {
         // Find best LTV player qualifies for
@@ -573,14 +609,19 @@ export function useGameState() {
         return cash >= cashNeeded;
       };
       
-      // Count affordable properties
-      const affordableCount = estateAgentProperties.filter(p => 
-        isAffordable(p, gameState.cash, gameState.creditScore)
+      // Check if property is within current level range
+      const isWithinLevelRange = (property: Property) => {
+        return property.price >= levelMin && property.price <= levelMax;
+      };
+      
+      // Count properties that are BOTH within level range AND affordable
+      const levelAffordableCount = estateAgentProperties.filter(p => 
+        isWithinLevelRange(p) && isAffordable(p, gameState.cash, gameState.creditScore)
       ).length;
       
-      // Ensure minimum 5 affordable properties
-      const minAffordable = 5;
-      const needsMoreAffordable = affordableCount < minAffordable;
+      // Ensure minimum 8 affordable properties within level range
+      const minAffordable = 8;
+      const needsMoreAffordable = levelAffordableCount < minAffordable;
       
       if (totalAvailable < targetTotal || needsMoreAffordable) {
         setEstateAgentProperties(prev => {
@@ -591,20 +632,21 @@ export function useGameState() {
             ...list.map(p => p.id),
           ]);
           
-          // First, ensure we have minimum affordable properties
+          // First, ensure we have minimum affordable properties WITHIN LEVEL RANGE
           if (needsMoreAffordable) {
-            const currentAffordable = list.filter(p => isAffordable(p, gameState.cash, gameState.creditScore)).length;
-            const affordableNeeded = minAffordable - currentAffordable;
+            const currentLevelAffordable = list.filter(p => 
+              isWithinLevelRange(p) && isAffordable(p, gameState.cash, gameState.creditScore)
+            ).length;
+            const affordableNeeded = minAffordable - currentLevelAffordable;
             
             for (let i = 0; i < affordableNeeded; i++) {
-              // Generate properties at the lower end of the level range to be more affordable
-              const { min: levelMin } = getPropertyValueRangeForLevel(gameState.level);
-              const affordableMax = Math.min(levelMin + (levelMin * 0.3), gameState.cash * 4); // Properties within affordable range
+              // Generate properties at the lower 50% of the level range to be more affordable
+              // Ensure the price stays WITHIN level bounds
+              const targetPrice = levelMin + Math.random() * (levelMin * 0.5);
+              const adjustedPrice = Math.max(levelMin, Math.min(levelMax, Math.floor(targetPrice)));
               
-              // Generate a cheaper property
+              // Generate a property and adjust its price to be within level range
               const affordableProperty = generateRandomProperty(gameState.level);
-              // Adjust price to be more affordable
-              const adjustedPrice = Math.max(40000, Math.floor(levelMin + Math.random() * (affordableMax - levelMin)));
               affordableProperty.price = adjustedPrice;
               affordableProperty.value = adjustedPrice;
               affordableProperty.monthlyIncome = Math.floor((adjustedPrice * (6 + Math.random() * 9) / 100) / 12);
@@ -623,8 +665,8 @@ export function useGameState() {
             const candidates = AVAILABLE_PROPERTIES.filter(p => 
               !usedIds.has(p.id) && 
               !ownedIds.has(p.id) &&
-              p.price >= min && 
-              p.price <= max
+              p.price >= levelMin && 
+              p.price <= levelMax
             );
             const pick = candidates.length > 0
               ? candidates[Math.floor(Math.random() * candidates.length)]
