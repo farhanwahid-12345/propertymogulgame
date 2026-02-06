@@ -503,8 +503,9 @@ export function useGameState() {
           for (let i = validProperties.length; i < 10; i++) {
             const prop = generateRandomProperty(gameState.level);
             // Ensure price is at lower end of level range for affordability
-            const targetPrice = min + Math.random() * (min * 0.5);
-            prop.price = Math.max(min, Math.min(max, Math.floor(targetPrice)));
+            const priceFloor = Math.max(40000, min);
+            const targetPrice = priceFloor + Math.random() * (priceFloor * 0.5);
+            prop.price = Math.max(priceFloor, Math.min(max, Math.floor(targetPrice)));
             prop.value = prop.price;
             prop.monthlyIncome = Math.floor((prop.price * (6 + Math.random() * 9) / 100) / 12);
             newProperties.push(prop);
@@ -642,8 +643,9 @@ export function useGameState() {
             for (let i = 0; i < affordableNeeded; i++) {
               // Generate properties at the lower 50% of the level range to be more affordable
               // Ensure the price stays WITHIN level bounds
-              const targetPrice = levelMin + Math.random() * (levelMin * 0.5);
-              const adjustedPrice = Math.max(levelMin, Math.min(levelMax, Math.floor(targetPrice)));
+              const priceFloor = Math.max(40000, levelMin);
+              const targetPrice = priceFloor + Math.random() * (priceFloor * 0.5);
+              const adjustedPrice = Math.max(priceFloor, Math.min(levelMax, Math.floor(targetPrice)));
               
               // Generate a property and adjust its price to be within level range
               const affordableProperty = generateRandomProperty(gameState.level);
