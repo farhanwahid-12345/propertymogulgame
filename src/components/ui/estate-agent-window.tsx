@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Clock, Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle } from "lucide-react";
+import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, MessageSquare, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface PropertyOffer {
@@ -103,7 +103,14 @@ export function EstateAgentWindow({
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
   
-  // Counter-offer state
+  // Buying negotiation state
+  const [vendorResponse, setVendorResponse] = useState<'pending' | 'accepted' | 'countered' | 'rejected' | null>(null);
+  const [vendorCounterAmount, setVendorCounterAmount] = useState<number | null>(null);
+  const [buyNegotiationRound, setBuyNegotiationRound] = useState(0);
+  const [isVendorThinking, setIsVendorThinking] = useState(false);
+  const [negotiationHistory, setNegotiationHistory] = useState<Array<{ type: 'player' | 'vendor'; amount: number; action: string }>>([]);
+  
+  // Counter-offer state (selling)
   const [counteringOfferId, setCounteringOfferId] = useState<string | null>(null);
   const [counterAmount, setCounterAmount] = useState<string>("");
 
@@ -154,6 +161,127 @@ export function EstateAgentWindow({
   const levelRestrictedCount = availableProperties.length - levelFilteredProperties.length;
   const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
 
+  // Reset negotiation when selecting a new property
+  const resetNegotiation = () => {
+    setVendorResponse(null);
+    setVendorCounterAmount(null);
+    setBuyNegotiationRound(0);
+    setIsVendorThinking(false);
+    setNegotiationHistory([]);
+  };
+
+  // Vendor negotiation logic
+  const submitOffer = (playerOffer: number, property: Property) => {
+    const marketValue = property.value;
+    const ratio = playerOffer / marketValue;
+    
+    setIsVendorThinking(true);
+    setNegotiationHistory(prev => [...prev, { type: 'player', amount: playerOffer, action: 'Offered' }]);
+
+    setTimeout(() => {
+      setIsVendorThinking(false);
+      const roll = Math.random();
+
+      if (ratio >= 1.0) {
+        // At or above market: instant accept
+        setVendorResponse('accepted');
+        setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+      } else if (ratio >= 0.95) {
+        if (roll < 0.80) {
+          setVendorResponse('accepted');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+        } else {
+          const counter = marketValue;
+          setVendorResponse('countered');
+          setVendorCounterAmount(counter);
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: counter, action: 'Countered' }]);
+        }
+      } else if (ratio >= 0.90) {
+        if (roll < 0.30) {
+          setVendorResponse('accepted');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+        } else if (roll < 0.80) {
+          const counter = Math.max(Math.floor(marketValue * 0.92), Math.floor(playerOffer + (marketValue - playerOffer) * 0.5));
+          setVendorResponse('countered');
+          setVendorCounterAmount(counter);
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: counter, action: 'Countered' }]);
+        } else {
+          setVendorResponse('rejected');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: 0, action: 'Rejected' }]);
+        }
+      } else if (ratio >= 0.85) {
+        if (roll < 0.10) {
+          setVendorResponse('accepted');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+        } else if (roll < 0.50) {
+          const counter = Math.max(Math.floor(marketValue * 0.92), Math.floor(playerOffer + (marketValue - playerOffer) * 0.6));
+          setVendorResponse('countered');
+          setVendorCounterAmount(counter);
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: counter, action: 'Countered' }]);
+        } else {
+          setVendorResponse('rejected');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: 0, action: 'Rejected' }]);
+        }
+      } else {
+        // Below 85%
+        if (roll < 0.05) {
+          setVendorResponse('accepted');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+        } else if (roll < 0.30) {
+          const counter = Math.max(Math.floor(marketValue * 0.92), Math.floor(playerOffer + (marketValue - playerOffer) * 0.7));
+          setVendorResponse('countered');
+          setVendorCounterAmount(counter);
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: counter, action: 'Countered' }]);
+        } else {
+          setVendorResponse('rejected');
+          setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: 0, action: 'Rejected' }]);
+        }
+      }
+      setBuyNegotiationRound(prev => prev + 1);
+    }, 1500);
+  };
+
+  const handleCounterVendor = () => {
+    if (!selectedBuyProperty || !vendorCounterAmount) return;
+    // Player submits a new counter - vendor reconsiders
+    // Each round vendor moves 30% toward player but never below 92% of market
+    const marketValue = selectedBuyProperty.value;
+    const playerOffer = offerAmount[0];
+    
+    setIsVendorThinking(true);
+    setNegotiationHistory(prev => [...prev, { type: 'player', amount: playerOffer, action: 'Countered' }]);
+
+    setTimeout(() => {
+      setIsVendorThinking(false);
+      const ratio = playerOffer / marketValue;
+      const roll = Math.random();
+      const round = buyNegotiationRound;
+      
+      // Acceptance chance increases each round
+      const acceptBonus = round * 0.15;
+      
+      if (ratio >= 0.95 || roll < (0.3 + acceptBonus)) {
+        setVendorResponse('accepted');
+        setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: playerOffer, action: 'Accepted' }]);
+      } else if (round >= 2) {
+        // Final round - take it or leave it
+        const finalOffer = Math.max(Math.floor(marketValue * 0.92), Math.floor(vendorCounterAmount - (vendorCounterAmount - playerOffer) * 0.3));
+        setVendorResponse('countered');
+        setVendorCounterAmount(finalOffer);
+        setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: finalOffer, action: 'Final offer' }]);
+      } else {
+        const newCounter = Math.max(
+          Math.floor(marketValue * 0.92),
+          Math.floor(vendorCounterAmount - (vendorCounterAmount - playerOffer) * 0.3)
+        );
+        setVendorResponse('countered');
+        setVendorCounterAmount(newCounter);
+        setNegotiationHistory(prev => [...prev, { type: 'vendor', amount: newCounter, action: 'Countered' }]);
+      }
+      setBuyNegotiationRound(prev => prev + 1);
+    }, 1500);
+  };
+
   // Generate offers for listed properties
   useEffect(() => {
     const interval = setInterval(() => {
@@ -162,58 +290,57 @@ export function EstateAgentWindow({
         if (!property) return;
 
         const currentTime = Date.now();
-        const timeSinceListing = (currentTime - listing.listingDate) / (1000 * 60 * 60 * 24); // days
+        const timeSinceListing = (currentTime - listing.listingDate) / (1000 * 60 * 60 * 24);
         const lastCheck = listing.lastOfferCheck || listing.listingDate;
-        const timeSinceLastCheckSeconds = (currentTime - lastCheck) / 1000; // seconds
+        const timeSinceLastCheckSeconds = (currentTime - lastCheck) / 1000;
 
         const marketValue = property.value;
         const askingPrice = listing.askingPrice || property.value;
         const priceRatio = askingPrice / marketValue;
         
-        // Dynamic timing: check interval based on pricing
-        // Below market: check every 3-5 seconds (fast offers)
-        // At market: check every 8-12 seconds
-        // Above market: check every 15-30 seconds (slow offers)
-        // Way above market (>120%): check every 30-60 seconds
+        // Dynamic timing based on pricing - expanded tiers
         let minCheckInterval: number;
         if (priceRatio <= 0.9) minCheckInterval = 3;
         else if (priceRatio <= 1.0) minCheckInterval = 5;
         else if (priceRatio <= 1.1) minCheckInterval = 10;
-        else if (priceRatio <= 1.2) minCheckInterval = 20;
-        else minCheckInterval = 40;
+        else if (priceRatio <= 1.3) minCheckInterval = 20;
+        else if (priceRatio <= 1.5) minCheckInterval = 40;
+        else minCheckInterval = 60;
         
         if (timeSinceLastCheckSeconds < minCheckInterval) return;
         
-        // Calculate offer chance - still higher for lower prices
-        let offerChance = 0.6; // Base 60% chance when check happens
+        // Offer chance - drops significantly for overpriced
+        let offerChance: number;
         if (priceRatio <= 0.9) offerChance = 0.85;
         else if (priceRatio <= 1.0) offerChance = 0.75;
         else if (priceRatio <= 1.1) offerChance = 0.55;
-        else if (priceRatio <= 1.2) offerChance = 0.35;
-        else offerChance = 0.20;
+        else if (priceRatio <= 1.3) offerChance = 0.30;
+        else if (priceRatio <= 1.5) offerChance = 0.20;
+        else offerChance = 0.12;
         
         if (Math.random() < offerChance) {
-          // Offers should gravitate toward market value
-          // The higher the asking price above market, the lower the offers relative to asking
           let offerAmount: number;
           
-          if (priceRatio > 1.3) {
-            // Way overpriced: offers cluster around 85-95% of market value
-            offerAmount = marketValue * (0.85 + Math.random() * 0.10);
-          } else if (priceRatio > 1.2) {
-            // Very overpriced: offers around 90-100% of market value
-            offerAmount = marketValue * (0.90 + Math.random() * 0.10);
+          if (priceRatio > 1.5) {
+            // Grossly overpriced: lowball offers 60-75% of market value
+            offerAmount = marketValue * (0.60 + Math.random() * 0.15);
+          } else if (priceRatio > 1.3) {
+            // Very overpriced: 70-85% of market value
+            offerAmount = marketValue * (0.70 + Math.random() * 0.15);
           } else if (priceRatio > 1.1) {
-            // Overpriced: offers around 92-102% of market value
-            offerAmount = marketValue * (0.92 + Math.random() * 0.10);
+            // Overpriced: 80-92% of market value
+            offerAmount = marketValue * (0.80 + Math.random() * 0.12);
           } else if (priceRatio >= 1.0) {
-            // At or slightly above market: offers 95-103% of market value
-            offerAmount = marketValue * (0.95 + Math.random() * 0.08);
+            // At or slightly above market: 88-98% of market value
+            offerAmount = marketValue * (0.88 + Math.random() * 0.10);
           } else if (priceRatio >= 0.95) {
-            // Slightly below market: offers at asking or slightly above
-            offerAmount = askingPrice * (0.98 + Math.random() * 0.07);
+            // Slightly below market: 95-103% of market value
+            offerAmount = marketValue * (0.95 + Math.random() * 0.08);
+          } else if (priceRatio >= 0.9) {
+            // Below market: competitive offers at or above asking
+            offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
           } else {
-            // Priced below market: competitive offers at or above asking
+            // Way below market: bidding war 100-108% of asking
             offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
           }
           
@@ -240,7 +367,7 @@ export function EstateAgentWindow({
           onAddOffer(listing.propertyId, newOffer);
         }
       });
-    }, 10000); // Check every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [propertyListings, ownedProperties, onAddOffer]);
@@ -383,6 +510,7 @@ export function EstateAgentWindow({
                   onClick={() => {
                     setSelectedBuyProperty(property);
                     setOfferAmount([property.value]);
+                    resetNegotiation();
                   }}
                 >
                   <CardHeader>
@@ -424,94 +552,242 @@ export function EstateAgentWindow({
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Offer Amount: £{offerAmount[0].toLocaleString()}</Label>
-                    <Slider
-                      value={offerAmount}
-                      onValueChange={setOfferAmount}
-                      min={Math.floor(selectedBuyProperty.value * 0.85)}
-                      max={Math.floor(selectedBuyProperty.value * 1.05)}
-                      step={1000}
-                    />
-                  </div>
+                  {/* Negotiation history */}
+                  {negotiationHistory.length > 0 && (
+                    <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                      <h4 className="text-sm font-semibold flex items-center gap-1">
+                        <MessageSquare className="h-4 w-4" />
+                        Negotiation
+                      </h4>
+                      {negotiationHistory.map((entry, i) => (
+                        <div key={i} className={`text-sm flex items-center gap-2 ${entry.type === 'vendor' ? 'justify-start' : 'justify-end'}`}>
+                          <Badge variant={entry.type === 'vendor' ? 'secondary' : 'default'} className="text-xs">
+                            {entry.type === 'vendor' ? 'Vendor' : 'You'}
+                          </Badge>
+                          <span>
+                            {entry.action}{entry.amount > 0 ? `: £${entry.amount.toLocaleString()}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                      {isVendorThinking && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Vendor considering your offer...
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label>Mortgage: {mortgagePercentage[0]}%</Label>
-                    <Slider
-                      value={mortgagePercentage}
-                      onValueChange={setMortgagePercentage}
-                      min={0}
-                      max={75}
-                      step={5}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
-                    </p>
-                  </div>
-
-                  {mortgagePercentage[0] > 0 && (
-                    <>
+                  {/* Vendor accepted */}
+                  {vendorResponse === 'accepted' && (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg border-2 border-green-500 bg-green-500/10 text-center">
+                        <Check className="h-6 w-6 mx-auto mb-1 text-green-600" />
+                        <p className="font-semibold">Offer Accepted!</p>
+                        <p className="text-sm text-muted-foreground">
+                          The vendor accepted £{offerAmount[0].toLocaleString()}
+                        </p>
+                      </div>
+                      
+                      {/* Mortgage options before completing */}
                       <div className="space-y-2">
-                        <Label>Mortgage Provider</Label>
-                        <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select provider" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mortgageProviders.map(provider => (
-                              <SelectItem key={provider.id} value={provider.id}>
-                                {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Mortgage: {mortgagePercentage[0]}%</Label>
+                        <Slider
+                          value={mortgagePercentage}
+                          onValueChange={setMortgagePercentage}
+                          min={0}
+                          max={75}
+                          step={5}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
+                        </p>
                       </div>
 
+                      {mortgagePercentage[0] > 0 && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Mortgage Provider</Label>
+                            <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select provider" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mortgageProviders.map(provider => (
+                                  <SelectItem key={provider.id} value={provider.id}>
+                                    {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Term: {termYears} years</Label>
+                            <Slider
+                              value={[termYears]}
+                              onValueChange={(v) => setTermYears(v[0])}
+                              min={5}
+                              max={30}
+                              step={5}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Mortgage Type</Label>
+                            <Select value={mortgageType} onValueChange={(v: any) => setMortgageType(v)}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="repayment">Repayment</SelectItem>
+                                <SelectItem value="interest-only">Interest Only</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          onBuyProperty(
+                            selectedBuyProperty,
+                            offerAmount[0],
+                            mortgagePercentage[0],
+                            selectedProvider,
+                            termYears,
+                            mortgageType
+                          );
+                          setSelectedBuyProperty(null);
+                          resetNegotiation();
+                          setIsOpen(false);
+                        }}
+                        disabled={mortgagePercentage[0] > 0 && !selectedProvider}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Complete Purchase - £{offerAmount[0].toLocaleString()}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Vendor countered */}
+                  {vendorResponse === 'countered' && vendorCounterAmount && !isVendorThinking && (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg border-2 border-amber-500 bg-amber-500/10 text-center">
+                        <p className="font-semibold">Counter-Offer Received</p>
+                        <p className="text-lg font-bold">£{vendorCounterAmount.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {buyNegotiationRound >= 3 ? 'Final offer - take it or leave it' : `Round ${buyNegotiationRound} of 3`}
+                        </p>
+                      </div>
+                      
                       <div className="space-y-2">
-                        <Label>Term: {termYears} years</Label>
+                        <Label>Your Counter: £{offerAmount[0].toLocaleString()}</Label>
                         <Slider
-                          value={[termYears]}
-                          onValueChange={(v) => setTermYears(v[0])}
-                          min={5}
-                          max={30}
-                          step={5}
+                          value={offerAmount}
+                          onValueChange={setOfferAmount}
+                          min={Math.floor(selectedBuyProperty.value * 0.85)}
+                          max={vendorCounterAmount}
+                          step={1000}
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Mortgage Type</Label>
-                        <Select value={mortgageType} onValueChange={(v: any) => setMortgageType(v)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="repayment">Repayment</SelectItem>
-                            <SelectItem value="interest-only">Interest Only</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          variant="default"
+                          onClick={() => {
+                            setOfferAmount([vendorCounterAmount]);
+                            setVendorResponse('accepted');
+                            setNegotiationHistory(prev => [...prev, { type: 'player', amount: vendorCounterAmount, action: 'Accepted' }]);
+                          }}
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Accept £{vendorCounterAmount.toLocaleString()}
+                        </Button>
+                        {buyNegotiationRound < 3 && (
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={handleCounterVendor}
+                            disabled={isVendorThinking}
+                          >
+                            Counter at £{offerAmount[0].toLocaleString()}
+                          </Button>
+                        )}
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setSelectedBuyProperty(null);
+                            resetNegotiation();
+                          }}
+                        >
+                          <Ban className="h-4 w-4 mr-1" />
+                          Walk Away
+                        </Button>
                       </div>
-                    </>
+                    </div>
                   )}
 
-                  <Button
-                    className="w-full"
-                    onClick={() => {
-                      onBuyProperty(
-                        selectedBuyProperty,
-                        offerAmount[0],
-                        mortgagePercentage[0],
-                        selectedProvider,
-                        termYears,
-                        mortgageType
-                      );
-                      setSelectedBuyProperty(null);
-                      setIsOpen(false);
-                    }}
-                    disabled={mortgagePercentage[0] > 0 && !selectedProvider}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Buy Property
-                  </Button>
+                  {/* Vendor rejected */}
+                  {vendorResponse === 'rejected' && !isVendorThinking && (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-lg border-2 border-destructive bg-destructive/10 text-center">
+                        <X className="h-6 w-6 mx-auto mb-1 text-destructive" />
+                        <p className="font-semibold">Offer Rejected</p>
+                        <p className="text-sm text-muted-foreground">The vendor rejected your offer.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            resetNegotiation();
+                            setOfferAmount([selectedBuyProperty.value]);
+                          }}
+                        >
+                          Try New Offer
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setSelectedBuyProperty(null);
+                            resetNegotiation();
+                          }}
+                        >
+                          Walk Away
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Initial offer form - show when no negotiation is active */}
+                  {!vendorResponse && !isVendorThinking && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Offer Amount: £{offerAmount[0].toLocaleString()}</Label>
+                        <Slider
+                          value={offerAmount}
+                          onValueChange={setOfferAmount}
+                          min={Math.floor(selectedBuyProperty.value * 0.85)}
+                          max={Math.floor(selectedBuyProperty.value * 1.05)}
+                          step={1000}
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{Math.round((offerAmount[0] / selectedBuyProperty.value) * 100)}% of market value</span>
+                          <span>Market: £{selectedBuyProperty.value.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        className="w-full"
+                        onClick={() => submitOffer(offerAmount[0], selectedBuyProperty)}
+                        disabled={isVendorThinking}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Submit Offer
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
