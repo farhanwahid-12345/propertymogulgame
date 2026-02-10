@@ -88,7 +88,7 @@ export function EstateAgentWindow({
   creditScore = 650
 }: EstateAgentWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [newListingPrice, setNewListingPrice] = useState("");
+  const [newListingPrice, setNewListingPrice] = useState<number>(0);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [editingListing, setEditingListing] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
@@ -373,21 +373,11 @@ export function EstateAgentWindow({
   }, [propertyListings, ownedProperties, onAddOffer]);
 
   const handleListProperty = () => {
-    if (!selectedProperty || !newListingPrice) return;
+    if (!selectedProperty || newListingPrice <= 0) return;
 
-    const price = parseInt(newListingPrice);
-    if (isNaN(price) || price <= 0) {
-      toast({
-        title: "Invalid Price",
-        description: "Please enter a valid asking price.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    onListProperty(selectedProperty.id, price);
+    onListProperty(selectedProperty.id, newListingPrice);
     setSelectedProperty(null);
-    setNewListingPrice("");
+    setNewListingPrice(0);
   };
 
   const handleUpdatePrice = (propertyId: string) => {
@@ -442,8 +432,24 @@ export function EstateAgentWindow({
 
   const setPriceFromEstimate = (multiplier: number) => {
     if (selectedProperty) {
-      setNewListingPrice(Math.floor(selectedProperty.value * multiplier).toString());
+      setNewListingPrice(Math.floor(selectedProperty.value * multiplier));
     }
+  };
+
+  const getPricingGuidance = (ratio: number) => {
+    if (ratio < 0.95) return { message: "Below market — expect a bidding war with fast offers", color: "text-green-600", bg: "bg-green-50" };
+    if (ratio <= 1.0) return { message: "At market value — offers will come quickly", color: "text-green-600", bg: "bg-green-50" };
+    if (ratio <= 1.1) return { message: "Slightly above market — offers will be slower", color: "text-yellow-600", bg: "bg-yellow-50" };
+    if (ratio <= 1.3) return { message: "Overpriced — expect low offers well below asking", color: "text-orange-600", bg: "bg-orange-50" };
+    return { message: "Significantly overpriced — very rare, very low offers", color: "text-red-600", bg: "bg-red-50" };
+  };
+
+  const getExpectedOfferRange = (marketValue: number, ratio: number) => {
+    if (ratio < 0.9) return { low: Math.floor(marketValue * ratio), high: Math.floor(marketValue * ratio * 1.08), speed: "Every few seconds" };
+    if (ratio <= 1.0) return { low: Math.floor(marketValue * 0.95), high: Math.floor(marketValue * 1.03), speed: "Every 5-10s" };
+    if (ratio <= 1.1) return { low: Math.floor(marketValue * 0.88), high: Math.floor(marketValue * 0.98), speed: "Every 10-15s" };
+    if (ratio <= 1.3) return { low: Math.floor(marketValue * 0.80), high: Math.floor(marketValue * 0.92), speed: "Every 20-30s" };
+    return { low: Math.floor(marketValue * 0.70), high: Math.floor(marketValue * 0.85), speed: "Every 40-60s" };
   };
 
   const unlistedProperties = ownedProperties.filter(
@@ -806,9 +812,9 @@ export function EstateAgentWindow({
                     <Select
                       value={selectedProperty?.id || ""}
                       onValueChange={(id) => {
-                        const prop = unlistedProperties.find(p => p.id === id);
+                       const prop = unlistedProperties.find(p => p.id === id);
                         setSelectedProperty(prop || null);
-                        if (prop) setNewListingPrice(prop.value.toString());
+                        if (prop) setNewListingPrice(prop.value);
                       }}
                     >
                       <SelectTrigger>
@@ -824,34 +830,73 @@ export function EstateAgentWindow({
                     </Select>
                   </div>
 
-                  {selectedProperty && (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Asking Price</Label>
-                        <Input
-                          type="number"
-                          value={newListingPrice}
-                          onChange={(e) => setNewListingPrice(e.target.value)}
-                          placeholder="Enter asking price"
-                        />
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(0.95)}>
-                            95% (£{Math.floor(selectedProperty.value * 0.95).toLocaleString()})
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(1.0)}>
-                            100% (£{selectedProperty.value.toLocaleString()})
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setPriceFromEstimate(1.05)}>
-                            105% (£{Math.floor(selectedProperty.value * 1.05).toLocaleString()})
-                          </Button>
+                  {selectedProperty && (() => {
+                    const priceRatio = newListingPrice / selectedProperty.value;
+                    const guidance = getPricingGuidance(priceRatio);
+                    const offerRange = getExpectedOfferRange(selectedProperty.value, priceRatio);
+                    return (
+                      <>
+                        {/* Property details */}
+                        <div className="grid grid-cols-2 gap-2 text-sm bg-muted/50 rounded-lg p-3">
+                          <div><span className="text-muted-foreground">Type:</span> <span className="font-medium capitalize">{selectedProperty.type}</span></div>
+                          <div><span className="text-muted-foreground">Area:</span> <span className="font-medium">{selectedProperty.neighborhood}</span></div>
+                          <div><span className="text-muted-foreground">Market Value:</span> <span className="font-medium">£{selectedProperty.value.toLocaleString()}</span></div>
+                          <div><span className="text-muted-foreground">Rent:</span> <span className="font-medium text-green-600">£{selectedProperty.monthlyIncome}/mo</span></div>
                         </div>
-                      </div>
 
-                      <Button onClick={handleListProperty} className="w-full">
-                        List Property
-                      </Button>
-                    </>
-                  )}
+                        {/* Slider-based asking price */}
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-baseline">
+                            <Label className="text-base font-semibold">Asking Price</Label>
+                            <div className="text-right">
+                              <span className="text-xl font-bold">£{newListingPrice.toLocaleString()}</span>
+                              <span className="text-sm text-muted-foreground ml-2">({Math.round(priceRatio * 100)}%)</span>
+                            </div>
+                          </div>
+                          <Slider
+                            value={[newListingPrice]}
+                            onValueChange={(vals) => setNewListingPrice(vals[0])}
+                            min={Math.floor(selectedProperty.value * 0.85)}
+                            max={Math.floor(selectedProperty.value * 1.5)}
+                            step={1000}
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>85% (£{Math.floor(selectedProperty.value * 0.85).toLocaleString()})</span>
+                            <span>150% (£{Math.floor(selectedProperty.value * 1.5).toLocaleString()})</span>
+                          </div>
+
+                          {/* Quick preset buttons */}
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[0.90, 0.95, 1.0, 1.1, 1.2].map(mult => (
+                              <Button
+                                key={mult}
+                                size="sm"
+                                variant={Math.abs(priceRatio - mult) < 0.01 ? "default" : "outline"}
+                                onClick={() => setPriceFromEstimate(mult)}
+                                className="text-xs"
+                              >
+                                {Math.round(mult * 100)}%
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Pricing guidance */}
+                        <div className={`rounded-lg p-3 ${guidance.bg} border`}>
+                          <p className={`text-sm font-medium ${guidance.color}`}>
+                            {guidance.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Expected offers: £{offerRange.low.toLocaleString()} – £{offerRange.high.toLocaleString()} • {offerRange.speed}
+                          </p>
+                        </div>
+
+                        <Button onClick={handleListProperty} className="w-full">
+                          List Property for £{newListingPrice.toLocaleString()}
+                        </Button>
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
@@ -871,27 +916,44 @@ export function EstateAgentWindow({
                     const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
                     const askingPrice = listing.askingPrice || property.value;
                     const priceRatio = askingPrice / property.value;
-                    const priceIndicator = priceRatio > 1.1 ? 'Overpriced - slow offers' 
-                      : priceRatio > 1.0 ? 'Above market'
-                      : priceRatio >= 0.95 ? 'At market'
-                      : 'Below market - fast offers';
+                    const guidance = getPricingGuidance(priceRatio);
+                    const expectedOffers = getExpectedOfferRange(property.value, priceRatio);
 
                     return (
                       <Card key={listing.propertyId} className="border-2">
-                        <CardHeader>
+                        <CardHeader className="pb-3">
                           <div className="flex justify-between items-start">
                             <div>
                               <CardTitle className="text-lg">{property.name}</CardTitle>
                               <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
                             </div>
-                            <Badge variant="secondary">{daysOnMarket} days on market</Badge>
+                            <div className="flex gap-1.5">
+                              <Badge variant="secondary">{daysOnMarket}d on market</Badge>
+                              <Badge variant={priceRatio > 1.1 ? 'destructive' : priceRatio < 0.95 ? 'default' : 'secondary'}>
+                                {Math.round(priceRatio * 100)}% of market
+                              </Badge>
+                            </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                          {/* Market Value Info */}
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Market Value:</span>
-                            <span className="font-medium">£{property.value.toLocaleString()}</span>
+                        <CardContent className="space-y-3">
+                          {/* Price comparison */}
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="bg-muted/50 rounded p-2">
+                              <span className="text-muted-foreground text-xs">Market Value</span>
+                              <p className="font-medium">£{property.value.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-muted/50 rounded p-2">
+                              <span className="text-muted-foreground text-xs">Asking Price</span>
+                              <p className="font-bold">£{askingPrice.toLocaleString()}</p>
+                            </div>
+                          </div>
+
+                          {/* Pricing guidance for this listing */}
+                          <div className={`rounded p-2 text-xs ${guidance.bg} border`}>
+                            <p className={`font-medium ${guidance.color}`}>{guidance.message}</p>
+                            <p className="text-muted-foreground mt-0.5">
+                              Expected offers: £{expectedOffers.low.toLocaleString()} – £{expectedOffers.high.toLocaleString()} • {expectedOffers.speed}
+                            </p>
                           </div>
                           
                           <div className="flex justify-between items-center">
@@ -928,13 +990,6 @@ export function EstateAgentWindow({
                             )}
                           </div>
                           
-                          {/* Pricing indicator */}
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground">Pricing Strategy:</span>
-                            <Badge variant={priceRatio > 1.1 ? 'destructive' : priceRatio < 0.95 ? 'default' : 'secondary'}>
-                              {priceIndicator} ({Math.round(priceRatio * 100)}%)
-                            </Badge>
-                          </div>
 
                           {/* Auto-Accept Threshold */}
                           <div className="border-t pt-3 space-y-2">
