@@ -1,118 +1,74 @@
 
 
-# Realistic Negotiation System for Buying and Selling
+# Fix Selling Price Exploits and Improve Estate Agent UI
 
-## Overview
+## Problem
 
-Two problems to fix:
-1. **Buying**: You can slide the offer down to 85% and it always gets accepted instantly -- no vendor pushback
-2. **Selling**: Offers cluster too close to asking price even when it's far above market value
+The selling interface allows users to type any asking price (e.g. £1,590,000 for a £159,000 property) with no guardrails. While the offer generation code does anchor to market value, the UI makes it too easy to set absurd prices and doesn't clearly communicate consequences.
 
----
+Additionally, the overall selling UI is basic -- a raw number input with small preset buttons.
 
-## Buying: Vendor Counter-Offer System
+## Changes
 
-Currently, clicking "Buy Property" at any slider price instantly purchases the property. Instead, the vendor should respond realistically:
+### 1. Cap the Asking Price (max 150% of market value)
 
-### How It Will Work
+Replace the free-text number input with a **slider** capped at 85%-150% of market value. This prevents the exploit entirely:
 
-1. You select a property and set your offer amount using the slider
-2. You click "Submit Offer" (renamed from "Buy Property")
-3. The vendor responds based on how your offer compares to market value:
+- Minimum asking price: 85% of market value
+- Maximum asking price: 150% of market value
+- Default: 100% of market value
+- Preset buttons updated: 90%, 95%, 100%, 110%, 120%
 
-| Your Offer vs Market Value | Vendor Response |
+The slider shows the current percentage of market value and the pound amount.
+
+### 2. Add Pricing Guidance to Sell UI
+
+Below the slider, show a dynamic tip based on the selected price:
+
+| Range | Message |
 |---|---|
-| 100%+ | Instant acceptance |
-| 95-99% | 80% accept, 20% counter at asking price |
-| 90-94% | 30% accept, 50% counter (split difference), 20% reject |
-| 85-89% | 10% accept, 40% counter, 50% reject |
-| Below 85% | 5% accept, 25% counter, 70% reject |
+| 85-94% | "Below market -- expect a bidding war with fast offers" |
+| 95-100% | "At market value -- offers will come quickly" |
+| 101-110% | "Slightly above market -- offers will be slower" |
+| 111-130% | "Overpriced -- expect low offers well below asking" |
+| 131-150% | "Significantly overpriced -- very rare, very low offers" |
 
-4. If the vendor counters, you see their counter-offer and can:
-   - **Accept** their counter (purchase proceeds at their price)
-   - **Counter again** (up to 3 rounds total)
-   - **Walk away** (no purchase)
+### 3. Add Market Value Context to Active Listings
 
-5. Each negotiation round, the vendor moves slightly toward your price but never below ~92% of market value
+For each active listing, show:
+- A clearer comparison between asking price and market value (as a percentage badge)
+- Expected offer range based on current pricing tier
+- A visual indicator (color-coded progress bar or badge) showing how realistic the asking price is
 
-### UI Changes
+### 4. Improve Overall Sell Tab Layout
 
-- Replace "Buy Property" button with "Submit Offer"
-- Add a negotiation panel that shows the back-and-forth
-- Show vendor response with a brief delay (1-2 seconds) for realism
-- Display negotiation status: "Vendor considering...", "Counter-offer received", etc.
-
----
-
-## Selling: More Realistic Offer Amounts
-
-Current problem: even if you list at 200% of market value, offers come in at 85-95% of market value, which is still close to reasonable. The issue is offers should be even lower relative to asking when the price is truly unrealistic.
-
-### Changes to Offer Generation
-
-The existing offer logic (lines 196-218 of estate-agent-window.tsx) will be updated:
-
-| Asking Price vs Market | Offer Range | Speed |
-|---|---|---|
-| Below 90% of market | 100-108% of asking (bidding war) | Every 3-5 seconds |
-| 90-100% of market | 95-103% of market value | Every 5-10 seconds |
-| 100-110% of market | 88-98% of market value | Every 10-15 seconds |
-| 110-130% of market | 80-92% of market value | Every 20-30 seconds |
-| 130-150% of market | 70-85% of market value | Every 40-60 seconds |
-| Over 150% of market | 60-75% of market value (lowball) | Every 60-90 seconds |
-
-Key difference: when the asking price is ridiculous, offers anchor to market value and go significantly below it, not near asking price. Buyers in the real world don't offer close to an absurd asking price.
+- Show property details (type, neighbourhood, current tenant, monthly income) when selected
+- Use a card-based layout for the listing form instead of bare inputs
+- Add an "Estimated offer range" preview before listing (e.g. "At this price, expect offers around £X-£Y")
 
 ---
 
-## Technical Implementation
+## Technical Details
 
-### Files to Modify
+### File: `src/components/ui/estate-agent-window.tsx`
 
-**1. `src/components/ui/estate-agent-window.tsx`**
+**Sell form (lines 796-857):**
+- Replace the `<Input type="number">` for asking price with a `<Slider>` component
+  - `min={Math.floor(selectedProperty.value * 0.85)}`
+  - `max={Math.floor(selectedProperty.value * 1.5)}`
+  - `step={1000}`
+- Add a `listingPrice` state as `number[]` (for slider) instead of string
+- Show percentage of market value and pound amount as labels
+- Add pricing guidance text that updates dynamically based on selected percentage
+- Update preset buttons to: 90%, 95%, 100%, 110%, 120%
+- Add an "Expected offers" preview showing the offer range the player can expect
 
-- Add buying negotiation state: `vendorResponse`, `negotiationRound`, `isNegotiating`, `vendorCounterAmount`
-- Replace instant buy with offer submission that triggers vendor response
-- Add negotiation UI panel showing offer history and vendor responses
-- Update selling offer generation ranges (lines 196-218) to be more market-anchored for overpriced listings
-- Adjust check intervals for very overpriced properties (add 40-90 second tiers)
+**Active listings section (lines 860-1240):**
+- Add expected offer range display based on current asking price vs market value
+- Improve the pricing strategy badge with more descriptive text and color coding
+- Show the offer range buyers would typically offer at current price
 
-**2. `src/pages/Index.tsx`**
+**Validation:**
+- Remove the free-text input entirely -- slider enforces the 85%-150% cap
+- The `handleListProperty` function will use the slider value directly
 
-- No changes needed -- `onBuyProperty` and `buyPropertyAtPrice` already support custom prices
-
-### New Buying Flow (in estate-agent-window.tsx)
-
-```
-State additions:
-- vendorResponse: 'pending' | 'accepted' | 'countered' | 'rejected' | null
-- vendorCounterAmount: number | null  
-- buyNegotiationRound: number
-- isVendorThinking: boolean
-
-On "Submit Offer":
-1. Set isVendorThinking = true
-2. After 1.5s delay, calculate vendor response based on offer/value ratio
-3. If accepted: call onBuyProperty with offer amount
-4. If countered: show vendor's counter-offer, let player accept/counter/walk away
-5. If rejected: show rejection message, let player try new offer
-
-Vendor counter-offer logic:
-- Vendor counters at: marketValue - (marketValue - playerOffer) * 0.3
-  (Vendor moves 30% toward your price each round)
-- Vendor never goes below 92% of market value
-- Max 3 rounds before vendor gives final "take it or leave it"
-```
-
-### Updated Selling Offer Logic
-
-Replace lines 196-218 with wider offer ranges that anchor more strongly to market value, especially for grossly overpriced properties. Add two new pricing tiers for 130-150% and 150%+ overpriced listings where offers come in dramatically lower.
-
----
-
-## Expected Outcomes
-
-- **Buying**: You can no longer get properties at 85% of value easily; vendors will negotiate and most hold out for close to market value
-- **Selling overpriced**: Listing at double the market value will result in very rare, very low offers rather than offers near market value
-- **Selling underpriced**: Listing below market generates a flurry of competitive offers above asking
-- **Realistic feel**: Both buying and selling involve genuine negotiation rather than instant transactions
