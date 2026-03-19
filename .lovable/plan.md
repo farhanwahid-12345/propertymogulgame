@@ -1,134 +1,74 @@
 
 
-# Fix Selling Offer Generation to Anchor to Market Value
+# Fix Selling Price Exploits and Improve Estate Agent UI
 
 ## Problem
 
-Two issues found:
+The selling interface allows users to type any asking price (e.g. £1,590,000 for a £159,000 property) with no guardrails. While the offer generation code does anchor to market value, the UI makes it too easy to set absurd prices and doesn't clearly communicate consequences.
 
-1. **"Reduce Price 7%" generates offers based on asking price, not market value.** The code at line 2088 in `useGameState.ts` uses `0.92 + Math.random() * 0.13` multiplied by the *new asking price*. So a property worth £60,000 listed at £83,700, reduced to £77,841, gets offers of £71,614-£81,733 -- all far above market value.
+Additionally, the overall selling UI is basic -- a raw number input with small preset buttons.
 
-2. **The user wants 70%+ of offers to cluster around market value**, with the remainder spread above and below for variability.
+## Changes
 
-## Solution
+### 1. Cap the Asking Price (max 150% of market value)
 
-### 1. Fix "Reduce Price" Offer Generation (`useGameState.ts`, lines 2086-2100)
+Replace the free-text number input with a **slider** capped at 85%-150% of market value. This prevents the exploit entirely:
 
-Replace the current logic that uses `newPrice * priceMultiplier` with market-value-anchored logic:
+- Minimum asking price: 85% of market value
+- Maximum asking price: 150% of market value
+- Default: 100% of market value
+- Preset buttons updated: 90%, 95%, 100%, 110%, 120%
 
-- 70% of offers: within 90-105% of **market value**
-- 15% of offers: below market value (80-90%)
-- 15% of offers: above market value (105-115%) but capped at the new asking price
+The slider shows the current percentage of market value and the pound amount.
 
-```text
-Before:
-  priceMultiplier = 0.92 + Math.random() * 0.13  // 92-105% of asking
-  amount = newPrice * priceMultiplier
+### 2. Add Pricing Guidance to Sell UI
 
-After:
-  roll = Math.random()
-  if roll < 0.70:  amount = marketValue * (0.90 + Math.random() * 0.15)  // 90-105%
-  elif roll < 0.85: amount = marketValue * (0.80 + Math.random() * 0.10) // 80-90%
-  else:             amount = marketValue * (1.05 + Math.random() * 0.10) // 105-115%
-  amount = min(amount, newPrice)  // Never exceed asking price
-```
+Below the slider, show a dynamic tip based on the selected price:
 
-Also increase the number of immediate offers from 1-2 to 1-3 to make the price reduction feel impactful.
+| Range | Message |
+|---|---|
+| 85-94% | "Below market -- expect a bidding war with fast offers" |
+| 95-100% | "At market value -- offers will come quickly" |
+| 101-110% | "Slightly above market -- offers will be slower" |
+| 111-130% | "Overpriced -- expect low offers well below asking" |
+| 131-150% | "Significantly overpriced -- very rare, very low offers" |
 
-### 2. Fix Periodic Offer Generation (`estate-agent-window.tsx`, lines 322-345)
+### 3. Add Market Value Context to Active Listings
 
-Apply the same 70/15/15 distribution within each pricing tier. Currently the tiers correctly anchor to market value, but offers within each tier are uniformly distributed. Update each tier to use the weighted distribution:
+For each active listing, show:
+- A clearer comparison between asking price and market value (as a percentage badge)
+- Expected offer range based on current pricing tier
+- A visual indicator (color-coded progress bar or badge) showing how realistic the asking price is
 
-- For overpriced listings (priceRatio > 1.1): 70% of offers at 88-100% of market, 15% at 78-88%, 15% at 100-108%
-- For fairly priced listings (0.95-1.1): 70% of offers at 93-103% of market, 15% at 88-93%, 15% at 103-108%
-- For underpriced listings (< 0.95): keep the bidding war logic as-is (offers above asking)
+### 4. Improve Overall Sell Tab Layout
 
-### 3. No UI changes needed
-
-The UI already shows market value, asking price, and expected offer ranges correctly. The fix is purely in the offer amount calculations.
+- Show property details (type, neighbourhood, current tenant, monthly income) when selected
+- Use a card-based layout for the listing form instead of bare inputs
+- Add an "Estimated offer range" preview before listing (e.g. "At this price, expect offers around £X-£Y")
 
 ---
 
 ## Technical Details
 
-### File: `src/hooks/useGameState.ts` (lines 2086-2100)
+### File: `src/components/ui/estate-agent-window.tsx`
 
-Replace the offer generation in `reduceListingPrice`:
+**Sell form (lines 796-857):**
+- Replace the `<Input type="number">` for asking price with a `<Slider>` component
+  - `min={Math.floor(selectedProperty.value * 0.85)}`
+  - `max={Math.floor(selectedProperty.value * 1.5)}`
+  - `step={1000}`
+- Add a `listingPrice` state as `number[]` (for slider) instead of string
+- Show percentage of market value and pound amount as labels
+- Add pricing guidance text that updates dynamically based on selected percentage
+- Update preset buttons to: 90%, 95%, 100%, 110%, 120%
+- Add an "Expected offers" preview showing the offer range the player can expect
 
-```typescript
-const newOffers: PropertyOffer[] = [];
-const numNewOffers = Math.random() > 0.3 ? (Math.random() > 0.5 ? 3 : 2) : 1;
+**Active listings section (lines 860-1240):**
+- Add expected offer range display based on current asking price vs market value
+- Improve the pricing strategy badge with more descriptive text and color coding
+- Show the offer range buyers would typically offer at current price
 
-for (let i = 0; i < numNewOffers; i++) {
-  const roll = Math.random();
-  let offerAmount: number;
-
-  if (roll < 0.70) {
-    // 70% cluster around market value (90-105%)
-    offerAmount = property.value * (0.90 + Math.random() * 0.15);
-  } else if (roll < 0.85) {
-    // 15% below market (80-90%)
-    offerAmount = property.value * (0.80 + Math.random() * 0.10);
-  } else {
-    // 15% above market (105-115%)
-    offerAmount = property.value * (1.05 + Math.random() * 0.10);
-  }
-
-  // Never exceed the new asking price
-  offerAmount = Math.min(offerAmount, newPrice);
-
-  newOffers.push({
-    id: `offer-${Date.now()}-reduce-${i}`,
-    buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
-    amount: Math.floor(offerAmount),
-    daysOnMarket: 0,
-    isChainFree: Math.random() > 0.5,
-    mortgageApproved: Math.random() > 0.25,
-    timestamp: Date.now(),
-    status: 'pending',
-    negotiationRound: 0
-  });
-}
-```
-
-### File: `src/components/ui/estate-agent-window.tsx` (lines 322-345)
-
-Update the periodic offer generation to use weighted distribution. For each pricing tier, apply the 70/15/15 split anchored to market value:
-
-```typescript
-let offerAmount: number;
-const roll = Math.random();
-
-if (priceRatio > 1.3) {
-  // Very overpriced: most offers well below market
-  if (roll < 0.70) offerAmount = marketValue * (0.82 + Math.random() * 0.13); // 82-95%
-  else if (roll < 0.85) offerAmount = marketValue * (0.70 + Math.random() * 0.12); // 70-82%
-  else offerAmount = marketValue * (0.95 + Math.random() * 0.08); // 95-103%
-} else if (priceRatio > 1.1) {
-  // Overpriced: offers around market value
-  if (roll < 0.70) offerAmount = marketValue * (0.88 + Math.random() * 0.12); // 88-100%
-  else if (roll < 0.85) offerAmount = marketValue * (0.78 + Math.random() * 0.10); // 78-88%
-  else offerAmount = marketValue * (1.00 + Math.random() * 0.05); // 100-105%
-} else if (priceRatio >= 0.95) {
-  // Fairly priced: offers close to market
-  if (roll < 0.70) offerAmount = marketValue * (0.93 + Math.random() * 0.10); // 93-103%
-  else if (roll < 0.85) offerAmount = marketValue * (0.88 + Math.random() * 0.05); // 88-93%
-  else offerAmount = marketValue * (1.03 + Math.random() * 0.05); // 103-108%
-} else {
-  // Underpriced: bidding war above asking
-  offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
-}
-
-// Never exceed asking price for overpriced listings
-if (priceRatio > 1.0) {
-  offerAmount = Math.min(offerAmount, askingPrice);
-}
-```
-
-## Expected Outcome
-
-- A £60,000 property listed at £83,700 will get offers mostly around £54,000-£63,000 (near market value), not £77,000-£84,000
-- "Reduce Price 7%" still generates interest, but offers are anchored to the £60,000 market value
-- 70% of offers cluster around market value, with realistic spread above and below
-- Underpriced listings still generate competitive bidding wars above asking
+**Validation:**
+- Remove the free-text input entirely -- slider enforces the 85%-150% cap
+- The `handleListProperty` function will use the slider value directly
 
