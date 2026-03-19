@@ -320,28 +320,31 @@ export function EstateAgentWindow({
         
         if (Math.random() < offerChance) {
           let offerAmount: number;
+          const roll = Math.random();
           
-          if (priceRatio > 1.5) {
-            // Grossly overpriced: lowball offers 60-75% of market value
-            offerAmount = marketValue * (0.60 + Math.random() * 0.15);
-          } else if (priceRatio > 1.3) {
-            // Very overpriced: 70-85% of market value
-            offerAmount = marketValue * (0.70 + Math.random() * 0.15);
+          if (priceRatio > 1.3) {
+            // Very overpriced: most offers well below market
+            if (roll < 0.70) offerAmount = marketValue * (0.82 + Math.random() * 0.13); // 82-95%
+            else if (roll < 0.85) offerAmount = marketValue * (0.70 + Math.random() * 0.12); // 70-82%
+            else offerAmount = marketValue * (0.95 + Math.random() * 0.08); // 95-103%
           } else if (priceRatio > 1.1) {
-            // Overpriced: 80-92% of market value
-            offerAmount = marketValue * (0.80 + Math.random() * 0.12);
-          } else if (priceRatio >= 1.0) {
-            // At or slightly above market: 88-98% of market value
-            offerAmount = marketValue * (0.88 + Math.random() * 0.10);
+            // Overpriced: offers around market value
+            if (roll < 0.70) offerAmount = marketValue * (0.88 + Math.random() * 0.12); // 88-100%
+            else if (roll < 0.85) offerAmount = marketValue * (0.78 + Math.random() * 0.10); // 78-88%
+            else offerAmount = marketValue * (1.00 + Math.random() * 0.05); // 100-105%
           } else if (priceRatio >= 0.95) {
-            // Slightly below market: 95-103% of market value
-            offerAmount = marketValue * (0.95 + Math.random() * 0.08);
-          } else if (priceRatio >= 0.9) {
-            // Below market: competitive offers at or above asking
-            offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
+            // Fairly priced: offers close to market
+            if (roll < 0.70) offerAmount = marketValue * (0.93 + Math.random() * 0.10); // 93-103%
+            else if (roll < 0.85) offerAmount = marketValue * (0.88 + Math.random() * 0.05); // 88-93%
+            else offerAmount = marketValue * (1.03 + Math.random() * 0.05); // 103-108%
           } else {
-            // Way below market: bidding war 100-108% of asking
+            // Underpriced: bidding war above asking
             offerAmount = askingPrice * (1.0 + Math.random() * 0.08);
+          }
+          
+          // Never exceed asking price for overpriced listings
+          if (priceRatio > 1.0) {
+            offerAmount = Math.min(offerAmount, askingPrice);
           }
           
           const buyerNames = [
