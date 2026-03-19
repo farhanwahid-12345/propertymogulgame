@@ -1321,7 +1321,7 @@ export function useGameState() {
 
       // Check level restrictions for minimum value
       const { min: minValue } = getPropertyValueRangeForLevel(prev.level);
-      if (purchasePrice < minValue) {
+      if (property.value < minValue) {
         toast({
           title: "Property Too Cheap",
           description: `At level ${prev.level}, you can only buy properties worth £${minValue.toLocaleString()} or more!`,

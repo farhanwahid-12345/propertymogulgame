@@ -1,25 +1,74 @@
 
 
-# Allow Negotiated-Down Properties to Be Purchased
+# Fix Selling Price Exploits and Improve Estate Agent UI
 
 ## Problem
 
-In `buyPropertyAtPrice` (useGameState.ts, line 1324), the level restriction checks if `purchasePrice < minValue`. This means a Level 2 player who negotiates a £105,000 property down to £95,000 gets blocked because £95,000 < £100,000 (Level 2 minimum).
+The selling interface allows users to type any asking price (e.g. £1,590,000 for a £159,000 property) with no guardrails. While the offer generation code does anchor to market value, the UI makes it too easy to set absurd prices and doesn't clearly communicate consequences.
 
-The property itself is a valid Level 2 property — it's listed in the Level 2 range. The negotiated price should not disqualify it.
+Additionally, the overall selling UI is basic -- a raw number input with small preset buttons.
 
-## Fix
+## Changes
 
-**File: `src/hooks/useGameState.ts` (line 1324)**
+### 1. Cap the Asking Price (max 150% of market value)
 
-Change the validation from checking the **purchase price** against the level minimum to checking the **property's market value** instead:
+Replace the free-text number input with a **slider** capped at 85%-150% of market value. This prevents the exploit entirely:
 
-```
-Before: if (purchasePrice < minValue)
-After:  if (property.value < minValue)
-```
+- Minimum asking price: 85% of market value
+- Maximum asking price: 150% of market value
+- Default: 100% of market value
+- Preset buttons updated: 90%, 95%, 100%, 110%, 120%
 
-This way, if the property's market value falls within the player's level range, the purchase goes through regardless of the negotiated discount. A £105k property negotiated to £95k is still a valid Level 2 property.
+The slider shows the current percentage of market value and the pound amount.
 
-One line change, no other files affected.
+### 2. Add Pricing Guidance to Sell UI
+
+Below the slider, show a dynamic tip based on the selected price:
+
+| Range | Message |
+|---|---|
+| 85-94% | "Below market -- expect a bidding war with fast offers" |
+| 95-100% | "At market value -- offers will come quickly" |
+| 101-110% | "Slightly above market -- offers will be slower" |
+| 111-130% | "Overpriced -- expect low offers well below asking" |
+| 131-150% | "Significantly overpriced -- very rare, very low offers" |
+
+### 3. Add Market Value Context to Active Listings
+
+For each active listing, show:
+- A clearer comparison between asking price and market value (as a percentage badge)
+- Expected offer range based on current pricing tier
+- A visual indicator (color-coded progress bar or badge) showing how realistic the asking price is
+
+### 4. Improve Overall Sell Tab Layout
+
+- Show property details (type, neighbourhood, current tenant, monthly income) when selected
+- Use a card-based layout for the listing form instead of bare inputs
+- Add an "Estimated offer range" preview before listing (e.g. "At this price, expect offers around £X-£Y")
+
+---
+
+## Technical Details
+
+### File: `src/components/ui/estate-agent-window.tsx`
+
+**Sell form (lines 796-857):**
+- Replace the `<Input type="number">` for asking price with a `<Slider>` component
+  - `min={Math.floor(selectedProperty.value * 0.85)}`
+  - `max={Math.floor(selectedProperty.value * 1.5)}`
+  - `step={1000}`
+- Add a `listingPrice` state as `number[]` (for slider) instead of string
+- Show percentage of market value and pound amount as labels
+- Add pricing guidance text that updates dynamically based on selected percentage
+- Update preset buttons to: 90%, 95%, 100%, 110%, 120%
+- Add an "Expected offers" preview showing the offer range the player can expect
+
+**Active listings section (lines 860-1240):**
+- Add expected offer range display based on current asking price vs market value
+- Improve the pricing strategy badge with more descriptive text and color coding
+- Show the offer range buyers would typically offer at current price
+
+**Validation:**
+- Remove the free-text input entirely -- slider enforces the 85%-150% cap
+- The `handleListProperty` function will use the slider value directly
 
