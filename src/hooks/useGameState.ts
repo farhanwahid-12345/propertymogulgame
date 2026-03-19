@@ -2075,8 +2075,8 @@ export function useGameState() {
       const currentAskingPrice = listing.askingPrice || property.value;
       const newPrice = Math.floor(currentAskingPrice * (1 - reductionPercent));
       
-      // Generate 1-2 new immediate offers at the reduced price
-      const numNewOffers = Math.random() > 0.4 ? 2 : 1;
+      // Generate 1-3 new immediate offers anchored to MARKET VALUE
+      const numNewOffers = Math.random() > 0.3 ? (Math.random() > 0.5 ? 3 : 2) : 1;
       const buyerNames = [
         "Mr & Mrs Johnson", "Sarah Matthews", "David Chen", "Emma Wilson", 
         "The Thompson Family", "Investment Properties Ltd", "Michael Brown",
@@ -2085,11 +2085,27 @@ export function useGameState() {
       
       const newOffers: PropertyOffer[] = [];
       for (let i = 0; i < numNewOffers; i++) {
-        const priceMultiplier = 0.92 + (Math.random() * 0.13); // 92% to 105% of new price
+        const roll = Math.random();
+        let offerAmount: number;
+
+        if (roll < 0.70) {
+          // 70% cluster around market value (90-105%)
+          offerAmount = property.value * (0.90 + Math.random() * 0.15);
+        } else if (roll < 0.85) {
+          // 15% below market (80-90%)
+          offerAmount = property.value * (0.80 + Math.random() * 0.10);
+        } else {
+          // 15% above market (105-115%)
+          offerAmount = property.value * (1.05 + Math.random() * 0.10);
+        }
+
+        // Never exceed the new asking price
+        offerAmount = Math.min(offerAmount, newPrice);
+
         newOffers.push({
           id: `offer-${Date.now()}-reduce-${i}`,
           buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
-          amount: Math.floor(newPrice * priceMultiplier),
+          amount: Math.floor(offerAmount),
           daysOnMarket: 0,
           isChainFree: Math.random() > 0.5,
           mortgageApproved: Math.random() > 0.25,
