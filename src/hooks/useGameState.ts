@@ -532,11 +532,10 @@ export function useGameState() {
       setEstateAgentProperties(estate);
       setAuctionProperties(auction);
     } else if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
-      // First load - split properties
+      // First load - split properties (5 for auction)
       const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-      const first = shuffled[0];
-      const auctionProps = first ? [first] : [];
-      const estateProps = shuffled.slice(1);
+      const auctionProps = shuffled.slice(0, Math.min(5, shuffled.length));
+      const estateProps = shuffled.slice(auctionProps.length);
       setAuctionProperties(auctionProps);
       setEstateAgentProperties(estateProps);
       
