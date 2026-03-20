@@ -1528,7 +1528,7 @@ export function useGameState() {
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-    setAuctionProperties(shuffled.length ? [shuffled[0]] : []);
+    setAuctionProperties(shuffled.slice(0, Math.min(5, shuffled.length)));
     setEstateAgentProperties(shuffled.slice(1));
     localStorage.removeItem("propertyTycoonSave");
     
