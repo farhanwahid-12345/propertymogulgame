@@ -7,16 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Gavel, Clock, TrendingUp, ShoppingCart, Building2 } from "lucide-react";
+import { Gavel, Clock, TrendingUp, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface AuctionListing {
   property: Property;
   reservePrice: number;
   guidePrice: number;
-  listDate: number;
-  auctionDate: number;
+  listMonth: number; // monthsPlayed when listed
+  auctionMonth: number; // monthsPlayed when auction completes
   highestBid: number;
   bidderCount: number;
 }
@@ -44,9 +45,10 @@ interface AuctionHouseProps {
   mortgageProviders: any[];
   level: number;
   onAuctionPropertySold: (propertyId: string) => void;
+  creditScore?: number;
 }
 
-export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auctionProperties, onBuyProperty, cash, mortgageProviders, level, onAuctionPropertySold }: AuctionHouseProps) {
+export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auctionProperties, onBuyProperty, cash, mortgageProviders, level, onAuctionPropertySold, creditScore = 650 }: AuctionHouseProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [listings, setListings] = useState<AuctionListing[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -60,10 +62,40 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [auctioneerMessage, setAuctioneerMessage] = useState("");
   const [userMaxAutoBid, setUserMaxAutoBid] = useState<number | null>(null);
 
+  // Mortgage selection for buying
+  const [selectedMortgagePercent, setSelectedMortgagePercent] = useState<number>(0);
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("halifax");
+  const [selectedTermYears, setSelectedTermYears] = useState<number>(25);
+  const [selectedMortgageType, setSelectedMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+
   // Get properties that aren't already listed
   const unlistedProperties = ownedProperties.filter(
     prop => !listings.some(listing => listing.property.id === prop.id)
   );
+
+  // Calculate total budget with mortgage
+  const calculateTotalBudget = (propertyPrice: number) => {
+    if (selectedMortgagePercent === 0) return cash;
+    const mortgageAmount = propertyPrice * (selectedMortgagePercent / 100);
+    const stampDuty = propertyPrice <= 250000 ? propertyPrice * 0.03 : (250000 * 0.03) + ((propertyPrice - 250000) * 0.08);
+    const fees = 600 + (propertyPrice * 0.01) + stampDuty;
+    const deposit = propertyPrice - mortgageAmount;
+    const cashNeeded = deposit + fees;
+    return cashNeeded <= cash ? propertyPrice : cash; // Can afford this price with mortgage
+  };
+
+  const getMaxBidWithMortgage = () => {
+    if (selectedMortgagePercent === 0) return cash;
+    // Max property price where deposit + fees <= cash
+    // deposit = price * (1 - mortgage%), fees ≈ price * 0.04 + 600
+    const depositFraction = 1 - (selectedMortgagePercent / 100);
+    const feeFraction = 0.04; // approx stamp duty + mortgage fee
+    const maxPrice = Math.floor((cash - 600) / (depositFraction + feeFraction));
+    return Math.max(0, maxPrice);
+  };
+
+  // Eligible mortgage providers based on credit score
+  const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
 
   // Live auction timer with precise 30-second timing
   useEffect(() => {
@@ -83,9 +115,8 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
           if (prev.currentBid >= prev.reservePrice) {
             if (isUserWinner) {
-              // Purchase will validate funds and ownership in buyPropertyAtPrice
-              onBuyProperty(prev.property, prev.currentBid, 0);
-              // Don't remove from auction properties yet - let buyPropertyAtPrice handle it
+              // Pass mortgage details through to purchase
+              onBuyProperty(prev.property, prev.currentBid, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType);
             } else {
               toast({
                 title: "Auction Lost",
@@ -114,23 +145,20 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
         let newState = { ...prev };
         
-        // AI bidding logic - more frequent but realistic
+        // AI bidding logic
         if (timeSinceLastBid > 800 && Math.random() < 0.85) {
-          const minInc = Math.max(1000, Math.floor(prev.property.price * 0.005));
-          const maxInc = Math.max(minInc, Math.floor(prev.property.price * 0.025));
+          const minInc = Math.max(1000, Math.floor(prev.property.value * 0.005));
+          const maxInc = Math.max(minInc, Math.floor(prev.property.value * 0.025));
 
-          // Select random AI bidder with their own behavior
           const ai = prev.aiBidders[Math.floor(Math.random() * prev.aiBidders.length)];
           const bidProb = 0.12 + (ai.aggression * 0.25) + endgameBoost;
 
           if (Math.random() < bidProb) {
-            // Calculate bid increment with some randomness
             const baseInc = minInc + Math.floor(Math.random() * (maxInc - minInc + 1));
-            const varianceMultiplier = 0.8 + Math.random() * 0.4; // 80% to 120%
+            const varianceMultiplier = 0.8 + Math.random() * 0.4;
             const inc = Math.floor(baseInc * varianceMultiplier);
             const candidateBid = prev.currentBid + inc;
             
-            // Each AI has their own max valuation and overbid tendency
             const maxWilling = ai.valuation * (Math.random() < ai.overbidChance ? 1.05 + Math.random() * 0.1 : 1);
 
             if (candidateBid <= maxWilling && candidateBid > prev.currentBid) {
@@ -152,11 +180,12 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
               setAuctioneerMessage(`${bidderName} bids £${candidateBid.toLocaleString()}`);
 
               // Auto-bid logic for user
+              const maxBudget = getMaxBidWithMortgage();
               setTimeout(() => {
-                const minAutoInc = Math.max(1000, Math.floor(prev.property.price * 0.005));
+                const minAutoInc = Math.max(1000, Math.floor(prev.property.value * 0.005));
                 const autoBid = candidateBid + minAutoInc;
                 
-                if (userMaxAutoBid && autoBid <= userMaxAutoBid && cash >= autoBid) {
+                if (userMaxAutoBid && autoBid <= userMaxAutoBid && autoBid <= maxBudget) {
                   setLiveAuction(current => {
                     if (!current || !current.isActive || current.currentBid !== candidateBid) return current;
                     
@@ -176,7 +205,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     };
                   });
                 }
-              }, 500); // Half second delay for auto-bid
+              }, 500);
             }
           }
         }
@@ -187,43 +216,66 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
         
         return newState;
       });
-    }, 100); // Update every 100ms for smooth countdown
+    }, 100);
 
     return () => clearInterval(interval);
-  }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold]);
+  }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType]);
 
-  // Monthly auction cycle for property listings
+  // Monthly auction cycle for property listings - uses monthsPlayed
   useEffect(() => {
-    setListings(prev => prev.map(listing => {
-      const timeToAuction = listing.auctionDate - Date.now();
+    setListings(prev => {
+      const completed: AuctionListing[] = [];
+      const active: AuctionListing[] = [];
       
-      if (timeToAuction <= 0) {
-        const finalPrice = Math.max(listing.highestBid, listing.reservePrice);
+      prev.forEach(listing => {
+        if (monthsPlayed >= listing.auctionMonth) {
+          completed.push(listing);
+        } else {
+          // Simulate bidding activity
+          if (Math.random() > 0.5) {
+            const bidIncrease = listing.property.value * (0.01 + Math.random() * 0.05);
+            active.push({
+              ...listing,
+              highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
+              bidderCount: listing.bidderCount + 1
+            });
+          } else {
+            active.push(listing);
+          }
+        }
+      });
+      
+      // Process completed auctions
+      completed.forEach(listing => {
+        // Generate final price using market-value-anchored 70/15/15 distribution
+        const marketValue = listing.property.value;
+        const roll = Math.random();
+        let finalPrice: number;
+        
+        if (roll < 0.70) {
+          // 70%: near market value (90-105%)
+          finalPrice = marketValue * (0.90 + Math.random() * 0.15);
+        } else if (roll < 0.85) {
+          // 15%: below market (80-90%)
+          finalPrice = marketValue * (0.80 + Math.random() * 0.10);
+        } else {
+          // 15%: above market (105-115%)
+          finalPrice = marketValue * (1.05 + Math.random() * 0.10);
+        }
+        
+        finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
         
         setTimeout(() => {
           onAuctionSale(listing.property.id, finalPrice);
           toast({
-            title: "Auction Complete!",
+            title: "Auction Complete! 🔨",
             description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
           });
-        }, 1000);
-        
-        return null;
-      }
+        }, 500);
+      });
       
-      if (Math.random() > 0.7) {
-        const bidIncrease = listing.guidePrice * (0.01 + Math.random() * 0.05);
-        return {
-          ...listing,
-          highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
-          bidderCount: listing.bidderCount + 1
-        };
-      }
-      
-      return listing;
-    }).filter(Boolean) as AuctionListing[]);
-
-    setListings(prev => prev.filter(listing => listing.auctionDate > Date.now()));
+      return active;
+    });
   }, [monthsPlayed]);
 
   const handleListForAuction = () => {
@@ -254,9 +306,9 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       property: selectedProperty,
       reservePrice: reserve,
       guidePrice: guide,
-      listDate: Date.now(),
-      auctionDate: Date.now() + (1 * 24 * 60 * 60 * 1000), // 1 day from now
-      highestBid: reserve * 0.8, // Start below reserve
+      listMonth: monthsPlayed,
+      auctionMonth: monthsPlayed + 1, // Sells next in-game month
+      highestBid: reserve * 0.8,
       bidderCount: Math.floor(Math.random() * 3) + 1
     };
 
@@ -267,42 +319,39 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
     toast({
       title: "Property Listed!",
-      description: `${selectedProperty.name} has been listed for auction.`,
+      description: `${selectedProperty.name} has been listed for auction. Sale completes next month.`,
     });
   };
 
   const startLiveAuction = (property: Property, isExpress: boolean = false) => {
-    const reservePrice = Math.floor(property.price * (isExpress ? 0.75 : 0.85)); // Lower reserve for express
+    // Use market value for all calculations
+    const reservePrice = Math.floor(property.value * (isExpress ? 0.75 : 0.85));
     const startingBid = Math.floor(reservePrice * 0.9);
-    const auctionDuration = isExpress ? 15_000 : 30_000; // 15 seconds for express, 30 for normal
+    const auctionDuration = isExpress ? 15_000 : 30_000;
     const endTime = Date.now() + auctionDuration;
 
-    // Generate realistic AI bidders with individual characteristics
     const bidderNames = [
       "Michael J.", "Sarah T.", "Property Investor Ltd", "James W.", 
       "Emma R.", "David L.", "Trinity Homes", "North East Holdings",
       "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
     ];
     
-    // Express auctions have fewer bidders
-    // 30% chance of a "cold auction" with fewer bidders and lower valuations
     const isColdAuction = Math.random() < 0.3;
     const baseBidderCount = isExpress ? 2 : 3;
     const maxExtraBidders = isExpress ? 2 : 5;
     const bidderCount = isColdAuction 
-      ? Math.floor(Math.random() * 2) + baseBidderCount // 2-3 for express cold, 3-4 for normal cold
-      : Math.floor(Math.random() * maxExtraBidders) + baseBidderCount; // 2-4 for express, 3-7 for normal
+      ? Math.floor(Math.random() * 2) + baseBidderCount
+      : Math.floor(Math.random() * maxExtraBidders) + baseBidderCount;
     
-    const coldAuctionPenalty = isColdAuction ? 0.10 : 0; // Reduce valuations by 10% for cold auctions
-    const expressPenalty = isExpress ? 0.05 : 0; // Additional 5% penalty for express
+    const coldAuctionPenalty = isColdAuction ? 0.10 : 0;
+    const expressPenalty = isExpress ? 0.05 : 0;
     
+    // AI valuations anchored to MARKET VALUE
     const aiBidders = Array.from({ length: bidderCount }, (_, i) => {
       const name = bidderNames[i % bidderNames.length];
-      // Each bidder has different valuation and behavior
-      // 70% - 110% of guide price
-      const baseValuation = property.price * (0.70 + Math.random() * 0.40);
-      const valuation = baseValuation * (1 - coldAuctionPenalty - expressPenalty); // Apply penalties
-      const aggression = isColdAuction || isExpress ? Math.random() * 0.7 : Math.random(); // Less aggressive
+      const baseValuation = property.value * (0.70 + Math.random() * 0.40); // 70-110% of market value
+      const valuation = baseValuation * (1 - coldAuctionPenalty - expressPenalty);
+      const aggression = isColdAuction || isExpress ? Math.random() * 0.7 : Math.random();
       const overbidChance = isColdAuction ? Math.random() * 0.1 : Math.random() * 0.25;
       return { name, valuation, aggression, overbidChance };
     });
@@ -325,7 +374,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       aiBidders
     });
     
-    setUserBidAmount([startingBid + Math.floor(property.price * 0.02)]);
+    setUserBidAmount([startingBid + Math.floor(property.value * 0.02)]);
     setUserMaxAutoBid(null);
     setAuctioneerMessage(`${isExpress ? '⚡ EXPRESS: ' : ''}Lot ${property.id}: ${property.name}. Starting at £${startingBid.toLocaleString()}`);
   };
@@ -333,10 +382,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const placeBid = () => {
     if (!liveAuction || !liveAuction.isActive || userBidAmount[0] <= liveAuction.currentBid) return;
     
-    if (cash < userBidAmount[0]) {
+    const maxBudget = getMaxBidWithMortgage();
+    if (userBidAmount[0] > maxBudget) {
       toast({
-        title: "Insufficient Funds",
-        description: "You don't have enough cash for this bid.",
+        title: "Exceeds Budget",
+        description: `Your maximum budget with ${selectedMortgagePercent}% mortgage is £${maxBudget.toLocaleString()}.`,
         variant: "destructive"
       });
       return;
@@ -357,12 +407,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     } : null);
 
     setAuctioneerMessage(`You bid £${userBidAmount[0].toLocaleString()}`);
-    setUserBidAmount([userBidAmount[0] + Math.floor(liveAuction.property.price * 0.02)]);
-  };
-
-  const getDaysUntilAuction = (auctionDate: number) => {
-    const timeDiff = auctionDate - Date.now();
-    return Math.max(0, Math.ceil(timeDiff / (24 * 60 * 60 * 1000)));
+    setUserBidAmount([userBidAmount[0] + Math.floor(liveAuction.property.value * 0.02)]);
   };
 
   const formatTime = (seconds: number) => {
@@ -370,6 +415,8 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const maxBudget = getMaxBidWithMortgage();
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -391,7 +438,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4" />
-              Buy Properties
+              Buy Properties ({auctionProperties.length})
             </TabsTrigger>
             <TabsTrigger value="sell" className="flex items-center gap-2">
               <Gavel className="h-4 w-4" />
@@ -400,6 +447,59 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
+            {/* Mortgage Selection - shown before entering auction */}
+            {!liveAuction && (
+              <Card className="border-blue-200 bg-blue-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Landmark className="h-4 w-4" />
+                    Financing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Mortgage %</Label>
+                      <Select value={selectedMortgagePercent.toString()} onValueChange={(v) => setSelectedMortgagePercent(Number(v))}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Cash Only (0%)</SelectItem>
+                          <SelectItem value="50">50% LTV</SelectItem>
+                          <SelectItem value="75">75% LTV</SelectItem>
+                          <SelectItem value="85">85% LTV</SelectItem>
+                          <SelectItem value="90">90% LTV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {selectedMortgagePercent > 0 && (
+                      <div>
+                        <Label className="text-xs">Provider</Label>
+                        <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {mortgageProviders.map((p: any) => (
+                              <SelectItem key={p.id} value={p.id} disabled={creditScore < p.minCreditScore || (selectedMortgagePercent / 100) > p.maxLTV}>
+                                {p.name} ({(p.baseRate * 100).toFixed(1)}%)
+                                {creditScore < p.minCreditScore ? ' ❌ Credit' : (selectedMortgagePercent / 100) > p.maxLTV ? ' ❌ LTV' : ' ✓'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Cash: £{cash.toLocaleString()}</span>
+                    <span className="font-medium">Max Budget: £{maxBudget.toLocaleString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Live Auction Interface */}
             {liveAuction && (
               <Card className="border-red-500 border-2 bg-red-50">
@@ -418,8 +518,13 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <div>
                       <h3 className="font-bold text-lg">{liveAuction.property.name}</h3>
                       <p className="text-sm text-muted-foreground">{liveAuction.property.neighborhood}</p>
-                      <p className="text-sm">Guide: £{liveAuction.property.price.toLocaleString()}</p>
+                      <p className="text-sm">Market Value: £{liveAuction.property.value.toLocaleString()}</p>
                       <p className="text-sm">Reserve: £{liveAuction.reservePrice.toLocaleString()}</p>
+                      {selectedMortgagePercent > 0 && (
+                        <p className="text-xs text-blue-600">
+                          Financing: {selectedMortgagePercent}% mortgage
+                        </p>
+                      )}
                       <Badge variant={liveAuction.currentBid >= liveAuction.reservePrice ? "default" : "destructive"}>
                         {liveAuction.currentBid >= liveAuction.reservePrice ? "Reserve Met" : "Below Reserve"}
                       </Badge>
@@ -434,6 +539,9 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                         <p className="text-sm text-muted-foreground">
                           {liveAuction.bidderCount} bidders registered
                         </p>
+                        <p className="text-xs text-muted-foreground">
+                          Your budget: £{maxBudget.toLocaleString()}
+                        </p>
                       </div>
                       
                       {liveAuction.isActive && (
@@ -442,15 +550,15 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           <Slider
                             value={userBidAmount}
                             onValueChange={setUserBidAmount}
-                            min={liveAuction.currentBid + Math.max(1000, Math.floor(liveAuction.property.price * 0.005))}
-                            max={Math.min(cash, liveAuction.property.price * 2)}
-                            step={Math.max(1000, Math.floor(liveAuction.property.price * 0.005))}
+                            min={liveAuction.currentBid + Math.max(1000, Math.floor(liveAuction.property.value * 0.005))}
+                            max={Math.min(maxBudget, liveAuction.property.value * 2)}
+                            step={Math.max(1000, Math.floor(liveAuction.property.value * 0.005))}
                             className="w-full"
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <Button 
                               onClick={placeBid}
-                              disabled={userBidAmount[0] <= liveAuction.currentBid || cash < userBidAmount[0]}
+                              disabled={userBidAmount[0] <= liveAuction.currentBid || userBidAmount[0] > maxBudget}
                               className="w-full bg-red-600 hover:bg-red-700"
                             >
                               Place Bid: £{userBidAmount[0].toLocaleString()}
@@ -527,10 +635,10 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-bold text-orange-600">
-                              £{property.price.toLocaleString()}
+                              £{property.value.toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Guide Price
+                              Market Value
                             </p>
                           </div>
                         </div>
@@ -539,7 +647,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           <div>
                             <span className="text-muted-foreground">Reserve:</span>
                             <span className="ml-1 font-medium">
-                              £{Math.floor(property.price * 0.85).toLocaleString()}
+                              £{Math.floor(property.value * 0.85).toLocaleString()}
                             </span>
                           </div>
                           <div>
@@ -549,6 +657,13 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </span>
                           </div>
                         </div>
+
+                        {selectedMortgagePercent > 0 && (
+                          <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                            Cash needed: £{Math.floor(property.value * (1 - selectedMortgagePercent / 100) + property.value * 0.04 + 600).toLocaleString()} 
+                            ({selectedMortgagePercent}% mortgage)
+                          </div>
+                        )}
                         
                         <div className="mt-3 flex gap-2">
                           <Button 
@@ -647,7 +762,9 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                         />
                       </div>
                     </div>
-                    
+                    <p className="text-xs text-muted-foreground">
+                      Auction will complete when the next in-game month begins. Final price is based on market conditions.
+                    </p>
                     <Button onClick={handleListForAuction} className="w-full">
                       List for Auction
                     </Button>
@@ -675,12 +792,12 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-green-600">
-                              £{listing.highestBid.toLocaleString()}
+                              £{Math.floor(listing.highestBid).toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">Current bid</p>
                             <Badge variant="outline" className="mt-1">
                               <Clock className="h-3 w-3 mr-1" />
-                              {getDaysUntilAuction(listing.auctionDate)} days
+                              {Math.max(0, listing.auctionMonth - monthsPlayed)} month(s)
                             </Badge>
                           </div>
                         </div>
