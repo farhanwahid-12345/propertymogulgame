@@ -188,7 +188,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "hsbc",
     name: "HSBC",
-    baseRate: 0.042, // 4.2% - Lowest base rate
+    baseRate: 0.035, // 3.5% - Lowest base rate (was 4.2%)
     maxLTV: 0.75, // 75% - Strictest LTV
     minCreditScore: 720, // Highest credit requirement
     description: "Premier bank with the best rates but strictest criteria"
@@ -196,7 +196,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "nationwide",
     name: "Nationwide",
-    baseRate: 0.048, // 4.8%
+    baseRate: 0.045, // 4.5% (was 4.8%)
     maxLTV: 0.80, // 80%
     minCreditScore: 680,
     description: "Building society with competitive rates"
@@ -204,7 +204,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "halifax",
     name: "Halifax",
-    baseRate: 0.055, // 5.5%
+    baseRate: 0.058, // 5.8% (was 5.5%)
     maxLTV: 0.85, // 85%
     minCreditScore: 640,
     description: "Flexible lending with moderate rates"
@@ -212,7 +212,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "quickcash",
     name: "QuickCash Mortgages",
-    baseRate: 0.089, // 8.9%
+    baseRate: 0.095, // 9.5% (was 8.9%)
     maxLTV: 0.90, // 90%
     minCreditScore: 550,
     description: "Fast approval with higher rates"
@@ -220,7 +220,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "easyloan",
     name: "Easy Finance Ltd",
-    baseRate: 0.135, // 13.5% - Highest base rate
+    baseRate: 0.15, // 15% - Highest base rate (was 13.5%)
     maxLTV: 0.95, // 95% - Most lenient LTV
     minCreditScore: 450, // Lowest credit requirement
     description: "Last resort lender - approves almost anyone"
