@@ -188,7 +188,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "hsbc",
     name: "HSBC",
-    baseRate: 0.042, // 4.2% - Lowest base rate
+    baseRate: 0.035, // 3.5% - Lowest base rate (was 4.2%)
     maxLTV: 0.75, // 75% - Strictest LTV
     minCreditScore: 720, // Highest credit requirement
     description: "Premier bank with the best rates but strictest criteria"
@@ -196,7 +196,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "nationwide",
     name: "Nationwide",
-    baseRate: 0.048, // 4.8%
+    baseRate: 0.045, // 4.5% (was 4.8%)
     maxLTV: 0.80, // 80%
     minCreditScore: 680,
     description: "Building society with competitive rates"
@@ -204,7 +204,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "halifax",
     name: "Halifax",
-    baseRate: 0.055, // 5.5%
+    baseRate: 0.058, // 5.8% (was 5.5%)
     maxLTV: 0.85, // 85%
     minCreditScore: 640,
     description: "Flexible lending with moderate rates"
@@ -212,7 +212,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "quickcash",
     name: "QuickCash Mortgages",
-    baseRate: 0.089, // 8.9%
+    baseRate: 0.095, // 9.5% (was 8.9%)
     maxLTV: 0.90, // 90%
     minCreditScore: 550,
     description: "Fast approval with higher rates"
@@ -220,7 +220,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   {
     id: "easyloan",
     name: "Easy Finance Ltd",
-    baseRate: 0.135, // 13.5% - Highest base rate
+    baseRate: 0.15, // 15% - Highest base rate (was 13.5%)
     maxLTV: 0.95, // 95% - Most lenient LTV
     minCreditScore: 450, // Lowest credit requirement
     description: "Last resort lender - approves almost anyone"
@@ -361,23 +361,95 @@ const getInitialProviderRates = (): Record<string, number> => {
   return rates;
 };
 
-// Fluctuate mortgage rates slightly each month
+// Fluctuate mortgage rates each month with wider swings
+// Cheaper providers are more volatile, expensive ones are stable
 const fluctuateProviderRates = (currentRates: Record<string, number>): Record<string, number> => {
   const newRates: Record<string, number> = {};
   MORTGAGE_PROVIDERS.forEach(provider => {
     const currentRate = currentRates[provider.id] || provider.baseRate;
-    // Rates can fluctuate +/- 0.3% from current rate, but stay within reasonable bounds
-    const fluctuation = (Math.random() - 0.5) * 0.006; // +/- 0.3%
+    // Volatility inversely proportional to base rate (cheap = volatile)
+    const volatility = provider.baseRate < 0.05 ? 0.008 : provider.baseRate < 0.07 ? 0.005 : 0.003;
+    const fluctuation = (Math.random() - 0.5) * 2 * volatility;
     let newRate = currentRate + fluctuation;
     
-    // Keep rates within 0.5% of base rate
-    const minRate = provider.baseRate - 0.005;
-    const maxRate = provider.baseRate + 0.005;
-    newRate = Math.max(minRate, Math.min(maxRate, newRate));
+    // Keep rates within 1.5% of base rate
+    const minRate = provider.baseRate - 0.015;
+    const maxRate = provider.baseRate + 0.015;
+    newRate = Math.max(Math.max(0.01, minRate), Math.min(maxRate, newRate));
     
     newRates[provider.id] = newRate;
   });
   return newRates;
+};
+
+// DTI thresholds per provider (max DTI ratio they'll accept)
+const PROVIDER_DTI_LIMITS: Record<string, number> = {
+  hsbc: 0.50,
+  nationwide: 0.50,
+  halifax: 0.65,
+  quickcash: 0.80,
+  easyloan: 0.80,
+};
+
+// Application rejection chance per provider (premium = higher rejection)
+const PROVIDER_REJECTION_CHANCE: Record<string, number> = {
+  hsbc: 0.15,
+  nationwide: 0.10,
+  halifax: 0.05,
+  quickcash: 0,
+  easyloan: 0,
+};
+
+// Calculate DTI ratio for the player
+const calculateDTI = (mortgages: Mortgage[], ownedProperties: Property[], tenants: PropertyTenant[]): number => {
+  const totalMortgagePayments = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
+  const totalRentalIncome = ownedProperties.reduce((total, prop) => {
+    const hasTenant = tenants.some(t => t.propertyId === prop.id);
+    return total + (hasTenant ? prop.monthlyIncome : 0);
+  }, 0);
+  if (totalRentalIncome === 0) return totalMortgagePayments > 0 ? 999 : 0;
+  return totalMortgagePayments / totalRentalIncome;
+};
+
+// Check mortgage application eligibility including DTI
+const checkMortgageEligibility = (
+  providerId: string, 
+  creditScore: number, 
+  ltvRequired: number,
+  currentDTI: number,
+  additionalMonthlyPayment: number,
+  totalRentalIncome: number
+): { eligible: boolean; reason?: string } => {
+  const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
+  if (!provider) return { eligible: false, reason: "Unknown provider" };
+  
+  // Credit score check
+  if (creditScore < provider.minCreditScore) {
+    return { eligible: false, reason: `Credit score too low (need ${provider.minCreditScore}+)` };
+  }
+  
+  // LTV check
+  if (ltvRequired > provider.maxLTV) {
+    return { eligible: false, reason: `LTV too high (max ${(provider.maxLTV * 100).toFixed(0)}%)` };
+  }
+  
+  // DTI check with new payment included
+  const dtiLimit = PROVIDER_DTI_LIMITS[providerId] || 0.80;
+  const projectedDTI = totalRentalIncome > 0 
+    ? (totalRentalIncome > 0 ? (currentDTI * totalRentalIncome + additionalMonthlyPayment) / totalRentalIncome : 999)
+    : (additionalMonthlyPayment > 0 ? 999 : 0);
+  
+  if (projectedDTI > dtiLimit) {
+    return { eligible: false, reason: `DTI too high (${(projectedDTI * 100).toFixed(0)}% > ${(dtiLimit * 100).toFixed(0)}% limit)` };
+  }
+  
+  // Random rejection chance for premium providers
+  const rejectionChance = PROVIDER_REJECTION_CHANCE[providerId] || 0;
+  if (rejectionChance > 0 && Math.random() < rejectionChance) {
+    return { eligible: false, reason: "Application declined - try again next month" };
+  }
+  
+  return { eligible: true };
 };
 
 export function useGameState() {
@@ -460,11 +532,10 @@ export function useGameState() {
       setEstateAgentProperties(estate);
       setAuctionProperties(auction);
     } else if (estateAgentProperties.length === 0 && auctionProperties.length === 0) {
-      // First load - split properties
+      // First load - split properties (5 for auction)
       const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-      const first = shuffled[0];
-      const auctionProps = first ? [first] : [];
-      const estateProps = shuffled.slice(1);
+      const auctionProps = shuffled.slice(0, Math.min(5, shuffled.length));
+      const estateProps = shuffled.slice(auctionProps.length);
       setAuctionProperties(auctionProps);
       setEstateAgentProperties(estateProps);
       
@@ -520,69 +591,55 @@ export function useGameState() {
     }
   }, [gameState.level]);
 
-  // Ensure a single live auction property and replenish market inventory
+  // Maintain 5 auction properties and replenish market inventory
   useEffect(() => {
     const { min, max } = getPropertyValueRangeForLevel(gameState.level);
+    const TARGET_AUCTION_COUNT = 5;
     
-    // Enforce exactly one property in auction that matches current level
     setAuctionProperties(prev => {
-      // If current auction property is outside level range, replace it
-      if (prev.length > 0 && (prev[0].price < min || prev[0].price > max)) {
-        let replacement: Property | undefined;
-        setEstateAgentProperties(est => {
-          // Try to find a property from estate agent that matches level
-          const validProperty = est.find(p => p.price >= min && p.price <= max);
-          if (validProperty) {
-            replacement = validProperty;
-            return est.filter(p => p.id !== validProperty.id);
-          }
-          return est;
-        });
-        
-        // If no valid property found in estate agent, generate one
-        if (!replacement) {
-          replacement = generateRandomProperty(gameState.level);
-        }
-        
-        // Move old auction property back to estate agent
-        const old = prev[0];
-        setEstateAgentProperties(est => {
-          if (!est.find(p => p.id === old.id)) {
-            return [...est, old];
-          }
-          return est;
-        });
-        
-        return [replacement];
-      }
+      // Filter out-of-range properties, move them back to estate agent
+      const valid = prev.filter(p => p.price >= min && p.price <= max);
+      const invalid = prev.filter(p => p.price < min || p.price > max);
       
-      // If no auction property, get one that matches level
-      if (prev.length === 0) {
-        let moved: Property | undefined;
-        setEstateAgentProperties(est => {
-          const validProperty = est.find(p => p.price >= min && p.price <= max);
-          if (validProperty) {
-            moved = validProperty;
-            return est.filter(p => p.id !== validProperty.id);
-          }
-          return est;
-        });
-        if (!moved) {
-          moved = generateRandomProperty(gameState.level);
-        }
-        return [moved];
-      } else if (prev.length > 1) {
-        const [keep, ...rest] = prev;
+      if (invalid.length > 0) {
         setEstateAgentProperties(est => {
           const merged = [...est];
-          rest.forEach(p => {
+          invalid.forEach(p => {
             if (!merged.find(x => x.id === p.id)) merged.push(p);
           });
           return merged;
         });
-        return [keep];
       }
-      return prev;
+      
+      // Replenish to target count
+      if (valid.length < TARGET_AUCTION_COUNT) {
+        const needed = TARGET_AUCTION_COUNT - valid.length;
+        const newProps: Property[] = [];
+        
+        for (let i = 0; i < needed; i++) {
+          let moved: Property | undefined;
+          setEstateAgentProperties(est => {
+            const candidate = est.find(p => 
+              p.price >= min && p.price <= max && 
+              !valid.find(v => v.id === p.id) &&
+              !newProps.find(n => n.id === p.id)
+            );
+            if (candidate) {
+              moved = candidate;
+              return est.filter(p => p.id !== candidate.id);
+            }
+            return est;
+          });
+          if (!moved) {
+            moved = generateRandomProperty(gameState.level);
+          }
+          newProps.push(moved);
+        }
+        
+        return [...valid, ...newProps];
+      }
+      
+      return valid;
     });
 
     // Always maintain 30 total properties for sale if portfolio not full
@@ -1012,10 +1069,16 @@ export function useGameState() {
           };
         });
 
-        // Improve credit score for consistent payments and mortgage payoffs
+        // Improve credit score - base 550, with DTI penalty
         let creditScoreImprovement = 0;
         if (prev.mortgages.length > 0) {
           creditScoreImprovement += 1; // +1 for each month with mortgage payments
+        }
+        
+        // DTI penalty on credit score
+        const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        if (playerDTI > 0.60) {
+          creditScoreImprovement -= Math.floor((playerDTI - 0.60) * 100); // -1 per 1% over 60%
         }
 
         // Check for paid-off mortgages
@@ -1465,7 +1528,7 @@ export function useGameState() {
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
-    setAuctionProperties(shuffled.length ? [shuffled[0]] : []);
+    setAuctionProperties(shuffled.slice(0, Math.min(5, shuffled.length)));
     setEstateAgentProperties(shuffled.slice(1));
     localStorage.removeItem("propertyTycoonSave");
     
@@ -1844,21 +1907,36 @@ export function useGameState() {
     total + mortgage.remainingBalance, 0
   );
 
-  // Calculate credit score based on player performance
+  // Calculate credit score based on player performance (tougher formula)
   const calculateCreditScore = () => {
-    let score = 600; // Base score
+    let score = 550; // Base score (was 600)
     
-    // Increase based on net worth
-    score += Math.min((netWorth - totalDebt) / 10000, 200); // Up to 200 points
+    // Increase based on net worth - capped at 100 points (was 200)
+    score += Math.min((netWorth - totalDebt) / 10000, 100);
     
     // Increase based on level
     score += gameState.level * 10;
+    
+    // Add stored credit score improvements (from monthly payments)
+    score += Math.max(0, gameState.creditScore - 650) * 0.5; // Half the accumulated improvements
     
     // Decrease if high debt-to-value (portfolio LTV) ratio
     const portfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
     const debtToValue = portfolioValue > 0 ? totalDebt / portfolioValue : 0;
     if (debtToValue > 0.8) score -= 100;
-    if (debtToValue > 0.6) score -= 50;
+    else if (debtToValue > 0.6) score -= 50;
+    
+    // DTI penalty
+    const playerDTI = calculateDTI(gameState.mortgages, gameState.ownedProperties, gameState.tenants);
+    if (playerDTI > 0.60) {
+      score -= Math.min(100, Math.floor((playerDTI - 0.60) * 200));
+    }
+    
+    // Portfolio size pressure: each property beyond 3 adds a small penalty
+    const propCount = gameState.ownedProperties.length;
+    if (propCount > 3) {
+      score -= (propCount - 3) * 5;
+    }
     
     // Decrease if bankrupt history
     if (gameState.isBankrupt) score -= 150;
