@@ -361,23 +361,95 @@ const getInitialProviderRates = (): Record<string, number> => {
   return rates;
 };
 
-// Fluctuate mortgage rates slightly each month
+// Fluctuate mortgage rates each month with wider swings
+// Cheaper providers are more volatile, expensive ones are stable
 const fluctuateProviderRates = (currentRates: Record<string, number>): Record<string, number> => {
   const newRates: Record<string, number> = {};
   MORTGAGE_PROVIDERS.forEach(provider => {
     const currentRate = currentRates[provider.id] || provider.baseRate;
-    // Rates can fluctuate +/- 0.3% from current rate, but stay within reasonable bounds
-    const fluctuation = (Math.random() - 0.5) * 0.006; // +/- 0.3%
+    // Volatility inversely proportional to base rate (cheap = volatile)
+    const volatility = provider.baseRate < 0.05 ? 0.008 : provider.baseRate < 0.07 ? 0.005 : 0.003;
+    const fluctuation = (Math.random() - 0.5) * 2 * volatility;
     let newRate = currentRate + fluctuation;
     
-    // Keep rates within 0.5% of base rate
-    const minRate = provider.baseRate - 0.005;
-    const maxRate = provider.baseRate + 0.005;
-    newRate = Math.max(minRate, Math.min(maxRate, newRate));
+    // Keep rates within 1.5% of base rate
+    const minRate = provider.baseRate - 0.015;
+    const maxRate = provider.baseRate + 0.015;
+    newRate = Math.max(Math.max(0.01, minRate), Math.min(maxRate, newRate));
     
     newRates[provider.id] = newRate;
   });
   return newRates;
+};
+
+// DTI thresholds per provider (max DTI ratio they'll accept)
+const PROVIDER_DTI_LIMITS: Record<string, number> = {
+  hsbc: 0.50,
+  nationwide: 0.50,
+  halifax: 0.65,
+  quickcash: 0.80,
+  easyloan: 0.80,
+};
+
+// Application rejection chance per provider (premium = higher rejection)
+const PROVIDER_REJECTION_CHANCE: Record<string, number> = {
+  hsbc: 0.15,
+  nationwide: 0.10,
+  halifax: 0.05,
+  quickcash: 0,
+  easyloan: 0,
+};
+
+// Calculate DTI ratio for the player
+const calculateDTI = (mortgages: Mortgage[], ownedProperties: Property[], tenants: PropertyTenant[]): number => {
+  const totalMortgagePayments = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
+  const totalRentalIncome = ownedProperties.reduce((total, prop) => {
+    const hasTenant = tenants.some(t => t.propertyId === prop.id);
+    return total + (hasTenant ? prop.monthlyIncome : 0);
+  }, 0);
+  if (totalRentalIncome === 0) return totalMortgagePayments > 0 ? 999 : 0;
+  return totalMortgagePayments / totalRentalIncome;
+};
+
+// Check mortgage application eligibility including DTI
+const checkMortgageEligibility = (
+  providerId: string, 
+  creditScore: number, 
+  ltvRequired: number,
+  currentDTI: number,
+  additionalMonthlyPayment: number,
+  totalRentalIncome: number
+): { eligible: boolean; reason?: string } => {
+  const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
+  if (!provider) return { eligible: false, reason: "Unknown provider" };
+  
+  // Credit score check
+  if (creditScore < provider.minCreditScore) {
+    return { eligible: false, reason: `Credit score too low (need ${provider.minCreditScore}+)` };
+  }
+  
+  // LTV check
+  if (ltvRequired > provider.maxLTV) {
+    return { eligible: false, reason: `LTV too high (max ${(provider.maxLTV * 100).toFixed(0)}%)` };
+  }
+  
+  // DTI check with new payment included
+  const dtiLimit = PROVIDER_DTI_LIMITS[providerId] || 0.80;
+  const projectedDTI = totalRentalIncome > 0 
+    ? (totalRentalIncome > 0 ? (currentDTI * totalRentalIncome + additionalMonthlyPayment) / totalRentalIncome : 999)
+    : (additionalMonthlyPayment > 0 ? 999 : 0);
+  
+  if (projectedDTI > dtiLimit) {
+    return { eligible: false, reason: `DTI too high (${(projectedDTI * 100).toFixed(0)}% > ${(dtiLimit * 100).toFixed(0)}% limit)` };
+  }
+  
+  // Random rejection chance for premium providers
+  const rejectionChance = PROVIDER_REJECTION_CHANCE[providerId] || 0;
+  if (rejectionChance > 0 && Math.random() < rejectionChance) {
+    return { eligible: false, reason: "Application declined - try again next month" };
+  }
+  
+  return { eligible: true };
 };
 
 export function useGameState() {
