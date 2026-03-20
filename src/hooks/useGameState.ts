@@ -591,69 +591,55 @@ export function useGameState() {
     }
   }, [gameState.level]);
 
-  // Ensure a single live auction property and replenish market inventory
+  // Maintain 5 auction properties and replenish market inventory
   useEffect(() => {
     const { min, max } = getPropertyValueRangeForLevel(gameState.level);
+    const TARGET_AUCTION_COUNT = 5;
     
-    // Enforce exactly one property in auction that matches current level
     setAuctionProperties(prev => {
-      // If current auction property is outside level range, replace it
-      if (prev.length > 0 && (prev[0].price < min || prev[0].price > max)) {
-        let replacement: Property | undefined;
-        setEstateAgentProperties(est => {
-          // Try to find a property from estate agent that matches level
-          const validProperty = est.find(p => p.price >= min && p.price <= max);
-          if (validProperty) {
-            replacement = validProperty;
-            return est.filter(p => p.id !== validProperty.id);
-          }
-          return est;
-        });
-        
-        // If no valid property found in estate agent, generate one
-        if (!replacement) {
-          replacement = generateRandomProperty(gameState.level);
-        }
-        
-        // Move old auction property back to estate agent
-        const old = prev[0];
-        setEstateAgentProperties(est => {
-          if (!est.find(p => p.id === old.id)) {
-            return [...est, old];
-          }
-          return est;
-        });
-        
-        return [replacement];
-      }
+      // Filter out-of-range properties, move them back to estate agent
+      const valid = prev.filter(p => p.price >= min && p.price <= max);
+      const invalid = prev.filter(p => p.price < min || p.price > max);
       
-      // If no auction property, get one that matches level
-      if (prev.length === 0) {
-        let moved: Property | undefined;
-        setEstateAgentProperties(est => {
-          const validProperty = est.find(p => p.price >= min && p.price <= max);
-          if (validProperty) {
-            moved = validProperty;
-            return est.filter(p => p.id !== validProperty.id);
-          }
-          return est;
-        });
-        if (!moved) {
-          moved = generateRandomProperty(gameState.level);
-        }
-        return [moved];
-      } else if (prev.length > 1) {
-        const [keep, ...rest] = prev;
+      if (invalid.length > 0) {
         setEstateAgentProperties(est => {
           const merged = [...est];
-          rest.forEach(p => {
+          invalid.forEach(p => {
             if (!merged.find(x => x.id === p.id)) merged.push(p);
           });
           return merged;
         });
-        return [keep];
       }
-      return prev;
+      
+      // Replenish to target count
+      if (valid.length < TARGET_AUCTION_COUNT) {
+        const needed = TARGET_AUCTION_COUNT - valid.length;
+        const newProps: Property[] = [];
+        
+        for (let i = 0; i < needed; i++) {
+          let moved: Property | undefined;
+          setEstateAgentProperties(est => {
+            const candidate = est.find(p => 
+              p.price >= min && p.price <= max && 
+              !valid.find(v => v.id === p.id) &&
+              !newProps.find(n => n.id === p.id)
+            );
+            if (candidate) {
+              moved = candidate;
+              return est.filter(p => p.id !== candidate.id);
+            }
+            return est;
+          });
+          if (!moved) {
+            moved = generateRandomProperty(gameState.level);
+          }
+          newProps.push(moved);
+        }
+        
+        return [...valid, ...newProps];
+      }
+      
+      return valid;
     });
 
     // Always maintain 30 total properties for sale if portfolio not full
