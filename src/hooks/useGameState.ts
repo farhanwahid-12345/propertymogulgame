@@ -1907,21 +1907,36 @@ export function useGameState() {
     total + mortgage.remainingBalance, 0
   );
 
-  // Calculate credit score based on player performance
+  // Calculate credit score based on player performance (tougher formula)
   const calculateCreditScore = () => {
-    let score = 600; // Base score
+    let score = 550; // Base score (was 600)
     
-    // Increase based on net worth
-    score += Math.min((netWorth - totalDebt) / 10000, 200); // Up to 200 points
+    // Increase based on net worth - capped at 100 points (was 200)
+    score += Math.min((netWorth - totalDebt) / 10000, 100);
     
     // Increase based on level
     score += gameState.level * 10;
+    
+    // Add stored credit score improvements (from monthly payments)
+    score += Math.max(0, gameState.creditScore - 650) * 0.5; // Half the accumulated improvements
     
     // Decrease if high debt-to-value (portfolio LTV) ratio
     const portfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
     const debtToValue = portfolioValue > 0 ? totalDebt / portfolioValue : 0;
     if (debtToValue > 0.8) score -= 100;
-    if (debtToValue > 0.6) score -= 50;
+    else if (debtToValue > 0.6) score -= 50;
+    
+    // DTI penalty
+    const playerDTI = calculateDTI(gameState.mortgages, gameState.ownedProperties, gameState.tenants);
+    if (playerDTI > 0.60) {
+      score -= Math.min(100, Math.floor((playerDTI - 0.60) * 200));
+    }
+    
+    // Portfolio size pressure: each property beyond 3 adds a small penalty
+    const propCount = gameState.ownedProperties.length;
+    if (propCount > 3) {
+      score -= (propCount - 3) * 5;
+    }
     
     // Decrease if bankrupt history
     if (gameState.isBankrupt) score -= 150;
