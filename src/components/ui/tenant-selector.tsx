@@ -51,7 +51,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["NHS Doctor", "Senior Engineer", "Solicitor", "University Professor", "Consultant"][Math.floor(Math.random() * 5)],
       rentMultiplier: 1.15 + Math.random() * 0.1,
       defaultRisk: 1 + Math.floor(Math.random() * 3),
-      damageRisk: 1 + Math.floor(Math.random() * 2),
+      damageRisk: 0.5 + Math.random() * 0.5,
       description: "High-income professional with excellent credit history"
     })),
     
