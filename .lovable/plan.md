@@ -1,22 +1,87 @@
 
-# Completed: Auction House Overhaul + Realistic Mortgages
 
-## Changes Made
+# Fix Repair Frequency + Toughen Mortgage Difficulty
 
-### Auction House
-- Multiple properties (5) in auction at all times, replenished from estate agent pool
-- Mortgage support for buying: select mortgage %, provider before entering auction
-- AI bidding anchored to market value (property.value) not guide price
-- Selling auctions use in-game months (monthsPlayed) instead of Date.now()
-- Selling uses 70/15/15 market-value-anchored price distribution
-- Budget display shows total buying power with mortgage
+## Problem 1: Repairs Too Frequent
 
-### Mortgages Made Realistic
-- Wider rate spread: HSBC 3.5%, Nationwide 4.5%, Halifax 5.8%, QuickCash 9.5%, Easy Finance 15%
-- Wider rate fluctuation: ±1.5% from base (was ±0.5%), cheaper providers more volatile
-- Tougher credit score: base 550 (was 600), net worth bonus capped at 100 (was 200)
-- DTI checks: HSBC/Nationwide max 50%, Halifax 65%, QuickCash/EasyFinance 80%
-- DTI penalty on credit score when over 60%
-- Portfolio size penalty: -5 per property beyond 3
-- Random application rejection: 15% HSBC, 10% Nationwide, 5% Halifax
-- Mortgage provider selector updated with DTI badge and application risk indicator
+The damage check runs **every month** with `Math.random() < tenant.damageRisk / 100`. A "standard" tenant has 3-10% damageRisk, meaning damage fires roughly every 10-33 months. The 30-month cooldown per property helps, but with multiple properties, the player constantly sees damage dialogs.
+
+**Root cause**: The damageRisk values are too high for a monthly check, and the 30-month cooldown isn't enough when you own several properties.
+
+### Fix
+
+1. **Reduce tenant damageRisk values** in `tenant-selector.tsx`:
+   - Premium: 0.5-1% (was 1-2%)
+   - Standard: 1-3% (was 3-10%)
+   - Budget: 2-5% (was 8-19%)
+   - Risky: 5-10% (was 15-39%)
+
+2. **Increase cooldown from 30 to 48 months** (4 years) per property in `useGameState.ts` line 925
+
+3. **Add a global cooldown**: max 1 damage event across entire portfolio per 6 months, preventing multiple properties firing in quick succession
+
+---
+
+## Problem 2: Mortgages Still Too Easy
+
+The credit score formula gives too many free points. Starting at 550 base, a Level 3 player with £200k net worth gets: 550 + 20 (net worth capped at 100 but scales fast) + 30 (level) + accumulated monthly improvements = easily 650+. The `calculateCreditScore` formula also feeds back the stored `gameState.creditScore` improvements at 0.5x, which compounds over time.
+
+### Fix
+
+**Tighten `calculateCreditScore`** in `useGameState.ts`:
+- Reduce net worth divisor from 10,000 to 20,000 (slower scaling)
+- Cap level bonus at 20 (was uncapped `level * 10`)
+- Remove the feedback loop that adds stored credit score improvements back (line 1921) -- this causes compounding
+- Increase portfolio size penalty from -5 to -8 per property beyond 3
+
+**Slow monthly credit improvement** in the month-end logic:
+- Only award +1 credit improvement if DTI is below 40% (was unconditional)
+- Award +0 if DTI is 40-60%
+- Apply -2 if DTI is above 60% (was -1 per 1%)
+
+**Raise HSBC minimum credit score** from 720 to 740, making it a genuine late-game reward.
+
+---
+
+## Technical Details
+
+### File: `src/components/ui/tenant-selector.tsx`
+
+Update damageRisk ranges for each tenant profile:
+- Premium: `0.5 + Math.random() * 0.5` (0.5-1%)
+- Standard: `1 + Math.floor(Math.random() * 2)` (1-3%)
+- Budget: `2 + Math.floor(Math.random() * 3)` (2-5%)
+- Risky: `5 + Math.floor(Math.random() * 5)` (5-10%)
+
+### File: `src/hooks/useGameState.ts`
+
+**Line 925** -- change cooldown:
+```
+if (monthsSinceLastDamage >= 48)  // was 30
+```
+
+**Add global portfolio cooldown** (lines 909-953): Track `lastDamageMonth` globally, skip all damage if `monthsPlayed - lastGlobalDamageMonth < 6`.
+
+**`calculateCreditScore` (lines 1911-1945):**
+```typescript
+let score = 550;
+score += Math.min((netWorth - totalDebt) / 20000, 100); // slower scaling
+score += Math.min(gameState.level * 10, 20); // cap at 20
+// Remove line 1921 (stored credit feedback loop)
+// Keep DTI and portfolio penalties as-is but increase portfolio penalty
+if (propCount > 3) score -= (propCount - 3) * 8; // was 5
+```
+
+**Monthly credit improvement (lines 1072-1082):**
+```typescript
+let creditScoreImprovement = 0;
+if (prev.mortgages.length > 0 && playerDTI < 0.40) {
+  creditScoreImprovement += 1;
+}
+if (playerDTI > 0.60) {
+  creditScoreImprovement -= 2;
+}
+```
+
+**HSBC minCreditScore**: Change from 720 to 740 (line 193).
+
