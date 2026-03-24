@@ -518,6 +518,7 @@ export function useGameState() {
       auctionPropertyIds: [],
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
+      lastGlobalDamageMonth: 0,
     };
   });
 
