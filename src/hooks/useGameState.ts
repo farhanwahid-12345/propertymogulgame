@@ -130,6 +130,7 @@ interface GameState {
   auctionPropertyIds: string[]; // Persist which properties are in auction
   yearlyNetProfit: number; // Track net profit for corporation tax
   lastCorporationTaxMonth: number; // Track when we last paid corporation tax (April = month 4)
+  lastGlobalDamageMonth: number; // Global cooldown: max 1 damage event per 6 months across portfolio
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
