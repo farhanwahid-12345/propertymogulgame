@@ -957,6 +957,7 @@ export function useGameState() {
             }
           }
         });
+        } // end global cooldown check
 
         // Handle completed sales
         const remainingProperties = updatedProperties.filter(p => 
