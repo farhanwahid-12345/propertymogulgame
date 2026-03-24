@@ -908,22 +908,27 @@ export function useGameState() {
         });
         
         // Check for tenant events - only damage events now, shown as prompts
-        // Restrict to one damage event every 30 months (2.5 years) per property
+        // Restrict to one damage event every 48 months (4 years) per property
+        // Global cooldown: max 1 damage event across entire portfolio per 6 months
         const newPendingDamages: PropertyDamage[] = [];
         const currentYear = Math.floor(prev.monthsPlayed / 12);
+        const globalMonthsSinceLastDamage = prev.lastGlobalDamageMonth !== undefined
+          ? prev.monthsPlayed - prev.lastGlobalDamageMonth
+          : 999;
         
+        if (globalMonthsSinceLastDamage >= 6) {
         prev.tenants.forEach(({ propertyId, tenant }) => {
-          if (Math.random() < tenant.damageRisk / 100) {
+          if (newPendingDamages.length === 0 && Math.random() < tenant.damageRisk / 100) {
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (property) {
-              // Check if 30 months have passed since last damage
+              // Check if 48 months have passed since last damage on this property
               const damageHistory = prev.damageHistory.find(dh => dh.propertyId === propertyId);
               const monthsSinceLastDamage = damageHistory 
                 ? prev.monthsPlayed - damageHistory.lastDamageMonth 
                 : 999; // No previous damage
               
-              // Only allow damage if 30+ months since last damage
-              if (monthsSinceLastDamage >= 30) {
+              // Only allow damage if 48+ months since last damage
+              if (monthsSinceLastDamage >= 48) {
                 // Check annual repair cost cap (2% of property value)
                 const annualCap = property.value * 0.02;
                 const existingAnnualCost = prev.annualRepairCosts.find(
