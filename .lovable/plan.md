@@ -1,22 +1,18 @@
 
-# Completed: Auction House Overhaul + Realistic Mortgages
+# Completed: Fix Repair Frequency + Toughen Mortgage Difficulty
 
 ## Changes Made
 
-### Auction House
-- Multiple properties (5) in auction at all times, replenished from estate agent pool
-- Mortgage support for buying: select mortgage %, provider before entering auction
-- AI bidding anchored to market value (property.value) not guide price
-- Selling auctions use in-game months (monthsPlayed) instead of Date.now()
-- Selling uses 70/15/15 market-value-anchored price distribution
-- Budget display shows total buying power with mortgage
+### Repairs Made Realistic
+- Lowered damageRisk: Premium 0.5-1%, Standard 1-3%, Budget 2-5%, Risky 5-10%
+- Per-property cooldown increased from 30 to 48 months
+- Global portfolio cooldown: max 1 damage event per 6 months across all properties
 
-### Mortgages Made Realistic
-- Wider rate spread: HSBC 3.5%, Nationwide 4.5%, Halifax 5.8%, QuickCash 9.5%, Easy Finance 15%
-- Wider rate fluctuation: ±1.5% from base (was ±0.5%), cheaper providers more volatile
-- Tougher credit score: base 550 (was 600), net worth bonus capped at 100 (was 200)
-- DTI checks: HSBC/Nationwide max 50%, Halifax 65%, QuickCash/EasyFinance 80%
-- DTI penalty on credit score when over 60%
-- Portfolio size penalty: -5 per property beyond 3
-- Random application rejection: 15% HSBC, 10% Nationwide, 5% Halifax
-- Mortgage provider selector updated with DTI badge and application risk indicator
+### Mortgage Difficulty Toughened
+- Credit score net worth scaling slowed (divisor 20000, was 10000)
+- Level bonus capped at 20 points (was uncapped)
+- Removed compounding feedback loop from stored credit improvements
+- Portfolio penalty increased to -8 per property beyond 3 (was -5)
+- Monthly credit improvement now requires DTI < 40% (was unconditional)
+- DTI > 60% now applies flat -2 penalty (was proportional)
+- HSBC minimum credit score raised to 740 (was 720)

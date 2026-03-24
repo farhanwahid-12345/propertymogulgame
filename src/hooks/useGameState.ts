@@ -1534,6 +1534,7 @@ export function useGameState() {
       auctionPropertyIds: [],
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
+      lastGlobalDamageMonth: 0,
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
