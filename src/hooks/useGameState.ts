@@ -1076,16 +1076,15 @@ export function useGameState() {
           };
         });
 
-        // Improve credit score - base 550, with DTI penalty
+        // Improve credit score - conditional on DTI health
         let creditScoreImprovement = 0;
-        if (prev.mortgages.length > 0) {
-          creditScoreImprovement += 1; // +1 for each month with mortgage payments
-        }
-        
-        // DTI penalty on credit score
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        if (prev.mortgages.length > 0 && playerDTI < 0.40) {
+          creditScoreImprovement += 1; // Only improve if DTI is healthy
+        }
+        // DTI penalty on credit score
         if (playerDTI > 0.60) {
-          creditScoreImprovement -= Math.floor((playerDTI - 0.60) * 100); // -1 per 1% over 60%
+          creditScoreImprovement -= 2; // Flat penalty for high DTI
         }
 
         // Check for paid-off mortgages
