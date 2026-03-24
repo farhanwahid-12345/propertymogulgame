@@ -51,7 +51,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["NHS Doctor", "Senior Engineer", "Solicitor", "University Professor", "Consultant"][Math.floor(Math.random() * 5)],
       rentMultiplier: 1.15 + Math.random() * 0.1,
       defaultRisk: 1 + Math.floor(Math.random() * 3),
-      damageRisk: 1 + Math.floor(Math.random() * 2),
+      damageRisk: 0.5 + Math.random() * 0.5,
       description: "High-income professional with excellent credit history"
     })),
     
@@ -65,7 +65,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["Teacher", "Nurse", "Accountant", "Manager", "Civil Servant"][Math.floor(Math.random() * 5)],
       rentMultiplier: 0.95 + Math.random() * 0.15,
       defaultRisk: 5 + Math.floor(Math.random() * 10),
-      damageRisk: 3 + Math.floor(Math.random() * 8),
+      damageRisk: 1 + Math.floor(Math.random() * 2),
       description: "Stable employment with good references"
     })),
     
@@ -79,7 +79,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["Shop Worker", "Warehouse Staff", "Care Worker", "Security Guard", "Cleaner"][Math.floor(Math.random() * 5)],
       rentMultiplier: 0.8 + Math.random() * 0.15,
       defaultRisk: 15 + Math.floor(Math.random() * 15),
-      damageRisk: 8 + Math.floor(Math.random() * 12),
+      damageRisk: 2 + Math.floor(Math.random() * 3),
       description: "Lower income but employed and willing to pay market rate"
     })),
     
@@ -93,7 +93,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["Unemployed", "Temporary Work", "Benefits", "Gig Work", "Part-time"][Math.floor(Math.random() * 5)],
       rentMultiplier: 1.1 + Math.random() * 0.3, // Risky tenants pay MORE
       defaultRisk: 25 + Math.floor(Math.random() * 25),
-      damageRisk: 15 + Math.floor(Math.random() * 25),
+      damageRisk: 5 + Math.floor(Math.random() * 5),
       description: "Higher risk but willing to pay premium rent for accommodation"
     }))
   ];

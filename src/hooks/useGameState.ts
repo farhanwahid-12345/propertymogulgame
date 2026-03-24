@@ -130,6 +130,7 @@ interface GameState {
   auctionPropertyIds: string[]; // Persist which properties are in auction
   yearlyNetProfit: number; // Track net profit for corporation tax
   lastCorporationTaxMonth: number; // Track when we last paid corporation tax (April = month 4)
+  lastGlobalDamageMonth: number; // Global cooldown: max 1 damage event per 6 months across portfolio
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -190,7 +191,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
     name: "HSBC",
     baseRate: 0.035, // 3.5% - Lowest base rate (was 4.2%)
     maxLTV: 0.75, // 75% - Strictest LTV
-    minCreditScore: 720, // Highest credit requirement
+    minCreditScore: 740, // Highest credit requirement (was 720)
     description: "Premier bank with the best rates but strictest criteria"
   },
   {
@@ -482,6 +483,7 @@ export function useGameState() {
       overdraftLimit: parsedState.overdraftLimit ?? 0,
       overdraftUsed: parsedState.overdraftUsed ?? 0,
       mortgageProviderRates: parsedState.mortgageProviderRates ?? getInitialProviderRates(),
+      lastGlobalDamageMonth: parsedState.lastGlobalDamageMonth ?? 0,
       estateAgentPropertyIds: parsedState.estateAgentPropertyIds ?? [],
       auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
       yearlyNetProfit: parsedState.yearlyNetProfit ?? 0,
@@ -516,6 +518,7 @@ export function useGameState() {
       auctionPropertyIds: [],
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
+      lastGlobalDamageMonth: 0,
     };
   });
 
@@ -907,22 +910,27 @@ export function useGameState() {
         });
         
         // Check for tenant events - only damage events now, shown as prompts
-        // Restrict to one damage event every 30 months (2.5 years) per property
+        // Restrict to one damage event every 48 months (4 years) per property
+        // Global cooldown: max 1 damage event across entire portfolio per 6 months
         const newPendingDamages: PropertyDamage[] = [];
         const currentYear = Math.floor(prev.monthsPlayed / 12);
+        const globalMonthsSinceLastDamage = prev.lastGlobalDamageMonth !== undefined
+          ? prev.monthsPlayed - prev.lastGlobalDamageMonth
+          : 999;
         
+        if (globalMonthsSinceLastDamage >= 6) {
         prev.tenants.forEach(({ propertyId, tenant }) => {
-          if (Math.random() < tenant.damageRisk / 100) {
+          if (newPendingDamages.length === 0 && Math.random() < tenant.damageRisk / 100) {
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (property) {
-              // Check if 30 months have passed since last damage
+              // Check if 48 months have passed since last damage on this property
               const damageHistory = prev.damageHistory.find(dh => dh.propertyId === propertyId);
               const monthsSinceLastDamage = damageHistory 
                 ? prev.monthsPlayed - damageHistory.lastDamageMonth 
                 : 999; // No previous damage
               
-              // Only allow damage if 30+ months since last damage
-              if (monthsSinceLastDamage >= 30) {
+              // Only allow damage if 48+ months since last damage
+              if (monthsSinceLastDamage >= 48) {
                 // Check annual repair cost cap (2% of property value)
                 const annualCap = property.value * 0.02;
                 const existingAnnualCost = prev.annualRepairCosts.find(
@@ -951,6 +959,7 @@ export function useGameState() {
             }
           }
         });
+        } // end global cooldown check
 
         // Handle completed sales
         const remainingProperties = updatedProperties.filter(p => 
@@ -996,6 +1005,7 @@ export function useGameState() {
           voidPeriods: activeVoidPeriods,
           propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0),
           pendingDamages: [...prev.pendingDamages, ...newPendingDamages],
+          lastGlobalDamageMonth: newPendingDamages.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           annualRepairCosts: prev.annualRepairCosts,
           damageHistory: prev.damageHistory
         };
@@ -1069,16 +1079,15 @@ export function useGameState() {
           };
         });
 
-        // Improve credit score - base 550, with DTI penalty
+        // Improve credit score - conditional on DTI health
         let creditScoreImprovement = 0;
-        if (prev.mortgages.length > 0) {
-          creditScoreImprovement += 1; // +1 for each month with mortgage payments
-        }
-        
-        // DTI penalty on credit score
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        if (prev.mortgages.length > 0 && playerDTI < 0.40) {
+          creditScoreImprovement += 1; // Only improve if DTI is healthy
+        }
+        // DTI penalty on credit score
         if (playerDTI > 0.60) {
-          creditScoreImprovement -= Math.floor((playerDTI - 0.60) * 100); // -1 per 1% over 60%
+          creditScoreImprovement -= 2; // Flat penalty for high DTI
         }
 
         // Check for paid-off mortgages
@@ -1525,6 +1534,7 @@ export function useGameState() {
       auctionPropertyIds: [],
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
+      lastGlobalDamageMonth: 0,
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -1907,18 +1917,17 @@ export function useGameState() {
     total + mortgage.remainingBalance, 0
   );
 
-  // Calculate credit score based on player performance (tougher formula)
+  // Calculate credit score based on player performance (toughened formula)
   const calculateCreditScore = () => {
-    let score = 550; // Base score (was 600)
+    let score = 550; // Base score
     
-    // Increase based on net worth - capped at 100 points (was 200)
-    score += Math.min((netWorth - totalDebt) / 10000, 100);
+    // Increase based on net worth - slower scaling (divisor 20000, was 10000)
+    score += Math.min((netWorth - totalDebt) / 20000, 100);
     
-    // Increase based on level
-    score += gameState.level * 10;
+    // Increase based on level - capped at 20 (was uncapped level * 10)
+    score += Math.min(gameState.level * 10, 20);
     
-    // Add stored credit score improvements (from monthly payments)
-    score += Math.max(0, gameState.creditScore - 650) * 0.5; // Half the accumulated improvements
+    // No more feedback loop from stored credit score - removed compounding
     
     // Decrease if high debt-to-value (portfolio LTV) ratio
     const portfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
@@ -1932,10 +1941,10 @@ export function useGameState() {
       score -= Math.min(100, Math.floor((playerDTI - 0.60) * 200));
     }
     
-    // Portfolio size pressure: each property beyond 3 adds a small penalty
+    // Portfolio size pressure: -8 per property beyond 3 (was -5)
     const propCount = gameState.ownedProperties.length;
     if (propCount > 3) {
-      score -= (propCount - 3) * 5;
+      score -= (propCount - 3) * 8;
     }
     
     // Decrease if bankrupt history
