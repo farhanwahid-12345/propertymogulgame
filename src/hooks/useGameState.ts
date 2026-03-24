@@ -191,7 +191,7 @@ const MORTGAGE_PROVIDERS: MortgageProvider[] = [
     name: "HSBC",
     baseRate: 0.035, // 3.5% - Lowest base rate (was 4.2%)
     maxLTV: 0.75, // 75% - Strictest LTV
-    minCreditScore: 720, // Highest credit requirement
+    minCreditScore: 740, // Highest credit requirement (was 720)
     description: "Premier bank with the best rates but strictest criteria"
   },
   {
