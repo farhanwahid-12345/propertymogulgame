@@ -93,7 +93,7 @@ const generateTenantProfiles = (): Tenant[] => {
       employmentStatus: ["Unemployed", "Temporary Work", "Benefits", "Gig Work", "Part-time"][Math.floor(Math.random() * 5)],
       rentMultiplier: 1.1 + Math.random() * 0.3, // Risky tenants pay MORE
       defaultRisk: 25 + Math.floor(Math.random() * 25),
-      damageRisk: 15 + Math.floor(Math.random() * 25),
+      damageRisk: 5 + Math.floor(Math.random() * 5),
       description: "Higher risk but willing to pay premium rent for accommodation"
     }))
   ];
