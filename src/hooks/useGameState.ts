@@ -483,6 +483,7 @@ export function useGameState() {
       overdraftLimit: parsedState.overdraftLimit ?? 0,
       overdraftUsed: parsedState.overdraftUsed ?? 0,
       mortgageProviderRates: parsedState.mortgageProviderRates ?? getInitialProviderRates(),
+      lastGlobalDamageMonth: parsedState.lastGlobalDamageMonth ?? 0,
       estateAgentPropertyIds: parsedState.estateAgentPropertyIds ?? [],
       auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
       yearlyNetProfit: parsedState.yearlyNetProfit ?? 0,
