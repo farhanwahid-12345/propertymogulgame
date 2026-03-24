@@ -1005,6 +1005,7 @@ export function useGameState() {
           voidPeriods: activeVoidPeriods,
           propertyListings: updatedListings.filter(listing => listing.daysUntilSale > 0),
           pendingDamages: [...prev.pendingDamages, ...newPendingDamages],
+          lastGlobalDamageMonth: newPendingDamages.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           annualRepairCosts: prev.annualRepairCosts,
           damageHistory: prev.damageHistory
         };
