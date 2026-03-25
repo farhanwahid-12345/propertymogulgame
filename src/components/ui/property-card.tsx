@@ -208,9 +208,9 @@ export function PropertyCard({
 
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Monthly Income:</span>
-            <span className="font-semibold text-success">
+            <Badge className="bg-success/20 text-success border-success/30 hover:bg-success/30">
               £{property.monthlyIncome.toLocaleString()}/mo
-            </span>
+            </Badge>
           </div>
 
           {property.owned && (
