@@ -125,16 +125,36 @@ export function PropertyCard({
     });
   };
 
+  const typeEmoji = {
+    residential: "🏠",
+    commercial: "🏢",
+    luxury: "👑",
+  };
+
+  const typeBorderColor = {
+    residential: "border-t-[hsl(var(--property-residential))]",
+    commercial: "border-t-[hsl(var(--property-commercial))]",
+    luxury: "border-t-[hsl(var(--property-luxury))]",
+  };
+
+  const typeGlow = {
+    residential: "hover:shadow-[0_0_20px_hsl(var(--property-residential)/0.15)]",
+    commercial: "hover:shadow-[0_0_20px_hsl(var(--property-commercial)/0.15)]",
+    luxury: "hover:shadow-[0_0_20px_hsl(var(--property-luxury)/0.15)]",
+  };
+
   return (
     <Card className={cn(
-      "transition-all duration-300 hover:shadow-lg hover:scale-105",
-      property.owned && "ring-2 ring-primary"
+      "glass border-t-4 transition-all duration-300 hover:scale-[1.02]",
+      typeBorderColor[property.type],
+      typeGlow[property.type],
+      property.owned && "ring-2 ring-primary/50"
     )}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icon className={cn("h-5 w-5", `text-${PropertyTypeColor[property.type]}`)} />
-            <CardTitle className="text-lg">{property.name}</CardTitle>
+            <span className="text-lg">{typeEmoji[property.type]}</span>
+            <CardTitle className="text-base">{property.name}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
             {property.marketTrend === "up" ? (
@@ -142,12 +162,12 @@ export function PropertyCard({
             ) : property.marketTrend === "down" ? (
               <TrendingDown className="h-4 w-4 text-danger" />
             ) : null}
-            <Badge variant="outline" className="capitalize">
+            <Badge variant="outline" className="capitalize text-xs">
               {property.type}
             </Badge>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+        <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -188,9 +208,9 @@ export function PropertyCard({
 
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Monthly Income:</span>
-            <span className="font-semibold text-success">
+            <Badge className="bg-success/20 text-success border-success/30 hover:bg-success/30">
               £{property.monthlyIncome.toLocaleString()}/mo
-            </span>
+            </Badge>
           </div>
 
           {property.owned && (
