@@ -83,11 +83,11 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/[0.08] backdrop-blur-md border border-white/[0.12] rounded-2xl shadow-lg shadow-black/20;
+    @apply bg-white/[0.12] backdrop-blur-md border border-white/[0.18] rounded-2xl shadow-lg shadow-black/20;
   }
 
   .glass-hover {
-    @apply hover:bg-white/[0.12] hover:border-white/[0.18] hover:shadow-xl hover:shadow-black/30 transition-all duration-300;
+    @apply hover:bg-white/[0.16] hover:border-white/[0.24] hover:shadow-xl hover:shadow-black/30 transition-all duration-300;
   }
 
   .gradient-text {
