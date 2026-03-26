@@ -45,8 +45,8 @@
     --gradient-city: linear-gradient(135deg, hsl(230 25% 12%), hsl(260 30% 18%));
     --gradient-hero: linear-gradient(180deg, hsla(230 25% 8% / 0.7), hsla(260 30% 15% / 0.85));
 
-    --muted: 230 15% 22%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 230 15% 28%;
+    --muted-foreground: 215 20% 75%;
 
     --accent: 230 15% 22%;
     --accent-foreground: 210 40% 98%;
