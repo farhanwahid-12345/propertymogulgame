@@ -6,10 +6,10 @@
 
 @layer base {
   :root {
-    --background: 230 25% 12%;
+    --background: 230 25% 15%;
     --foreground: 210 40% 98%;
 
-    --card: 230 20% 16%;
+    --card: 230 20% 20%;
     --card-foreground: 210 40% 98%;
 
     --popover: 230 20% 16%;
@@ -45,8 +45,8 @@
     --gradient-city: linear-gradient(135deg, hsl(230 25% 12%), hsl(260 30% 18%));
     --gradient-hero: linear-gradient(180deg, hsla(230 25% 8% / 0.7), hsla(260 30% 15% / 0.85));
 
-    --muted: 230 15% 22%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 230 15% 28%;
+    --muted-foreground: 215 20% 75%;
 
     --accent: 230 15% 22%;
     --accent-foreground: 210 40% 98%;
@@ -54,8 +54,8 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 230 15% 25%;
-    --input: 230 15% 25%;
+    --border: 230 15% 30%;
+    --input: 230 15% 30%;
     --ring: 142 76% 36%;
 
     --radius: 0.75rem;
@@ -83,11 +83,11 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/[0.08] backdrop-blur-md border border-white/[0.12] rounded-2xl shadow-lg shadow-black/20;
+    @apply bg-white/[0.12] backdrop-blur-md border border-white/[0.18] rounded-2xl shadow-lg shadow-black/20;
   }
 
   .glass-hover {
-    @apply hover:bg-white/[0.12] hover:border-white/[0.18] hover:shadow-xl hover:shadow-black/30 transition-all duration-300;
+    @apply hover:bg-white/[0.16] hover:border-white/[0.24] hover:shadow-xl hover:shadow-black/30 transition-all duration-300;
   }
 
   .gradient-text {
