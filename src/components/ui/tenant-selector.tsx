@@ -1,10 +1,99 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, AlertTriangle, Shield, Star, DollarSign } from "lucide-react";
+import { Users, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// --- Trait system ---
+
+export interface TenantTrait {
+  name: string;
+  emoji: string;
+  color: string; // tailwind border/bg token
+  damageRiskMod: number;   // multiplier (e.g. 0.5 = halve)
+  defaultRiskMod: number;  // multiplier
+  rentMod: number;         // multiplier on rent (e.g. 1.05 = +5%)
+  description: string;
+}
+
+const TRAIT_POOL: TenantTrait[] = [
+  { name: "Meticulous", emoji: "✨", color: "border-sky-400 bg-sky-400/10 text-sky-300", damageRiskMod: 0.5, defaultRiskMod: 1, rentMod: 1, description: "Keeps the place spotless" },
+  { name: "Long-term", emoji: "🏡", color: "border-emerald-400 bg-emerald-400/10 text-emerald-300", damageRiskMod: 0.9, defaultRiskMod: 0.9, rentMod: 1, description: "Plans to stay for years" },
+  { name: "Pet Owner", emoji: "🐕", color: "border-amber-400 bg-amber-400/10 text-amber-300", damageRiskMod: 1.15, defaultRiskMod: 1, rentMod: 1.05, description: "Has a furry friend" },
+  { name: "Smoker", emoji: "🚬", color: "border-orange-400 bg-orange-400/10 text-orange-300", damageRiskMod: 1.2, defaultRiskMod: 1, rentMod: 1, description: "May need redecoration on exit" },
+  { name: "Quiet Professional", emoji: "🤫", color: "border-indigo-400 bg-indigo-400/10 text-indigo-300", damageRiskMod: 0.8, defaultRiskMod: 0.85, rentMod: 1, description: "Barely know they're there" },
+  { name: "DIY Enthusiast", emoji: "🔧", color: "border-teal-400 bg-teal-400/10 text-teal-300", damageRiskMod: 0.7, defaultRiskMod: 1, rentMod: 1, description: "Fixes small issues themselves" },
+  { name: "Late Payer", emoji: "⏰", color: "border-red-400 bg-red-400/10 text-red-300", damageRiskMod: 1, defaultRiskMod: 1.1, rentMod: 1, description: "Pays eventually, just late" },
+  { name: "Young Couple", emoji: "💑", color: "border-pink-400 bg-pink-400/10 text-pink-300", damageRiskMod: 1.05, defaultRiskMod: 0.95, rentMod: 1, description: "May outgrow the property" },
+  { name: "Retiree", emoji: "👴", color: "border-violet-400 bg-violet-400/10 text-violet-300", damageRiskMod: 0.6, defaultRiskMod: 0.8, rentMod: 0.95, description: "Very settled, negotiates lower rent" },
+  { name: "Student", emoji: "🎓", color: "border-cyan-400 bg-cyan-400/10 text-cyan-300", damageRiskMod: 1.25, defaultRiskMod: 0.9, rentMod: 1, description: "Guarantor pays on time" },
+];
+
+// Pick 1-2 random traits, avoiding contradictions
+const pickTraits = (): TenantTrait[] => {
+  const count = Math.random() < 0.4 ? 2 : 1;
+  const shuffled = [...TRAIT_POOL].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+};
+
+// --- Description pools ---
+
+const DESCRIPTIONS: Record<string, string[]> = {
+  premium: [
+    "Recently promoted surgeon, relocating from London",
+    "Tech founder, prefers quiet neighbourhoods",
+    "Senior barrister, impeccable references from 3 landlords",
+    "Consultant engineer returning from overseas contract",
+    "University professor with 15 years' renting history",
+    "NHS Director, relocating for a new hospital role",
+    "Architect couple, both earning well above average",
+    "Senior partner at a law firm, downsizing from owned home",
+  ],
+  standard: [
+    "Primary school teacher, been renting for 5 years",
+    "Couple both working in the NHS, no children",
+    "Civil servant with stable government employment",
+    "Junior accountant, recently promoted",
+    "Nurse practitioner, excellent references from current landlord",
+    "Office manager, lived at previous address for 4 years",
+    "Local council worker, steady income and no debts",
+    "Retail manager with solid savings history",
+  ],
+  budget: [
+    "Single parent working two part-time jobs",
+    "Recent graduate starting first proper job",
+    "Care worker on a zero-hours contract, never missed rent",
+    "Warehouse operative, reliable but low income",
+    "Cleaner with three regular clients, pays weekly",
+    "Security guard doing night shifts, quiet during the day",
+    "Shop assistant saving up, has a guarantor lined up",
+    "Kitchen porter, been at the same restaurant 3 years",
+  ],
+  risky: [
+    "Self-employed tradesman between contracts",
+    "Recently divorced, rebuilding credit after joint mortgage",
+    "Ex-forces veteran transitioning to civilian work",
+    "Gig economy driver, income varies month to month",
+    "Former business owner, company folded last year",
+    "Benefits claimant actively job hunting, references from shelter",
+    "Part-time carer with fluctuating hours",
+    "Young person leaving care system, council support in place",
+  ],
+};
+
+const EMPLOYMENTS: Record<string, string[]> = {
+  premium: ["NHS Consultant", "Senior Engineer", "Solicitor", "University Professor", "Management Consultant", "Surgeon", "Architect", "Finance Director"],
+  standard: ["Teacher", "Nurse", "Accountant", "Office Manager", "Civil Servant", "Police Officer", "Paramedic", "Social Worker"],
+  budget: ["Shop Worker", "Warehouse Staff", "Care Worker", "Security Guard", "Cleaner", "Kitchen Porter", "Delivery Driver", "Receptionist"],
+  risky: ["Unemployed", "Temporary Work", "Benefits", "Gig Work", "Part-time", "Self-Employed", "Zero-hours", "Casual Labour"],
+};
+
+const FIRST_NAMES = ["James", "Sarah", "Michael", "Emma", "David", "Lisa", "John", "Kate", "Tom", "Sophie", "Alex", "Rachel", "Ben", "Amy", "Chris", "Lucy", "Hassan", "Priya", "Liam", "Chloe", "Ollie", "Megan", "Ryan", "Zara"];
+const LAST_NAMES = ["Smith", "Jones", "Brown", "Wilson", "Taylor", "Davies", "Evans", "Thomas", "Roberts", "Johnson", "Williams", "Miller", "Patel", "Khan", "O'Brien", "Garcia", "Singh", "Murphy", "Ali", "Chen"];
+
+// --- Tenant interface ---
 
 export interface Tenant {
   id: string;
@@ -14,10 +103,102 @@ export interface Tenant {
   monthlyIncome: number;
   employmentStatus: string;
   rentMultiplier: number;
-  defaultRisk: number; // 0-100%
-  damageRisk: number; // 0-100%
+  defaultRisk: number;
+  damageRisk: number;
   description: string;
+  traits: TenantTrait[];
 }
+
+// --- Generation with wider variance & overlap ---
+
+const rand = (min: number, max: number) => min + Math.random() * (max - min);
+const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const generateTenantProfiles = (): Tenant[] => {
+  const getName = () => `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
+
+  const makeTenant = (profile: Tenant["profile"], i: number): Tenant => {
+    const traits = pickTraits();
+    const traitDamageMod = traits.reduce((m, t) => m * t.damageRiskMod, 1);
+    const traitDefaultMod = traits.reduce((m, t) => m * t.defaultRiskMod, 1);
+    const traitRentMod = traits.reduce((m, t) => m * t.rentMod, 1);
+
+    // Wider ranges with overlap between tiers
+    const configs = {
+      premium: { credit: [680, 800], income: [5500, 9500], rent: [1.1, 1.25], defRisk: [1, 5], dmgRisk: [0.5, 2] },
+      standard: { credit: [580, 720], income: [2800, 5500], rent: [0.9, 1.1], defRisk: [3, 15], dmgRisk: [1, 4] },
+      budget:  { credit: [480, 650], income: [1800, 3200], rent: [0.75, 0.95], defRisk: [8, 25], dmgRisk: [2, 6] },
+      risky:   { credit: [380, 580], income: [1200, 2800], rent: [1.0, 1.35], defRisk: [15, 45], dmgRisk: [3, 10] },
+    };
+
+    const c = configs[profile];
+    const baseDefaultRisk = rand(c.defRisk[0], c.defRisk[1]);
+    const baseDamageRisk = rand(c.dmgRisk[0], c.dmgRisk[1]);
+    const baseRentMult = rand(c.rent[0], c.rent[1]);
+
+    return {
+      id: `${profile}_${i}_${Date.now()}`,
+      name: getName(),
+      profile,
+      creditScore: randInt(c.credit[0], c.credit[1]),
+      monthlyIncome: randInt(c.income[0], c.income[1]),
+      employmentStatus: pick(EMPLOYMENTS[profile]),
+      rentMultiplier: +(baseRentMult * traitRentMod).toFixed(3),
+      defaultRisk: +Math.min(60, baseDefaultRisk * traitDefaultMod).toFixed(1),
+      damageRisk: +Math.min(15, baseDamageRisk * traitDamageMod).toFixed(1),
+      description: pick(DESCRIPTIONS[profile]),
+      traits,
+    };
+  };
+
+  return [
+    ...Array.from({ length: randInt(2, 3) }, (_, i) => makeTenant("premium", i)),
+    ...Array.from({ length: randInt(3, 4) }, (_, i) => makeTenant("standard", i)),
+    ...Array.from({ length: randInt(2, 3) }, (_, i) => makeTenant("budget", i)),
+    ...Array.from({ length: randInt(1, 2) }, (_, i) => makeTenant("risky", i)),
+  ];
+};
+
+// --- Star rating helper ---
+
+const StarRating = ({ value, max = 5, label }: { value: number; max?: number; label: string }) => {
+  const stars = Math.round(value);
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-muted-foreground">{label}:</span>
+      <div className="flex">
+        {Array.from({ length: max }, (_, i) => (
+          <span key={i} className={cn("text-xs", i < stars ? "text-amber-400" : "text-white/20")}>★</span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Convert risk % to star rating (inverted: low risk = more stars)
+const riskToStars = (risk: number, maxRisk: number): number => {
+  const normalized = 1 - Math.min(risk / maxRisk, 1);
+  return Math.max(1, Math.round(normalized * 5));
+};
+
+// --- Profile styling ---
+
+const ProfileColors: Record<string, string> = {
+  premium: "border-amber-400/30 bg-amber-400/5",
+  standard: "border-sky-400/30 bg-sky-400/5",
+  budget: "border-emerald-400/30 bg-emerald-400/5",
+  risky: "border-red-400/30 bg-red-400/5",
+};
+
+const ProfileEmoji: Record<string, string> = {
+  premium: "👑",
+  standard: "🛡️",
+  budget: "💼",
+  risky: "⚡",
+};
+
+// --- Component ---
 
 interface TenantSelectorProps {
   propertyId: string;
@@ -29,104 +210,25 @@ interface TenantSelectorProps {
   monthsPlayed?: number;
 }
 
-// Generate dynamic tenant pools
-const generateTenantProfiles = (): Tenant[] => {
-  const firstNames = ["James", "Sarah", "Michael", "Emma", "David", "Lisa", "John", "Kate", "Tom", "Sophie", "Alex", "Rachel", "Ben", "Amy", "Chris", "Lucy"];
-  const lastNames = ["Smith", "Jones", "Brown", "Wilson", "Taylor", "Davies", "Evans", "Thomas", "Roberts", "Johnson", "Williams", "Miller", "Davis", "Garcia", "Rodriguez", "Martinez"];
-  
-  const getRandomName = () => {
-    const first = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const last = lastNames[Math.floor(Math.random() * lastNames.length)];
-    return `${first} ${last}`;
-  };
-
-  const profiles = [
-    // Premium tenants (2-3 available)
-    ...Array.from({ length: 2 + Math.floor(Math.random() * 2) }, (_, i) => ({
-      id: `premium_${i + 1}`,
-      name: getRandomName(),
-      profile: "premium" as const,
-      creditScore: 720 + Math.floor(Math.random() * 80),
-      monthlyIncome: 6500 + Math.floor(Math.random() * 3000),
-      employmentStatus: ["NHS Doctor", "Senior Engineer", "Solicitor", "University Professor", "Consultant"][Math.floor(Math.random() * 5)],
-      rentMultiplier: 1.15 + Math.random() * 0.1,
-      defaultRisk: 1 + Math.floor(Math.random() * 3),
-      damageRisk: 0.5 + Math.random() * 0.5,
-      description: "High-income professional with excellent credit history"
-    })),
-    
-    // Standard tenants (3-4 available)
-    ...Array.from({ length: 3 + Math.floor(Math.random() * 2) }, (_, i) => ({
-      id: `standard_${i + 1}`,
-      name: getRandomName(),
-      profile: "standard" as const,
-      creditScore: 620 + Math.floor(Math.random() * 80),
-      monthlyIncome: 3500 + Math.floor(Math.random() * 2000),
-      employmentStatus: ["Teacher", "Nurse", "Accountant", "Manager", "Civil Servant"][Math.floor(Math.random() * 5)],
-      rentMultiplier: 0.95 + Math.random() * 0.15,
-      defaultRisk: 5 + Math.floor(Math.random() * 10),
-      damageRisk: 1 + Math.floor(Math.random() * 2),
-      description: "Stable employment with good references"
-    })),
-    
-    // Budget tenants (2-3 available)  
-    ...Array.from({ length: 2 + Math.floor(Math.random() * 2) }, (_, i) => ({
-      id: `budget_${i + 1}`,
-      name: getRandomName(),
-      profile: "budget" as const,
-      creditScore: 520 + Math.floor(Math.random() * 80),
-      monthlyIncome: 2200 + Math.floor(Math.random() * 1200),
-      employmentStatus: ["Shop Worker", "Warehouse Staff", "Care Worker", "Security Guard", "Cleaner"][Math.floor(Math.random() * 5)],
-      rentMultiplier: 0.8 + Math.random() * 0.15,
-      defaultRisk: 15 + Math.floor(Math.random() * 15),
-      damageRisk: 2 + Math.floor(Math.random() * 3),
-      description: "Lower income but employed and willing to pay market rate"
-    })),
-    
-    // Risky tenants (1-2 available, but pay MORE)
-    ...Array.from({ length: 1 + Math.floor(Math.random() * 2) }, (_, i) => ({
-      id: `risky_${i + 1}`,
-      name: getRandomName(),
-      profile: "risky" as const,
-      creditScore: 420 + Math.floor(Math.random() * 120),
-      monthlyIncome: 1800 + Math.floor(Math.random() * 1000),
-      employmentStatus: ["Unemployed", "Temporary Work", "Benefits", "Gig Work", "Part-time"][Math.floor(Math.random() * 5)],
-      rentMultiplier: 1.1 + Math.random() * 0.3, // Risky tenants pay MORE
-      defaultRisk: 25 + Math.floor(Math.random() * 25),
-      damageRisk: 5 + Math.floor(Math.random() * 5),
-      description: "Higher risk but willing to pay premium rent for accommodation"
-    }))
-  ];
-  
-  return profiles;
-};
-
-const ProfileColors = {
-  premium: "text-luxury border-luxury/20 bg-luxury/5",
-  standard: "text-primary border-primary/20 bg-primary/5",
-  budget: "text-secondary border-secondary/20 bg-secondary/5", 
-  risky: "text-danger border-danger/20 bg-danger/5"
-};
-
-const ProfileIcons = {
-  premium: Star,
-  standard: Shield,
-  budget: Users,
-  risky: AlertTriangle
-};
-
-export function TenantSelector({ 
-  propertyId, 
-  baseRent, 
-  onSelectTenant, 
+export function TenantSelector({
+  propertyId,
+  baseRent,
+  onSelectTenant,
   currentTenant,
-  currentMonthlyRent,
   lastTenantChange,
-  monthsPlayed = 0
+  monthsPlayed = 0,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [tenantProfiles] = useState(() => generateTenantProfiles());
+  const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
+
+  // Regenerate tenant pool every time dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setTenantProfiles(generateTenantProfiles());
+      setSelectedTenant(null);
+    }
+  }, [isOpen]);
 
   const handleSelectTenant = () => {
     if (selectedTenant) {
@@ -140,133 +242,113 @@ export function TenantSelector({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
-          {currentTenant ? (
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {currentTenant.name}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Select Tenant
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            {currentTenant ? currentTenant.name : "Select Tenant"}
+          </div>
         </Button>
       </DialogTrigger>
-      
+
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Choose Tenant for Property</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            Different tenants pay different rents based on their profile. Rent increases 3% annually.
+            Different tenants offer different rent and risk profiles. The market refreshes each time you look!
             {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
-              <span className="text-warning block mt-1">
+              <span className="text-amber-400 block mt-1">
                 ⚠️ Higher-rent tenants unavailable for {3 - (monthsPlayed - lastTenantChange)} more month(s)
               </span>
             )}
           </p>
         </DialogHeader>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
-            const Icon = ProfileIcons[tenant.profile];
-            // Calculate rent adjustment (±10%) based on tenant profile
-            let adjustment = 1.0;
-            if (tenant.profile === 'premium') adjustment = 1.10;
-            else if (tenant.profile === 'budget') adjustment = 0.90;
-            else if (tenant.profile === 'risky') adjustment = 1.05;
-            const potentialRent = Math.floor(baseRent * adjustment);
+            const potentialRent = Math.floor(baseRent * tenant.rentMultiplier);
             const isSelected = selectedTenant?.id === tenant.id;
-            
+            const reliabilityStars = riskToStars(tenant.defaultRisk, 50);
+            const careStars = riskToStars(tenant.damageRisk, 12);
+
             return (
-              <Card 
+              <Card
                 key={tenant.id}
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-md",
+                  "cursor-pointer transition-all hover:shadow-md border",
                   isSelected && "ring-2 ring-primary",
                   ProfileColors[tenant.profile]
                 )}
                 onClick={() => setSelectedTenant(tenant)}
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5" />
-                      <CardTitle className="text-lg">{tenant.name}</CardTitle>
+                      <span className="text-lg">{ProfileEmoji[tenant.profile]}</span>
+                      <CardTitle className="text-base">{tenant.name}</CardTitle>
                     </div>
-                    <Badge variant="outline" className="capitalize">
+                    <Badge variant="outline" className="capitalize text-xs">
                       {tenant.profile}
                     </Badge>
                   </div>
                 </CardHeader>
-                
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{tenant.description}</p>
-                  
+
+                <CardContent className="space-y-2.5">
+                  <p className="text-sm text-muted-foreground italic">{tenant.description}</p>
+
+                  {/* Trait badges */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {tenant.traits.map((trait) => (
+                      <span
+                        key={trait.name}
+                        className={cn("text-xs px-2 py-0.5 rounded-full border", trait.color)}
+                        title={trait.description}
+                      >
+                        {trait.emoji} {trait.name}
+                      </span>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="font-medium">Credit Score:</span>
-                      <br />
-                      <span className={cn(
-                        tenant.creditScore >= 700 ? "text-success" :
-                        tenant.creditScore >= 600 ? "text-warning" : "text-danger"
+                      <span className="text-xs text-muted-foreground">Credit Score</span>
+                      <div className={cn(
+                        "font-semibold",
+                        tenant.creditScore >= 700 ? "text-emerald-400" :
+                        tenant.creditScore >= 600 ? "text-amber-400" : "text-red-400"
                       )}>
                         {tenant.creditScore}
-                      </span>
+                      </div>
                     </div>
-                    
                     <div>
-                      <span className="font-medium">Monthly Income:</span>
-                      <br />
-                      £{tenant.monthlyIncome.toLocaleString()}
+                      <span className="text-xs text-muted-foreground">Income</span>
+                      <div className="font-semibold">£{tenant.monthlyIncome.toLocaleString()}/mo</div>
                     </div>
-                    
                     <div>
-                      <span className="font-medium">Employment:</span>
-                      <br />
-                      {tenant.employmentStatus}
+                      <span className="text-xs text-muted-foreground">Employment</span>
+                      <div className="text-sm">{tenant.employmentStatus}</div>
                     </div>
-                    
                     <div>
-                      <span className="font-medium">Potential Rent:</span>
-                      <br />
-                      <span className="text-success font-semibold">
+                      <span className="text-xs text-muted-foreground">Potential Rent</span>
+                      <div className="font-semibold text-emerald-400 flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
                         £{potentialRent}/mo
-                      </span>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3 text-danger" />
-                      <span>Default Risk: {tenant.defaultRisk}%</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3 text-warning" />
-                      <span>Damage Risk: {tenant.damageRisk}%</span>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <div className="flex items-center gap-1 text-sm">
-                      <DollarSign className="h-4 w-4 text-success" />
-                      <span>Rent Multiplier: {(tenant.rentMultiplier * 100).toFixed(0)}%</span>
-                    </div>
+
+                  {/* Star ratings instead of raw percentages */}
+                  <div className="flex gap-4 pt-1">
+                    <StarRating value={reliabilityStars} label="Reliability" />
+                    <StarRating value={careStars} label="Property Care" />
                   </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
-        
+
         <div className="flex justify-end gap-2 pt-4">
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSelectTenant}
-            disabled={!selectedTenant}
-          >
+          <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+          <Button onClick={handleSelectTenant} disabled={!selectedTenant}>
             Select Tenant
           </Button>
         </div>
