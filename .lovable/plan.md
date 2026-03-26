@@ -1,66 +1,37 @@
 
 
-# Make Tenants More Realistic and Dynamic
+# Fix Contrast and Brightness Issues
 
-## Current Problems
-1. **Every tenant in a tier has the same description** -- all premium tenants say "High-income professional with excellent credit history", all standard say "Stable employment with good references", etc.
-2. **Stats within a tier barely vary** -- a premium tenant is always credit 720-800, income £6500-9500. There's no overlap or surprise between tiers.
-3. **No personality or quirks** -- tenants are just stat blocks. Real tenants have traits that affect how they behave (neat vs messy, quiet vs noisy, long-term vs short-term).
-4. **Tenant pool is static per dialog open** -- the same pool persists for the life of the component. No sense of "these tenants are available right now" changing over time.
-5. **Redundant stats shown** -- both "Rent Multiplier" and "Potential Rent" are displayed; the multiplier is confusing and game-y.
+## Problem
+The dark theme combined with glass-morphism cards (only 8% white opacity) creates insufficient contrast. The `muted-foreground` color (65% lightness) is too dim against the dark background, and glass panels are nearly invisible. Text disappears in several areas.
 
 ## Changes
 
-### 1. Add Personality Traits (`tenant-selector.tsx`)
-Each tenant gets 1-2 randomly assigned traits that have gameplay effects:
-- **Meticulous** -- 50% less damage risk, but demands quick repairs (or leaves)
-- **Long-term** -- unlikely to leave early, +5% rent after 12 months
-- **Pet Owner** -- +15% damage risk, pays 5% rent premium
-- **Smoker** -- +20% damage risk on exit (redecoration needed)
-- **Quiet Professional** -- no noise complaints, slightly lower default risk
-- **DIY Enthusiast** -- sometimes fixes minor issues themselves (-30% damage risk)
-- **Late Payer** -- pays eventually but often 1-2 weeks late (+10% default risk)
-- **Young Couple** -- may outgrow property and leave after 18-24 months
-- **Retiree** -- very long-term, very low damage, but negotiates 5% lower rent
-- **Student** -- high turnover (leaves after 12 months), higher damage, pays on time via guarantor
+### 1. Brighten Base Colors (`src/index.css`)
+- Lighten `--background` from `230 25% 12%` to `230 25% 15%`
+- Lighten `--card` from `230 20% 16%` to `230 20% 20%`
+- Brighten `--muted-foreground` from `215 20% 65%` to `215 20% 75%` (major readability boost)
+- Lighten `--border` from `230 15% 25%` to `230 15% 30%`
+- Lighten `--muted` from `230 15% 22%` to `230 15% 28%`
 
-### 2. Wider Stat Variance with Tier Overlap
-Allow stats to overlap between tiers so players actually have to read each tenant:
-- Standard tenant could have credit score 580-720 (overlaps with budget high-end and premium low-end)
-- A budget tenant with great references might have lower default risk than a careless standard tenant
-- Risky tenants get more variance: some are genuinely recovering (low damage, moderate default) vs chaotic (high everything)
+### 2. Increase Glass Card Opacity (`src/index.css`)
+- Change `.glass` from `bg-white/[0.08]` to `bg-white/[0.12]`
+- Change border from `border-white/[0.12]` to `border-white/[0.18]`
+- Update `.glass-hover` accordingly
 
-### 3. Unique Descriptions Per Tenant
-Replace the single static description per tier with a pool of 8-10 descriptions per tier, randomly assigned. Examples:
-- Premium: "Recently promoted surgeon, relocating from London" / "Tech founder, prefers quiet neighbourhoods"
-- Standard: "Primary school teacher, been renting 5 years" / "Couple both working in the NHS"
-- Budget: "Single parent working two part-time jobs" / "Recent graduate starting first proper job"
-- Risky: "Self-employed tradesman between contracts" / "Recently divorced, rebuilding credit"
+### 3. Fix Specific Text Contrast Issues
+- **`src/components/ui/property-card.tsx`**: The "Annual Yield" uses `text-accent` which resolves to the same dark muted color -- change to `text-[hsl(var(--stat-credit))]` (amber) for visibility
+- **`src/components/ui/game-stats.tsx`**: Ensure all label text uses `text-muted-foreground` which will be brighter after the CSS fix
+- **`src/pages/Index.tsx`**: The hero subtitle `text-muted-foreground` will benefit from the global fix; tab text in inactive state needs `text-foreground/70` instead of inheriting the dim default
 
-### 4. Refresh Tenant Pool Each Time Dialog Opens
-Regenerate the tenant pool every time the dialog opens instead of persisting it in state. This creates a sense of "the market is moving" -- if you close and reopen, different tenants are available.
+### 4. Dialog Readability (`src/components/ui/dialog.tsx`)
+- Add explicit `text-foreground` to DialogContent to ensure all dialog text inherits proper light color on dark background
 
-### 5. Cleaner Card Display
-- Remove the "Rent Multiplier" row (redundant with Potential Rent)
-- Show traits as small colored badges below the description
-- Replace raw "Default Risk: 23%" with friendlier labels: "Reliability: ⭐⭐⭐⭐" (4/5 stars) derived from the risk value
-- Replace raw "Damage Risk" with "Property Care: ⭐⭐⭐" rating
+## Files Modified
 
----
-
-## Technical Details
-
-### File: `src/components/ui/tenant-selector.tsx`
-
-- Add a `traits` field to the `Tenant` interface: `traits: string[]`
-- Create a trait pool with effects mapped to stat modifiers
-- Expand description pools per tier (8-10 each)
-- Widen stat ranges with overlaps between tiers
-- Change `useState(() => generate())` to regenerate on dialog open via `useEffect` on `isOpen`
-- Update card UI: trait badges, star ratings instead of raw percentages, remove multiplier row
-
-### File: `src/hooks/useGameState.ts`
-
-- Read tenant traits when processing monthly events (e.g., "Long-term" trait gives rent bonus after 12 months, "Pet Owner" increases damage check probability)
-- Store traits on the `PropertyTenant` record so they persist
+| File | Changes |
+|---|---|
+| `src/index.css` | Brighten muted-foreground, lighten background/card/border, increase glass opacity |
+| `src/components/ui/property-card.tsx` | Fix yield text color |
+| `src/components/ui/dialog.tsx` | Add explicit text-foreground |
 
