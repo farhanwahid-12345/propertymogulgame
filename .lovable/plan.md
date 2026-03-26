@@ -1,68 +1,66 @@
 
 
-# Visual Overhaul -- Fun, Clean, Kid-Friendly Interface
+# Make Tenants More Realistic and Dynamic
 
-## Design Direction
-Bright, playful but not childish. Rounded corners, emoji accents, vibrant color-coded cards, animated progress bars, and a compact layout that feels like a modern mobile game dashboard. Appealing to kids while keeping all functionality for adults.
+## Current Problems
+1. **Every tenant in a tier has the same description** -- all premium tenants say "High-income professional with excellent credit history", all standard say "Stable employment with good references", etc.
+2. **Stats within a tier barely vary** -- a premium tenant is always credit 720-800, income £6500-9500. There's no overlap or surprise between tiers.
+3. **No personality or quirks** -- tenants are just stat blocks. Real tenants have traits that affect how they behave (neat vs messy, quiet vs noisy, long-term vs short-term).
+4. **Tenant pool is static per dialog open** -- the same pool persists for the life of the component. No sense of "these tenants are available right now" changing over time.
+5. **Redundant stats shown** -- both "Rent Multiplier" and "Potential Rent" are displayed; the multiplier is confusing and game-y.
 
 ## Changes
 
-### 1. Color System + Glass Cards (`index.css`, `tailwind.config.ts`)
-- Replace the dark slate gradient background with a friendlier deep blue-to-purple gradient
-- Add `.glass` utility class: `bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl`
-- Add `pulse-glow` keyframe for the clock progress bar
-- Increase default border-radius to `0.75rem` for softer feel
-- Add fun color accents: emerald for money, sky-blue for cash flow, amber for credit, violet for level
+### 1. Add Personality Traits (`tenant-selector.tsx`)
+Each tenant gets 1-2 randomly assigned traits that have gameplay effects:
+- **Meticulous** -- 50% less damage risk, but demands quick repairs (or leaves)
+- **Long-term** -- unlikely to leave early, +5% rent after 12 months
+- **Pet Owner** -- +15% damage risk, pays 5% rent premium
+- **Smoker** -- +20% damage risk on exit (redecoration needed)
+- **Quiet Professional** -- no noise complaints, slightly lower default risk
+- **DIY Enthusiast** -- sometimes fixes minor issues themselves (-30% damage risk)
+- **Late Payer** -- pays eventually but often 1-2 weeks late (+10% default risk)
+- **Young Couple** -- may outgrow property and leave after 18-24 months
+- **Retiree** -- very long-term, very low damage, but negotiates 5% lower rent
+- **Student** -- high turnover (leaves after 12 months), higher damage, pays on time via guarantor
 
-### 2. Compact Hero with Integrated Clock (`Index.tsx`, `game-clock.tsx`)
-- Shrink hero from 300px to 160px
-- Add emoji to the title: "Property Tycoon 🏘️"
-- Move game clock into the hero as an overlay bar at the bottom
-- Add playful subtitle: "Build your empire, one house at a time!"
-- Animated gradient text for the title
+### 2. Wider Stat Variance with Tier Overlap
+Allow stats to overlap between tiers so players actually have to read each tenant:
+- Standard tenant could have credit score 580-720 (overlaps with budget high-end and premium low-end)
+- A budget tenant with great references might have lower default risk than a careless standard tenant
+- Risky tenants get more variance: some are genuinely recovering (low damage, moderate default) vs chaotic (high everything)
 
-### 3. Stats Bar Redesign (`game-stats.tsx`)
-- Replace 4 plain white cards with a single glass card containing 4 color-coded stat cells
-- Each cell: colored left-border accent + emoji icon + large bold value + small label
-  - 💰 Net Worth (emerald border)
-  - 📈 Cash Flow (blue/red border based on positive/negative)
-  - 🏠 Portfolio + Credit (amber border)
-  - ⭐ Level (violet border) with animated XP bar
-- Collapse Market Conditions and Tenant Events into expandable sections below the main stats
-- More compact -- one row instead of a 2x4 grid
+### 3. Unique Descriptions Per Tenant
+Replace the single static description per tier with a pool of 8-10 descriptions per tier, randomly assigned. Examples:
+- Premium: "Recently promoted surgeon, relocating from London" / "Tech founder, prefers quiet neighbourhoods"
+- Standard: "Primary school teacher, been renting 5 years" / "Couple both working in the NHS"
+- Budget: "Single parent working two part-time jobs" / "Recent graduate starting first proper job"
+- Risky: "Self-employed tradesman between contracts" / "Recently divorced, rebuilding credit"
 
-### 4. Action Buttons as Tiles (`Index.tsx`)
-- Replace cramped button row with icon tiles in a horizontal strip
-- Estate Agent: 🏪 green-tinted glass tile
-- Auction House: 🔨 amber-tinted glass tile
-- Reset: 🔄 subtle ghost tile
-- Each tile: icon + label, rounded-2xl, hover scale effect
+### 4. Refresh Tenant Pool Each Time Dialog Opens
+Regenerate the tenant pool every time the dialog opens instead of persisting it in state. This creates a sense of "the market is moving" -- if you close and reopen, different tenants are available.
 
-### 5. Property Cards Refresh (`property-card.tsx`)
-- Add colored top-border by type: blue (residential), purple (commercial), gold (luxury)
-- Add type emoji badges: 🏠 🏢 👑
-- Style monthly income as a bright green pill badge
-- Add subtle hover glow matching property type color
-- Tighter spacing, rounded-2xl corners
+### 5. Cleaner Card Display
+- Remove the "Rent Multiplier" row (redundant with Potential Rent)
+- Show traits as small colored badges below the description
+- Replace raw "Default Risk: 23%" with friendlier labels: "Reliability: ⭐⭐⭐⭐" (4/5 stars) derived from the risk value
+- Replace raw "Damage Risk" with "Property Care: ⭐⭐⭐" rating
 
-### 6. Portfolio Section (`Index.tsx`)
-- Glass card wrapper with property count badge in header
-- Add summary row: total value | total monthly income | avg yield
-- Fun header: "Your Empire 🏰" with count badge
+---
 
-### 7. Tabs with Icons (`Index.tsx`)
-- Market tab: "🏪 Market"
-- Bank tab: "🏦 Bank"
-- Active tab gets a colored bottom-border glow
+## Technical Details
 
-## Files Modified
+### File: `src/components/ui/tenant-selector.tsx`
 
-| File | Changes |
-|---|---|
-| `src/index.css` | Glass utility, new gradient, pulse-glow keyframe, larger radius |
-| `tailwind.config.ts` | Pulse-glow animation, updated gradient-city |
-| `src/pages/Index.tsx` | Compact hero, integrated clock, action tiles, glass portfolio, summary row, tab icons |
-| `src/components/ui/game-stats.tsx` | Single-bar layout, colored accents, emoji icons, collapsible sections |
-| `src/components/ui/game-clock.tsx` | Inline variant for hero overlay, animated progress |
-| `src/components/ui/property-card.tsx` | Type borders, emoji badges, income pill, hover glow, rounded corners |
+- Add a `traits` field to the `Tenant` interface: `traits: string[]`
+- Create a trait pool with effects mapped to stat modifiers
+- Expand description pools per tier (8-10 each)
+- Widen stat ranges with overlaps between tiers
+- Change `useState(() => generate())` to regenerate on dialog open via `useEffect` on `isOpen`
+- Update card UI: trait badges, star ratings instead of raw percentages, remove multiplier row
+
+### File: `src/hooks/useGameState.ts`
+
+- Read tenant traits when processing monthly events (e.g., "Long-term" trait gives rent bonus after 12 months, "Pet Owner" increases damage check probability)
+- Store traits on the `PropertyTenant` record so they persist
 
