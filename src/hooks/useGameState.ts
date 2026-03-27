@@ -1241,7 +1241,7 @@ export function useGameState() {
           monthsPlayed: prev.monthsPlayed + 1,
           timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
-          creditScore: Math.min(850, prev.creditScore + creditScoreImprovement),
+          creditScore: Math.max(300, Math.min(850, prev.creditScore + creditScoreImprovement)),
           lastYearlyGrowth: newLastYearlyGrowth,
           mortgageProviderRates: newProviderRates,
           yearlyNetProfit: finalYearlyProfit,
