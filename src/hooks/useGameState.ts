@@ -1413,7 +1413,6 @@ export function useGameState() {
         experience: prev.experience + Math.floor(property.price / 10000),
         creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdjust)),
       };
-      };
     });
 
     setEstateAgentProperties(prev => prev.filter(p => p.id !== property.id));
