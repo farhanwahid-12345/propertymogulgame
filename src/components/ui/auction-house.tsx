@@ -533,7 +533,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <div className="space-y-2">
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Current Bid</p>
-                        <p className="text-3xl font-bold text-green-600">
+                        <p className="text-3xl font-bold text-green-400">
                           £{liveAuction.currentBid.toLocaleString()}
                         </p>
                         <p className="text-sm text-muted-foreground">
