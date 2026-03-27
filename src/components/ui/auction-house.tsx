@@ -521,7 +521,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                       <p className="text-sm">Market Value: £{liveAuction.property.value.toLocaleString()}</p>
                       <p className="text-sm">Reserve: £{liveAuction.reservePrice.toLocaleString()}</p>
                       {selectedMortgagePercent > 0 && (
-                        <p className="text-xs text-blue-600">
+                         <p className="text-xs text-blue-400">
                           Financing: {selectedMortgagePercent}% mortgage
                         </p>
                       )}
