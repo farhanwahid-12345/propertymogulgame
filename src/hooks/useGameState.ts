@@ -471,7 +471,7 @@ export function useGameState() {
       monthsPlayed: parsedState.monthsPlayed ?? 0,
       timeUntilNextMonth: parsedState.timeUntilNextMonth ?? 180,
       isBankrupt: parsedState.isBankrupt ?? false,
-      creditScore: parsedState.creditScore ?? 650,
+      creditScore: parsedState.creditScore ?? 580,
       currentMarketRate: parsedState.currentMarketRate ?? BASE_MARKET_RATE,
       tenantEvents: parsedState.tenantEvents ?? [],
       voidPeriods: parsedState.voidPeriods ?? [],
