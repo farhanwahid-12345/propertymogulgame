@@ -791,7 +791,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold text-green-600">
+                            <p className="font-semibold text-green-400">
                               £{Math.floor(listing.highestBid).toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">Current bid</p>
