@@ -644,11 +644,16 @@ export function EstateAgentWindow({
                                 <SelectValue placeholder="Select provider" />
                               </SelectTrigger>
                               <SelectContent>
-                                {mortgageProviders.map(provider => (
+                                {mortgageProviders
+                                  .filter((provider: any) => creditScore >= provider.minCreditScore && (mortgagePercentage[0] / 100) <= provider.maxLTV)
+                                  .map((provider: any) => (
                                   <SelectItem key={provider.id} value={provider.id}>
                                     {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
                                   </SelectItem>
                                 ))}
+                                {mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore && (mortgagePercentage[0] / 100) <= p.maxLTV).length === 0 && (
+                                  <SelectItem value="none" disabled>No providers available for this LTV</SelectItem>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>
