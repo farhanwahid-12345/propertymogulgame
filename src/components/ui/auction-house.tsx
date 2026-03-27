@@ -652,7 +652,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           </div>
                           <div>
                             <span className="text-muted-foreground">Monthly Income:</span>
-                            <span className="ml-1 font-medium text-green-600">
+                            <span className="ml-1 font-medium text-green-400">
                               £{property.monthlyIncome.toLocaleString()}/mo
                             </span>
                           </div>
