@@ -659,7 +659,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                         </div>
 
                         {selectedMortgagePercent > 0 && (
-                          <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                          <div className="mt-2 text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
                             Cash needed: £{Math.floor(property.value * (1 - selectedMortgagePercent / 100) + property.value * 0.04 + 600).toLocaleString()} 
                             ({selectedMortgagePercent}% mortgage)
                           </div>
