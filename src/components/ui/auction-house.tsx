@@ -634,7 +634,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </Badge>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-bold text-orange-600">
+                            <p className="text-lg font-bold text-orange-400">
                               £{property.value.toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">
