@@ -502,7 +502,7 @@ export function useGameState() {
       monthsPlayed: 0,
       timeUntilNextMonth: 180,
       isBankrupt: false,
-      creditScore: 650,
+      creditScore: 580,
       currentMarketRate: BASE_MARKET_RATE,
       tenantEvents: [],
       voidPeriods: [],
