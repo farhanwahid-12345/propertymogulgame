@@ -440,11 +440,11 @@ export function EstateAgentWindow({
   };
 
   const getPricingGuidance = (ratio: number) => {
-    if (ratio < 0.95) return { message: "Below market — expect a bidding war with fast offers", color: "text-green-600", bg: "bg-green-50" };
-    if (ratio <= 1.0) return { message: "At market value — offers will come quickly", color: "text-green-600", bg: "bg-green-50" };
-    if (ratio <= 1.1) return { message: "Slightly above market — offers will be slower", color: "text-yellow-600", bg: "bg-yellow-50" };
-    if (ratio <= 1.3) return { message: "Overpriced — expect low offers well below asking", color: "text-orange-600", bg: "bg-orange-50" };
-    return { message: "Significantly overpriced — very rare, very low offers", color: "text-red-600", bg: "bg-red-50" };
+    if (ratio < 0.95) return { message: "Below market — expect a bidding war with fast offers", color: "text-green-400", bg: "bg-green-500/10" };
+    if (ratio <= 1.0) return { message: "At market value — offers will come quickly", color: "text-green-400", bg: "bg-green-500/10" };
+    if (ratio <= 1.1) return { message: "Slightly above market — offers will be slower", color: "text-yellow-400", bg: "bg-yellow-500/10" };
+    if (ratio <= 1.3) return { message: "Overpriced — expect low offers well below asking", color: "text-orange-400", bg: "bg-orange-500/10" };
+    return { message: "Significantly overpriced — very rare, very low offers", color: "text-red-400", bg: "bg-red-500/10" };
   };
 
   const getExpectedOfferRange = (marketValue: number, ratio: number) => {
