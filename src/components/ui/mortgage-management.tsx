@@ -239,12 +239,12 @@ export function MortgageManagement({
                 </div>
 
                 {singleProvider && (
-                  <Card className="bg-blue-50 border-blue-200">
+                  <Card className="bg-blue-500/10 border-blue-500/30">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-muted-foreground">Monthly Payment:</span>
-                          <span className="ml-1 font-bold text-blue-700">
+                          <span className="ml-1 font-bold text-blue-400">
                             £{singleMonthlyPayment.toLocaleString()}
                           </span>
                         </div>
