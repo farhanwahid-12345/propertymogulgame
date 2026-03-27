@@ -2057,7 +2057,8 @@ export function useGameState() {
         mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
         tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
         voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId),
-        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
+        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + 5)),
       };
     });
   }, []);
