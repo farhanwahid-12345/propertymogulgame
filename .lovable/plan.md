@@ -1,37 +1,71 @@
 
 
-# Fix Contrast and Brightness Issues
+# Fix Auction Contrast + Make Mortgages Harder
 
-## Problem
-The dark theme combined with glass-morphism cards (only 8% white opacity) creates insufficient contrast. The `muted-foreground` color (65% lightness) is too dim against the dark background, and glass panels are nearly invisible. Text disappears in several areas.
+## Problem 1: Auction House Text Unreadable
+The auction house uses hardcoded light-theme colors (`bg-blue-50`, `bg-red-50`, `bg-white`, `text-red-700`, etc.) that clash with the dark glass-morphism theme. Text becomes invisible against these backgrounds.
+
+## Problem 2: Mortgages Too Easy in Estate Agent
+- The estate agent mortgage slider is hardcoded to max 75% with no credit/LTV eligibility check
+- All mortgage providers are listed without disabling ineligible ones
+- The `buyProperty` function in `useGameState.ts` never calls `checkMortgageEligibility` -- it blindly creates the mortgage
+- Credit score barely moves: only +1/month if DTI is healthy, starting at 650 which already qualifies for Halifax (640 min)
+
+## Problem 3: Credit Score Too Static
+- Gains: +1/month (with healthy DTI) and +15 for paying off a mortgage
+- Losses: -2/month if DTI > 60%
+- Starting at 650, a player qualifies for Halifax immediately and reaches Nationwide (680) in ~30 months with zero effort
+
+---
 
 ## Changes
 
-### 1. Brighten Base Colors (`src/index.css`)
-- Lighten `--background` from `230 25% 12%` to `230 25% 15%`
-- Lighten `--card` from `230 20% 16%` to `230 20% 20%`
-- Brighten `--muted-foreground` from `215 20% 65%` to `215 20% 75%` (major readability boost)
-- Lighten `--border` from `230 15% 25%` to `230 15% 30%`
-- Lighten `--muted` from `230 15% 22%` to `230 15% 28%`
+### 1. Fix Auction House Colors (`src/components/ui/auction-house.tsx`)
+Replace all hardcoded light-theme colors with dark-theme-compatible equivalents:
+- `bg-blue-50` → `glass` or `bg-[hsl(var(--card))]`
+- `bg-red-50` / `border-red-500` → `glass border-red-500/50`
+- `bg-orange-50` → glass styling
+- `bg-white` (bid history, auctioneer message) → `bg-[hsl(var(--muted))]`
+- `text-red-700` → `text-red-400`
+- `text-orange-600/700` → `text-orange-400`
+- `text-blue-600` → `text-blue-400`
+- `text-green-600` → `text-green-400`
 
-### 2. Increase Glass Card Opacity (`src/index.css`)
-- Change `.glass` from `bg-white/[0.08]` to `bg-white/[0.12]`
-- Change border from `border-white/[0.12]` to `border-white/[0.18]`
-- Update `.glass-hover` accordingly
+### 2. Enforce Mortgage Eligibility in Estate Agent (`src/components/ui/estate-agent-window.tsx`)
+- Calculate max LTV the player actually qualifies for based on credit score, and cap the mortgage slider to that value (instead of hardcoded 75%)
+- Filter provider dropdown to only show providers the player qualifies for (credit score + LTV check)
+- Show a warning if credit score is too low for any mortgage ("Credit too low for mortgage financing")
+- If no providers match, disable the mortgage slider entirely
 
-### 3. Fix Specific Text Contrast Issues
-- **`src/components/ui/property-card.tsx`**: The "Annual Yield" uses `text-accent` which resolves to the same dark muted color -- change to `text-[hsl(var(--stat-credit))]` (amber) for visibility
-- **`src/components/ui/game-stats.tsx`**: Ensure all label text uses `text-muted-foreground` which will be brighter after the CSS fix
-- **`src/pages/Index.tsx`**: The hero subtitle `text-muted-foreground` will benefit from the global fix; tab text in inactive state needs `text-foreground/70` instead of inheriting the dim default
+### 3. Add Eligibility Check to Buy Function (`src/hooks/useGameState.ts`)
+- In `buyProperty`, call `checkMortgageEligibility` before creating the mortgage
+- If rejected, show a toast with the reason and abort the purchase
+- This catches edge cases where the UI might not fully prevent ineligible applications
 
-### 4. Dialog Readability (`src/components/ui/dialog.tsx`)
-- Add explicit `text-foreground` to DialogContent to ensure all dialog text inherits proper light color on dark background
+### 4. Make Credit Score More Dynamic (`src/hooks/useGameState.ts`)
+**Slower gains, more penalties, more meaningful progression:**
+- Reduce monthly mortgage-holding bonus from +1 to +0.5 (rounds to 0 or 1 alternating)
+- Lower starting credit score from 650 to 580 (below Halifax's 640 minimum)
+- Add new credit events:
+  - Missed rent (tenant default): -10 credit score
+  - Property damage unrepaired for 2+ months: -5
+  - Successful property sale: +5
+  - Each consecutive 6 months with no defaults: +3 bonus
+  - Taking on very high LTV (>85%): -3 per mortgage at that level
+  - Paying off overdraft: +5
+- Cap at 850, floor at 300
+
+### 5. Fix Auction Dialog Colors (`src/components/ui/auction-dialog.tsx`)
+- Same pattern: replace `bg-muted/50` text visibility issues
+
+---
 
 ## Files Modified
 
 | File | Changes |
 |---|---|
-| `src/index.css` | Brighten muted-foreground, lighten background/card/border, increase glass opacity |
-| `src/components/ui/property-card.tsx` | Fix yield text color |
-| `src/components/ui/dialog.tsx` | Add explicit text-foreground |
+| `src/components/ui/auction-house.tsx` | Replace all hardcoded light colors with dark-theme classes |
+| `src/components/ui/auction-dialog.tsx` | Fix muted background contrast |
+| `src/components/ui/estate-agent-window.tsx` | Add credit-based mortgage eligibility, cap slider to qualified LTV, filter providers |
+| `src/hooks/useGameState.ts` | Add eligibility check in buyProperty, lower starting credit to 580, add credit events for defaults/sales/damage |
 
