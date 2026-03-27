@@ -676,7 +676,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           <Button 
                             size="sm" 
                             variant="outline"
-                            className="flex-1 border-orange-400 text-orange-600 hover:bg-orange-50"
+                            className="flex-1 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                             onClick={() => startLiveAuction(property, true)}
                           >
                             ⚡ Express (15s)
