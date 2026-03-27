@@ -666,9 +666,9 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                         )}
                         
                         <div className="mt-3 flex gap-2">
-                          <Button 
+                           <Button 
                             size="sm" 
-                            className="flex-1 bg-orange-600 hover:bg-orange-700"
+                            className="flex-1 bg-orange-500 hover:bg-orange-600"
                             onClick={() => startLiveAuction(property, false)}
                           >
                             Standard (30s)
