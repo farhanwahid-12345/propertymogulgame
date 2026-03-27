@@ -502,13 +502,13 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
             {/* Live Auction Interface */}
             {liveAuction && (
-              <Card className="border-red-500 border-2 bg-red-50">
+              <Card className="border-red-500/50 border-2 bg-red-500/10">
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-xl text-red-700">
+                    <CardTitle className="text-xl text-red-400">
                       🔴 LIVE AUCTION - Lot {liveAuction.property.id}
                     </CardTitle>
-                    <div className="text-2xl font-bold text-red-600">
+                    <div className="text-2xl font-bold text-red-400">
                       {formatTime(liveAuction.timeRemaining)}
                     </div>
                   </div>
