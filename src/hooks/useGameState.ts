@@ -1410,7 +1410,9 @@ export function useGameState() {
         cash: prev.cash - cashRequired,
         ownedProperties: [...prev.ownedProperties, purchasedProperty],
         mortgages: newMortgage ? [...prev.mortgages, newMortgage] : prev.mortgages,
-        experience: prev.experience + Math.floor(property.price / 10000)
+        experience: prev.experience + Math.floor(property.price / 10000),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdjust)),
+      };
       };
     });
 
