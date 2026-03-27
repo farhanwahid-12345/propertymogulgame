@@ -600,17 +600,39 @@ export function EstateAgentWindow({
                       
                       {/* Mortgage options before completing */}
                       <div className="space-y-2">
-                        <Label>Mortgage: {mortgagePercentage[0]}%</Label>
-                        <Slider
-                          value={mortgagePercentage}
-                          onValueChange={setMortgagePercentage}
-                          min={0}
-                          max={75}
-                          step={5}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
-                        </p>
+                        {(() => {
+                          // Calculate max LTV player qualifies for
+                          const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
+                          const maxQualifiedLTV = eligibleProviders.length > 0 
+                            ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
+                            : 0;
+                          const maxLTVPercent = Math.floor(maxQualifiedLTV * 100);
+                          
+                          return (
+                            <>
+                              {maxLTVPercent === 0 ? (
+                                <div className="p-2 rounded border border-destructive/50 bg-destructive/10 text-sm text-destructive">
+                                  <AlertCircle className="h-4 w-4 inline mr-1" />
+                                  Credit score too low for any mortgage ({creditScore}). Cash purchase only.
+                                </div>
+                              ) : (
+                                <>
+                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% with your credit)</Label>
+                                  <Slider
+                                    value={mortgagePercentage}
+                                    onValueChange={setMortgagePercentage}
+                                    min={0}
+                                    max={maxLTVPercent}
+                                    step={5}
+                                  />
+                                </>
+                              )}
+                              <p className="text-sm text-muted-foreground">
+                                Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {mortgagePercentage[0] > 0 && (
