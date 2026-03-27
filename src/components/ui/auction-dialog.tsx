@@ -120,7 +120,7 @@ export function AuctionDialog({ property, onAuction }: AuctionDialogProps) {
 
           <Separator />
 
-          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+          <div className="bg-[hsl(var(--muted))] p-4 rounded-lg space-y-2">
             <h4 className="font-medium text-sm">Auction Terms</h4>
             <ul className="text-xs text-muted-foreground space-y-1">
               <li>• Sale completes in 1 day</li>
