@@ -1471,9 +1471,17 @@ export function useGameState() {
       }
 
       let newMortgage: Mortgage | null = null;
+      let creditAdjust = 0;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-        // Use dynamic rate from game state
+        
+        // Eligibility check
+        const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
+          const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
+          return total + (hasTenant ? prop.monthlyIncome : 0);
+        }, 0);
+        const currentDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
         const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = dynamicRate / 12;
@@ -1481,6 +1489,25 @@ export function useGameState() {
         const monthlyPayment = mortgageType === 'interest-only'
           ? mortgageAmount * monthlyRate
           : mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+        
+        const ltvRequired = mortgagePercentage / 100;
+        const eligibility = checkMortgageEligibility(
+          provider.id, prev.creditScore, ltvRequired, currentDTI, monthlyPayment, totalRentalIncome
+        );
+        
+        if (!eligibility.eligible) {
+          toast({
+            title: "Mortgage Rejected",
+            description: eligibility.reason || "Application declined",
+            variant: "destructive"
+          });
+          return prev;
+        }
+        
+        if (ltvRequired > 0.85) {
+          creditAdjust -= 3;
+        }
+        
         newMortgage = {
           id: `${property.id}_${Date.now()}`,
           propertyId: property.id,
