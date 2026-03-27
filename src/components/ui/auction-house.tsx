@@ -421,7 +421,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100">
+        <Button variant="outline" className="bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20">
           <Gavel className="h-4 w-4 mr-2" />
           Auction House
         </Button>
