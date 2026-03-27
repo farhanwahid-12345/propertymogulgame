@@ -449,7 +449,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           <TabsContent value="buy" className="space-y-4">
             {/* Mortgage Selection - shown before entering auction */}
             {!liveAuction && (
-              <Card className="border-blue-200 bg-blue-50">
+              <Card className="border-blue-500/30 bg-blue-500/10">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Landmark className="h-4 w-4" />
