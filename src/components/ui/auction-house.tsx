@@ -580,16 +580,16 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     </div>
                   </div>
                   
-                  <div className="bg-white p-3 rounded border">
+                   <div className="bg-[hsl(var(--muted))] p-3 rounded border border-border">
                     <p className="font-medium text-center">{auctioneerMessage}</p>
                   </div>
                   
                   {/* Bid History */}
-                  <div className="bg-white rounded border max-h-32 overflow-y-auto">
-                    <div className="p-2 border-b font-medium text-sm">Bid History</div>
+                  <div className="bg-[hsl(var(--muted))] rounded border border-border max-h-32 overflow-y-auto">
+                    <div className="p-2 border-b border-border font-medium text-sm">Bid History</div>
                     <div className="space-y-1 p-2">
                       {liveAuction.bidHistory.slice(-5).reverse().map((bid, index) => (
-                        <div key={index} className={`flex justify-between text-sm ${bid.isUser ? 'font-bold text-blue-600' : ''}`}>
+                        <div key={index} className={`flex justify-between text-sm ${bid.isUser ? 'font-bold text-blue-400' : ''}`}>
                           <span>{bid.bidder}</span>
                           <span>£{bid.amount.toLocaleString()}</span>
                         </div>
