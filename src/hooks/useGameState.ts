@@ -1082,12 +1082,37 @@ export function useGameState() {
         // Improve credit score - conditional on DTI health
         let creditScoreImprovement = 0;
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
-        if (prev.mortgages.length > 0 && playerDTI < 0.40) {
-          creditScoreImprovement += 1; // Only improve if DTI is healthy
+        
+        // Slower monthly gain: +1 only on even months (effectively +0.5/month avg)
+        if (prev.mortgages.length > 0 && playerDTI < 0.40 && prev.monthsPlayed % 2 === 0) {
+          creditScoreImprovement += 1; // Only improve every other month if DTI is healthy
         }
         // DTI penalty on credit score
         if (playerDTI > 0.60) {
           creditScoreImprovement -= 2; // Flat penalty for high DTI
+        }
+        
+        // Tenant default penalty: -10 per default this month
+        const thisMonthDefaults = prev.tenantEvents.filter(
+          e => e.type === 'default' && e.month === prev.monthsPlayed
+        );
+        creditScoreImprovement -= thisMonthDefaults.length * 10;
+        
+        // Unrepaired damage penalty: -5 for each damage older than 2 months
+        const oldDamages = prev.pendingDamages.filter(d => {
+          const monthsOld = (Date.now() - d.timestamp) / (1000 * 60 * 60 * 24 * 30);
+          return monthsOld >= 2;
+        });
+        creditScoreImprovement -= oldDamages.length * 5;
+        
+        // Consecutive 6 months with no defaults bonus
+        if (prev.monthsPlayed > 0 && prev.monthsPlayed % 6 === 0) {
+          const recentDefaults = prev.tenantEvents.filter(
+            e => e.type === 'default' && e.month > prev.monthsPlayed - 6
+          );
+          if (recentDefaults.length === 0 && prev.ownedProperties.length > 0) {
+            creditScoreImprovement += 3;
+          }
         }
 
         // Check for paid-off mortgages
