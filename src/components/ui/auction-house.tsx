@@ -622,7 +622,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                   {auctionProperties.map((property) => (
                     <Card 
                       key={property.id} 
-                      className="cursor-pointer transition-colors border-orange-200 hover:border-orange-400"
+                      className="cursor-pointer transition-colors border-orange-500/30 hover:border-orange-500/50"
                     >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
