@@ -82,7 +82,7 @@ export function MortgageManagement({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100">
+        <Button variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20">
           <Calculator className="h-4 w-4 mr-2" />
           Manage Mortgages
         </Button>
@@ -239,12 +239,12 @@ export function MortgageManagement({
                 </div>
 
                 {singleProvider && (
-                  <Card className="bg-blue-50 border-blue-200">
+                  <Card className="bg-blue-500/10 border-blue-500/30">
                     <CardContent className="p-4">
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-muted-foreground">Monthly Payment:</span>
-                          <span className="ml-1 font-bold text-blue-700">
+                          <span className="ml-1 font-bold text-blue-400">
                             £{singleMonthlyPayment.toLocaleString()}
                           </span>
                         </div>

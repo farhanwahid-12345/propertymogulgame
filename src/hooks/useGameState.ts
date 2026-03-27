@@ -471,7 +471,7 @@ export function useGameState() {
       monthsPlayed: parsedState.monthsPlayed ?? 0,
       timeUntilNextMonth: parsedState.timeUntilNextMonth ?? 180,
       isBankrupt: parsedState.isBankrupt ?? false,
-      creditScore: parsedState.creditScore ?? 650,
+      creditScore: parsedState.creditScore ?? 580,
       currentMarketRate: parsedState.currentMarketRate ?? BASE_MARKET_RATE,
       tenantEvents: parsedState.tenantEvents ?? [],
       voidPeriods: parsedState.voidPeriods ?? [],
@@ -502,7 +502,7 @@ export function useGameState() {
       monthsPlayed: 0,
       timeUntilNextMonth: 180,
       isBankrupt: false,
-      creditScore: 650,
+      creditScore: 580,
       currentMarketRate: BASE_MARKET_RATE,
       tenantEvents: [],
       voidPeriods: [],
@@ -1082,12 +1082,37 @@ export function useGameState() {
         // Improve credit score - conditional on DTI health
         let creditScoreImprovement = 0;
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
-        if (prev.mortgages.length > 0 && playerDTI < 0.40) {
-          creditScoreImprovement += 1; // Only improve if DTI is healthy
+        
+        // Slower monthly gain: +1 only on even months (effectively +0.5/month avg)
+        if (prev.mortgages.length > 0 && playerDTI < 0.40 && prev.monthsPlayed % 2 === 0) {
+          creditScoreImprovement += 1; // Only improve every other month if DTI is healthy
         }
         // DTI penalty on credit score
         if (playerDTI > 0.60) {
           creditScoreImprovement -= 2; // Flat penalty for high DTI
+        }
+        
+        // Tenant default penalty: -10 per default this month
+        const thisMonthDefaults = prev.tenantEvents.filter(
+          e => e.type === 'default' && e.month === prev.monthsPlayed
+        );
+        creditScoreImprovement -= thisMonthDefaults.length * 10;
+        
+        // Unrepaired damage penalty: -5 for each damage older than 2 months
+        const oldDamages = prev.pendingDamages.filter(d => {
+          const monthsOld = (Date.now() - d.timestamp) / (1000 * 60 * 60 * 24 * 30);
+          return monthsOld >= 2;
+        });
+        creditScoreImprovement -= oldDamages.length * 5;
+        
+        // Consecutive 6 months with no defaults bonus
+        if (prev.monthsPlayed > 0 && prev.monthsPlayed % 6 === 0) {
+          const recentDefaults = prev.tenantEvents.filter(
+            e => e.type === 'default' && e.month > prev.monthsPlayed - 6
+          );
+          if (recentDefaults.length === 0 && prev.ownedProperties.length > 0) {
+            creditScoreImprovement += 3;
+          }
         }
 
         // Check for paid-off mortgages
@@ -1216,7 +1241,7 @@ export function useGameState() {
           monthsPlayed: prev.monthsPlayed + 1,
           timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
           isBankrupt,
-          creditScore: Math.min(850, prev.creditScore + creditScoreImprovement),
+          creditScore: Math.max(300, Math.min(850, prev.creditScore + creditScoreImprovement)),
           lastYearlyGrowth: newLastYearlyGrowth,
           mortgageProviderRates: newProviderRates,
           yearlyNetProfit: finalYearlyProfit,
@@ -1304,8 +1329,17 @@ export function useGameState() {
       }
 
       let newMortgage: Mortgage | null = null;
+      let creditAdjust = 0;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
+        
+        // Eligibility check
+        const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
+          const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
+          return total + (hasTenant ? prop.monthlyIncome : 0);
+        }, 0);
+        const currentDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        
         // Use dynamic rate from game state
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
         const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + 
@@ -1316,10 +1350,28 @@ export function useGameState() {
         if (mortgageType === 'interest-only') {
           monthlyPayment = mortgageAmount * monthlyRate;
         } else {
-          // Repayment mortgage calculation
           const totalPayments = termYears * 12;
           monthlyPayment = mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
             (Math.pow(1 + monthlyRate, totalPayments) - 1);
+        }
+        
+        const ltvRequired = mortgagePercentage / 100;
+        const eligibility = checkMortgageEligibility(
+          provider.id, prev.creditScore, ltvRequired, currentDTI, monthlyPayment, totalRentalIncome
+        );
+        
+        if (!eligibility.eligible) {
+          toast({
+            title: "Mortgage Rejected",
+            description: eligibility.reason || "Application declined",
+            variant: "destructive"
+          });
+          return prev;
+        }
+        
+        // High LTV penalty
+        if (ltvRequired > 0.85) {
+          creditAdjust -= 3;
         }
         
         newMortgage = {
@@ -1328,7 +1380,7 @@ export function useGameState() {
           principal: mortgageAmount,
           monthlyPayment,
           remainingBalance: mortgageAmount,
-          interestRate: dynamicRate, // Use dynamic rate
+          interestRate: dynamicRate,
           termYears,
           mortgageType,
           providerId: providerId || "halifax",
@@ -1358,7 +1410,8 @@ export function useGameState() {
         cash: prev.cash - cashRequired,
         ownedProperties: [...prev.ownedProperties, purchasedProperty],
         mortgages: newMortgage ? [...prev.mortgages, newMortgage] : prev.mortgages,
-        experience: prev.experience + Math.floor(property.price / 10000)
+        experience: prev.experience + Math.floor(property.price / 10000),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdjust)),
       };
     });
 
@@ -1418,9 +1471,17 @@ export function useGameState() {
       }
 
       let newMortgage: Mortgage | null = null;
+      let creditAdjust = 0;
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-        // Use dynamic rate from game state
+        
+        // Eligibility check
+        const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
+          const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
+          return total + (hasTenant ? prop.monthlyIncome : 0);
+        }, 0);
+        const currentDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
         const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = dynamicRate / 12;
@@ -1428,6 +1489,25 @@ export function useGameState() {
         const monthlyPayment = mortgageType === 'interest-only'
           ? mortgageAmount * monthlyRate
           : mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+        
+        const ltvRequired = mortgagePercentage / 100;
+        const eligibility = checkMortgageEligibility(
+          provider.id, prev.creditScore, ltvRequired, currentDTI, monthlyPayment, totalRentalIncome
+        );
+        
+        if (!eligibility.eligible) {
+          toast({
+            title: "Mortgage Rejected",
+            description: eligibility.reason || "Application declined",
+            variant: "destructive"
+          });
+          return prev;
+        }
+        
+        if (ltvRequired > 0.85) {
+          creditAdjust -= 3;
+        }
+        
         newMortgage = {
           id: `${property.id}_${Date.now()}`,
           propertyId: property.id,
@@ -1470,7 +1550,8 @@ export function useGameState() {
         cash: prev.cash - cashRequired,
         ownedProperties: [...prev.ownedProperties, purchased],
         mortgages: newMortgage ? [...prev.mortgages, newMortgage] : prev.mortgages,
-        experience: prev.experience + Math.floor(purchasePrice / 10000)
+        experience: prev.experience + Math.floor(purchasePrice / 10000),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdjust)),
       };
     });
 
@@ -1976,7 +2057,8 @@ export function useGameState() {
         mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
         tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
         voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId),
-        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
+        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + 5)),
       };
     });
   }, []);
@@ -1998,7 +2080,8 @@ export function useGameState() {
         mortgages: prev.mortgages.filter(m => m.propertyId !== propertyId),
         tenants: prev.tenants.filter(t => t.propertyId !== propertyId),
         voidPeriods: prev.voidPeriods.filter(vp => vp.propertyId !== propertyId),
-        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId)
+        propertyListings: prev.propertyListings.filter(l => l.propertyId !== propertyId),
+        creditScore: Math.max(300, Math.min(850, prev.creditScore + 5)),
       };
     });
   }, []);

@@ -440,11 +440,11 @@ export function EstateAgentWindow({
   };
 
   const getPricingGuidance = (ratio: number) => {
-    if (ratio < 0.95) return { message: "Below market — expect a bidding war with fast offers", color: "text-green-600", bg: "bg-green-50" };
-    if (ratio <= 1.0) return { message: "At market value — offers will come quickly", color: "text-green-600", bg: "bg-green-50" };
-    if (ratio <= 1.1) return { message: "Slightly above market — offers will be slower", color: "text-yellow-600", bg: "bg-yellow-50" };
-    if (ratio <= 1.3) return { message: "Overpriced — expect low offers well below asking", color: "text-orange-600", bg: "bg-orange-50" };
-    return { message: "Significantly overpriced — very rare, very low offers", color: "text-red-600", bg: "bg-red-50" };
+    if (ratio < 0.95) return { message: "Below market — expect a bidding war with fast offers", color: "text-green-400", bg: "bg-green-500/10" };
+    if (ratio <= 1.0) return { message: "At market value — offers will come quickly", color: "text-green-400", bg: "bg-green-500/10" };
+    if (ratio <= 1.1) return { message: "Slightly above market — offers will be slower", color: "text-yellow-400", bg: "bg-yellow-500/10" };
+    if (ratio <= 1.3) return { message: "Overpriced — expect low offers well below asking", color: "text-orange-400", bg: "bg-orange-500/10" };
+    return { message: "Significantly overpriced — very rare, very low offers", color: "text-red-400", bg: "bg-red-500/10" };
   };
 
   const getExpectedOfferRange = (marketValue: number, ratio: number) => {
@@ -600,17 +600,39 @@ export function EstateAgentWindow({
                       
                       {/* Mortgage options before completing */}
                       <div className="space-y-2">
-                        <Label>Mortgage: {mortgagePercentage[0]}%</Label>
-                        <Slider
-                          value={mortgagePercentage}
-                          onValueChange={setMortgagePercentage}
-                          min={0}
-                          max={75}
-                          step={5}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
-                        </p>
+                        {(() => {
+                          // Calculate max LTV player qualifies for
+                          const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
+                          const maxQualifiedLTV = eligibleProviders.length > 0 
+                            ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
+                            : 0;
+                          const maxLTVPercent = Math.floor(maxQualifiedLTV * 100);
+                          
+                          return (
+                            <>
+                              {maxLTVPercent === 0 ? (
+                                <div className="p-2 rounded border border-destructive/50 bg-destructive/10 text-sm text-destructive">
+                                  <AlertCircle className="h-4 w-4 inline mr-1" />
+                                  Credit score too low for any mortgage ({creditScore}). Cash purchase only.
+                                </div>
+                              ) : (
+                                <>
+                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% with your credit)</Label>
+                                  <Slider
+                                    value={mortgagePercentage}
+                                    onValueChange={setMortgagePercentage}
+                                    min={0}
+                                    max={maxLTVPercent}
+                                    step={5}
+                                  />
+                                </>
+                              )}
+                              <p className="text-sm text-muted-foreground">
+                                Cash needed: £{(offerAmount[0] * (1 - mortgagePercentage[0] / 100)).toLocaleString()}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {mortgagePercentage[0] > 0 && (
@@ -622,11 +644,16 @@ export function EstateAgentWindow({
                                 <SelectValue placeholder="Select provider" />
                               </SelectTrigger>
                               <SelectContent>
-                                {mortgageProviders.map(provider => (
+                                {mortgageProviders
+                                  .filter((provider: any) => creditScore >= provider.minCreditScore && (mortgagePercentage[0] / 100) <= provider.maxLTV)
+                                  .map((provider: any) => (
                                   <SelectItem key={provider.id} value={provider.id}>
                                     {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
                                   </SelectItem>
                                 ))}
+                                {mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore && (mortgagePercentage[0] / 100) <= p.maxLTV).length === 0 && (
+                                  <SelectItem value="none" disabled>No providers available for this LTV</SelectItem>
+                                )}
                               </SelectContent>
                             </Select>
                           </div>

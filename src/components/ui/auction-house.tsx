@@ -421,7 +421,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100">
+        <Button variant="outline" className="bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20">
           <Gavel className="h-4 w-4 mr-2" />
           Auction House
         </Button>
@@ -449,7 +449,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           <TabsContent value="buy" className="space-y-4">
             {/* Mortgage Selection - shown before entering auction */}
             {!liveAuction && (
-              <Card className="border-blue-200 bg-blue-50">
+              <Card className="border-blue-500/30 bg-blue-500/10">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Landmark className="h-4 w-4" />
@@ -502,13 +502,13 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
 
             {/* Live Auction Interface */}
             {liveAuction && (
-              <Card className="border-red-500 border-2 bg-red-50">
+              <Card className="border-red-500/50 border-2 bg-red-500/10">
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-xl text-red-700">
+                    <CardTitle className="text-xl text-red-400">
                       🔴 LIVE AUCTION - Lot {liveAuction.property.id}
                     </CardTitle>
-                    <div className="text-2xl font-bold text-red-600">
+                    <div className="text-2xl font-bold text-red-400">
                       {formatTime(liveAuction.timeRemaining)}
                     </div>
                   </div>
@@ -521,7 +521,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                       <p className="text-sm">Market Value: £{liveAuction.property.value.toLocaleString()}</p>
                       <p className="text-sm">Reserve: £{liveAuction.reservePrice.toLocaleString()}</p>
                       {selectedMortgagePercent > 0 && (
-                        <p className="text-xs text-blue-600">
+                         <p className="text-xs text-blue-400">
                           Financing: {selectedMortgagePercent}% mortgage
                         </p>
                       )}
@@ -533,7 +533,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <div className="space-y-2">
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Current Bid</p>
-                        <p className="text-3xl font-bold text-green-600">
+                        <p className="text-3xl font-bold text-green-400">
                           £{liveAuction.currentBid.toLocaleString()}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -580,16 +580,16 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     </div>
                   </div>
                   
-                  <div className="bg-white p-3 rounded border">
+                   <div className="bg-[hsl(var(--muted))] p-3 rounded border border-border">
                     <p className="font-medium text-center">{auctioneerMessage}</p>
                   </div>
                   
                   {/* Bid History */}
-                  <div className="bg-white rounded border max-h-32 overflow-y-auto">
-                    <div className="p-2 border-b font-medium text-sm">Bid History</div>
+                  <div className="bg-[hsl(var(--muted))] rounded border border-border max-h-32 overflow-y-auto">
+                    <div className="p-2 border-b border-border font-medium text-sm">Bid History</div>
                     <div className="space-y-1 p-2">
                       {liveAuction.bidHistory.slice(-5).reverse().map((bid, index) => (
-                        <div key={index} className={`flex justify-between text-sm ${bid.isUser ? 'font-bold text-blue-600' : ''}`}>
+                        <div key={index} className={`flex justify-between text-sm ${bid.isUser ? 'font-bold text-blue-400' : ''}`}>
                           <span>{bid.bidder}</span>
                           <span>£{bid.amount.toLocaleString()}</span>
                         </div>
@@ -622,7 +622,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                   {auctionProperties.map((property) => (
                     <Card 
                       key={property.id} 
-                      className="cursor-pointer transition-colors border-orange-200 hover:border-orange-400"
+                      className="cursor-pointer transition-colors border-orange-500/30 hover:border-orange-500/50"
                     >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-3">
@@ -634,7 +634,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </Badge>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-bold text-orange-600">
+                            <p className="text-lg font-bold text-orange-400">
                               £{property.value.toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -652,23 +652,23 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           </div>
                           <div>
                             <span className="text-muted-foreground">Monthly Income:</span>
-                            <span className="ml-1 font-medium text-green-600">
+                            <span className="ml-1 font-medium text-green-400">
                               £{property.monthlyIncome.toLocaleString()}/mo
                             </span>
                           </div>
                         </div>
 
                         {selectedMortgagePercent > 0 && (
-                          <div className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                          <div className="mt-2 text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
                             Cash needed: £{Math.floor(property.value * (1 - selectedMortgagePercent / 100) + property.value * 0.04 + 600).toLocaleString()} 
                             ({selectedMortgagePercent}% mortgage)
                           </div>
                         )}
                         
                         <div className="mt-3 flex gap-2">
-                          <Button 
+                           <Button 
                             size="sm" 
-                            className="flex-1 bg-orange-600 hover:bg-orange-700"
+                            className="flex-1 bg-orange-500 hover:bg-orange-600"
                             onClick={() => startLiveAuction(property, false)}
                           >
                             Standard (30s)
@@ -676,7 +676,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           <Button 
                             size="sm" 
                             variant="outline"
-                            className="flex-1 border-orange-400 text-orange-600 hover:bg-orange-50"
+                            className="flex-1 border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
                             onClick={() => startLiveAuction(property, true)}
                           >
                             ⚡ Express (15s)
@@ -791,7 +791,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold text-green-600">
+                            <p className="font-semibold text-green-400">
                               £{Math.floor(listing.highestBid).toLocaleString()}
                             </p>
                             <p className="text-sm text-muted-foreground">Current bid</p>
