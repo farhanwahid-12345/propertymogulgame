@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Building, Briefcase, TrendingUp } from "lucide-react";
+import { Building, Briefcase, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
 
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
@@ -16,9 +17,10 @@ interface PortfolioMortgageProps {
   onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   cash: number;
   setCash: (cash: number) => void;
+  creditScore?: number;
 }
 
-export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfolioMortgage, cash, setCash }: PortfolioMortgageProps) {
+export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580 }: PortfolioMortgageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
@@ -26,10 +28,11 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
 
-  // Only show if user has 3+ properties
   const canUsePortfolioMortgage = ownedProperties.length >= 3;
   
-  // Filter properties with equity available
+  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
+  const ratePenalty = getRatePenaltyForCreditScore(creditScore);
+
   const eligibleProperties = ownedProperties.filter(prop => {
     const equity = prop.value - (prop.mortgageRemaining || 0);
     return equity > 0;
@@ -39,16 +42,8 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const totalPortfolioValue = selectedProperties.reduce((sum, prop) => sum + prop.value, 0);
   const totalCurrentMortgages = selectedProperties.reduce((sum, prop) => sum + (prop.mortgageRemaining || 0), 0);
   const totalEquity = totalPortfolioValue - totalCurrentMortgages;
-  const maxLoanAmount = totalPortfolioValue * 0.75; // Portfolio mortgages typically allow 75% LTV
-
-  const calculateMonthlyPayment = (principal: number, rate: number, years: number, type: 'repayment' | 'interest-only') => {
-    if (type === 'interest-only') {
-      return (principal * rate) / 12;
-    }
-    const monthlyRate = rate / 12;
-    const numPayments = years * 12;
-    return (principal * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
-  };
+  const totalPortfolioRent = selectedProperties.reduce((sum, prop) => sum + prop.monthlyIncome, 0);
+  const maxLoanAmount = totalPortfolioValue * creditMaxLTV; // Credit-score capped LTV
 
   const togglePropertySelection = (propertyId: string) => {
     setSelectedPropertyIds(prev => 
@@ -60,33 +55,24 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
   const handlePortfolioMortgage = () => {
     if (selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0) return;
-
-    const cashFromMortgage = loanAmount[0] - totalCurrentMortgages;
-    
     onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
-    
-    if (cashFromMortgage > 0) {
-      setCash(cash + cashFromMortgage);
-    }
-
     setSelectedPropertyIds([]);
     setLoanAmount([0]);
     setSelectedProvider("");
-    
-    toast({
-      title: "Portfolio Mortgage Approved!",
-      description: `Secured £${loanAmount[0].toLocaleString()} against ${selectedPropertyIds.length} properties`,
-    });
+    setIsOpen(false);
   };
 
-  const selectedProviderData = mortgageProviders.find(p => p.id === selectedProvider);
-  const portfolioRate = selectedProviderData ? selectedProviderData.baseRate + 0.005 : 0; // Portfolio rates typically +0.5%
+  const selectedProviderData = mortgageProviders.find((p: any) => p.id === selectedProvider);
+  const portfolioRate = selectedProviderData ? Math.max(0.01, selectedProviderData.baseRate + 0.005 + ratePenalty) : 0;
   const monthlyPayment = selectedProviderData ? calculateMonthlyPayment(
-    loanAmount[0], 
-    portfolioRate, 
-    termYears, 
-    mortgageType
+    loanAmount[0], portfolioRate, termYears, mortgageType
   ) : 0;
+
+  // ICR check
+  const icrRatio = monthlyPayment > 0 && totalPortfolioRent > 0 
+    ? totalPortfolioRent / monthlyPayment 
+    : null;
+  const icrPasses = icrRatio === null || icrRatio >= 1.25;
 
   if (!canUsePortfolioMortgage) {
     return (
@@ -100,7 +86,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100">
+        <Button variant="outline" className="bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20">
           <Briefcase className="h-4 w-4 mr-2" />
           Portfolio Mortgage
         </Button>
@@ -112,10 +98,18 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
             Portfolio Mortgage
           </DialogTitle>
         </DialogHeader>
+
+        {/* Credit info */}
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-sm">
+          <span>Credit: <strong>{creditScore}</strong></span>
+          <span>|</span>
+          <span>Max LTV: <strong>{Math.round(creditMaxLTV * 100)}%</strong></span>
+          <span>|</span>
+          <span>Rate Adj: <strong>{ratePenalty > 0 ? `+${(ratePenalty * 100).toFixed(1)}%` : ratePenalty < 0 ? `${(ratePenalty * 100).toFixed(1)}%` : 'Standard'}</strong></span>
+        </div>
         
         <div className="space-y-6">
-          {/* Portfolio Overview */}
-          <Card className="bg-purple-50 border-purple-200">
+          <Card className="bg-purple-500/10 border-purple-500/30">
             <CardContent className="p-4">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
@@ -128,7 +122,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 </div>
                 <div>
                   <span className="text-muted-foreground">Total Equity:</span>
-                  <span className="ml-1 font-bold text-green-600">
+                  <span className="ml-1 font-bold text-green-400">
                     £{ownedProperties.reduce((sum, prop) => sum + prop.value - (prop.mortgageRemaining || 0), 0).toLocaleString()}
                   </span>
                 </div>
@@ -136,7 +130,6 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
             </CardContent>
           </Card>
 
-          {/* Property Selection */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Select Properties for Portfolio Mortgage</h3>
             <p className="text-sm text-muted-foreground">Choose at least 2 properties to secure against portfolio mortgage</p>
@@ -146,7 +139,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 <Card 
                   key={property.id}
                   className={`cursor-pointer transition-colors ${
-                    selectedPropertyIds.includes(property.id) ? 'ring-2 ring-purple-500 bg-purple-50' : ''
+                    selectedPropertyIds.includes(property.id) ? 'ring-2 ring-purple-500' : ''
                   }`}
                   onClick={() => togglePropertySelection(property.id)}
                 >
@@ -155,7 +148,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                       <div>
                         <p className="font-medium">{property.name}</p>
                         <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                        <p className="text-xs">Value: £{property.value.toLocaleString()}</p>
+                        <p className="text-xs">Value: £{property.value.toLocaleString()} | Rent: £{property.monthlyIncome}/mo</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm">
@@ -172,7 +165,6 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
             </div>
           </div>
 
-          {/* Portfolio Mortgage Details */}
           {selectedPropertyIds.length >= 2 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Portfolio Mortgage Terms</h3>
@@ -189,12 +181,12 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                       <span className="ml-1 font-medium">£{totalPortfolioValue.toLocaleString()}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Current Mortgages:</span>
-                      <span className="ml-1 font-medium">£{totalCurrentMortgages.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Combined Rent:</span>
+                      <span className="ml-1 font-medium text-green-400">£{totalPortfolioRent.toLocaleString()}/mo</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Available Equity:</span>
-                      <span className="ml-1 font-medium text-green-600">£{totalEquity.toLocaleString()}</span>
+                      <span className="ml-1 font-medium text-green-400">£{totalEquity.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -206,18 +198,28 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                   value={loanAmount}
                   onValueChange={setLoanAmount}
                   min={totalCurrentMortgages}
-                  max={maxLoanAmount}
+                  max={Math.floor(maxLoanAmount)}
                   step={5000}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Current: £{totalCurrentMortgages.toLocaleString()}</span>
-                  <span>Max 75%: £{Math.floor(maxLoanAmount).toLocaleString()}</span>
+                  <span>Max {Math.round(creditMaxLTV * 100)}%: £{Math.floor(maxLoanAmount).toLocaleString()}</span>
                 </div>
-                <p className="text-sm text-green-600">
+                <p className="text-sm text-green-400">
                   Cash out: £{Math.max(0, loanAmount[0] - totalCurrentMortgages).toLocaleString()}
                 </p>
               </div>
+
+              {/* ICR Warning */}
+              {icrRatio !== null && !icrPasses && (
+                <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                  <span className="text-red-400">
+                    <strong>Stress Test Warning:</strong> Combined rental income (£{totalPortfolioRent}/mo) is only {((icrRatio || 0) * 100).toFixed(0)}% of the monthly payment. Banks require 125% coverage.
+                  </span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -227,11 +229,16 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                       <SelectValue placeholder="Choose lender..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {mortgageProviders.map(provider => (
-                        <SelectItem key={provider.id} value={provider.id}>
-                          {provider.name} ({((provider.baseRate + 0.005) * 100).toFixed(1)}% portfolio rate)
-                        </SelectItem>
-                      ))}
+                      {mortgageProviders.map((provider: any) => {
+                        const ltvReq = loanAmount[0] / totalPortfolioValue;
+                        const eligible = creditScore >= provider.minCreditScore && ltvReq <= Math.min(provider.maxLTV, creditMaxLTV);
+                        return (
+                          <SelectItem key={provider.id} value={provider.id} disabled={!eligible}>
+                            {provider.name} ({((provider.baseRate + 0.005) * 100).toFixed(1)}% portfolio rate)
+                            {!eligible ? ' ❌' : ' ✓'}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -267,13 +274,13 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
               </div>
 
               {selectedProvider && (
-                <Card className="bg-purple-50 border-purple-200">
+                <Card className="bg-purple-500/10 border-purple-500/30">
                   <CardContent className="p-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Monthly Payment:</span>
-                        <span className="ml-1 font-bold text-purple-700">
-                          £{monthlyPayment.toLocaleString()}
+                        <span className="ml-1 font-bold text-purple-400">
+                          £{Math.round(monthlyPayment).toLocaleString()}
                         </span>
                       </div>
                       <div>
@@ -282,9 +289,17 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                           {(portfolioRate * 100).toFixed(2)}%
                         </span>
                       </div>
+                      {icrRatio !== null && (
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Stress Test (ICR):</span>
+                          <span className={`ml-1 font-medium ${icrPasses ? 'text-green-400' : 'text-red-400'}`}>
+                            {((icrRatio || 0) * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : '✗ Fail (need 125%)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Portfolio mortgages typically have higher rates but offer greater flexibility
+                      Portfolio mortgages have higher rates but offer greater flexibility
                     </p>
                   </CardContent>
                 </Card>
@@ -293,7 +308,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
               <Button 
                 className="w-full bg-purple-600 hover:bg-purple-700" 
                 onClick={handlePortfolioMortgage}
-                disabled={selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0}
+                disabled={selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0 || !icrPasses}
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Secure Portfolio Mortgage
