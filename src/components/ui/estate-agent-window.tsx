@@ -605,12 +605,14 @@ export function EstateAgentWindow({
                       {/* Mortgage options before completing */}
                       <div className="space-y-2">
                         {(() => {
-                          // Calculate max LTV player qualifies for
+                          // Use centralized credit-score LTV cap
                           const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
-                          const maxQualifiedLTV = eligibleProviders.length > 0 
+                          const maxProviderLTV = eligibleProviders.length > 0 
                             ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
                             : 0;
+                          const maxQualifiedLTV = Math.min(maxProviderLTV, creditMaxLTV);
                           const maxLTVPercent = Math.floor(maxQualifiedLTV * 100);
+                          const depositPercent = 100 - maxLTVPercent;
                           
                           return (
                             <>
@@ -621,7 +623,7 @@ export function EstateAgentWindow({
                                 </div>
                               ) : (
                                 <>
-                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% with your credit)</Label>
+                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% — credit score {creditScore} requires {depositPercent}% deposit)</Label>
                                   <Slider
                                     value={mortgagePercentage}
                                     onValueChange={setMortgagePercentage}
