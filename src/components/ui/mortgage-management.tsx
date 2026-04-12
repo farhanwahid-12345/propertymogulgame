@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Building2, Calculator, TrendingDown } from "lucide-react";
+import { Building2, Calculator, TrendingDown, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
 
 interface MortgageManagementProps {
   ownedProperties: Property[];
@@ -16,6 +17,7 @@ interface MortgageManagementProps {
   onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   cash: number;
   setCash: (cash: number) => void;
+  creditScore?: number;
 }
 
 export function MortgageManagement({ 
@@ -23,11 +25,10 @@ export function MortgageManagement({
   mortgageProviders, 
   onRefinance, 
   cash, 
-  setCash 
+  setCash,
+  creditScore = 580
 }: MortgageManagementProps) {
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Single property refinance state
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [singleLoanAmount, setSingleLoanAmount] = useState<number[]>([0]);
   const [singleProvider, setSingleProvider] = useState<string>("");
@@ -35,49 +36,41 @@ export function MortgageManagement({
   const [singleMortgageType, setSingleMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
 
   const refinanceableProperties = ownedProperties.filter(prop => prop.value > 0);
+  
+  // Credit-score-based LTV cap
+  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
+  const ratePenalty = getRatePenaltyForCreditScore(creditScore);
 
-  const calculateMonthlyPayment = (principal: number, rate: number, years: number, type: 'repayment' | 'interest-only') => {
-    if (type === 'interest-only') {
-      return (principal * rate) / 12;
-    }
-    const monthlyRate = rate / 12;
-    const numPayments = years * 12;
-    return (principal * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+  // Filter providers by credit score AND LTV
+  const getEligibleProviders = (ltvRequired: number) => {
+    return mortgageProviders.filter((p: any) => 
+      creditScore >= p.minCreditScore && 
+      ltvRequired <= Math.min(p.maxLTV, creditMaxLTV)
+    );
   };
 
   const handleRefinance = () => {
     if (!selectedProperty || !singleProvider || singleLoanAmount[0] <= 0) return;
-
-    const currentMortgage = selectedProperty.mortgageRemaining || 0;
-    const cashFromRefinance = singleLoanAmount[0] - currentMortgage;
-    
     onRefinance(selectedProperty.id, singleLoanAmount[0], singleProvider, singleTermYears, singleMortgageType);
-    
-    if (cashFromRefinance > 0) {
-      setCash(cash + cashFromRefinance);
-    }
-
     setSelectedProperty(null);
     setSingleLoanAmount([0]);
     setSingleProvider("");
     setSingleTermYears(25);
     setSingleMortgageType('repayment');
     setIsOpen(false);
-    
-    toast({
-      title: "Mortgage Refinanced!",
-      description: `${selectedProperty.name} refinanced for £${singleLoanAmount[0].toLocaleString()}`,
-    });
   };
 
-
-  const singleProviderData = mortgageProviders.find(p => p.id === singleProvider);
+  const singleProviderData = mortgageProviders.find((p: any) => p.id === singleProvider);
+  const adjustedRate = singleProviderData ? Math.max(0.01, singleProviderData.baseRate + ratePenalty) : 0;
   const singleMonthlyPayment = singleProviderData ? calculateMonthlyPayment(
-    singleLoanAmount[0], 
-    singleProviderData.baseRate, 
-    singleTermYears, 
-    singleMortgageType
+    singleLoanAmount[0], adjustedRate, singleTermYears, singleMortgageType
   ) : 0;
+
+  // ICR check preview
+  const icrRatio = selectedProperty && singleMonthlyPayment > 0 
+    ? selectedProperty.monthlyIncome / singleMonthlyPayment 
+    : null;
+  const icrPasses = icrRatio === null || icrRatio >= 1.25;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -97,6 +90,15 @@ export function MortgageManagement({
             Refinance an individual property to access equity or improve mortgage terms
           </DialogDescription>
         </DialogHeader>
+
+        {/* Credit info banner */}
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-sm">
+          <span>Credit Score: <strong>{creditScore}</strong></span>
+          <span>|</span>
+          <span>Max LTV: <strong>{Math.round(creditMaxLTV * 100)}%</strong></span>
+          <span>|</span>
+          <span>Rate Adjustment: <strong>{ratePenalty > 0 ? `+${(ratePenalty * 100).toFixed(1)}%` : ratePenalty < 0 ? `${(ratePenalty * 100).toFixed(1)}%` : 'Standard'}</strong></span>
+        </div>
         
         <div className="space-y-6">
             <div className="space-y-4">
@@ -110,7 +112,9 @@ export function MortgageManagement({
                     }`}
                     onClick={() => {
                       setSelectedProperty(property);
-                      setSingleLoanAmount([Math.floor(property.value * 0.75)]);
+                      const maxLoan = Math.floor(property.value * creditMaxLTV);
+                      setSingleLoanAmount([Math.min(maxLoan, Math.floor(property.value * 0.75))]);
+                      setSingleProvider("");
                     }}
                   >
                     <CardContent className="p-3">
@@ -119,12 +123,13 @@ export function MortgageManagement({
                           <p className="font-medium">{property.name}</p>
                           <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
                           <p className="text-xs">Current Value: £{property.value.toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">Rent: £{property.monthlyIncome.toLocaleString()}/mo</p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium">
                             Debt: £{(property.mortgageRemaining || 0).toLocaleString()}
                           </p>
-                          <p className="text-xs text-green-600">
+                          <p className="text-xs text-green-400">
                             Equity: £{(property.value - (property.mortgageRemaining || 0)).toLocaleString()}
                           </p>
                           <Badge variant="outline">{property.type}</Badge>
@@ -159,14 +164,14 @@ export function MortgageManagement({
                         <span className="ml-1 font-medium">£{(selectedProperty.mortgageRemaining || 0).toLocaleString()}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Available Equity:</span>
-                        <span className="ml-1 font-medium text-green-600">
-                          £{(selectedProperty.value - (selectedProperty.mortgageRemaining || 0)).toLocaleString()}
+                        <span className="text-muted-foreground">Max Loan ({Math.round(creditMaxLTV * 100)}% LTV):</span>
+                        <span className="ml-1 font-medium">
+                          £{Math.floor(selectedProperty.value * creditMaxLTV).toLocaleString()}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Cash Out:</span>
-                        <span className="ml-1 font-medium text-blue-600">
+                        <span className="ml-1 font-medium text-blue-400">
                           £{Math.max(0, singleLoanAmount[0] - (selectedProperty.mortgageRemaining || 0)).toLocaleString()}
                         </span>
                       </div>
@@ -180,15 +185,25 @@ export function MortgageManagement({
                     value={singleLoanAmount}
                     onValueChange={setSingleLoanAmount}
                     min={selectedProperty.mortgageRemaining || 0}
-                    max={Math.min(selectedProperty.value * 0.85, cash + (selectedProperty.mortgageRemaining || 0))}
+                    max={Math.floor(selectedProperty.value * creditMaxLTV)}
                     step={1000}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Current: £{(selectedProperty.mortgageRemaining || 0).toLocaleString()}</span>
-                    <span>Max: £{Math.min(Math.floor(selectedProperty.value * 0.85), cash + (selectedProperty.mortgageRemaining || 0)).toLocaleString()}</span>
+                    <span>Max ({Math.round(creditMaxLTV * 100)}% LTV): £{Math.floor(selectedProperty.value * creditMaxLTV).toLocaleString()}</span>
                   </div>
                 </div>
+
+                {/* ICR Warning */}
+                {icrRatio !== null && !icrPasses && (
+                  <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                    <span className="text-red-400">
+                      <strong>Stress Test Warning:</strong> Rental income (£{selectedProperty.monthlyIncome}/mo) is only {((icrRatio || 0) * 100).toFixed(0)}% of the monthly payment. Banks require 125% coverage. Reduce the loan amount or this will be rejected.
+                    </span>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -198,11 +213,16 @@ export function MortgageManagement({
                         <SelectValue placeholder="Choose provider..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {mortgageProviders.map(provider => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
-                          </SelectItem>
-                        ))}
+                        {mortgageProviders.map((provider: any) => {
+                          const ltvReq = singleLoanAmount[0] / selectedProperty.value;
+                          const eligible = creditScore >= provider.minCreditScore && ltvReq <= Math.min(provider.maxLTV, creditMaxLTV);
+                          return (
+                            <SelectItem key={provider.id} value={provider.id} disabled={!eligible}>
+                              {provider.name} ({(provider.baseRate * 100).toFixed(1)}%)
+                              {!eligible ? (creditScore < provider.minCreditScore ? ' ❌ Credit' : ' ❌ LTV') : ' ✓'}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -245,15 +265,28 @@ export function MortgageManagement({
                         <div>
                           <span className="text-muted-foreground">Monthly Payment:</span>
                           <span className="ml-1 font-bold text-blue-400">
-                            £{singleMonthlyPayment.toLocaleString()}
+                            £{Math.round(singleMonthlyPayment).toLocaleString()}
                           </span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Interest Rate:</span>
                           <span className="ml-1 font-medium">
-                            {(singleProviderData!.baseRate * 100).toFixed(2)}%
+                            {(adjustedRate * 100).toFixed(2)}%
+                            {ratePenalty !== 0 && (
+                              <span className={ratePenalty > 0 ? 'text-red-400' : 'text-green-400'}>
+                                {' '}({ratePenalty > 0 ? '+' : ''}{(ratePenalty * 100).toFixed(1)}%)
+                              </span>
+                            )}
                           </span>
                         </div>
+                        {icrRatio !== null && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Stress Test (ICR):</span>
+                            <span className={`ml-1 font-medium ${icrPasses ? 'text-green-400' : 'text-red-400'}`}>
+                              {((icrRatio || 0) * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : '✗ Fail (need 125%)'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -262,7 +295,7 @@ export function MortgageManagement({
                 <Button 
                   className="w-full" 
                   onClick={handleRefinance}
-                  disabled={!singleProvider || singleLoanAmount[0] <= 0}
+                  disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses}
                 >
                   <TrendingDown className="h-4 w-4 mr-2" />
                   Refinance Property

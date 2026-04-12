@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, MessageSquare, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore } from "@/lib/mortgageEligibility";
 
 interface PropertyOffer {
   id: string;
@@ -133,18 +134,21 @@ export function EstateAgentWindow({
 
   const { min: levelMin, max: levelMax } = getLevelRange(level);
 
-  // Calculate affordability for each property
+  // Calculate affordability for each property using credit-score-based LTV
+  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
+  
   const calculateAffordability = (property: Property) => {
-    // Find the best LTV the player qualifies for
-    const eligibleProviders = mortgageProviders.filter(p => creditScore >= p.minCreditScore);
-    const maxLTV = eligibleProviders.length > 0 
-      ? Math.max(...eligibleProviders.map(p => p.maxLTV))
+    // Find the best LTV the player qualifies for, capped by credit score
+    const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
+    const maxProviderLTV = eligibleProviders.length > 0 
+      ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
       : 0;
+    const maxLTV = Math.min(maxProviderLTV, creditMaxLTV);
     
     const maxMortgage = property.value * maxLTV;
     const stampDuty = property.value <= 250000 ? property.value * 0.03 :
       (250000 * 0.03) + ((property.value - 250000) * 0.08);
-    const fees = 600 + (property.value * 0.01) + stampDuty; // Solicitor + mortgage fee + stamp duty
+    const fees = 600 + (property.value * 0.01) + stampDuty;
     const cashNeeded = (property.value - maxMortgage) + fees;
     
     return cash >= cashNeeded;
@@ -601,12 +605,14 @@ export function EstateAgentWindow({
                       {/* Mortgage options before completing */}
                       <div className="space-y-2">
                         {(() => {
-                          // Calculate max LTV player qualifies for
+                          // Use centralized credit-score LTV cap
                           const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
-                          const maxQualifiedLTV = eligibleProviders.length > 0 
+                          const maxProviderLTV = eligibleProviders.length > 0 
                             ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
                             : 0;
+                          const maxQualifiedLTV = Math.min(maxProviderLTV, creditMaxLTV);
                           const maxLTVPercent = Math.floor(maxQualifiedLTV * 100);
+                          const depositPercent = 100 - maxLTVPercent;
                           
                           return (
                             <>
@@ -617,7 +623,7 @@ export function EstateAgentWindow({
                                 </div>
                               ) : (
                                 <>
-                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% with your credit)</Label>
+                                  <Label>Mortgage: {mortgagePercentage[0]}% (max {maxLTVPercent}% — credit score {creditScore} requires {depositPercent}% deposit)</Label>
                                   <Slider
                                     value={mortgagePercentage}
                                     onValueChange={setMortgagePercentage}
