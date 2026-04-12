@@ -204,6 +204,7 @@ const Index = () => {
                 onRefinance={gameState.handleRefinance}
                 cash={gameState.cash}
                 setCash={gameState.setCash}
+                creditScore={gameState.creditScore}
               />
               <CreditOverdraft
                 creditScore={gameState.creditScore}
