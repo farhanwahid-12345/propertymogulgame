@@ -3,6 +3,7 @@ import { Property } from "@/components/ui/property-card";
 import { Tenant } from "@/components/ui/tenant-selector";
 import { RenovationType } from "@/components/ui/renovation-dialog";
 import { toast } from "@/hooks/use-toast";
+import { calculateMortgageEligibility, getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment as calcPayment } from "@/lib/mortgageEligibility";
 
 interface MortgageProvider {
   id: string;
