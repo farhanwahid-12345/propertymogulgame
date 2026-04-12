@@ -2446,20 +2446,15 @@ export function useGameState() {
     });
   }, []);
 
-// Mortgage refinancing
+// Mortgage refinancing - uses centralized eligibility
 const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
   setGameState(prev => {
     const property = prev.ownedProperties.find(p => p.id === propertyId);
     if (!property) return prev;
 
-    // Block refinance if property is part of an active portfolio mortgage
     const inPortfolio = prev.mortgages.some(m => m.collateralPropertyIds?.includes(propertyId));
     if (inPortfolio) {
-      toast({
-        title: "Refinance Not Allowed",
-        description: "This property is part of a portfolio mortgage. Settle or adjust the portfolio loan first.",
-        variant: "destructive"
-      });
+      toast({ title: "Refinance Not Allowed", description: "This property is part of a portfolio mortgage.", variant: "destructive" });
       return prev;
     }
 
@@ -2467,31 +2462,46 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
     const currentMortgage = existingMortgage?.remainingBalance || 0;
     const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
 
-    // Check if new loan amount covers the existing mortgage
     if (newLoanAmount < currentMortgage) {
-      toast({
-        title: "Refinance Failed",
-        description: "New loan amount must be at least equal to current mortgage balance!",
-        variant: "destructive"
-      });
+      toast({ title: "Refinance Failed", description: "New loan amount must cover existing mortgage balance!", variant: "destructive" });
       return prev;
     }
 
-    // Recalculate rate and monthly payment
-    const dynamicRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
-    const monthlyRate = dynamicRate / 12;
-    const totalPayments = termYears * 12;
-    const monthlyPayment = mortgageType === 'interest-only'
-      ? newLoanAmount * monthlyRate
-      : newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+    const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
+      const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
+      return total + (hasTenant ? prop.monthlyIncome : 0);
+    }, 0);
+    const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((sum, m) => sum + m.monthlyPayment, 0);
+    const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+    const propertyRent = property.monthlyIncome;
+
+    const eligibility = calculateMortgageEligibility({
+      creditScore: prev.creditScore,
+      loanAmount: newLoanAmount,
+      propertyValue: property.value,
+      propertyMonthlyRent: propertyRent,
+      providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+      providerMinCreditScore: provider.minCreditScore,
+      providerMaxLTV: provider.maxLTV,
+      providerId: provider.id,
+      termYears,
+      mortgageType,
+      existingMonthlyMortgagePayments: existingPayments,
+      totalRentalIncome: totalRentalIncome - propertyRent,
+    });
+
+    if (!eligibility.eligible) {
+      toast({ title: "Refinance Rejected", description: eligibility.reason || "Application declined", variant: "destructive" });
+      return prev;
+    }
 
     const newMortgage: Mortgage = {
       id: `${propertyId}_${Date.now()}`,
       propertyId,
       principal: newLoanAmount,
-      monthlyPayment,
+      monthlyPayment: eligibility.monthlyPayment,
       remainingBalance: newLoanAmount,
-      interestRate: dynamicRate,
+      interestRate: eligibility.adjustedRate,
       termYears,
       mortgageType,
       providerId: provider.id,
@@ -2501,7 +2511,6 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
     const updatedMortgages = existingMortgage
       ? prev.mortgages.map(m => (m.propertyId === propertyId ? newMortgage : m))
       : [...prev.mortgages, newMortgage];
-
     const cashFromRefinance = newLoanAmount - currentMortgage;
 
     toast({
@@ -2511,48 +2520,68 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
         : `Property refinanced for £${newLoanAmount.toLocaleString()}`,
     });
 
-    return {
-      ...prev,
-      cash: prev.cash + cashFromRefinance, // Add cash (can be positive or negative after fees)
-      mortgages: updatedMortgages,
-    };
+    return { ...prev, cash: prev.cash + cashFromRefinance, mortgages: updatedMortgages };
   });
 }, []);
 
-// Portfolio mortgage
+// Portfolio mortgage - uses centralized eligibility
 const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
   setGameState(prev => {
-    // Prevent overlapping portfolio loans on the same properties
     const hasExistingPortfolio = prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)));
     if (hasExistingPortfolio) {
-      toast({
-        title: "Cannot Create Portfolio Mortgage",
-        description: "One or more selected properties are already part of a portfolio mortgage.",
-        variant: "destructive"
-      });
+      toast({ title: "Cannot Create Portfolio Mortgage", description: "One or more selected properties are already part of a portfolio mortgage.", variant: "destructive" });
       return prev;
     }
 
-    // Sum all existing individual mortgages for these properties
+    const selectedProps = prev.ownedProperties.filter(p => selectedPropertyIds.includes(p.id));
+    const totalPortfolioValue = selectedProps.reduce((sum, p) => sum + p.value, 0);
+    const totalPortfolioRent = selectedProps.reduce((sum, p) => {
+      const hasTenant = prev.tenants.some(t => t.propertyId === p.id);
+      return sum + (hasTenant ? p.monthlyIncome : p.monthlyIncome); // use projected rent
+    }, 0);
     const totalCurrentMortgages = prev.mortgages
       .filter(m => selectedPropertyIds.includes(m.propertyId))
       .reduce((sum, m) => sum + m.remainingBalance, 0);
 
     const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-    const dynamicRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE + 0.005; // portfolio +0.5%
-    const monthlyRate = dynamicRate / 12;
-    const totalPayments = termYears * 12;
-    const monthlyPayment = mortgageType === 'interest-only'
-      ? loanAmount * monthlyRate
-      : loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+    const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005; // portfolio +0.5%
+    const existingPayments = prev.mortgages
+      .filter(m => !selectedPropertyIds.includes(m.propertyId))
+      .reduce((sum, m) => sum + m.monthlyPayment, 0);
+    const otherRentalIncome = prev.ownedProperties
+      .filter(p => !selectedPropertyIds.includes(p.id))
+      .reduce((total, prop) => {
+        const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
+        return total + (hasTenant ? prop.monthlyIncome : 0);
+      }, 0);
+
+    const eligibility = calculateMortgageEligibility({
+      creditScore: prev.creditScore,
+      loanAmount: loanAmount,
+      propertyValue: totalPortfolioValue,
+      propertyMonthlyRent: totalPortfolioRent,
+      providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+      providerMinCreditScore: provider.minCreditScore,
+      providerMaxLTV: provider.maxLTV,
+      providerId: provider.id,
+      termYears,
+      mortgageType,
+      existingMonthlyMortgagePayments: existingPayments,
+      totalRentalIncome: otherRentalIncome,
+    });
+
+    if (!eligibility.eligible) {
+      toast({ title: "Portfolio Mortgage Rejected", description: eligibility.reason || "Application declined", variant: "destructive" });
+      return prev;
+    }
 
     const portfolioMortgage: Mortgage = {
       id: `portfolio_${Date.now()}`,
       propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
       principal: loanAmount,
-      monthlyPayment,
+      monthlyPayment: eligibility.monthlyPayment,
       remainingBalance: loanAmount,
-      interestRate: dynamicRate,
+      interestRate: eligibility.adjustedRate,
       termYears,
       mortgageType,
       providerId: provider.id,
@@ -2560,9 +2589,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       startDate: Date.now()
     };
 
-    // Remove existing individual mortgages for these properties before adding the portfolio loan
     const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
-
     const cashDelta = loanAmount - totalCurrentMortgages;
 
     return {
