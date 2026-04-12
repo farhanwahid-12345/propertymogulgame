@@ -134,18 +134,21 @@ export function EstateAgentWindow({
 
   const { min: levelMin, max: levelMax } = getLevelRange(level);
 
-  // Calculate affordability for each property
+  // Calculate affordability for each property using credit-score-based LTV
+  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
+  
   const calculateAffordability = (property: Property) => {
-    // Find the best LTV the player qualifies for
-    const eligibleProviders = mortgageProviders.filter(p => creditScore >= p.minCreditScore);
-    const maxLTV = eligibleProviders.length > 0 
-      ? Math.max(...eligibleProviders.map(p => p.maxLTV))
+    // Find the best LTV the player qualifies for, capped by credit score
+    const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
+    const maxProviderLTV = eligibleProviders.length > 0 
+      ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
       : 0;
+    const maxLTV = Math.min(maxProviderLTV, creditMaxLTV);
     
     const maxMortgage = property.value * maxLTV;
     const stampDuty = property.value <= 250000 ? property.value * 0.03 :
       (250000 * 0.03) + ((property.value - 250000) * 0.08);
-    const fees = 600 + (property.value * 0.01) + stampDuty; // Solicitor + mortgage fee + stamp duty
+    const fees = 600 + (property.value * 0.01) + stampDuty;
     const cashNeeded = (property.value - maxMortgage) + fees;
     
     return cash >= cashNeeded;
