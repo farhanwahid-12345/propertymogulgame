@@ -1334,32 +1334,28 @@ export function useGameState() {
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         
-        // Eligibility check
         const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
           const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
           return total + (hasTenant ? prop.monthlyIncome : 0);
         }, 0);
-        const currentDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        const existingMortgagePayments = prev.mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
         
-        // Use dynamic rate from game state
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-        const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + 
-          (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
-        const monthlyRate = dynamicRate / 12;
         
-        let monthlyPayment: number;
-        if (mortgageType === 'interest-only') {
-          monthlyPayment = mortgageAmount * monthlyRate;
-        } else {
-          const totalPayments = termYears * 12;
-          monthlyPayment = mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
-            (Math.pow(1 + monthlyRate, totalPayments) - 1);
-        }
-        
-        const ltvRequired = mortgagePercentage / 100;
-        const eligibility = checkMortgageEligibility(
-          provider.id, prev.creditScore, ltvRequired, currentDTI, monthlyPayment, totalRentalIncome
-        );
+        const eligibility = calculateMortgageEligibility({
+          creditScore: prev.creditScore,
+          loanAmount: mortgageAmount,
+          propertyValue: property.price,
+          propertyMonthlyRent: property.monthlyIncome,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerMinCreditScore: provider.minCreditScore,
+          providerMaxLTV: provider.maxLTV,
+          providerId: provider.id,
+          termYears,
+          mortgageType,
+          existingMonthlyMortgagePayments: existingMortgagePayments,
+          totalRentalIncome,
+        });
         
         if (!eligibility.eligible) {
           toast({
@@ -1370,7 +1366,7 @@ export function useGameState() {
           return prev;
         }
         
-        // High LTV penalty
+        const ltvRequired = mortgagePercentage / 100;
         if (ltvRequired > 0.85) {
           creditAdjust -= 3;
         }
@@ -1379,9 +1375,9 @@ export function useGameState() {
           id: `${property.id}_${Date.now()}`,
           propertyId: property.id,
           principal: mortgageAmount,
-          monthlyPayment,
+          monthlyPayment: eligibility.monthlyPayment,
           remainingBalance: mortgageAmount,
-          interestRate: dynamicRate,
+          interestRate: eligibility.adjustedRate,
           termYears,
           mortgageType,
           providerId: providerId || "halifax",
@@ -1476,25 +1472,28 @@ export function useGameState() {
       if (mortgageAmount > 0) {
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         
-        // Eligibility check
         const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
           const hasTenant = prev.tenants.some(t => t.propertyId === prop.id);
           return total + (hasTenant ? prop.monthlyIncome : 0);
         }, 0);
-        const currentDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
+        const existingMortgagePayments = prev.mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
         
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-        const dynamicRate = providerRate + prev.currentMarketRate - BASE_MARKET_RATE + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
-        const monthlyRate = dynamicRate / 12;
-        const totalPayments = termYears * 12;
-        const monthlyPayment = mortgageType === 'interest-only'
-          ? mortgageAmount * monthlyRate
-          : mortgageAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
         
-        const ltvRequired = mortgagePercentage / 100;
-        const eligibility = checkMortgageEligibility(
-          provider.id, prev.creditScore, ltvRequired, currentDTI, monthlyPayment, totalRentalIncome
-        );
+        const eligibility = calculateMortgageEligibility({
+          creditScore: prev.creditScore,
+          loanAmount: mortgageAmount,
+          propertyValue: purchasePrice,
+          propertyMonthlyRent: property.monthlyIncome,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerMinCreditScore: provider.minCreditScore,
+          providerMaxLTV: provider.maxLTV,
+          providerId: provider.id,
+          termYears,
+          mortgageType,
+          existingMonthlyMortgagePayments: existingMortgagePayments,
+          totalRentalIncome,
+        });
         
         if (!eligibility.eligible) {
           toast({
@@ -1505,6 +1504,7 @@ export function useGameState() {
           return prev;
         }
         
+        const ltvRequired = mortgagePercentage / 100;
         if (ltvRequired > 0.85) {
           creditAdjust -= 3;
         }
@@ -1513,9 +1513,9 @@ export function useGameState() {
           id: `${property.id}_${Date.now()}`,
           propertyId: property.id,
           principal: mortgageAmount,
-          monthlyPayment,
+          monthlyPayment: eligibility.monthlyPayment,
           remainingBalance: mortgageAmount,
-          interestRate: dynamicRate,
+          interestRate: eligibility.adjustedRate,
           termYears,
           mortgageType,
           providerId: providerId || "halifax",
