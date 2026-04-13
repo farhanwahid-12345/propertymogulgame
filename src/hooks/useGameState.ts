@@ -1631,6 +1631,8 @@ export function useGameState() {
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
       lastGlobalDamageMonth: 0,
+      nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
+      economicEvents: [],
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
