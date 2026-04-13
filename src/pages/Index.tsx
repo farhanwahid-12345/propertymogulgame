@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,9 +18,25 @@ import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 
 const Index = () => {
-  useGameEngine(); // Start the decoupled game loop
+  useGameEngine();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+
+  // Controlled damage dialog state to prevent stuck overlays
+  const [damageDialogOpen, setDamageDialogOpen] = useState(false);
+  const currentDamageRef = useRef(gameState.pendingDamages?.[0]);
+
+  // Only open damage dialog when a new damage appears; don't force-close on re-render
+  useEffect(() => {
+    const currentDamage = gameState.pendingDamages?.[0];
+    if (currentDamage && currentDamage.id !== currentDamageRef.current?.id) {
+      currentDamageRef.current = currentDamage;
+      setDamageDialogOpen(true);
+    } else if (!currentDamage) {
+      currentDamageRef.current = undefined;
+      setDamageDialogOpen(false);
+    }
+  }, [gameState.pendingDamages]);
 
   const getDebtForProperty = (propertyId: string) => {
     return gameState.mortgages.reduce((sum, m) => {
@@ -33,9 +49,9 @@ const Index = () => {
     }, 0);
   };
 
-  const sortedOwnedProperties = gameState.ownedProperties.sort((a, b) => {
-    const yieldA = (a.monthlyIncome / a.value) * 12 * 100;
-    const yieldB = (b.monthlyIncome / b.value) * 12 * 100;
+  const sortedOwnedProperties = [...gameState.ownedProperties].sort((a, b) => {
+    const yieldA = a.value > 0 ? (a.monthlyIncome / a.value) * 12 * 100 : 0;
+    const yieldB = b.value > 0 ? (b.monthlyIncome / b.value) * 12 * 100 : 0;
     return yieldB - yieldA;
   });
 
@@ -49,18 +65,21 @@ const Index = () => {
         gameState.payDamageWithLoan(currentDamage.id, cost);
       }
     }
+    setDamageDialogOpen(false);
   };
 
   const handleTakeLoan = (cost: number) => {
     if (currentDamage) {
       gameState.payDamageWithLoan(currentDamage.id, cost);
     }
+    setDamageDialogOpen(false);
   };
 
   const handleDismissDamage = () => {
     if (currentDamage) {
       gameState.dismissDamage(currentDamage.id);
     }
+    setDamageDialogOpen(false);
   };
 
   // Portfolio summary calculations
@@ -69,6 +88,29 @@ const Index = () => {
   const avgYield = totalPortfolioValue > 0 
     ? ((totalPortfolioIncome * 12 / totalPortfolioValue) * 100).toFixed(1) 
     : "0.0";
+
+  // Portfolio LTV calculation
+  const portfolioLTV = totalPortfolioValue > 0
+    ? (gameState.totalDebt / totalPortfolioValue) * 100
+    : 0;
+
+  // Build conveyancing-buying properties for display in portfolio
+  const conveyancingBuyProperties = (gameState.conveyancing || [])
+    .filter(c => c.status === 'buying')
+    .map(c => ({
+      id: c.propertyId,
+      name: c.propertyName,
+      type: 'residential' as const,
+      price: (c.purchasePrice || 0) / 100, // Convert pennies to pounds for display
+      value: (c.purchasePrice || 0) / 100,
+      neighborhood: '',
+      monthlyIncome: 0,
+      image: '',
+      owned: true,
+      marketTrend: 'stable' as const,
+      condition: 'standard' as const,
+      monthsSinceLastRenovation: 0,
+    }));
 
   return (
     <div className="min-h-screen bg-gradient-city">
@@ -120,6 +162,7 @@ const Index = () => {
           tenantEvents={gameState.tenantEvents}
           monthsPlayed={gameState.monthsPlayed}
           economicEvents={gameState.economicEvents}
+          portfolioLTV={portfolioLTV}
         />
 
         {/* Tabs + Action Tiles */}
@@ -234,15 +277,25 @@ const Index = () => {
         />
 
         {/* Player Portfolio */}
-        {gameState.ownedProperties.length > 0 && (
+        {(gameState.ownedProperties.length > 0 || conveyancingBuyProperties.length > 0) && (
           <div className="glass p-5 animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                 Your Empire 🏰
                 <Badge variant="secondary" className="text-xs">
                   {gameState.ownedProperties.length}
+                  {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
                 </Badge>
               </h2>
+              {portfolioLTV > 0 && (
+                <Badge variant="outline" className={
+                  portfolioLTV > 80 ? "text-danger border-danger/30" :
+                  portfolioLTV > 60 ? "text-yellow-400 border-yellow-400/30" :
+                  "text-success border-success/30"
+                }>
+                  Portfolio LTV: {portfolioLTV.toFixed(1)}%
+                </Badge>
+              )}
             </div>
 
             {/* Portfolio Summary */}
@@ -262,8 +315,27 @@ const Index = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Conveyancing-buying properties (pending) */}
+              {conveyancingBuyProperties.map((property) => {
+                const conv = (gameState.conveyancing || []).find(c => c.propertyId === property.id);
+                return (
+                  <PropertyCard
+                    key={`conv-${property.id}`}
+                    property={property}
+                    playerCash={gameState.cash}
+                    monthsPlayed={gameState.monthsPlayed}
+                    isInConveyancing={true}
+                    conveyancingStatus="buying"
+                    conveyancingCompletion={conv?.completionMonth}
+                  />
+                );
+              })}
+
+              {/* Owned properties */}
               {sortedOwnedProperties.map((property) => {
-                const conv = gameState.conveyancing?.find(c => c.propertyId === property.id);
+                const conv = (gameState.conveyancing || []).find(c => c.propertyId === property.id);
+                const propertyDebt = getDebtForProperty(property.id);
+                const propertyLTV = property.value > 0 ? (propertyDebt / property.value) * 100 : 0;
                 return (
                   <PropertyCard
                     key={property.id}
@@ -277,6 +349,7 @@ const Index = () => {
                     isInConveyancing={!!conv}
                     conveyancingStatus={conv?.status}
                     conveyancingCompletion={conv?.completionMonth}
+                    propertyLTV={propertyLTV}
                   />
                 );
               })}
@@ -285,10 +358,10 @@ const Index = () => {
         )}
       </div>
 
-      {/* Property Damage Dialog */}
+      {/* Property Damage Dialog — controlled open state */}
       {currentDamage && (
         <PropertyDamageDialog
-          open={!!currentDamage}
+          open={damageDialogOpen}
           propertyName={currentDamage.propertyName}
           repairCost={currentDamage.repairCost}
           playerCash={gameState.cash}
