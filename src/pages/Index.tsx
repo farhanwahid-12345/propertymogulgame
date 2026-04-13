@@ -262,18 +262,24 @@ const Index = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedOwnedProperties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property}
-                  onSell={gameState.sellProperty}
-                  onSelectTenant={gameState.selectTenant}
-                  playerCash={gameState.cash}
-                  currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
-                  mortgages={gameState.mortgages}
-                  monthsPlayed={gameState.monthsPlayed}
-                />
-              ))}
+              {sortedOwnedProperties.map((property) => {
+                const conv = gameState.conveyancing?.find(c => c.propertyId === property.id);
+                return (
+                  <PropertyCard
+                    key={property.id}
+                    property={property}
+                    onSell={gameState.sellProperty}
+                    onSelectTenant={gameState.selectTenant}
+                    playerCash={gameState.cash}
+                    currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
+                    mortgages={gameState.mortgages}
+                    monthsPlayed={gameState.monthsPlayed}
+                    isInConveyancing={!!conv}
+                    conveyancingStatus={conv?.status}
+                    conveyancingCompletion={conv?.completionMonth}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
