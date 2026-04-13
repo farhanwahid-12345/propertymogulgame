@@ -13,6 +13,7 @@ import { AuctionHouse } from "@/components/ui/auction-house";
 import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { useGameState } from "@/hooks/useGameState";
+import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 
