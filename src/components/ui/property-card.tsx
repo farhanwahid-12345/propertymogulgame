@@ -79,7 +79,10 @@ export const PropertyCard = memo(function PropertyCard({
   propertyListings = [],
   removeTenant,
   mortgages = [],
-  monthsPlayed = 0
+  monthsPlayed = 0,
+  isInConveyancing = false,
+  conveyancingStatus,
+  conveyancingCompletion,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
