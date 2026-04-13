@@ -2,11 +2,20 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, AlertTriangle, Info, ChevronDown } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+
+interface EconomicEvent {
+  id: string;
+  name: string;
+  description: string;
+  month: number;
+  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
+}
 
 interface GameStatsProps {
   cash: number;
@@ -33,6 +42,7 @@ interface GameStatsProps {
     month: number;
   }>;
   monthsPlayed: number;
+  economicEvents?: EconomicEvent[];
 }
 
 export function GameStats({
@@ -49,11 +59,19 @@ export function GameStats({
   ownedPropertiesCount,
   currentMarketRate,
   tenantEvents,
-  monthsPlayed
+  monthsPlayed,
+  economicEvents = []
 }: GameStatsProps) {
   const netMonthlyIncome = totalMonthlyIncome - totalMonthlyExpenses;
   const experienceProgress = (experience / experienceToNext) * 100;
   const [showDetails, setShowDetails] = useState(false);
+
+  // DTI calculation
+  const dtiRatio = totalMonthlyIncome > 0 
+    ? (totalMonthlyExpenses / totalMonthlyIncome) * 100 
+    : (totalMonthlyExpenses > 0 ? 100 : 0);
+  const dtiColor = dtiRatio <= 50 ? "text-success" : dtiRatio <= 79 ? "text-yellow-400" : "text-danger";
+  const dtiBarColor = dtiRatio <= 50 ? "bg-success" : dtiRatio <= 79 ? "bg-yellow-400" : "bg-red-500";
 
   const getCreditScoreColor = (score: number) => {
     if (score >= 750) return "text-success";
@@ -65,8 +83,29 @@ export function GameStats({
     .filter(event => event.month >= monthsPlayed - 3)
     .slice(-5);
 
+  const latestEconomicEvent = economicEvents.length > 0 ? economicEvents[economicEvents.length - 1] : null;
+
   return (
     <div className="space-y-3 animate-fade-in">
+      {/* Latest Economic Event Banner */}
+      {latestEconomicEvent && latestEconomicEvent.month >= monthsPlayed - 2 && (
+        <div className={cn(
+          "glass p-3 border-l-4 animate-fade-in",
+          latestEconomicEvent.type === 'recession' ? "border-red-500 bg-red-500/10" :
+          latestEconomicEvent.type === 'rate_cut' ? "border-green-500 bg-green-500/10" :
+          latestEconomicEvent.type === 'tech_boom' ? "border-blue-500 bg-blue-500/10" :
+          "border-yellow-500 bg-yellow-500/10"
+        )}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-sm text-foreground">{latestEconomicEvent.name}</div>
+              <div className="text-xs text-muted-foreground">{latestEconomicEvent.description}</div>
+            </div>
+            <Badge variant="outline" className="text-xs">Month {latestEconomicEvent.month}</Badge>
+          </div>
+        </div>
+      )}
+
       {/* Main Stats Bar */}
       <div className="glass p-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -155,6 +194,43 @@ export function GameStats({
         </div>
       </div>
 
+      {/* DTI Ratio Bar */}
+      {totalMonthlyExpenses > 0 && (
+        <div className="glass p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">📊 Debt-to-Income (DTI)</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[250px]">
+                    <p className="text-xs">DTI measures how much of your rental income goes to debt payments. Above 80% puts you at high risk if interest rates rise — one rate hike could make you cash-flow negative.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <span className={cn("text-sm font-bold", dtiColor)}>
+              {Math.round(dtiRatio)}%
+            </span>
+          </div>
+          <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
+            <div 
+              className={cn("h-full rounded-full transition-all duration-500", dtiBarColor)}
+              style={{ width: `${Math.min(100, dtiRatio)}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+            <span>0%</span>
+            <span className="text-success">Safe</span>
+            <span className="text-yellow-400">50%</span>
+            <span className="text-yellow-400">Caution</span>
+            <span className="text-danger">80%+</span>
+          </div>
+        </div>
+      )}
+
       {/* Collapsible Market & Events */}
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
         <CollapsibleTrigger asChild>
@@ -187,6 +263,25 @@ export function GameStats({
                 <div className="font-semibold">{monthsPlayed}</div>
               </div>
             </div>
+
+            {/* Economic Events History */}
+            {economicEvents.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <div className="text-sm font-medium text-muted-foreground">📰 Economic Events</div>
+                {economicEvents.slice(-3).reverse().map((event) => (
+                  <div key={event.id} className={cn(
+                    "p-2 rounded-xl text-sm",
+                    event.type === 'recession' ? "bg-red-500/10" :
+                    event.type === 'rate_cut' ? "bg-green-500/10" :
+                    event.type === 'tech_boom' ? "bg-blue-500/10" :
+                    "bg-yellow-500/10"
+                  )}>
+                    <div className="font-medium text-foreground">{event.name}</div>
+                    <div className="text-xs text-muted-foreground">Month {event.month}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {recentTenantEvents.length > 0 && (
               <div className="space-y-2 pt-2 border-t border-white/10">

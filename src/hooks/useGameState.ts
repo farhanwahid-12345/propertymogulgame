@@ -103,6 +103,14 @@ interface PropertyDamageHistory {
   lastDamageMonth: number; // Month when last damage occurred
 }
 
+interface MacroEconomicEvent {
+  id: string;
+  name: string;
+  description: string;
+  month: number;
+  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
@@ -125,13 +133,15 @@ interface GameState {
   pendingDamages: PropertyDamage[];
   annualRepairCosts: AnnualRepairCost[];
   damageHistory: PropertyDamageHistory[];
-  lastYearlyGrowth: number; // Tracks when we last applied yearly property value growth
-  mortgageProviderRates: Record<string, number>; // Dynamic rates for each provider
-  estateAgentPropertyIds: string[]; // Persist which properties are in estate agent
-  auctionPropertyIds: string[]; // Persist which properties are in auction
-  yearlyNetProfit: number; // Track net profit for corporation tax
-  lastCorporationTaxMonth: number; // Track when we last paid corporation tax (April = month 4)
-  lastGlobalDamageMonth: number; // Global cooldown: max 1 damage event per 6 months across portfolio
+  lastYearlyGrowth: number;
+  mortgageProviderRates: Record<string, number>;
+  estateAgentPropertyIds: string[];
+  auctionPropertyIds: string[];
+  yearlyNetProfit: number;
+  lastCorporationTaxMonth: number;
+  lastGlobalDamageMonth: number;
+  nextEconomicEventMonth: number; // When the next macro event fires
+  economicEvents: MacroEconomicEvent[]; // History of events
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
@@ -489,6 +499,8 @@ export function useGameState() {
       auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
       yearlyNetProfit: parsedState.yearlyNetProfit ?? 0,
       lastCorporationTaxMonth: parsedState.lastCorporationTaxMonth ?? 0,
+      nextEconomicEventMonth: parsedState.nextEconomicEventMonth ?? (3 + Math.floor(Math.random() * 4)),
+      economicEvents: parsedState.economicEvents ?? [],
     };
     }
     return {
@@ -520,6 +532,8 @@ export function useGameState() {
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
       lastGlobalDamageMonth: 0,
+      nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
+      economicEvents: [],
     };
   });
 
@@ -1084,9 +1098,11 @@ export function useGameState() {
         let creditScoreImprovement = 0;
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
         
-        // Slower monthly gain: +1 only on even months (effectively +0.5/month avg)
-        if (prev.mortgages.length > 0 && playerDTI < 0.40 && prev.monthsPlayed % 2 === 0) {
-          creditScoreImprovement += 1; // Only improve every other month if DTI is healthy
+        // Credit improvement: +5 per month if mortgages are being paid and cash is positive
+        if (prev.mortgages.length > 0 && prev.cash >= 0) {
+          creditScoreImprovement += 5;
+        } else if (prev.ownedProperties.length > 0 && prev.cash >= 0) {
+          creditScoreImprovement += 2; // Smaller gain for outright owners
         }
         // DTI penalty on credit score
         if (playerDTI > 0.60) {
@@ -1231,22 +1247,92 @@ export function useGameState() {
           });
         }
 
+        // === MACRO-ECONOMIC EVENTS ===
+        const newMonthNumber = prev.monthsPlayed + 1;
+        let nextEventMonth = prev.nextEconomicEventMonth;
+        let economicEvents = [...prev.economicEvents];
+        let eventCashBonus = 0;
+        let eventRateAdjust = 0;
+        
+        if (newMonthNumber >= nextEventMonth && prev.ownedProperties.length > 0) {
+          // Fire a random economic event
+          const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
+            { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%. Your variable mortgage payments decrease!' },
+            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'A tech company is moving to the area! Property values and rents increase by 15%.' },
+            { type: 'recession', name: '📉 Economic Recession', description: 'The economy is struggling. Base rates rise 1.5% and property values drop 10%.' },
+            { type: 'grant', name: '🏛️ Government Landlord Grant', description: 'The government is offering grants to landlords! You receive a cash injection.' },
+          ];
+          
+          const chosenEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+          const event: MacroEconomicEvent = {
+            id: `event_${newMonthNumber}`,
+            name: chosenEvent.name,
+            description: chosenEvent.description,
+            month: newMonthNumber,
+            type: chosenEvent.type,
+          };
+          economicEvents = [...economicEvents.slice(-9), event]; // Keep last 10
+          
+          // Apply effects
+          if (chosenEvent.type === 'rate_cut') {
+            eventRateAdjust = -0.01; // -1% on all rates
+          } else if (chosenEvent.type === 'tech_boom') {
+            // Property values & rents +15% applied below
+            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+              ...p,
+              value: Math.floor(p.value * 1.15),
+              marketValue: Math.floor((p.marketValue || p.value) * 1.15),
+              monthlyIncome: Math.floor(p.monthlyIncome * 1.15),
+              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.15),
+            }));
+          } else if (chosenEvent.type === 'recession') {
+            eventRateAdjust = 0.015; // +1.5% rates
+            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+              ...p,
+              value: Math.floor(p.value * 0.90),
+              marketValue: Math.floor((p.marketValue || p.value) * 0.90),
+            }));
+          } else if (chosenEvent.type === 'grant') {
+            const grantAmount = 5000 + Math.floor(Math.random() * 15000); // £5k-£20k
+            eventCashBonus = grantAmount;
+          }
+          
+          toast({
+            title: chosenEvent.name,
+            description: chosenEvent.description + (eventCashBonus > 0 ? ` You received £${eventCashBonus.toLocaleString()}!` : ''),
+          });
+          
+          // Schedule next event in 3-6 months
+          nextEventMonth = newMonthNumber + 3 + Math.floor(Math.random() * 4);
+        }
+        
+        // Apply rate adjustments from events
+        let finalProviderRates = newProviderRates;
+        if (eventRateAdjust !== 0) {
+          finalProviderRates = { ...newProviderRates };
+          Object.keys(finalProviderRates).forEach(key => {
+            finalProviderRates[key] = Math.max(0.01, finalProviderRates[key] + eventRateAdjust);
+          });
+        }
+
         return {
           ...prev,
-          cash: finalCash,
+          cash: finalCash + eventCashBonus,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           experience: prev.experience,
           level: newLevel,
           experienceToNext: prev.experienceToNext,
-          monthsPlayed: prev.monthsPlayed + 1,
-          timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
+          monthsPlayed: newMonthNumber,
+          timeUntilNextMonth: 180,
           isBankrupt,
           creditScore: Math.max(300, Math.min(850, prev.creditScore + creditScoreImprovement)),
           lastYearlyGrowth: newLastYearlyGrowth,
-          mortgageProviderRates: newProviderRates,
+          mortgageProviderRates: finalProviderRates,
           yearlyNetProfit: finalYearlyProfit,
           lastCorporationTaxMonth: lastCorpTaxMonth,
+          nextEconomicEventMonth: nextEventMonth,
+          economicEvents,
         };
       });
     }
@@ -1355,6 +1441,7 @@ export function useGameState() {
           mortgageType,
           existingMonthlyMortgagePayments: existingMortgagePayments,
           totalRentalIncome,
+          ownedPropertyCount: prev.ownedProperties.length,
         });
         
         if (!eligibility.eligible) {
@@ -1493,6 +1580,7 @@ export function useGameState() {
           mortgageType,
           existingMonthlyMortgagePayments: existingMortgagePayments,
           totalRentalIncome,
+          ownedPropertyCount: prev.ownedProperties.length,
         });
         
         if (!eligibility.eligible) {
@@ -1617,6 +1705,8 @@ export function useGameState() {
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
       lastGlobalDamageMonth: 0,
+      nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
+      economicEvents: [],
     };
     setGameState(newState);
     const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
@@ -2488,6 +2578,7 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
       mortgageType,
       existingMonthlyMortgagePayments: existingPayments,
       totalRentalIncome: totalRentalIncome - propertyRent,
+      ownedPropertyCount: prev.ownedProperties.length,
     });
 
     if (!eligibility.eligible) {
@@ -2568,6 +2659,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       mortgageType,
       existingMonthlyMortgagePayments: existingPayments,
       totalRentalIncome: otherRentalIncome,
+      ownedPropertyCount: prev.ownedProperties.length,
     });
 
     if (!eligibility.eligible) {
