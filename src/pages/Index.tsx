@@ -18,6 +18,7 @@ import { RotateCcw } from "lucide-react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 
 const Index = () => {
+  useGameEngine(); // Start the decoupled game loop
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
