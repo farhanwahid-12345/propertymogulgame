@@ -499,6 +499,8 @@ export function useGameState() {
       auctionPropertyIds: parsedState.auctionPropertyIds ?? [],
       yearlyNetProfit: parsedState.yearlyNetProfit ?? 0,
       lastCorporationTaxMonth: parsedState.lastCorporationTaxMonth ?? 0,
+      nextEconomicEventMonth: parsedState.nextEconomicEventMonth ?? (3 + Math.floor(Math.random() * 4)),
+      economicEvents: parsedState.economicEvents ?? [],
     };
     }
     return {
