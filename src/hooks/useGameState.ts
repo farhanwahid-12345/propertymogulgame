@@ -103,6 +103,14 @@ interface PropertyDamageHistory {
   lastDamageMonth: number; // Month when last damage occurred
 }
 
+interface MacroEconomicEvent {
+  id: string;
+  name: string;
+  description: string;
+  month: number;
+  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
+}
+
 interface GameState {
   cash: number;
   ownedProperties: Property[];
@@ -125,13 +133,15 @@ interface GameState {
   pendingDamages: PropertyDamage[];
   annualRepairCosts: AnnualRepairCost[];
   damageHistory: PropertyDamageHistory[];
-  lastYearlyGrowth: number; // Tracks when we last applied yearly property value growth
-  mortgageProviderRates: Record<string, number>; // Dynamic rates for each provider
-  estateAgentPropertyIds: string[]; // Persist which properties are in estate agent
-  auctionPropertyIds: string[]; // Persist which properties are in auction
-  yearlyNetProfit: number; // Track net profit for corporation tax
-  lastCorporationTaxMonth: number; // Track when we last paid corporation tax (April = month 4)
-  lastGlobalDamageMonth: number; // Global cooldown: max 1 damage event per 6 months across portfolio
+  lastYearlyGrowth: number;
+  mortgageProviderRates: Record<string, number>;
+  estateAgentPropertyIds: string[];
+  auctionPropertyIds: string[];
+  yearlyNetProfit: number;
+  lastCorporationTaxMonth: number;
+  lastGlobalDamageMonth: number;
+  nextEconomicEventMonth: number; // When the next macro event fires
+  economicEvents: MacroEconomicEvent[]; // History of events
 }
 
 const INITIAL_CASH = 250000; // £250K starting cash
