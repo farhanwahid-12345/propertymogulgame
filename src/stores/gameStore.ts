@@ -2,9 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
   GameState, Property, Mortgage, PropertyTenant, VoidPeriod,
-  PropertyListing, PropertyOffer, Renovation, TenantEvent,
-  PropertyDamage, AnnualRepairCost, PropertyDamageHistory,
-  MacroEconomicEvent, SAVE_VERSION,
+  PropertyListing, PropertyOffer, Renovation,
+  PropertyDamage, MacroEconomicEvent,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';

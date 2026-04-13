@@ -1,19 +1,24 @@
-import type { StateStorage } from 'zustand/middleware';
-
 /**
- * A Zustand-compatible storage adapter that debounces writes
- * to prevent blocking the main thread on every state update.
+ * Debounced storage adapter for Zustand persist middleware.
+ * Uses the StorageValue format that Zustand v4 persist expects.
  */
-export function createDebouncedStorage(delayMs: number = 2000): StateStorage {
+export function createDebouncedStorage(delayMs: number = 2000) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pendingValue: string | null = null;
 
   return {
-    getItem(name: string): string | null {
-      return localStorage.getItem(name);
+    getItem(name: string) {
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
     },
-    setItem(name: string, value: string): void {
-      pendingValue = value;
+    setItem(name: string, value: any): void {
+      const serialized = JSON.stringify(value);
+      pendingValue = serialized;
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (pendingValue !== null) {
