@@ -1,3 +1,4 @@
+// @refresh reset
 /**
  * useGameState — backward-compatible wrapper over the Zustand store.
  *
