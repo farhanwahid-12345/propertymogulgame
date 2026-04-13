@@ -52,6 +52,7 @@ interface PropertyCardProps {
   isInConveyancing?: boolean;
   conveyancingStatus?: 'buying' | 'selling';
   conveyancingCompletion?: number;
+  propertyLTV?: number;
 }
 
 const PropertyTypeIcon = {
@@ -83,6 +84,7 @@ export const PropertyCard = memo(function PropertyCard({
   isInConveyancing = false,
   conveyancingStatus,
   conveyancingCompletion,
+  propertyLTV = 0,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -234,6 +236,21 @@ export const PropertyCard = memo(function PropertyCard({
               £{property.monthlyIncome.toLocaleString()}/mo
             </Badge>
           </div>
+
+          {/* Per-property LTV */}
+          {property.owned && propertyLTV > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">LTV:</span>
+              <span className={cn(
+                "font-semibold text-sm",
+                propertyLTV > 80 ? "text-danger" :
+                propertyLTV > 60 ? "text-yellow-400" :
+                "text-success"
+              )}>
+                {propertyLTV.toFixed(1)}%
+              </span>
+            </div>
+          )}
 
           {property.owned && (
             <>

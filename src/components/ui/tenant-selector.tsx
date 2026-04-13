@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 export interface TenantTrait {
   name: string;
   emoji: string;
-  color: string; // tailwind border/bg token
-  damageRiskMod: number;   // multiplier (e.g. 0.5 = halve)
-  defaultRiskMod: number;  // multiplier
-  rentMod: number;         // multiplier on rent (e.g. 1.05 = +5%)
+  color: string;
+  damageRiskMod: number;
+  defaultRiskMod: number;
+  rentMod: number;
   description: string;
 }
 
@@ -31,7 +31,6 @@ const TRAIT_POOL: TenantTrait[] = [
   { name: "Student", emoji: "🎓", color: "border-cyan-400 bg-cyan-400/10 text-cyan-300", damageRiskMod: 1.25, defaultRiskMod: 0.9, rentMod: 1, description: "Guarantor pays on time" },
 ];
 
-// Pick 1-2 random traits, avoiding contradictions
 const pickTraits = (): TenantTrait[] => {
   const count = Math.random() < 0.4 ? 2 : 1;
   const shuffled = [...TRAIT_POOL].sort(() => Math.random() - 0.5);
@@ -109,7 +108,7 @@ export interface Tenant {
   traits: TenantTrait[];
 }
 
-// --- Generation with wider variance & overlap ---
+// --- Generation ---
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
@@ -124,7 +123,6 @@ const generateTenantProfiles = (): Tenant[] => {
     const traitDefaultMod = traits.reduce((m, t) => m * t.defaultRiskMod, 1);
     const traitRentMod = traits.reduce((m, t) => m * t.rentMod, 1);
 
-    // Wider ranges with overlap between tiers
     const configs = {
       premium: { credit: [680, 800], income: [5500, 9500], rent: [1.1, 1.25], defRisk: [1, 5], dmgRisk: [0.5, 2] },
       standard: { credit: [580, 720], income: [2800, 5500], rent: [0.9, 1.1], defRisk: [3, 15], dmgRisk: [1, 4] },
@@ -176,7 +174,6 @@ const StarRating = ({ value, max = 5, label }: { value: number; max?: number; la
   );
 };
 
-// Convert risk % to star rating (inverted: low risk = more stars)
 const riskToStars = (risk: number, maxRisk: number): number => {
   const normalized = 1 - Math.min(risk / maxRisk, 1);
   return Math.max(1, Math.round(normalized * 5));
@@ -202,7 +199,7 @@ const ProfileEmoji: Record<string, string> = {
 
 interface TenantSelectorProps {
   propertyId: string;
-  baseRent: number;
+  baseRent: number; // pounds (already converted from pennies by useGameState)
   onSelectTenant: (propertyId: string, tenant: Tenant) => void;
   currentTenant?: Tenant;
   currentMonthlyRent?: number;
@@ -222,7 +219,6 @@ export function TenantSelector({
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
 
-  // Regenerate tenant pool every time dialog opens
   useEffect(() => {
     if (isOpen) {
       setTenantProfiles(generateTenantProfiles());
@@ -237,6 +233,10 @@ export function TenantSelector({
       setSelectedTenant(null);
     }
   };
+
+  // Ensure baseRent is a valid positive number for display
+  // baseRent arrives in pounds from useGameState; guard against 0/NaN
+  const displayBaseRent = baseRent > 0 ? baseRent : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -254,6 +254,11 @@ export function TenantSelector({
           <DialogTitle>Choose Tenant for Property</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
             Different tenants offer different rent and risk profiles. The market refreshes each time you look!
+            {displayBaseRent > 0 && (
+              <span className="block mt-1 text-foreground">
+                Base rent: £{Math.round(displayBaseRent).toLocaleString()}/mo
+              </span>
+            )}
             {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
               <span className="text-amber-400 block mt-1">
                 ⚠️ Higher-rent tenants unavailable for {3 - (monthsPlayed - lastTenantChange)} more month(s)
@@ -264,7 +269,8 @@ export function TenantSelector({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
-            const potentialRent = Math.floor(baseRent * tenant.rentMultiplier);
+            // Calculate potential rent: baseRent (pounds) * multiplier, then round
+            const potentialRent = Math.round(displayBaseRent * tenant.rentMultiplier);
             const isSelected = selectedTenant?.id === tenant.id;
             const reliabilityStars = riskToStars(tenant.defaultRisk, 50);
             const careStars = riskToStars(tenant.damageRisk, 12);
@@ -330,12 +336,12 @@ export function TenantSelector({
                       <span className="text-xs text-muted-foreground">Potential Rent</span>
                       <div className="font-semibold text-emerald-400 flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
-                        £{potentialRent}/mo
+                        £{potentialRent.toLocaleString()}/mo
                       </div>
                     </div>
                   </div>
 
-                  {/* Star ratings instead of raw percentages */}
+                  {/* Star ratings */}
                   <div className="flex gap-4 pt-1">
                     <StarRating value={reliabilityStars} label="Reliability" />
                     <StarRating value={careStars} label="Property Care" />

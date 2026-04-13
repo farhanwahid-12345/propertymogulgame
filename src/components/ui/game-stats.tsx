@@ -43,6 +43,7 @@ interface GameStatsProps {
   }>;
   monthsPlayed: number;
   economicEvents?: EconomicEvent[];
+  portfolioLTV?: number;
 }
 
 export function GameStats({
@@ -60,7 +61,8 @@ export function GameStats({
   currentMarketRate,
   tenantEvents,
   monthsPlayed,
-  economicEvents = []
+  economicEvents = [],
+  portfolioLTV = 0,
 }: GameStatsProps) {
   const netMonthlyIncome = totalMonthlyIncome - totalMonthlyExpenses;
   const experienceProgress = (experience / experienceToNext) * 100;
@@ -171,10 +173,20 @@ export function GameStats({
             <div className="text-xl font-bold text-foreground">
               {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
               </span>
+              {portfolioLTV > 0 && (
+                <span className={cn(
+                  "text-xs font-semibold",
+                  portfolioLTV > 80 ? "text-danger" :
+                  portfolioLTV > 60 ? "text-yellow-400" :
+                  "text-success"
+                )}>
+                  LTV: {portfolioLTV.toFixed(0)}%
+                </span>
+              )}
               <CreditImprovementGuide
                 creditScore={creditScore}
                 mortgageCount={ownedPropertiesCount}
