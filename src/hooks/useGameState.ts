@@ -532,6 +532,8 @@ export function useGameState() {
       yearlyNetProfit: 0,
       lastCorporationTaxMonth: 0,
       lastGlobalDamageMonth: 0,
+      nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
+      economicEvents: [],
     };
   });
 
