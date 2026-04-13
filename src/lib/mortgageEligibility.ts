@@ -26,12 +26,12 @@ export interface MortgageEligibilityResult {
   icrRatio?: number; // interest coverage ratio
 }
 
-// Credit score → max LTV mapping
+// Credit score → max LTV mapping (more forgiving for early game)
 export function getMaxLTVForCreditScore(creditScore: number): number {
-  if (creditScore >= 800) return 0.90; // Excellent: up to 90% for specific providers
-  if (creditScore >= 650) return 0.80; // Good: up to 80%
-  if (creditScore >= 500) return 0.75; // Fair: up to 75%
-  return 0.60; // Poor: max 60%
+  if (creditScore >= 800) return 0.95; // Excellent: up to 95% (only 5% deposit)
+  if (creditScore >= 650) return 0.90; // Good: up to 90%
+  if (creditScore >= 500) return 0.85; // Fair: up to 85%
+  return 0.75; // Poor: max 75%
 }
 
 // Credit score → rate penalty
@@ -123,17 +123,38 @@ export function calculateMortgageEligibility(
     };
   }
 
-  // 3. ICR (Interest Coverage Ratio) / Affordability Stress Test
-  // Property's projected rental income must be >= 125% of proposed monthly payment
-  if (req.propertyMonthlyRent > 0 && monthlyPayment > 0) {
-    const icrRatio = req.propertyMonthlyRent / monthlyPayment;
-    result.icrRatio = icrRatio;
-    if (icrRatio < 1.25) {
-      return {
-        ...result,
-        eligible: false,
-        reason: `Mortgage Denied: Property rental income (£${req.propertyMonthlyRent.toLocaleString()}/mo) fails the 125% bank stress test. Need £${Math.ceil(monthlyPayment * 1.25).toLocaleString()}/mo rental income for this loan.`,
-      };
+  // 3. ICR / Portfolio Affordability Stress Test
+  // If player owns < 3 properties: lenient 100% ICR (rent covers mortgage)
+  // If player owns >= 3 properties: portfolio-level 125% ICR on TOTAL income vs TOTAL payments
+  const ownedPropertyCount = req.ownedPropertyCount ?? 0;
+  
+  if (ownedPropertyCount < 3) {
+    // Lenient: property rent just needs to cover 100% of its mortgage payment
+    if (req.propertyMonthlyRent > 0 && monthlyPayment > 0) {
+      const icrRatio = req.propertyMonthlyRent / monthlyPayment;
+      result.icrRatio = icrRatio;
+      if (icrRatio < 1.0) {
+        return {
+          ...result,
+          eligible: false,
+          reason: `Mortgage Denied: Property rental income (£${req.propertyMonthlyRent.toLocaleString()}/mo) doesn't cover the mortgage payment (£${Math.ceil(monthlyPayment).toLocaleString()}/mo).`,
+        };
+      }
+    }
+  } else {
+    // Portfolio affordability: TOTAL rental income must be >= 125% of TOTAL mortgage payments
+    const totalIncomeWithNew = req.totalRentalIncome + req.propertyMonthlyRent;
+    const totalPaymentsWithNew = req.existingMonthlyMortgagePayments + monthlyPayment;
+    if (totalPaymentsWithNew > 0 && totalIncomeWithNew > 0) {
+      const portfolioICR = totalIncomeWithNew / totalPaymentsWithNew;
+      result.icrRatio = portfolioICR;
+      if (portfolioICR < 1.25) {
+        return {
+          ...result,
+          eligible: false,
+          reason: `Mortgage Denied: Portfolio rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 125% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.25).toLocaleString()}/mo total rental income.`,
+        };
+      }
     }
   }
 
