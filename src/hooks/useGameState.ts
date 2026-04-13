@@ -257,6 +257,14 @@ export function useGameState() {
     store.rejectBuyerCounter(propertyId, offerId, toPennies(newCounterAmount));
   }, [store.rejectBuyerCounter]);
 
+  const upgradeCondition = useCallback((propertyId: string, targetCondition: any) => {
+    store.upgradeCondition(propertyId, targetCondition);
+  }, [store.upgradeCondition]);
+
+  const setEntityType = useCallback((type: any) => {
+    store.setEntityType(type);
+  }, [store.setEntityType]);
+
   // ── Return same shape as old hook ───────────────────────
   return {
     // State values (pounds)
@@ -288,6 +296,10 @@ export function useGameState() {
     lastGlobalDamageMonth: store.lastGlobalDamageMonth,
     nextEconomicEventMonth: store.nextEconomicEventMonth,
     economicEvents: store.economicEvents,
+    entityType: store.entityType,
+    conveyancing: store.conveyancing,
+    taxRecords: store.taxRecords,
+    totalTaxPaid: fromPennies(store.totalTaxPaid),
 
     // Derived values
     netWorth: netWorth - totalDebt,
@@ -316,6 +328,7 @@ export function useGameState() {
     selectTenant,
     removeTenant,
     startRenovation,
+    upgradeCondition,
     settleMortgage,
     remortgageProperty,
     handleEstateAgentSale,
@@ -340,5 +353,6 @@ export function useGameState() {
     reducePriceOnListing,
     acceptBuyerCounter,
     rejectBuyerCounter,
+    setEntityType,
   };
 }

@@ -21,12 +21,14 @@ export interface Property {
   image: string;
   owned?: boolean;
   marketTrend: "up" | "down" | "stable";
-  mortgageRemaining?: number; // For refinancing purposes
-  marketValue?: number; // True market value (for tracking profit on below-market purchases)
-  yield?: number; // Annual yield percentage (6-15%)
-  lastRentIncrease?: number; // Tracks when rent was last increased (month)
-  baseRent?: number; // Current base rent level (increases 3% annually, prevents dramatic tenant switch jumps)
-  lastTenantChange?: number; // Month when tenant was last changed (for rent upgrade timing)
+  mortgageRemaining?: number;
+  marketValue?: number;
+  yield?: number;
+  lastRentIncrease?: number;
+  baseRent?: number;
+  lastTenantChange?: number;
+  condition: "dilapidated" | "standard" | "premium";
+  monthsSinceLastRenovation: number;
 }
 
 interface PropertyCardProps {
@@ -47,6 +49,9 @@ interface PropertyCardProps {
     remainingBalance: number;
   }>;
   monthsPlayed?: number;
+  isInConveyancing?: boolean;
+  conveyancingStatus?: 'buying' | 'selling';
+  conveyancingCompletion?: number;
 }
 
 const PropertyTypeIcon = {
@@ -74,7 +79,10 @@ export const PropertyCard = memo(function PropertyCard({
   propertyListings = [],
   removeTenant,
   mortgages = [],
-  monthsPlayed = 0
+  monthsPlayed = 0,
+  isInConveyancing = false,
+  conveyancingStatus,
+  conveyancingCompletion,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -157,6 +165,20 @@ export const PropertyCard = memo(function PropertyCard({
             <CardTitle className="text-base">{property.name}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
+            {isInConveyancing && (
+              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">
+                ⏳ {conveyancingStatus === 'buying' ? 'Buying' : 'Selling'} (Mo {conveyancingCompletion})
+              </Badge>
+            )}
+            {property.owned && property.condition && (
+              <Badge className={cn("text-[10px]",
+                property.condition === 'premium' ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
+                property.condition === 'dilapidated' ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                "bg-blue-500/20 text-blue-400 border-blue-500/30"
+              )}>
+                {property.condition === 'premium' ? '✨' : property.condition === 'dilapidated' ? '🏚️' : '🏠'} {property.condition}
+              </Badge>
+            )}
             {property.marketTrend === "up" ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : property.marketTrend === "down" ? (
@@ -282,29 +304,37 @@ export const PropertyCard = memo(function PropertyCard({
 
         {property.owned ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-2">
-              {onSelectTenant && (
-                <TenantSelector
-                  propertyId={property.id}
-                  baseRent={property.baseRent || property.monthlyIncome}
-                  onSelectTenant={onSelectTenant}
-                  currentTenant={currentTenant}
-                  currentMonthlyRent={property.monthlyIncome}
-                  lastTenantChange={property.lastTenantChange}
-                  monthsPlayed={monthsPlayed}
-                />
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={() => handleAction(() => onSell?.(property, false))}
-                disabled={isLoading}
-              >
-                List for Sale
-              </Button>
-            </div>
+            {isInConveyancing ? (
+              <div className="text-center py-3 text-sm text-muted-foreground italic">
+                ⏳ In conveyancing — actions disabled
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 gap-2">
+                  {onSelectTenant && (
+                    <TenantSelector
+                      propertyId={property.id}
+                      baseRent={property.baseRent || property.monthlyIncome}
+                      onSelectTenant={onSelectTenant}
+                      currentTenant={currentTenant}
+                      currentMonthlyRent={property.monthlyIncome}
+                      lastTenantChange={property.lastTenantChange}
+                      monthsPlayed={monthsPlayed}
+                    />
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => handleAction(() => onSell?.(property, false))}
+                    disabled={isLoading}
+                  >
+                    List for Sale
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

@@ -23,6 +23,10 @@ export function generateRandomProperty(level: number): Property {
   const streetName = MIDDLESBROUGH_STREETS[Math.floor(Math.random() * MIDDLESBROUGH_STREETS.length)];
   const houseNumber = Math.floor(1 + Math.random() * 200);
 
+  // Random condition for generated properties
+  const conditionRoll = Math.random();
+  const condition = conditionRoll < 0.2 ? 'dilapidated' as const : conditionRoll < 0.85 ? 'standard' as const : 'premium' as const;
+
   return {
     id,
     name: `${houseNumber} ${streetName}`,
@@ -35,5 +39,7 @@ export function generateRandomProperty(level: number): Property {
     marketTrend: "stable",
     yield: averageYield,
     lastRentIncrease: 0,
+    condition,
+    monthsSinceLastRenovation: 0,
   };
 }

@@ -2,6 +2,37 @@
 import type { Tenant } from "@/components/ui/tenant-selector";
 import type { RenovationType } from "@/components/ui/renovation-dialog";
 
+// Property condition tiers
+export type PropertyCondition = 'dilapidated' | 'standard' | 'premium';
+
+// Entity type for taxation
+export type EntityType = 'sole_trader' | 'ltd';
+
+// Conveyancing status
+export type ConveyancingStatus = 'buying' | 'selling';
+
+export interface Conveyancing {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  status: ConveyancingStatus;
+  startMonth: number;
+  completionMonth: number; // 1-3 months after start
+  purchasePrice?: number; // pennies (for buying)
+  salePrice?: number; // pennies (for selling)
+  mortgageData?: {
+    amount: number; // pennies
+    providerId: string;
+    termYears: number;
+    mortgageType: 'repayment' | 'interest-only';
+    monthlyPayment: number; // pennies
+    interestRate: number;
+  };
+  cashHeld: number; // pennies - cash locked in escrow
+  isAuction?: boolean;
+  buyerOffer?: any; // for selling via estate agent
+}
+
 export interface Property {
   id: string;
   name: string;
@@ -19,6 +50,9 @@ export interface Property {
   lastRentIncrease?: number;
   baseRent?: number; // pennies
   lastTenantChange?: number;
+  // Condition & depreciation
+  condition: PropertyCondition;
+  monthsSinceLastRenovation: number;
 }
 
 export interface MortgageProvider {
@@ -125,6 +159,14 @@ export interface MacroEconomicEvent {
   type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
 }
 
+// Tax record for tracking
+export interface TaxRecord {
+  month: number;
+  type: 'income_tax' | 'corporation_tax' | 'cgt';
+  amount: number; // pennies
+  description: string;
+}
+
 export interface GameState {
   // Version for save migration
   _version: number;
@@ -137,6 +179,7 @@ export interface GameState {
   isBankrupt: boolean;
   overdraftLimit: number; // pennies
   overdraftUsed: number; // pennies
+  entityType: EntityType;
   // Properties
   ownedProperties: Property[];
   estateAgentProperties: Property[];
@@ -148,6 +191,8 @@ export interface GameState {
   pendingDamages: PropertyDamage[];
   annualRepairCosts: AnnualRepairCost[];
   damageHistory: PropertyDamageHistory[];
+  // Conveyancing
+  conveyancing: Conveyancing[];
   // Finance
   mortgages: Mortgage[];
   mortgageProviderRates: Record<string, number>;
@@ -162,7 +207,10 @@ export interface GameState {
   nextEconomicEventMonth: number;
   economicEvents: MacroEconomicEvent[];
   tenantEvents: TenantEvent[];
+  // Tax
+  taxRecords: TaxRecord[];
+  totalTaxPaid: number; // pennies - lifetime
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
