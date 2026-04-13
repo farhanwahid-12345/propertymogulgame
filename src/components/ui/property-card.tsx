@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +61,7 @@ const PropertyTypeColor = {
   luxury: "property-luxury",
 };
 
-export function PropertyCard({ 
+export const PropertyCard = memo(function PropertyCard({ 
   property, 
   onBuy, 
   onSell,
@@ -451,4 +451,4 @@ export function PropertyCard({
       </CardContent>
     </Card>
   );
-}
+});
