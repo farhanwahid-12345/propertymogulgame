@@ -1247,22 +1247,92 @@ export function useGameState() {
           });
         }
 
+        // === MACRO-ECONOMIC EVENTS ===
+        const newMonthNumber = prev.monthsPlayed + 1;
+        let nextEventMonth = prev.nextEconomicEventMonth;
+        let economicEvents = [...prev.economicEvents];
+        let eventCashBonus = 0;
+        let eventRateAdjust = 0;
+        
+        if (newMonthNumber >= nextEventMonth && prev.ownedProperties.length > 0) {
+          // Fire a random economic event
+          const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
+            { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%. Your variable mortgage payments decrease!' },
+            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'A tech company is moving to the area! Property values and rents increase by 15%.' },
+            { type: 'recession', name: '📉 Economic Recession', description: 'The economy is struggling. Base rates rise 1.5% and property values drop 10%.' },
+            { type: 'grant', name: '🏛️ Government Landlord Grant', description: 'The government is offering grants to landlords! You receive a cash injection.' },
+          ];
+          
+          const chosenEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+          const event: MacroEconomicEvent = {
+            id: `event_${newMonthNumber}`,
+            name: chosenEvent.name,
+            description: chosenEvent.description,
+            month: newMonthNumber,
+            type: chosenEvent.type,
+          };
+          economicEvents = [...economicEvents.slice(-9), event]; // Keep last 10
+          
+          // Apply effects
+          if (chosenEvent.type === 'rate_cut') {
+            eventRateAdjust = -0.01; // -1% on all rates
+          } else if (chosenEvent.type === 'tech_boom') {
+            // Property values & rents +15% applied below
+            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+              ...p,
+              value: Math.floor(p.value * 1.15),
+              marketValue: Math.floor((p.marketValue || p.value) * 1.15),
+              monthlyIncome: Math.floor(p.monthlyIncome * 1.15),
+              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.15),
+            }));
+          } else if (chosenEvent.type === 'recession') {
+            eventRateAdjust = 0.015; // +1.5% rates
+            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+              ...p,
+              value: Math.floor(p.value * 0.90),
+              marketValue: Math.floor((p.marketValue || p.value) * 0.90),
+            }));
+          } else if (chosenEvent.type === 'grant') {
+            const grantAmount = 5000 + Math.floor(Math.random() * 15000); // £5k-£20k
+            eventCashBonus = grantAmount;
+          }
+          
+          toast({
+            title: chosenEvent.name,
+            description: chosenEvent.description + (eventCashBonus > 0 ? ` You received £${eventCashBonus.toLocaleString()}!` : ''),
+          });
+          
+          // Schedule next event in 3-6 months
+          nextEventMonth = newMonthNumber + 3 + Math.floor(Math.random() * 4);
+        }
+        
+        // Apply rate adjustments from events
+        let finalProviderRates = newProviderRates;
+        if (eventRateAdjust !== 0) {
+          finalProviderRates = { ...newProviderRates };
+          Object.keys(finalProviderRates).forEach(key => {
+            finalProviderRates[key] = Math.max(0.01, finalProviderRates[key] + eventRateAdjust);
+          });
+        }
+
         return {
           ...prev,
-          cash: finalCash,
+          cash: finalCash + eventCashBonus,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           experience: prev.experience,
           level: newLevel,
           experienceToNext: prev.experienceToNext,
-          monthsPlayed: prev.monthsPlayed + 1,
-          timeUntilNextMonth: 180, // Reset to 3 minutes (180 seconds)
+          monthsPlayed: newMonthNumber,
+          timeUntilNextMonth: 180,
           isBankrupt,
           creditScore: Math.max(300, Math.min(850, prev.creditScore + creditScoreImprovement)),
           lastYearlyGrowth: newLastYearlyGrowth,
-          mortgageProviderRates: newProviderRates,
+          mortgageProviderRates: finalProviderRates,
           yearlyNetProfit: finalYearlyProfit,
           lastCorporationTaxMonth: lastCorpTaxMonth,
+          nextEconomicEventMonth: nextEventMonth,
+          economicEvents,
         };
       });
     }
