@@ -1371,6 +1371,7 @@ export function useGameState() {
           mortgageType,
           existingMonthlyMortgagePayments: existingMortgagePayments,
           totalRentalIncome,
+          ownedPropertyCount: prev.ownedProperties.length,
         });
         
         if (!eligibility.eligible) {
@@ -1509,6 +1510,7 @@ export function useGameState() {
           mortgageType,
           existingMonthlyMortgagePayments: existingMortgagePayments,
           totalRentalIncome,
+          ownedPropertyCount: prev.ownedProperties.length,
         });
         
         if (!eligibility.eligible) {
@@ -2506,6 +2508,7 @@ const handleRefinance = useCallback((propertyId: string, newLoanAmount: number, 
       mortgageType,
       existingMonthlyMortgagePayments: existingPayments,
       totalRentalIncome: totalRentalIncome - propertyRent,
+      ownedPropertyCount: prev.ownedProperties.length,
     });
 
     if (!eligibility.eligible) {
@@ -2586,6 +2589,7 @@ const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loan
       mortgageType,
       existingMonthlyMortgagePayments: existingPayments,
       totalRentalIncome: otherRentalIncome,
+      ownedPropertyCount: prev.ownedProperties.length,
     });
 
     if (!eligibility.eligible) {
