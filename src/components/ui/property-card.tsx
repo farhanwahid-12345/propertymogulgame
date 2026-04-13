@@ -21,12 +21,14 @@ export interface Property {
   image: string;
   owned?: boolean;
   marketTrend: "up" | "down" | "stable";
-  mortgageRemaining?: number; // For refinancing purposes
-  marketValue?: number; // True market value (for tracking profit on below-market purchases)
-  yield?: number; // Annual yield percentage (6-15%)
-  lastRentIncrease?: number; // Tracks when rent was last increased (month)
-  baseRent?: number; // Current base rent level (increases 3% annually, prevents dramatic tenant switch jumps)
-  lastTenantChange?: number; // Month when tenant was last changed (for rent upgrade timing)
+  mortgageRemaining?: number;
+  marketValue?: number;
+  yield?: number;
+  lastRentIncrease?: number;
+  baseRent?: number;
+  lastTenantChange?: number;
+  condition: "dilapidated" | "standard" | "premium";
+  monthsSinceLastRenovation: number;
 }
 
 interface PropertyCardProps {
@@ -47,6 +49,9 @@ interface PropertyCardProps {
     remainingBalance: number;
   }>;
   monthsPlayed?: number;
+  isInConveyancing?: boolean;
+  conveyancingStatus?: 'buying' | 'selling';
+  conveyancingCompletion?: number;
 }
 
 const PropertyTypeIcon = {
