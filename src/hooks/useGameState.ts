@@ -1094,9 +1094,11 @@ export function useGameState() {
         let creditScoreImprovement = 0;
         const playerDTI = calculateDTI(prev.mortgages, prev.ownedProperties, prev.tenants);
         
-        // Slower monthly gain: +1 only on even months (effectively +0.5/month avg)
-        if (prev.mortgages.length > 0 && playerDTI < 0.40 && prev.monthsPlayed % 2 === 0) {
-          creditScoreImprovement += 1; // Only improve every other month if DTI is healthy
+        // Credit improvement: +5 per month if mortgages are being paid and cash is positive
+        if (prev.mortgages.length > 0 && prev.cash >= 0) {
+          creditScoreImprovement += 5;
+        } else if (prev.ownedProperties.length > 0 && prev.cash >= 0) {
+          creditScoreImprovement += 2; // Smaller gain for outright owners
         }
         // DTI penalty on credit score
         if (playerDTI > 0.60) {
