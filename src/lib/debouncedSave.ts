@@ -1,6 +1,7 @@
 /**
  * Debounced storage adapter for Zustand persist middleware.
- * Uses the StorageValue format that Zustand v4 persist expects.
+ * Implements PersistStorage<S> — getItem returns StorageValue (parsed),
+ * setItem receives StorageValue (pre-parsed by Zustand).
  * Flushes pending writes on page unload to prevent data loss.
  */
 export function createDebouncedStorage(delayMs: number = 2000) {
@@ -14,7 +15,7 @@ export function createDebouncedStorage(delayMs: number = 2000) {
       try {
         localStorage.setItem(pendingName, pendingValue);
       } catch {
-        // localStorage full or unavailable — silently fail
+        // localStorage full or unavailable
       }
       pendingName = null;
       pendingValue = null;
@@ -27,16 +28,23 @@ export function createDebouncedStorage(delayMs: number = 2000) {
   }
 
   return {
-    getItem(name: string): string | null {
-      // Flush any pending write for this key first so reads are consistent
+    getItem(name: string) {
+      // Flush pending write for this key first so reads are consistent
       if (pendingName === name && pendingValue !== null) {
         flush();
       }
-      return localStorage.getItem(name);
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
     },
-    setItem(name: string, value: string): void {
+    setItem(name: string, value: any): void {
+      const serialized = JSON.stringify(value);
       pendingName = name;
-      pendingValue = value;
+      pendingValue = serialized;
       if (timer) clearTimeout(timer);
       timer = setTimeout(flush, delayMs);
     },
