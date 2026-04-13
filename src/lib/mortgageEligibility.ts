@@ -15,6 +15,7 @@ export interface MortgageEligibilityRequest {
   // Existing portfolio context
   existingMonthlyMortgagePayments: number; // total across all existing mortgages
   totalRentalIncome: number; // total across all existing tenanted properties
+  ownedPropertyCount?: number; // number of properties player currently owns
 }
 
 export interface MortgageEligibilityResult {
