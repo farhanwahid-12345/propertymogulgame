@@ -117,6 +117,7 @@ const Index = () => {
           currentMarketRate={gameState.currentMarketRate}
           tenantEvents={gameState.tenantEvents}
           monthsPlayed={gameState.monthsPlayed}
+          economicEvents={gameState.economicEvents}
         />
 
         {/* Tabs + Action Tiles */}
