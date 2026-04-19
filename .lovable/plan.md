@@ -1,87 +1,72 @@
 
-# Plan: Conveyancing Tracker, Lower Start Cash, Renovations & Mortgage UX
 
-Five focused changes pulled from the screenshot annotations.
+# Plan: Tenant Satisfaction, Background Clock, Rent £0 Bug Fix
 
----
-
-## 1. Conveyancing Tracker (new panel)
-**New file:** `src/components/ui/conveyancing-tracker.tsx`
-**Edit:** `src/pages/Index.tsx` (mount near portfolio summary)
-
-- Reads `gameState.conveyancing` directly. Shows one row per in-flight buy/sell:
-  - Property name + 🟢 Buying / 🔴 Selling badge
-  - Progress bar: `(currentMonth − startMonth) / (completionMonth − startMonth)`
-  - "Completes in N months"
-  - Cash held in escrow (for buys)
-  - 10%/mo chain-collapse risk warning chip
-- Collapsible glass card; only renders when `conveyancing.length > 0`.
+Three changes from the screenshot annotations.
 
 ---
 
-## 2. Change starting cash to £100k
-**File:** `src/lib/engine/constants.ts`
+## 1. Background-running game clock (Web Worker)
 
+**Problem:** Browsers throttle `setInterval` to ≥1 minute when a tab is hidden, so the in-game clock effectively pauses when the user switches tabs. Current loop lives in `src/hooks/useGameEngine.ts` using plain `setInterval`.
+
+**Fix:** Move the tick driver into a **Web Worker** (`src/workers/gameClock.worker.ts`) which is not throttled. The worker posts a `tick` message every 1000 ms; `useGameEngine` listens and calls the same store actions (`clockTick`, `processMonthEnd`, `replenishMarket`, `processMarketUpdate`, `processCounterResponses`).
+
+Implementation:
+- New file `src/workers/gameClock.worker.ts` — posts `{type:'tick', delta:elapsedMs}` based on `performance.now()` deltas, so even if the worker is briefly throttled the store catches up the correct number of seconds.
+- Update `useGameEngine.ts` to `new Worker(new URL('../workers/gameClock.worker.ts', import.meta.url), { type: 'module' })` and dispatch tick handlers based on `delta` (sum elapsed seconds, decrement timer accordingly, fire month-end when crossed).
+- Vite supports module workers natively — no config changes needed.
+- Fallback: if `Worker` is unavailable, fall back to current `setInterval`.
+
+---
+
+## 2. Fix £0/mo monthly income with tenant assigned
+
+**Root cause analysis:** Looking at `gameStore.ts` line 342–349, monthly income is summed only if `hasTenant && !isInVoid`. The property card uses `property.monthlyIncome` directly, which is set in `selectTenant` to `calcTenantRent(...)`. Two failure paths:
+1. **Stale `voidPeriod`** — when a tenant is selected, `selectTenant` removes the void *for that property*, but the **property-card display** in screenshot reads `monthlyIncome` (which is correct/non-zero), yet shows `£0/mo`. The card likely uses cashflow logic (skips income when `isInVoid` evaluated against legacy timestamps).
+2. **Conveyancing flag** — if the property is mid-conveyancing, the income is suppressed in totals but the per-property card may also skip rendering it.
+
+**Fix:**
+- In `src/components/ui/property-card.tsx`: display `property.monthlyIncome` directly (after pennies → pounds via `useGameState`). Remove any local "is in void" check that hides the value when a tenant is actually assigned.
+- In `selectTenant` (`gameStore.ts`): also clear any expired `voidPeriods` and update `lastRentIncrease = monthsPlayed` so the new rent is recognised.
+- Add a sanity guard in `processMonthEnd`'s income loop: if `hasTenant && voidPeriod.endDate < now`, treat as not in void (currently the filter is `endDate <= currentTime` — verify and fix off-by-one).
+- Add a small debug pill on the card when `hasTenant && monthlyIncome === 0` ("Rent pending — tenant just moved in") so the player understands.
+
+---
+
+## 3. Tenant Satisfaction System
+
+**New mechanic:** Each tenant has a satisfaction score 0–100 that decays based on neglect and influences default risk, rent renewal acceptance, and early-exit chance.
+
+### 3a. Data model — `src/types/game.ts`
+Extend `PropertyTenant`:
 ```ts
-export const INITIAL_CASH = toPennies(100_000); // was 250_000
+satisfaction: number;          // 0-100, starts at 80
+lastSatisfactionUpdate: number; // monthsPlayed snapshot
 ```
 
-Also update `mem://progression/starting-state` from £250k → £100k.
+### 3b. Monthly satisfaction update — `gameStore.ts processMonthEnd`
+For each tenanted property, adjust satisfaction:
+- **−15** if condition is `dilapidated`
+- **−5** if condition is `standard` and tenant profile is `premium` (premium tenants want more)
+- **+3** if condition is `premium`
+- **−10** if a damage event is unrepaired this month
+- **−8** per rent increase in the last 3 months
+- **+2** baseline drift back toward 70 if none of above
+- Clamp 0–100.
 
-No other code changes needed — `INITIAL_CASH` is the single source of truth (gameStore reads it, Reset uses it).
+### 3c. Effects of satisfaction
+- **Default risk multiplier** — extend the existing default chance in `processMarketUpdate`/`processMonthEnd`: multiply by `(1 + (60 - satisfaction) / 100)` so a satisfaction of 30 → ~1.3× default risk.
+- **Early exit** — if satisfaction < 25, 8%/month chance tenant leaves (creates void period).
+- **Rent increase rejection** — when player tries to bump rent (via tenant change to a higher-paying band), if satisfaction < 40 there's a 50% chance the tenant defaults instead of accepting.
 
----
+### 3d. UI — `src/components/ui/property-card.tsx`
+Add a thin satisfaction bar under the tenant name button:
+- Heart icon + colored bar (green ≥70, yellow 40–69, red <40)
+- Tooltip listing top 2 reasons (e.g. "Dilapidated condition (-15)", "Recent rent hike (-8)")
 
-## 3. Mortgage rejection appears inside Estate Agent sub-menu
-**File:** `src/components/ui/estate-agent-window.tsx` (the "Browse Properties" tab — the sub-menu shown in screenshot row 3)
-
-**Problem:** When a player clicks Buy with mortgage in the estate-agent listing card, rejection currently fires a toast and the listing collapses, forcing them to re-click the property to retry. The screenshot shows the red "Mortgage Rejected" banner appearing on the property tile but the user has to back out completely.
-
-**Fix:** Mirror what `property-card.tsx` already does — run `calculateMortgageEligibility` reactively inside the estate-agent property tile whenever provider/LTV/term changes:
-- Show inline red banner with `eligibility.reason` directly inside the expanded mortgage panel
-- Disable the "Confirm Purchase" button when `!eligibility.eligible`
-- Keep the panel open (do NOT collapse on rejection) so user can lower LTV / change provider / change term inline
-- Suppress the rejection toast on this surface (still keep it for auction house where there's no inline panel)
-
----
-
-## 4. Renovation upgrades + tracker
-**Files:** `src/components/ui/property-card.tsx`, `src/components/ui/renovation-dialog.tsx` (already exists, currently orphaned), `src/pages/Index.tsx`, optionally extend `gameStore.startRenovation`
-
-### 4a. Wire the existing RenovationDialog into owned property cards
-- In `property-card.tsx`, owned-property action area: add `<RenovationDialog>` button alongside existing actions.
-- Pass `playerCash`, `propertyValue`, `currentRent`, `onRenovate` (calls `useGameState.startRenovation`).
-- Hide it while `isInConveyancing` or while a renovation is already active for that property.
-
-### 4b. Show value/rent uplift preview (already in dialog)
-- Already shows "+£X rent / +£Y value / Duration: Nd". No change needed beyond surfacing it.
-
-### 4c. Renovation Tracker
-**New file:** `src/components/ui/renovation-tracker.tsx`
-**Edit:** `src/pages/Index.tsx`
-
-- Reads `gameState.renovations`. One row per active renovation:
-  - Property name + renovation type icon
-  - Progress bar based on `startDate` vs `completionDate` (in game-months)
-  - "Completes in N months" + cash already spent
-- Glass card, only renders when there are active renovations.
-
-### 4d. Condition-tier upgrade button (separate from the cosmetic renovations)
-- The existing `upgradeCondition` store action (Dilapidated → Standard → Premium) needs a UI entry point. Add a small "Upgrade Condition" button inside the Renovation dialog header showing cost = `value × 0.05` for next tier and the resulting rent multiplier (1.0× → 1.25×).
-
----
-
-## 5. Apply 125% portfolio stress test in refinance once 3+ owned
-**File:** `src/components/ui/mortgage-refinance.tsx`
-
-Already partially wired (lines 76–93 call `calculateMortgageEligibility` with `ownedPropertyCount`, `totalRentalIncome`, `existingMonthlyMortgagePayments`). The screenshot ("Stress Test (ICR): 76% ✗ Fail (need 125%)") confirms the math is running but the **denominator is wrong** — it's still showing per-property rent vs payment instead of portfolio totals.
-
-**Fix:** In the `Card` summary block (lines 250–285), the displayed ICR ratio comes from `eligibility.icrRatio`, but `calculateMortgageEligibility` already returns the portfolio-wide ICR when `ownedPropertyCount >= 3`. Verify the props flowing in from the parent (`Index.tsx` → `MortgageRefinance`):
-- `totalRentalIncome` — must equal `Σ ownedProperty.monthlyIncome` for tenanted properties (pounds)
-- `existingMonthlyMortgagePayments` — must equal `Σ mortgage.monthlyPayment` (pounds)
-- `ownedProperties.length` is correct
-
-**Edit `src/pages/Index.tsx`** where `<MortgageRefinance>` is rendered: ensure both totals are passed (currently may be 0/undefined, which causes the per-property fallback). Also relabel the displayed line to "Portfolio Stress Test (125%)" vs "Property Stress Test (100%)" based on count (already done via `stressLabel`).
+### 3e. UI — `src/components/ui/tenant-selector.tsx`
+Show current satisfaction in the "Currently renting" card so the player can see the impact of their decisions.
 
 ---
 
@@ -89,12 +74,10 @@ Already partially wired (lines 76–93 call `calculateMortgageEligibility` with 
 
 | File | Change |
 |---|---|
-| `src/lib/engine/constants.ts` | `INITIAL_CASH = 100_000` |
-| `src/components/ui/conveyancing-tracker.tsx` *(new)* | Tracker panel |
-| `src/components/ui/renovation-tracker.tsx` *(new)* | Active renovations panel |
-| `src/components/ui/estate-agent-window.tsx` | Inline mortgage rejection in browse sub-menu |
-| `src/components/ui/property-card.tsx` | Mount `RenovationDialog` for owned properties |
-| `src/components/ui/renovation-dialog.tsx` | Add condition-tier upgrade entry point |
-| `src/pages/Index.tsx` | Mount both trackers; pass totals to refinance |
-| `mem://progression/starting-state` | £250k → £100k |
+| `src/workers/gameClock.worker.ts` *(new)* | Tab-throttle-resistant tick driver |
+| `src/hooks/useGameEngine.ts` | Use Web Worker for clock; delta-based catch-up |
+| `src/types/game.ts` | Add `satisfaction`, `lastSatisfactionUpdate` to `PropertyTenant` |
+| `src/stores/gameStore.ts` | Satisfaction monthly update; default/exit modifiers; rent-display fix |
+| `src/components/ui/property-card.tsx` | Satisfaction bar; fix £0/mo display when tenant assigned |
+| `src/components/ui/tenant-selector.tsx` | Show current satisfaction |
 
