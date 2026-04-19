@@ -362,6 +362,35 @@ export const PropertyCard = memo(function PropertyCard({
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
+                  {onRenovate && (
+                    <RenovationDialog
+                      propertyId={property.id}
+                      propertyValue={property.value}
+                      currentRent={property.monthlyIncome}
+                      playerCash={playerCash}
+                      onRenovate={onRenovate}
+                      activeRenovations={activeRenovationIds}
+                    />
+                  )}
+                  {onUpgradeCondition && property.condition !== 'premium' && (() => {
+                    const target: 'standard' | 'premium' = property.condition === 'dilapidated' ? 'standard' : 'premium';
+                    // Cost matches getConditionUpgradeCost (8% standard, 15% premium)
+                    const costPct = target === 'standard' ? 0.08 : 0.15;
+                    const cost = Math.floor(property.value * costPct);
+                    const newMult = target === 'premium' ? 1.25 : 1.0;
+                    const canAfford = playerCash >= cost;
+                    return (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAction(() => onUpgradeCondition(property.id, target))}
+                        disabled={isLoading || !canAfford}
+                        className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                      >
+                        ✨ Upgrade to {target} (£{cost.toLocaleString()} → {newMult}× rent)
+                      </Button>
+                    );
+                  })()}
                   <Button 
                     variant="destructive" 
                     size="sm"
