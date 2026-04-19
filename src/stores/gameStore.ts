@@ -851,6 +851,9 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           cash: prev.cash - cashRequired,
           conveyancing: [...prev.conveyancing, conv],
+          // Hide property from market while in conveyancing
+          estateAgentProperties: prev.estateAgentProperties.filter(p => p.id !== property.id),
+          auctionProperties: prev.auctionProperties.filter(p => p.id !== property.id),
           experience: prev.experience + Math.floor(fromPennies(property.price) / 10000),
           creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdj)),
         });
@@ -926,6 +929,9 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           cash: prev.cash - cashRequired,
           conveyancing: [...prev.conveyancing, conv],
+          // Hide property from market while in conveyancing
+          estateAgentProperties: prev.estateAgentProperties.filter(p => p.id !== property.id),
+          auctionProperties: prev.auctionProperties.filter(p => p.id !== property.id),
           experience: prev.experience + Math.floor(fromPennies(purchasePrice) / 10000),
           creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdj)),
         });
@@ -1443,10 +1449,22 @@ export const useGameStore = create<GameState & GameActions>()(
         const { min, max } = getPropertyValueRangeForLevel(prev.level);
         const TARGET_AUCTION = 5;
 
-        let auctions = prev.auctionProperties.filter(p => p.price >= min && p.price <= max);
-        let estate = [...prev.estateAgentProperties];
+        // Build excluded ID set: owned + in-conveyancing + listed for sale
+        const excludedIds = new Set<string>([
+          ...prev.ownedProperties.map(p => p.id),
+          ...prev.conveyancing.map(c => c.propertyId),
+          ...prev.propertyListings.map(l => l.propertyId),
+        ]);
 
-        const invalidAuction = prev.auctionProperties.filter(p => p.price < min || p.price > max);
+        // Filter out excluded properties from current market lists immediately
+        let auctions = prev.auctionProperties
+          .filter(p => !excludedIds.has(p.id))
+          .filter(p => p.price >= min && p.price <= max);
+        let estate = prev.estateAgentProperties.filter(p => !excludedIds.has(p.id));
+
+        const invalidAuction = prev.auctionProperties
+          .filter(p => !excludedIds.has(p.id))
+          .filter(p => p.price < min || p.price > max);
         invalidAuction.forEach(p => { if (!estate.find(e => e.id === p.id)) estate.push(p); });
 
         if (auctions.length < TARGET_AUCTION) {
@@ -1462,7 +1480,6 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        const ownedIds = new Set(prev.ownedProperties.map(p => p.id));
         const usedIds = new Set([...auctions.map(p => p.id), ...estate.map(p => p.id)]);
         const totalAvailable = auctions.length + estate.length;
         const needed = Math.max(0, 30 - totalAvailable);
@@ -1488,7 +1505,7 @@ export const useGameStore = create<GameState & GameActions>()(
             prop.price = adjusted;
             prop.value = adjusted;
             prop.monthlyIncome = Math.floor((adjusted * (6 + Math.random() * 9) / 100) / 12);
-            if (!usedIds.has(prop.id)) {
+            if (!usedIds.has(prop.id) && !excludedIds.has(prop.id)) {
               estate.push(prop);
               usedIds.add(prop.id);
             }
@@ -1497,12 +1514,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
         for (let i = 0; i < needed; i++) {
           const candidates = AVAILABLE_PROPERTIES.filter(p =>
-            !usedIds.has(p.id) && !ownedIds.has(p.id) && p.price >= min && p.price <= max
+            !usedIds.has(p.id) && !excludedIds.has(p.id) && p.price >= min && p.price <= max
           );
           const pick = candidates.length > 0
             ? candidates[Math.floor(Math.random() * candidates.length)]
             : generateRandomProperty(prev.level);
-          if (!usedIds.has(pick.id) && !ownedIds.has(pick.id)) {
+          if (!usedIds.has(pick.id) && !excludedIds.has(pick.id)) {
             estate.push({ ...pick });
             usedIds.add(pick.id);
           }
