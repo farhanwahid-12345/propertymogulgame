@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
+import type { PropertyCondition } from "@/types/game";
 
 // --- Trait system ---
 
@@ -205,6 +207,9 @@ interface TenantSelectorProps {
   currentMonthlyRent?: number;
   lastTenantChange?: number;
   monthsPlayed?: number;
+  condition?: PropertyCondition;
+  propertyValue?: number; // pounds; used as fallback for £0 baseRent
+  propertyYield?: number; // % annual yield; used with value as last-resort
 }
 
 export function TenantSelector({
@@ -214,6 +219,9 @@ export function TenantSelector({
   currentTenant,
   lastTenantChange,
   monthsPlayed = 0,
+  condition,
+  propertyValue,
+  propertyYield,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -226,20 +234,25 @@ export function TenantSelector({
     }
   }, [isOpen]);
 
-  const handleSelectTenant = () => {
+  const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
+
+  const handleSelectTenant = useCallback(() => {
     if (selectedTenant) {
       onSelectTenant(propertyId, selectedTenant);
       setIsOpen(false);
       setSelectedTenant(null);
     }
-  };
+  }, [selectedTenant, onSelectTenant, propertyId]);
 
-  // Ensure baseRent is a valid positive number for display
-  // baseRent arrives in pounds from useGameState; guard against 0/NaN
-  const displayBaseRent = baseRent > 0 ? baseRent : 0;
+  // Robust base rent fallback: baseRent → derive from value × yield/12
+  let displayBaseRent = baseRent > 0 ? baseRent : 0;
+  if (displayBaseRent <= 0 && propertyValue && propertyValue > 0) {
+    const yieldPct = propertyYield ?? 7; // default 7%
+    displayBaseRent = Math.floor((propertyValue * (yieldPct / 100)) / 12);
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
           <div className="flex items-center gap-2">
@@ -269,8 +282,10 @@ export function TenantSelector({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
-            // Calculate potential rent: baseRent (pounds) * multiplier, then round
-            const potentialRent = Math.round(displayBaseRent * tenant.rentMultiplier);
+            // Use shared formula so preview matches what the tenant actually pays
+            const potentialRent = calcTenantRent(displayBaseRent, tenant, condition);
+            const profileMult = getProfileRentMultiplier(tenant.profile);
+            const conditionMult = getConditionRentMultiplierShared(condition);
             const isSelected = selectedTenant?.id === tenant.id;
             const reliabilityStars = riskToStars(tenant.defaultRisk, 50);
             const careStars = riskToStars(tenant.damageRisk, 12);
