@@ -166,7 +166,7 @@ export const PropertyCard = memo(function PropertyCard({
 
   return (
     <Card className={cn(
-      "glass border-t-4 transition-all duration-300 hover:scale-[1.02]",
+      "glass border-t-4 transition-all duration-300 hover:scale-[1.02] flex flex-col h-full",
       typeBorderColor[property.type],
       typeGlow[property.type],
       property.owned && "ring-2 ring-primary/50"
