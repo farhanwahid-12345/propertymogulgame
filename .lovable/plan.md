@@ -1,79 +1,100 @@
 
+# Plan: Conveyancing Tracker, Lower Start Cash, Renovations & Mortgage UX
 
-# Plan: Bug Fixes & UX Polish
-
-Fix 7 issues from the screenshots: notification persistence, owned-property duplicates, tenant rent mismatch + dialog stuck, card sizing, mortgage repayment display, portfolio-wide stress test, and inline mortgage rejection.
-
----
-
-## 1. Notifications (Sonner) — auto-dismiss faster + always closable
-**File:** `src/components/ui/sonner.tsx`
-- Add `duration={4000}` (default is 6000+) and `closeButton` so users can dismiss with one click.
-- Add `position="top-right"` styling and visible × on hover.
+Five focused changes pulled from the screenshot annotations.
 
 ---
 
-## 2. Owned properties showing up at Estate Agent
-**File:** `src/stores/gameStore.ts` (`replenishMarket`)
-- Build `excludedIds = ownedIds ∪ conveyancingIds ∪ listingIds`.
-- Filter `auctions` and `estate` arrays to remove any property whose id is in `excludedIds` (currently only filtered when *adding* new ones).
-- Also when `buyProperty`/`buyPropertyAtPrice` succeed (entering conveyancing): immediately remove that property from `estateAgentProperties` and `auctionProperties` so it disappears from the listings during the 1–3 month conveyancing window.
+## 1. Conveyancing Tracker (new panel)
+**New file:** `src/components/ui/conveyancing-tracker.tsx`
+**Edit:** `src/pages/Index.tsx` (mount near portfolio summary)
+
+- Reads `gameState.conveyancing` directly. Shows one row per in-flight buy/sell:
+  - Property name + 🟢 Buying / 🔴 Selling badge
+  - Progress bar: `(currentMonth − startMonth) / (completionMonth − startMonth)`
+  - "Completes in N months"
+  - Cash held in escrow (for buys)
+  - 10%/mo chain-collapse risk warning chip
+- Collapsible glass card; only renders when `conveyancing.length > 0`.
 
 ---
 
-## 3a. Tenant rent mismatch (preview ≠ actual paid)
-**Files:** `src/components/ui/tenant-selector.tsx`, `src/stores/gameStore.ts` (`selectTenant`)
-- **Root cause:** preview uses `tenant.rentMultiplier` (random 0.75–1.35); actual store uses fixed profile band (premium 1.10 / standard 1.0 / budget 0.90 / risky 1.05) × condition multiplier.
-- **Fix:** Make a single shared helper `calcTenantRent(baseRent, tenant, condition)` and call it from both the preview card and `selectTenant`. Show the breakdown in the preview ("Base £X × Premium 1.10 × ✨ Premium condition 1.25 = £Y/mo").
+## 2. Change starting cash to £100k
+**File:** `src/lib/engine/constants.ts`
 
-## 3b. £0/mo shown for some tenants & sub-menu won't close
-**Files:** `src/components/ui/tenant-selector.tsx`, `src/components/ui/property-card.tsx`
-- `baseRent` falls back to `property.monthlyIncome`, but during a void/default month `monthlyIncome` may be reduced. Use `property.baseRent ?? property.monthlyIncome` and when both are 0, derive from `value × yield/12` as last resort.
-- **Dialog close:** wrap `setIsOpen` callbacks in `useCallback`, ensure `onOpenChange={setIsOpen}` properly handles the overlay click. The dialog likely gets stuck because a background tick re-renders the property-card and unmounts the Dialog mid-interaction. Hoist `isOpen` state to a `useRef`-guarded controlled dialog, or memoize the parent props passed to PropertyCard so it doesn't re-mount.
+```ts
+export const INITIAL_CASH = toPennies(100_000); // was 250_000
+```
 
----
+Also update `mem://progression/starting-state` from £250k → £100k.
 
-## 4. Property card sizes not uniform
-**File:** `src/components/ui/property-card.tsx`
-- Add `flex flex-col h-full` to the `Card`, make `CardContent` use `flex-1 flex flex-col`, and push the action buttons to the bottom with `mt-auto`.
-- Ensure parent grid uses `grid-rows-[auto]` items-stretch (already does via grid). All cards in a row will then match the tallest sibling.
+No other code changes needed — `INITIAL_CASH` is the single source of truth (gameStore reads it, Reset uses it).
 
 ---
 
-## 5. Display monthly repayment & total payable when choosing mortgage
-**File:** `src/components/ui/property-card.tsx` (mortgage panel)
-- Below the provider list, when a provider is selected show a summary block:
-  - `Monthly Payment: £X/mo`
-  - `Total Payable: £X` (= monthly × term × 12 for repayment, or interest×term + principal for interest-only)
-  - `Total Interest: £X`
-- Already calculating `estimatedMonthly` per provider — just surface the chosen one in a prominent panel.
+## 3. Mortgage rejection appears inside Estate Agent sub-menu
+**File:** `src/components/ui/estate-agent-window.tsx` (the "Browse Properties" tab — the sub-menu shown in screenshot row 3)
+
+**Problem:** When a player clicks Buy with mortgage in the estate-agent listing card, rejection currently fires a toast and the listing collapses, forcing them to re-click the property to retry. The screenshot shows the red "Mortgage Rejected" banner appearing on the property tile but the user has to back out completely.
+
+**Fix:** Mirror what `property-card.tsx` already does — run `calculateMortgageEligibility` reactively inside the estate-agent property tile whenever provider/LTV/term changes:
+- Show inline red banner with `eligibility.reason` directly inside the expanded mortgage panel
+- Disable the "Confirm Purchase" button when `!eligibility.eligible`
+- Keep the panel open (do NOT collapse on rejection) so user can lower LTV / change provider / change term inline
+- Suppress the rejection toast on this surface (still keep it for auction house where there's no inline panel)
 
 ---
 
-## 6. Portfolio-wide stress test once 3+ properties owned
-**Already implemented** in `src/lib/mortgageEligibility.ts` (lines 122–148: switches to portfolio 125% ICR when `ownedPropertyCount >= 3`).
-**File:** `src/components/ui/mortgage-refinance.tsx` — the screenshot shows it still doing per-property check.
-- Update the inline stress test display in refinance UI to use the same `calculateMortgageEligibility` call (with `ownedPropertyCount`, `totalRentalIncome`, `existingMonthlyMortgagePayments`) instead of computing rent ÷ payment locally.
-- Show "Portfolio Stress Test (125%)" vs "Property Stress Test (100%)" label based on count.
+## 4. Renovation upgrades + tracker
+**Files:** `src/components/ui/property-card.tsx`, `src/components/ui/renovation-dialog.tsx` (already exists, currently orphaned), `src/pages/Index.tsx`, optionally extend `gameStore.startRenovation`
+
+### 4a. Wire the existing RenovationDialog into owned property cards
+- In `property-card.tsx`, owned-property action area: add `<RenovationDialog>` button alongside existing actions.
+- Pass `playerCash`, `propertyValue`, `currentRent`, `onRenovate` (calls `useGameState.startRenovation`).
+- Hide it while `isInConveyancing` or while a renovation is already active for that property.
+
+### 4b. Show value/rent uplift preview (already in dialog)
+- Already shows "+£X rent / +£Y value / Duration: Nd". No change needed beyond surfacing it.
+
+### 4c. Renovation Tracker
+**New file:** `src/components/ui/renovation-tracker.tsx`
+**Edit:** `src/pages/Index.tsx`
+
+- Reads `gameState.renovations`. One row per active renovation:
+  - Property name + renovation type icon
+  - Progress bar based on `startDate` vs `completionDate` (in game-months)
+  - "Completes in N months" + cash already spent
+- Glass card, only renders when there are active renovations.
+
+### 4d. Condition-tier upgrade button (separate from the cosmetic renovations)
+- The existing `upgradeCondition` store action (Dilapidated → Standard → Premium) needs a UI entry point. Add a small "Upgrade Condition" button inside the Renovation dialog header showing cost = `value × 0.05` for next tier and the resulting rent multiplier (1.0× → 1.25×).
 
 ---
 
-## 7. Inline mortgage rejection (no popup blocking purchase flow)
-**Files:** `src/components/ui/property-card.tsx`, `src/components/ui/estate-agent-window.tsx`
-- Currently the rejection toast appears and the dialog/sub-menu stays open but user has no inline feedback.
-- Add a per-provider inline error tag: when the selected provider fails eligibility, show a red banner *inside* the mortgage panel: "❌ Mortgage Denied: <reason>" with the slider/term/provider still editable so user can immediately tweak (lower LTV, change provider, etc.) without re-opening the dialog.
-- Run `calculateMortgageEligibility` reactively in the property card whenever LTV/provider/term changes — disable the Buy button + show inline reason if not eligible, instead of waiting for the store action toast.
+## 5. Apply 125% portfolio stress test in refinance once 3+ owned
+**File:** `src/components/ui/mortgage-refinance.tsx`
+
+Already partially wired (lines 76–93 call `calculateMortgageEligibility` with `ownedPropertyCount`, `totalRentalIncome`, `existingMonthlyMortgagePayments`). The screenshot ("Stress Test (ICR): 76% ✗ Fail (need 125%)") confirms the math is running but the **denominator is wrong** — it's still showing per-property rent vs payment instead of portfolio totals.
+
+**Fix:** In the `Card` summary block (lines 250–285), the displayed ICR ratio comes from `eligibility.icrRatio`, but `calculateMortgageEligibility` already returns the portfolio-wide ICR when `ownedPropertyCount >= 3`. Verify the props flowing in from the parent (`Index.tsx` → `MortgageRefinance`):
+- `totalRentalIncome` — must equal `Σ ownedProperty.monthlyIncome` for tenanted properties (pounds)
+- `existingMonthlyMortgagePayments` — must equal `Σ mortgage.monthlyPayment` (pounds)
+- `ownedProperties.length` is correct
+
+**Edit `src/pages/Index.tsx`** where `<MortgageRefinance>` is rendered: ensure both totals are passed (currently may be 0/undefined, which causes the per-property fallback). Also relabel the displayed line to "Portfolio Stress Test (125%)" vs "Property Stress Test (100%)" based on count (already done via `stressLabel`).
 
 ---
 
 ## Files Modified
 
-| File | Changes |
+| File | Change |
 |---|---|
-| `src/components/ui/sonner.tsx` | Shorter duration, close button |
-| `src/stores/gameStore.ts` | Exclude owned/conveyancing from market; remove from listings on buy; share rent formula |
-| `src/components/ui/tenant-selector.tsx` | Shared rent calc, baseRent fallback, dialog close fix |
-| `src/components/ui/property-card.tsx` | Uniform sizing (flex-col h-full), mortgage summary panel, inline eligibility check, memoized callbacks |
-| `src/components/ui/mortgage-refinance.tsx` | Use centralized `calculateMortgageEligibility` (portfolio-aware) |
-| `src/lib/tenantRent.ts` *(new, tiny)* | Shared `calcTenantRent(baseRent, tenant, condition)` helper |
+| `src/lib/engine/constants.ts` | `INITIAL_CASH = 100_000` |
+| `src/components/ui/conveyancing-tracker.tsx` *(new)* | Tracker panel |
+| `src/components/ui/renovation-tracker.tsx` *(new)* | Active renovations panel |
+| `src/components/ui/estate-agent-window.tsx` | Inline mortgage rejection in browse sub-menu |
+| `src/components/ui/property-card.tsx` | Mount `RenovationDialog` for owned properties |
+| `src/components/ui/renovation-dialog.tsx` | Add condition-tier upgrade entry point |
+| `src/pages/Index.tsx` | Mount both trackers; pass totals to refinance |
+| `mem://progression/starting-state` | £250k → £100k |
 
