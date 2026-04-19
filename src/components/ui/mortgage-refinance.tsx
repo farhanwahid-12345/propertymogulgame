@@ -18,7 +18,7 @@ interface MortgageRefinanceProps {
   setCash: (cash: number) => void;
 }
 
-export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefinance, cash, setCash }: MortgageRefinanceProps) {
+export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefinance, cash, setCash, creditScore = 700, totalRentalIncome = 0, existingMonthlyMortgagePayments = 0 }: MortgageRefinanceProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
@@ -66,12 +66,26 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
   };
 
   const selectedProviderData = mortgageProviders.find(p => p.id === selectedProvider);
-  const monthlyPayment = selectedProviderData ? calculateMonthlyPayment(
-    loanAmount[0], 
-    selectedProviderData.baseRate, 
-    termYears, 
-    mortgageType
-  ) : 0;
+
+  // Centralized eligibility check (portfolio-aware: 125% ICR if 3+ owned)
+  const eligibility = (selectedProperty && selectedProviderData) ? calculateMortgageEligibility({
+    creditScore,
+    loanAmount: loanAmount[0],
+    propertyValue: selectedProperty.value,
+    propertyMonthlyRent: selectedProperty.monthlyIncome,
+    providerBaseRate: selectedProviderData.baseRate,
+    providerMinCreditScore: selectedProviderData.minCreditScore,
+    providerMaxLTV: selectedProviderData.maxLTV,
+    providerId: selectedProviderData.id,
+    termYears,
+    mortgageType,
+    existingMonthlyMortgagePayments,
+    totalRentalIncome,
+    ownedPropertyCount: ownedProperties.length,
+  }) : null;
+
+  const monthlyPayment = eligibility?.monthlyPayment ?? 0;
+  const stressLabel = ownedProperties.length >= 3 ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
