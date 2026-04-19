@@ -247,23 +247,39 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                 </Select>
               </div>
 
-              {selectedProvider && (
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+              {selectedProvider && eligibility && (
+                <Card className="glass border-border">
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="text-muted-foreground">Monthly Payment:</span>
-                        <span className="ml-1 font-bold text-blue-700">
-                          £{monthlyPayment.toLocaleString()}
+                        <span className="ml-1 font-bold text-foreground">
+                          £{Math.round(monthlyPayment).toLocaleString()}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Interest Rate:</span>
                         <span className="ml-1 font-medium">
-                          {(selectedProviderData.baseRate * 100).toFixed(2)}%
+                          {(eligibility.adjustedRate * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex justify-between pt-1 border-t border-border/50">
+                        <span className="text-muted-foreground">{stressLabel}:</span>
+                        <span className={cn(
+                          "font-medium",
+                          eligibility.icrRatio && eligibility.icrRatio >= (ownedProperties.length >= 3 ? 1.25 : 1)
+                            ? "text-success" : "text-danger"
+                        )}>
+                          {eligibility.icrRatio ? `${(eligibility.icrRatio * 100).toFixed(0)}%` : '—'}
                         </span>
                       </div>
                     </div>
+                    {!eligibility.eligible && (
+                      <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>{eligibility.reason}</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -271,7 +287,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
               <Button 
                 className="w-full" 
                 onClick={handleRefinance}
-                disabled={!selectedProvider || loanAmount[0] <= 0}
+                disabled={!selectedProvider || loanAmount[0] <= 0 || (eligibility ? !eligibility.eligible : false)}
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
                 Refinance Property
