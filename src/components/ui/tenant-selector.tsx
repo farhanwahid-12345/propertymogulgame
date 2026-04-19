@@ -210,6 +210,9 @@ interface TenantSelectorProps {
   condition?: PropertyCondition;
   propertyValue?: number; // pounds; used as fallback for £0 baseRent
   propertyYield?: number; // % annual yield; used with value as last-resort
+  /** Current tenant's satisfaction (0-100) — shown in the dialog header. */
+  currentSatisfaction?: number;
+  satisfactionReasons?: Array<{ reason: string; delta: number }>;
 }
 
 export function TenantSelector({
@@ -222,6 +225,8 @@ export function TenantSelector({
   condition,
   propertyValue,
   propertyYield,
+  currentSatisfaction,
+  satisfactionReasons = [],
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
