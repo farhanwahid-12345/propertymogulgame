@@ -39,6 +39,9 @@ interface PropertyCardProps {
   onSell?: (property: Property, isAuction?: boolean) => void;
   onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
   onRemortgage?: (propertyId: string, newLoanAmount: number, providerId: string) => void;
+  onRenovate?: (propertyId: string, renovation: RenovationType) => void;
+  onUpgradeCondition?: (propertyId: string, target: "standard" | "premium") => void;
+  activeRenovationIds?: string[];
   playerCash?: number;
   creditScore?: number;
   mortgageProviders?: any[];
@@ -81,6 +84,9 @@ export const PropertyCard = memo(function PropertyCard({
   onBuy, 
   onSell,
   onSelectTenant,
+  onRenovate,
+  onUpgradeCondition,
+  activeRenovationIds = [],
   playerCash = 0, 
   creditScore = 600,
   mortgageProviders = [],
