@@ -201,6 +201,16 @@ function migrateState(persisted: any): GameState {
     persisted._version = 3;
   }
 
+  // Backfill satisfaction on existing tenants (any save version)
+  if (Array.isArray(persisted.tenants)) {
+    persisted.tenants = persisted.tenants.map((t: any) => ({
+      ...t,
+      satisfaction: typeof t.satisfaction === 'number' ? t.satisfaction : 80,
+      lastSatisfactionUpdate: typeof t.lastSatisfactionUpdate === 'number' ? t.lastSatisfactionUpdate : (persisted.monthsPlayed || 0),
+      satisfactionReasons: t.satisfactionReasons || [],
+    }));
+  }
+
   // Migrate old save fields
   if (persisted.estateAgentPropertyIds && !persisted.estateAgentProperties) {
     persisted.estateAgentProperties = AVAILABLE_PROPERTIES.filter((p: Property) => persisted.estateAgentPropertyIds.includes(p.id));
