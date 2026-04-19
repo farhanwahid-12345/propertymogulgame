@@ -3,46 +3,85 @@ import { useGameStore } from "@/stores/gameStore";
 
 /**
  * Decoupled game engine loop.
- * Runs three periodic processes outside of the React render cycle:
- *   1. Clock tick (1 s)  – decrements timeUntilNextMonth
- *   2. Month-end (triggered when timer hits 0)
- *   3. Market / renovation / damage update (10 s)
- *   4. Counter-offer response check (2 s)
  *
- * All mutations happen inside the Zustand store, so only
- * subscribed components re-render.
+ * Drives the game forward using a Web Worker so the clock keeps ticking even
+ * when the tab is in the background (browsers throttle setInterval on hidden
+ * tabs to ≥1 minute, but workers are not throttled).
+ *
+ * The worker posts {type:'tick', deltaMs} once per second. We accumulate the
+ * delta and apply it to the store:
+ *   • every full second → clockTick() (decrements timeUntilNextMonth)
+ *   • when the timer hits 0 → processMonthEnd() + replenishMarket()
+ *   • every 10s of accumulated time → processMarketUpdate()
+ *   • every 2s of accumulated time → processCounterResponses()
+ *
+ * Falls back to setInterval if Worker is unavailable.
  */
 export function useGameEngine() {
   const lastMonthProcessed = useRef(-1);
+  const accumulatedSec = useRef(0);
+  const marketAccumSec = useRef(0);
+  const counterAccumSec = useRef(0);
 
   useEffect(() => {
-    // 1-second clock tick
-    const clockId = setInterval(() => {
-      const { clockTick, timeUntilNextMonth, monthsPlayed, isBankrupt } = useGameStore.getState();
-      clockTick();
+    const handleTick = (deltaMs: number) => {
+      accumulatedSec.current += deltaMs / 1000;
+      marketAccumSec.current += deltaMs / 1000;
+      counterAccumSec.current += deltaMs / 1000;
 
-      // Month-end trigger — process exactly once per month
-      if (timeUntilNextMonth <= 1 && lastMonthProcessed.current !== monthsPlayed && !isBankrupt) {
-        lastMonthProcessed.current = monthsPlayed;
-        useGameStore.getState().processMonthEnd();
-        useGameStore.getState().replenishMarket();
+      // Whole-second clock ticks (catch up multiple seconds if needed)
+      while (accumulatedSec.current >= 1) {
+        accumulatedSec.current -= 1;
+        const { clockTick, timeUntilNextMonth, monthsPlayed, isBankrupt } = useGameStore.getState();
+        clockTick();
+
+        if (timeUntilNextMonth <= 1 && lastMonthProcessed.current !== monthsPlayed && !isBankrupt) {
+          lastMonthProcessed.current = monthsPlayed;
+          useGameStore.getState().processMonthEnd();
+          useGameStore.getState().replenishMarket();
+        }
       }
-    }, 1000);
 
-    // 10-second market / renovation / damage update
-    const marketId = setInterval(() => {
-      useGameStore.getState().processMarketUpdate();
-    }, 10_000);
+      if (marketAccumSec.current >= 10) {
+        marketAccumSec.current = 0;
+        useGameStore.getState().processMarketUpdate();
+      }
 
-    // 2-second counter-offer response check
-    const counterId = setInterval(() => {
-      useGameStore.getState().processCounterResponses();
-    }, 2_000);
+      if (counterAccumSec.current >= 2) {
+        counterAccumSec.current = 0;
+        useGameStore.getState().processCounterResponses();
+      }
+    };
+
+    let worker: Worker | null = null;
+    let fallbackId: ReturnType<typeof setInterval> | null = null;
+    let lastFallbackTime = performance.now();
+
+    try {
+      if (typeof Worker !== 'undefined') {
+        worker = new Worker(new URL('../workers/gameClock.worker.ts', import.meta.url), { type: 'module' });
+        worker.addEventListener('message', (e: MessageEvent) => {
+          const data = e.data as { type: string; deltaMs: number };
+          if (data?.type === 'tick') handleTick(data.deltaMs);
+        });
+      }
+    } catch (err) {
+      console.warn('[useGameEngine] Worker unavailable, falling back to setInterval', err);
+      worker = null;
+    }
+
+    if (!worker) {
+      fallbackId = setInterval(() => {
+        const now = performance.now();
+        const deltaMs = now - lastFallbackTime;
+        lastFallbackTime = now;
+        handleTick(deltaMs);
+      }, 1000);
+    }
 
     return () => {
-      clearInterval(clockId);
-      clearInterval(marketId);
-      clearInterval(counterId);
+      if (worker) worker.terminate();
+      if (fallbackId) clearInterval(fallbackId);
     };
   }, []);
 }
