@@ -205,7 +205,7 @@ export const PropertyCard = memo(function PropertyCard({
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 flex-1 flex flex-col">
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Price:</span>
@@ -338,7 +338,7 @@ export const PropertyCard = memo(function PropertyCard({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-2 mt-auto">
                   {onSelectTenant && (
                     <TenantSelector
                       propertyId={property.id}
@@ -348,6 +348,9 @@ export const PropertyCard = memo(function PropertyCard({
                       currentMonthlyRent={property.monthlyIncome}
                       lastTenantChange={property.lastTenantChange}
                       monthsPlayed={monthsPlayed}
+                      condition={property.condition}
+                      propertyValue={property.value}
+                      propertyYield={property.yield}
                     />
                   )}
                 </div>
