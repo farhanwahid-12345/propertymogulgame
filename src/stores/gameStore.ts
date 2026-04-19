@@ -293,13 +293,22 @@ export const useGameStore = create<GameState & GameActions>()(
           // Find the property from market lists
           let prop = newEstateAgent.find(p => p.id === conv.propertyId) || newAuction.find(p => p.id === conv.propertyId);
           if (!prop) {
-            // Property was generated inline — reconstruct
-            prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: conv.purchasePrice || 0, value: conv.purchasePrice || 0, neighborhood: '', monthlyIncome: 0, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0 };
+            // Property was generated inline — reconstruct with derived rent so monthlyIncome isn't £0
+            const reconstructedValue = conv.purchasePrice || 0;
+            const reconstructedYield = 6 + Math.random() * 9;
+            const derivedRent = reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0;
+            prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
+          // Ensure baseRent is non-zero — fall back to value × yield/12 if monthlyIncome is missing
+          const effectiveYield = prop.yield || (6 + Math.random() * 9);
+          const effectiveRent = prop.monthlyIncome > 0
+            ? prop.monthlyIncome
+            : (prop.value > 0 ? Math.floor((prop.value * (effectiveYield / 100)) / 12) : 0);
           const purchased: Property = {
             ...prop, owned: true, price: conv.purchasePrice || prop.price,
-            marketValue: prop.value, yield: prop.yield || (6 + Math.random() * 9),
-            lastRentIncrease: newMonthNumber, baseRent: prop.monthlyIncome,
+            marketValue: prop.value, yield: effectiveYield,
+            monthlyIncome: effectiveRent,
+            lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
           };
           newOwnedProperties.push(purchased);
           newEstateAgent = newEstateAgent.filter(p => p.id !== conv.propertyId);
@@ -1227,7 +1236,13 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
         }
 
-        const currentBaseRent = property.baseRent || property.monthlyIncome;
+        // Robust base-rent fallback: stored baseRent → current monthlyIncome →
+        // value × yield/12 (last-resort for properties created via inline conveyancing)
+        let currentBaseRent = property.baseRent || property.monthlyIncome;
+        if (currentBaseRent <= 0 && property.value > 0) {
+          const yieldPct = property.yield ?? 7;
+          currentBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
+        }
         // Use shared helper so the displayed preview matches the actual rent
         const newRent = calcTenantRent(currentBaseRent, tenant, property.condition);
         const isIncrease = newRent > property.monthlyIncome;
@@ -1604,7 +1619,7 @@ export const useGameStore = create<GameState & GameActions>()(
       resetGame: () => {
         const fresh = createInitialState();
         set(fresh);
-        showToast("Game Reset", "Started fresh with £250K!");
+        showToast("Game Reset", "Started fresh with £100K!");
       },
     }),
     {
