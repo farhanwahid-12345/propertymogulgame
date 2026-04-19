@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, memo, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
-import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 
 export interface Property {
   id: string;
