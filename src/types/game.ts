@@ -83,6 +83,12 @@ export interface PropertyTenant {
   tenant: Tenant;
   rentMultiplier: number;
   startDate: number;
+  /** 0-100. Decays based on neglect; affects default risk + early exit. Starts at 80. */
+  satisfaction: number;
+  /** monthsPlayed snapshot of the last satisfaction update (for monthly tick). */
+  lastSatisfactionUpdate: number;
+  /** Reasons array for the last satisfaction adjustment, surfaced in tooltips. */
+  satisfactionReasons?: Array<{ reason: string; delta: number }>;
 }
 
 export interface VoidPeriod {

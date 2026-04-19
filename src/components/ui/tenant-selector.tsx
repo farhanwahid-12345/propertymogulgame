@@ -210,6 +210,9 @@ interface TenantSelectorProps {
   condition?: PropertyCondition;
   propertyValue?: number; // pounds; used as fallback for £0 baseRent
   propertyYield?: number; // % annual yield; used with value as last-resort
+  /** Current tenant's satisfaction (0-100) — shown in the dialog header. */
+  currentSatisfaction?: number;
+  satisfactionReasons?: Array<{ reason: string; delta: number }>;
 }
 
 export function TenantSelector({
@@ -222,6 +225,8 @@ export function TenantSelector({
   condition,
   propertyValue,
   propertyYield,
+  currentSatisfaction,
+  satisfactionReasons = [],
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -270,6 +275,28 @@ export function TenantSelector({
             {displayBaseRent > 0 && (
               <span className="block mt-1 text-foreground">
                 Base rent: £{Math.round(displayBaseRent).toLocaleString()}/mo
+              </span>
+            )}
+            {currentTenant && typeof currentSatisfaction === 'number' && (
+              <span className="block mt-2 p-2 rounded-md bg-muted/50 border border-border text-foreground">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-xs">
+                    Current: {currentTenant.name} —
+                    <span className={cn(
+                      "ml-1",
+                      currentSatisfaction >= 70 ? "text-emerald-400" :
+                      currentSatisfaction >= 40 ? "text-amber-400" :
+                      "text-red-400"
+                    )}>
+                      ❤️ {Math.round(currentSatisfaction)}% satisfied
+                    </span>
+                  </span>
+                </span>
+                {satisfactionReasons.length > 0 && (
+                  <span className="block mt-1 text-[10px] text-muted-foreground">
+                    {satisfactionReasons.slice(0, 2).map(r => `${r.reason} (${r.delta > 0 ? '+' : ''}${r.delta})`).join(' • ')}
+                  </span>
+                )}
               </span>
             )}
             {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (

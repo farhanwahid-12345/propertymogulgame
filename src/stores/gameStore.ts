@@ -201,6 +201,16 @@ function migrateState(persisted: any): GameState {
     persisted._version = 3;
   }
 
+  // Backfill satisfaction on existing tenants (any save version)
+  if (Array.isArray(persisted.tenants)) {
+    persisted.tenants = persisted.tenants.map((t: any) => ({
+      ...t,
+      satisfaction: typeof t.satisfaction === 'number' ? t.satisfaction : 80,
+      lastSatisfactionUpdate: typeof t.lastSatisfactionUpdate === 'number' ? t.lastSatisfactionUpdate : (persisted.monthsPlayed || 0),
+      satisfactionReasons: t.satisfactionReasons || [],
+    }));
+  }
+
   // Migrate old save fields
   if (persisted.estateAgentPropertyIds && !persisted.estateAgentProperties) {
     persisted.estateAgentProperties = AVAILABLE_PROPERTIES.filter((p: Property) => persisted.estateAgentPropertyIds.includes(p.id));
@@ -447,7 +457,61 @@ export const useGameStore = create<GameState & GameActions>()(
           return { ...p, monthsSinceLastRenovation: resetMonths };
         });
 
-        // Bankruptcy check
+        // ── Tenant satisfaction & early exit ──
+        // For each tenant, adjust satisfaction based on neglect (condition,
+        // damages, recent rent hikes). Low satisfaction can trigger an
+        // early exit (creating a void period).
+        const recentDamageIds = new Set(prev.pendingDamages.map(d => d.propertyId));
+        let satisfactionAdjustedTenants = newTenants.map(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property) return t;
+          const reasons: Array<{ reason: string; delta: number }> = [];
+          let delta = 0;
+
+          if (property.condition === 'dilapidated') {
+            delta -= 15; reasons.push({ reason: 'Dilapidated condition', delta: -15 });
+          } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
+            delta -= 5; reasons.push({ reason: 'Premium tenant in standard property', delta: -5 });
+          } else if (property.condition === 'premium') {
+            delta += 3; reasons.push({ reason: 'Premium condition', delta: +3 });
+          }
+
+          if (recentDamageIds.has(t.propertyId)) {
+            delta -= 10; reasons.push({ reason: 'Unrepaired damage', delta: -10 });
+          }
+
+          // Recent rent hike (within last 3 months)
+          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed) {
+            delta -= 8; reasons.push({ reason: 'Recent rent increase', delta: -8 });
+          }
+
+          // Drift back toward 70 baseline if no negative pressure
+          if (reasons.length === 0) {
+            const drift = t.satisfaction < 70 ? 2 : t.satisfaction > 70 ? -1 : 0;
+            delta += drift;
+            if (drift !== 0) reasons.push({ reason: 'Stable conditions', delta: drift });
+          }
+
+          const newSatisfaction = Math.max(0, Math.min(100, t.satisfaction + delta));
+          return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
+        });
+
+        // Early-exit: <25 satisfaction → 8% chance tenant leaves (void period)
+        const earlyExitVoids: VoidPeriod[] = [];
+        satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
+          if (t.satisfaction < 25 && Math.random() < 0.08) {
+            const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+            earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+            const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+            showToast("Tenant Moved Out 😞", `${t.tenant.name}${property ? ` left ${property.name}` : ''} due to low satisfaction.`, "destructive");
+            return false;
+          }
+          return true;
+        });
+        newTenants = satisfactionAdjustedTenants;
+        newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
+
+
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
           showToast("BANKRUPTCY!", "Your expenses exceed your income and you've run out of cash!", "destructive");
@@ -1178,13 +1242,21 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
         const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
-        const rec: PropertyTenant = { propertyId, tenant, rentMultiplier: tenant.rentMultiplier, startDate: Date.now() };
+        const rec: PropertyTenant = {
+          propertyId,
+          tenant,
+          rentMultiplier: tenant.rentMultiplier,
+          startDate: Date.now(),
+          satisfaction: 80,
+          lastSatisfactionUpdate: prev.monthsPlayed,
+          satisfactionReasons: [],
+        };
         let updatedTenants;
         if (existingIdx >= 0) { updatedTenants = [...prev.tenants]; updatedTenants[existingIdx] = rec; }
         else updatedTenants = [...prev.tenants, rec];
 
         const updatedProps = prev.ownedProperties.map(p =>
-          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed } : p
+          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
         showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo`);
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
