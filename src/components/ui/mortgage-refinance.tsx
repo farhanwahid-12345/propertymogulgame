@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Building2, Calculator, TrendingDown } from "lucide-react";
+import { Building2, Calculator, TrendingDown, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { cn } from "@/lib/utils";
 
 interface MortgageRefinanceProps {
   ownedProperties: Property[];
@@ -16,9 +18,12 @@ interface MortgageRefinanceProps {
   onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   cash: number;
   setCash: (cash: number) => void;
+  creditScore?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
 }
 
-export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefinance, cash, setCash }: MortgageRefinanceProps) {
+export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefinance, cash, setCash, creditScore = 700, totalRentalIncome = 0, existingMonthlyMortgagePayments = 0 }: MortgageRefinanceProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
@@ -66,12 +71,26 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
   };
 
   const selectedProviderData = mortgageProviders.find(p => p.id === selectedProvider);
-  const monthlyPayment = selectedProviderData ? calculateMonthlyPayment(
-    loanAmount[0], 
-    selectedProviderData.baseRate, 
-    termYears, 
-    mortgageType
-  ) : 0;
+
+  // Centralized eligibility check (portfolio-aware: 125% ICR if 3+ owned)
+  const eligibility = (selectedProperty && selectedProviderData) ? calculateMortgageEligibility({
+    creditScore,
+    loanAmount: loanAmount[0],
+    propertyValue: selectedProperty.value,
+    propertyMonthlyRent: selectedProperty.monthlyIncome,
+    providerBaseRate: selectedProviderData.baseRate,
+    providerMinCreditScore: selectedProviderData.minCreditScore,
+    providerMaxLTV: selectedProviderData.maxLTV,
+    providerId: selectedProviderData.id,
+    termYears,
+    mortgageType,
+    existingMonthlyMortgagePayments,
+    totalRentalIncome,
+    ownedPropertyCount: ownedProperties.length,
+  }) : null;
+
+  const monthlyPayment = eligibility?.monthlyPayment ?? 0;
+  const stressLabel = ownedProperties.length >= 3 ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -228,23 +247,39 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                 </Select>
               </div>
 
-              {selectedProvider && (
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+              {selectedProvider && eligibility && (
+                <Card className="glass border-border">
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="text-muted-foreground">Monthly Payment:</span>
-                        <span className="ml-1 font-bold text-blue-700">
-                          £{monthlyPayment.toLocaleString()}
+                        <span className="ml-1 font-bold text-foreground">
+                          £{Math.round(monthlyPayment).toLocaleString()}
                         </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Interest Rate:</span>
                         <span className="ml-1 font-medium">
-                          {(selectedProviderData.baseRate * 100).toFixed(2)}%
+                          {(eligibility.adjustedRate * 100).toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex justify-between pt-1 border-t border-border/50">
+                        <span className="text-muted-foreground">{stressLabel}:</span>
+                        <span className={cn(
+                          "font-medium",
+                          eligibility.icrRatio && eligibility.icrRatio >= (ownedProperties.length >= 3 ? 1.25 : 1)
+                            ? "text-success" : "text-danger"
+                        )}>
+                          {eligibility.icrRatio ? `${(eligibility.icrRatio * 100).toFixed(0)}%` : '—'}
                         </span>
                       </div>
                     </div>
+                    {!eligibility.eligible && (
+                      <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>{eligibility.reason}</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -252,7 +287,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
               <Button 
                 className="w-full" 
                 onClick={handleRefinance}
-                disabled={!selectedProvider || loanAmount[0] <= 0}
+                disabled={!selectedProvider || loanAmount[0] <= 0 || (eligibility ? !eligibility.eligible : false)}
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
                 Refinance Property

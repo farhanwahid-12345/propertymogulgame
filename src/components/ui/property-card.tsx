@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
-import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 
 export interface Property {
   id: string;
@@ -53,6 +54,13 @@ interface PropertyCardProps {
   conveyancingStatus?: 'buying' | 'selling';
   conveyancingCompletion?: number;
   propertyLTV?: number;
+  // Portfolio context for inline mortgage stress test
+  ownedPropertyCount?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
+  currentMarketRate?: number;
+  baseMarketRate?: number;
+  providerRates?: Record<string, number>;
 }
 
 const PropertyTypeIcon = {
@@ -72,19 +80,22 @@ export const PropertyCard = memo(function PropertyCard({
   onBuy, 
   onSell,
   onSelectTenant,
-  onRemortgage,
   playerCash = 0, 
   creditScore = 600,
   mortgageProviders = [],
   currentTenant,
-  propertyListings = [],
-  removeTenant,
   mortgages = [],
   monthsPlayed = 0,
   isInConveyancing = false,
   conveyancingStatus,
   conveyancingCompletion,
   propertyLTV = 0,
+  ownedPropertyCount = 0,
+  totalRentalIncome = 0,
+  existingMonthlyMortgagePayments = 0,
+  currentMarketRate = 0.05,
+  baseMarketRate = 0.05,
+  providerRates = {},
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -155,7 +166,7 @@ export const PropertyCard = memo(function PropertyCard({
 
   return (
     <Card className={cn(
-      "glass border-t-4 transition-all duration-300 hover:scale-[1.02]",
+      "glass border-t-4 transition-all duration-300 hover:scale-[1.02] flex flex-col h-full",
       typeBorderColor[property.type],
       typeGlow[property.type],
       property.owned && "ring-2 ring-primary/50"
@@ -194,7 +205,7 @@ export const PropertyCard = memo(function PropertyCard({
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 flex-1 flex flex-col">
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Price:</span>
@@ -327,7 +338,7 @@ export const PropertyCard = memo(function PropertyCard({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-2 mt-auto">
                   {onSelectTenant && (
                     <TenantSelector
                       propertyId={property.id}
@@ -337,6 +348,9 @@ export const PropertyCard = memo(function PropertyCard({
                       currentMonthlyRent={property.monthlyIncome}
                       lastTenantChange={property.lastTenantChange}
                       monthsPlayed={monthsPlayed}
+                      condition={property.condition}
+                      propertyValue={property.value}
+                      propertyYield={property.yield}
                     />
                   )}
                 </div>
@@ -461,36 +475,118 @@ export const PropertyCard = memo(function PropertyCard({
                                 <span className="text-xs">{(provider.baseRate * 100).toFixed(1)}%</span>
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {eligible ? `£${estimatedMonthly.toLocaleString()}/mo (${mortgageType})` : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
+                                {eligible ? `£${Math.round(estimatedMonthly).toLocaleString()}/mo (${mortgageType})` : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     </div>
+
+                    {/* Inline mortgage summary + eligibility */}
+                    {(() => {
+                      if (!selectedProviderId) return null;
+                      const provider = mortgageProviders.find((p: any) => p.id === selectedProviderId);
+                      if (!provider) return null;
+
+                      const providerBaseRate = (providerRates[provider.id] ?? provider.baseRate) + currentMarketRate - baseMarketRate;
+                      const eligibility = calculateMortgageEligibility({
+                        creditScore,
+                        loanAmount: mortgageAmount,
+                        propertyValue: property.price,
+                        propertyMonthlyRent: property.monthlyIncome,
+                        providerBaseRate,
+                        providerMinCreditScore: provider.minCreditScore,
+                        providerMaxLTV: provider.maxLTV,
+                        providerId: provider.id,
+                        termYears: parseInt(mortgageTermYears),
+                        mortgageType,
+                        existingMonthlyMortgagePayments,
+                        totalRentalIncome,
+                        ownedPropertyCount,
+                      });
+
+                      const monthly = eligibility.monthlyPayment;
+                      const totalPayable = mortgageType === 'interest-only'
+                        ? monthly * parseInt(mortgageTermYears) * 12 + mortgageAmount
+                        : monthly * parseInt(mortgageTermYears) * 12;
+                      const totalInterest = totalPayable - mortgageAmount;
+                      const stressLabel = ownedPropertyCount >= 3 ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="rounded border border-border bg-muted/30 p-3 space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Monthly Payment:</span>
+                              <span className="font-bold text-foreground">£{Math.round(monthly).toLocaleString()}/mo</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Payable:</span>
+                              <span className="font-medium">£{Math.round(totalPayable).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Interest:</span>
+                              <span className="font-medium">£{Math.round(totalInterest).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-border/50">
+                              <span className="text-muted-foreground">{stressLabel}:</span>
+                              <span className={cn("font-medium", eligibility.icrRatio && eligibility.icrRatio >= (ownedPropertyCount >= 3 ? 1.25 : 1) ? "text-success" : "text-danger")}>
+                                {eligibility.icrRatio ? `${(eligibility.icrRatio * 100).toFixed(0)}%` : '—'}
+                              </span>
+                            </div>
+                          </div>
+                          {!eligibility.eligible && (
+                            <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                              <span>{eligibility.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    className="w-full bg-gradient-primary hover:opacity-90" 
-                    onClick={handleBuyWithMortgage}
-                    disabled={!canAffordMortgage || isLoading || (mortgageAmount > 0 && !selectedProviderId)}
-                  >
-                    {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : "Buy"}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setShowMortgageOptions(false);
-                      setSelectedProviderId("");
-                      setMortgageTermYears("25");
-                      setMortgageType('repayment');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+                {(() => {
+                  // Compute eligibility for the buy button disable
+                  let inlineBlocked = false;
+                  if (mortgageAmount > 0 && selectedProviderId) {
+                    const provider = mortgageProviders.find((p: any) => p.id === selectedProviderId);
+                    if (provider) {
+                      const providerBaseRate = (providerRates[provider.id] ?? provider.baseRate) + currentMarketRate - baseMarketRate;
+                      const elig = calculateMortgageEligibility({
+                        creditScore, loanAmount: mortgageAmount, propertyValue: property.price,
+                        propertyMonthlyRent: property.monthlyIncome, providerBaseRate,
+                        providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
+                        providerId: provider.id, termYears: parseInt(mortgageTermYears), mortgageType,
+                        existingMonthlyMortgagePayments, totalRentalIncome, ownedPropertyCount,
+                      });
+                      inlineBlocked = !elig.eligible;
+                    }
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        className="w-full bg-gradient-primary hover:opacity-90" 
+                        onClick={handleBuyWithMortgage}
+                        disabled={!canAffordMortgage || isLoading || (mortgageAmount > 0 && !selectedProviderId) || inlineBlocked}
+                      >
+                        {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : inlineBlocked ? "Not Eligible" : "Buy"}
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setShowMortgageOptions(false);
+                          setSelectedProviderId("");
+                          setMortgageTermYears("25");
+                          setMortgageType('repayment');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
