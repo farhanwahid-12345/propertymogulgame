@@ -455,9 +455,61 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           return { ...p, monthsSinceLastRenovation: resetMonths };
+        // ── Tenant satisfaction & early exit ──
+        // For each tenant, adjust satisfaction based on neglect (condition,
+        // damages, recent rent hikes). Low satisfaction can trigger an
+        // early exit (creating a void period).
+        const recentDamageIds = new Set(prev.pendingDamages.map(d => d.propertyId));
+        let satisfactionAdjustedTenants = newTenants.map(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property) return t;
+          const reasons: Array<{ reason: string; delta: number }> = [];
+          let delta = 0;
+
+          if (property.condition === 'dilapidated') {
+            delta -= 15; reasons.push({ reason: 'Dilapidated condition', delta: -15 });
+          } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
+            delta -= 5; reasons.push({ reason: 'Premium tenant in standard property', delta: -5 });
+          } else if (property.condition === 'premium') {
+            delta += 3; reasons.push({ reason: 'Premium condition', delta: +3 });
+          }
+
+          if (recentDamageIds.has(t.propertyId)) {
+            delta -= 10; reasons.push({ reason: 'Unrepaired damage', delta: -10 });
+          }
+
+          // Recent rent hike (within last 3 months)
+          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed) {
+            delta -= 8; reasons.push({ reason: 'Recent rent increase', delta: -8 });
+          }
+
+          // Drift back toward 70 baseline if no negative pressure
+          if (reasons.length === 0) {
+            const drift = t.satisfaction < 70 ? 2 : t.satisfaction > 70 ? -1 : 0;
+            delta += drift;
+            if (drift !== 0) reasons.push({ reason: 'Stable conditions', delta: drift });
+          }
+
+          const newSatisfaction = Math.max(0, Math.min(100, t.satisfaction + delta));
+          return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
         });
 
-        // Bankruptcy check
+        // Early-exit: <25 satisfaction → 8% chance tenant leaves (void period)
+        const earlyExitVoids: VoidPeriod[] = [];
+        satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
+          if (t.satisfaction < 25 && Math.random() < 0.08) {
+            const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+            earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+            const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+            showToast("Tenant Moved Out 😞", `${t.tenant.name}${property ? ` left ${property.name}` : ''} due to low satisfaction.`, "destructive");
+            return false;
+          }
+          return true;
+        });
+        newTenants = satisfactionAdjustedTenants;
+        newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
+
+
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
           showToast("BANKRUPTCY!", "Your expenses exceed your income and you've run out of cash!", "destructive");
