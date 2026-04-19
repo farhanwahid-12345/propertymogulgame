@@ -215,12 +215,12 @@ export function MortgageManagement({
                   </div>
                 </div>
 
-                {/* ICR Warning */}
-                {icrRatio !== null && !icrPasses && (
+                {/* Stress test warning (portfolio-aware) */}
+                {eligibility && !icrPasses && eligibility.icrRatio !== undefined && (
                   <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
                     <span className="text-red-400">
-                      <strong>Stress Test Warning:</strong> Rental income (£{selectedProperty.monthlyIncome}/mo) is only {((icrRatio || 0) * 100).toFixed(0)}% of the monthly payment. Banks require 125% coverage. Reduce the loan amount or this will be rejected.
+                      <strong>{stressLabel} — Failing:</strong> Coverage is only {(eligibility.icrRatio * 100).toFixed(0)}%. Banks require {Math.round(stressThreshold * 100)}% coverage. Reduce the loan amount{portfolioMode ? " or grow your rental portfolio" : ""}.
                     </span>
                   </div>
                 )}
@@ -299,12 +299,17 @@ export function MortgageManagement({
                             )}
                           </span>
                         </div>
-                        {icrRatio !== null && (
+                        {eligibility?.icrRatio !== undefined && (
                           <div className="col-span-2">
-                            <span className="text-muted-foreground">Stress Test (ICR):</span>
+                            <span className="text-muted-foreground">{stressLabel}:</span>
                             <span className={`ml-1 font-medium ${icrPasses ? 'text-green-400' : 'text-red-400'}`}>
-                              {((icrRatio || 0) * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : '✗ Fail (need 125%)'}
+                              {(eligibility.icrRatio * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : `✗ Fail (need ${Math.round(stressThreshold * 100)}%)`}
                             </span>
+                          </div>
+                        )}
+                        {eligibility && !eligibility.eligible && eligibility.reason && (
+                          <div className="col-span-2 p-2 rounded border border-red-500/40 bg-red-500/10 text-xs text-red-400">
+                            {eligibility.reason}
                           </div>
                         )}
                       </div>
@@ -315,7 +320,7 @@ export function MortgageManagement({
                 <Button 
                   className="w-full" 
                   onClick={handleRefinance}
-                  disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses}
+                  disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses || (eligibility ? !eligibility.eligible : false)}
                 >
                   <TrendingDown className="h-4 w-4 mr-2" />
                   Refinance Property
