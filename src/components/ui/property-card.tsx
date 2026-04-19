@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
-import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 
