@@ -455,6 +455,8 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           return { ...p, monthsSinceLastRenovation: resetMonths };
+        });
+
         // ── Tenant satisfaction & early exit ──
         // For each tenant, adjust satisfaction based on neglect (condition,
         // damages, recent rent hikes). Low satisfaction can trigger an
