@@ -94,6 +94,8 @@ export const PropertyCard = memo(function PropertyCard({
   creditScore = 600,
   mortgageProviders = [],
   currentTenant,
+  tenantSatisfaction,
+  tenantSatisfactionReasons = [],
   mortgages = [],
   monthsPlayed = 0,
   isInConveyancing = false,
