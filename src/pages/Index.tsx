@@ -12,6 +12,8 @@ import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
+import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
+import { RenovationTracker } from "@/components/ui/renovation-tracker";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
@@ -209,6 +211,9 @@ const Index = () => {
                   level={gameState.level}
                   mortgageProviders={gameState.mortgageProviders}
                   creditScore={gameState.creditScore}
+                  totalRentalIncome={totalPortfolioIncome}
+                  existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
+                  ownedPropertyCount={gameState.ownedProperties.length}
                 />
                 <AuctionHouse
                   ownedProperties={gameState.ownedProperties}
@@ -251,6 +256,8 @@ const Index = () => {
                 cash={gameState.cash}
                 setCash={gameState.setCash}
                 creditScore={gameState.creditScore}
+                totalRentalIncome={totalPortfolioIncome}
+                existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
               />
               <CreditOverdraft
                 creditScore={gameState.creditScore}
