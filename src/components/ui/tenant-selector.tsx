@@ -277,6 +277,28 @@ export function TenantSelector({
                 Base rent: £{Math.round(displayBaseRent).toLocaleString()}/mo
               </span>
             )}
+            {currentTenant && typeof currentSatisfaction === 'number' && (
+              <span className="block mt-2 p-2 rounded-md bg-muted/50 border border-border text-foreground">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-xs">
+                    Current: {currentTenant.name} —
+                    <span className={cn(
+                      "ml-1",
+                      currentSatisfaction >= 70 ? "text-emerald-400" :
+                      currentSatisfaction >= 40 ? "text-amber-400" :
+                      "text-red-400"
+                    )}>
+                      ❤️ {Math.round(currentSatisfaction)}% satisfied
+                    </span>
+                  </span>
+                </span>
+                {satisfactionReasons.length > 0 && (
+                  <span className="block mt-1 text-[10px] text-muted-foreground">
+                    {satisfactionReasons.slice(0, 2).map(r => `${r.reason} (${r.delta > 0 ? '+' : ''}${r.delta})`).join(' • ')}
+                  </span>
+                )}
+              </span>
+            )}
             {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
               <span className="text-amber-400 block mt-1">
                 ⚠️ Higher-rent tenants unavailable for {3 - (monthsPlayed - lastTenantChange)} more month(s)
