@@ -364,7 +364,63 @@ export const PropertyCard = memo(function PropertyCard({
                       condition={property.condition}
                       propertyValue={property.value}
                       propertyYield={property.yield}
+                      currentSatisfaction={tenantSatisfaction}
+                      satisfactionReasons={tenantSatisfactionReasons}
                     />
+                  )}
+                  {/* Satisfaction bar — only when a tenant is assigned */}
+                  {currentTenant && typeof tenantSatisfaction === 'number' && (
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-2 px-1 cursor-help">
+                            <Heart className={cn(
+                              "h-3.5 w-3.5 shrink-0",
+                              tenantSatisfaction >= 70 ? "text-emerald-400 fill-emerald-400/30" :
+                              tenantSatisfaction >= 40 ? "text-amber-400 fill-amber-400/30" :
+                              "text-red-400 fill-red-400/30"
+                            )} />
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={cn(
+                                  "h-full transition-all",
+                                  tenantSatisfaction >= 70 ? "bg-emerald-400" :
+                                  tenantSatisfaction >= 40 ? "bg-amber-400" :
+                                  "bg-red-400"
+                                )}
+                                style={{ width: `${tenantSatisfaction}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">
+                              {Math.round(tenantSatisfaction)}%
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="text-xs font-semibold mb-1">Tenant Satisfaction</div>
+                          {tenantSatisfactionReasons && tenantSatisfactionReasons.length > 0 ? (
+                            <ul className="space-y-0.5">
+                              {tenantSatisfactionReasons.slice(0, 3).map((r, i) => (
+                                <li key={i} className="text-[11px] flex justify-between gap-2">
+                                  <span>{r.reason}</span>
+                                  <span className={r.delta >= 0 ? "text-emerald-400" : "text-red-400"}>
+                                    {r.delta > 0 ? '+' : ''}{r.delta}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="text-[11px] text-muted-foreground">Stable — no recent changes.</div>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {/* Rent pending hint when tenant just moved in */}
+                  {currentTenant && property.monthlyIncome === 0 && (
+                    <div className="text-[10px] text-amber-400 italic px-1">
+                      ⏳ Rent pending — tenant just moved in
+                    </div>
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
