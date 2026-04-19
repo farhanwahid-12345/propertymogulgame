@@ -46,6 +46,9 @@ interface PropertyCardProps {
   creditScore?: number;
   mortgageProviders?: any[];
   currentTenant?: Tenant;
+  /** Tenant satisfaction (0-100) for the assigned tenant; renders bar + tooltip. */
+  tenantSatisfaction?: number;
+  tenantSatisfactionReasons?: Array<{ reason: string; delta: number }>;
   propertyListings?: any[];
   removeTenant?: (propertyId: string) => void;
   mortgages?: Array<{
