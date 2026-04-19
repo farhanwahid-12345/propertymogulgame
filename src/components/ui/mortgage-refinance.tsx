@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Property } from "@/components/ui/property-card";
-import { Building2, Calculator, TrendingDown } from "lucide-react";
+import { Building2, Calculator, TrendingDown, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { cn } from "@/lib/utils";
 
 interface MortgageRefinanceProps {
   ownedProperties: Property[];
@@ -16,6 +18,9 @@ interface MortgageRefinanceProps {
   onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   cash: number;
   setCash: (cash: number) => void;
+  creditScore?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
 }
 
 export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefinance, cash, setCash, creditScore = 700, totalRentalIncome = 0, existingMonthlyMortgagePayments = 0 }: MortgageRefinanceProps) {
