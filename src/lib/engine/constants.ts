@@ -3,7 +3,7 @@ import { toPennies } from "@/lib/formatCurrency";
 
 // All monetary constants are in PENNIES
 
-export const INITIAL_CASH = toPennies(250_000);
+export const INITIAL_CASH = toPennies(100_000);
 export const EXPERIENCE_BASE = 1000;
 export const MORTGAGE_INTEREST_RATE = 0.055;
 export const BASE_MARKET_RATE = 0.035;

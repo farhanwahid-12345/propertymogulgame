@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, MessageSquare, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore } from "@/lib/mortgageEligibility";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 
 interface PropertyOffer {
   id: string;
@@ -62,6 +62,9 @@ interface EstateAgentWindowProps {
   level: number;
   mortgageProviders: any[];
   creditScore: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
+  ownedPropertyCount?: number;
 }
 
 export function EstateAgentWindow({ 
@@ -86,7 +89,10 @@ export function EstateAgentWindow({
   getMaxPropertyValue, 
   level, 
   mortgageProviders,
-  creditScore = 650
+  creditScore = 650,
+  totalRentalIncome = 0,
+  existingMonthlyMortgagePayments = 0,
+  ownedPropertyCount = 0,
 }: EstateAgentWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [newListingPrice, setNewListingPrice] = useState<number>(0);
@@ -688,9 +694,73 @@ export function EstateAgentWindow({
                         </>
                       )}
 
+                      {/* Inline mortgage eligibility check (portfolio-aware) */}
+                      {(() => {
+                        if (!selectedBuyProperty) return null;
+                        if (mortgagePercentage[0] === 0) return null;
+                        const provider = mortgageProviders.find((p: any) => p.id === selectedProvider);
+                        if (!provider) return null;
+                        const loanAmount = Math.floor(offerAmount[0] * (mortgagePercentage[0] / 100));
+                        const elig = calculateMortgageEligibility({
+                          creditScore,
+                          loanAmount,
+                          propertyValue: selectedBuyProperty.value,
+                          propertyMonthlyRent: selectedBuyProperty.monthlyIncome,
+                          providerBaseRate: provider.baseRate,
+                          providerMinCreditScore: provider.minCreditScore,
+                          providerMaxLTV: provider.maxLTV,
+                          providerId: provider.id,
+                          termYears,
+                          mortgageType,
+                          existingMonthlyMortgagePayments,
+                          totalRentalIncome,
+                          ownedPropertyCount,
+                        });
+                        if (elig.eligible) {
+                          return (
+                            <div className="rounded border border-green-500/40 bg-green-500/10 p-2 text-xs text-green-400 flex items-center gap-2">
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Mortgage pre-approved · £{Math.round(elig.monthlyPayment).toLocaleString()}/mo</span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="rounded border border-destructive/50 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
+                            <Ban className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            <span><strong>Mortgage Denied:</strong> {elig.reason} — adjust LTV / provider / term to retry.</span>
+                          </div>
+                        );
+                      })()}
+
                       <Button
                         className="w-full"
                         onClick={() => {
+                          // Final eligibility gate
+                          if (mortgagePercentage[0] > 0 && selectedProvider) {
+                            const provider = mortgageProviders.find((p: any) => p.id === selectedProvider);
+                            if (provider) {
+                              const loanAmount = Math.floor(offerAmount[0] * (mortgagePercentage[0] / 100));
+                              const elig = calculateMortgageEligibility({
+                                creditScore,
+                                loanAmount,
+                                propertyValue: selectedBuyProperty.value,
+                                propertyMonthlyRent: selectedBuyProperty.monthlyIncome,
+                                providerBaseRate: provider.baseRate,
+                                providerMinCreditScore: provider.minCreditScore,
+                                providerMaxLTV: provider.maxLTV,
+                                providerId: provider.id,
+                                termYears,
+                                mortgageType,
+                                existingMonthlyMortgagePayments,
+                                totalRentalIncome,
+                                ownedPropertyCount,
+                              });
+                              if (!elig.eligible) {
+                                // Suppress disruptive toast — banner already shown inline
+                                return;
+                              }
+                            }
+                          }
                           onBuyProperty(
                             selectedBuyProperty,
                             offerAmount[0],
@@ -703,7 +773,29 @@ export function EstateAgentWindow({
                           resetNegotiation();
                           setIsOpen(false);
                         }}
-                        disabled={mortgagePercentage[0] > 0 && !selectedProvider}
+                        disabled={(() => {
+                          if (mortgagePercentage[0] > 0 && !selectedProvider) return true;
+                          if (mortgagePercentage[0] === 0) return false;
+                          const provider = mortgageProviders.find((p: any) => p.id === selectedProvider);
+                          if (!provider) return true;
+                          const loanAmount = Math.floor(offerAmount[0] * (mortgagePercentage[0] / 100));
+                          const elig = calculateMortgageEligibility({
+                            creditScore,
+                            loanAmount,
+                            propertyValue: selectedBuyProperty.value,
+                            propertyMonthlyRent: selectedBuyProperty.monthlyIncome,
+                            providerBaseRate: provider.baseRate,
+                            providerMinCreditScore: provider.minCreditScore,
+                            providerMaxLTV: provider.maxLTV,
+                            providerId: provider.id,
+                            termYears,
+                            mortgageType,
+                            existingMonthlyMortgagePayments,
+                            totalRentalIncome,
+                            ownedPropertyCount,
+                          });
+                          return !elig.eligible;
+                        })()}
                       >
                         <Check className="h-4 w-4 mr-2" />
                         Complete Purchase - £{offerAmount[0].toLocaleString()}

@@ -12,6 +12,8 @@ import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
+import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
+import { RenovationTracker } from "@/components/ui/renovation-tracker";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
@@ -209,6 +211,9 @@ const Index = () => {
                   level={gameState.level}
                   mortgageProviders={gameState.mortgageProviders}
                   creditScore={gameState.creditScore}
+                  totalRentalIncome={totalPortfolioIncome}
+                  existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
+                  ownedPropertyCount={gameState.ownedProperties.length}
                 />
                 <AuctionHouse
                   ownedProperties={gameState.ownedProperties}
@@ -251,6 +256,8 @@ const Index = () => {
                 cash={gameState.cash}
                 setCash={gameState.setCash}
                 creditScore={gameState.creditScore}
+                totalRentalIncome={totalPortfolioIncome}
+                existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
               />
               <CreditOverdraft
                 creditScore={gameState.creditScore}
@@ -267,6 +274,18 @@ const Index = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Conveyancing tracker */}
+        <ConveyancingTracker
+          conveyancing={gameState.conveyancing || []}
+          monthsPlayed={gameState.monthsPlayed}
+        />
+
+        {/* Renovation tracker */}
+        <RenovationTracker
+          renovations={gameState.renovations || []}
+          ownedProperties={gameState.ownedProperties}
+        />
 
         {/* Listed Properties */}
         <ListedProperties 
@@ -336,12 +355,18 @@ const Index = () => {
                 const conv = (gameState.conveyancing || []).find(c => c.propertyId === property.id);
                 const propertyDebt = getDebtForProperty(property.id);
                 const propertyLTV = property.value > 0 ? (propertyDebt / property.value) * 100 : 0;
+                const activeRenoIds = (gameState.renovations || [])
+                  .filter(r => r.propertyId === property.id)
+                  .map(r => r.type.id);
                 return (
                   <PropertyCard
                     key={property.id}
                     property={property}
                     onSell={gameState.sellProperty}
                     onSelectTenant={gameState.selectTenant}
+                    onRenovate={gameState.startRenovation}
+                    onUpgradeCondition={gameState.upgradeCondition}
+                    activeRenovationIds={activeRenoIds}
                     playerCash={gameState.cash}
                     currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
                     mortgages={gameState.mortgages}

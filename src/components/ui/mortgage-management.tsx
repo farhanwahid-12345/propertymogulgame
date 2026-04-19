@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Building2, Calculator, TrendingDown, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { cn } from "@/lib/utils";
 
 interface MortgageManagementProps {
   ownedProperties: Property[];
@@ -18,6 +19,8 @@ interface MortgageManagementProps {
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
 }
 
 export function MortgageManagement({ 
@@ -26,7 +29,9 @@ export function MortgageManagement({
   onRefinance, 
   cash, 
   setCash,
-  creditScore = 580
+  creditScore = 580,
+  totalRentalIncome = 0,
+  existingMonthlyMortgagePayments = 0,
 }: MortgageManagementProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -66,11 +71,26 @@ export function MortgageManagement({
     singleLoanAmount[0], adjustedRate, singleTermYears, singleMortgageType
   ) : 0;
 
-  // ICR check preview
-  const icrRatio = selectedProperty && singleMonthlyPayment > 0 
-    ? selectedProperty.monthlyIncome / singleMonthlyPayment 
-    : null;
-  const icrPasses = icrRatio === null || icrRatio >= 1.25;
+  // Centralized portfolio-aware eligibility (125% ICR if 3+ owned, 100% otherwise)
+  const eligibility = (selectedProperty && singleProviderData && singleLoanAmount[0] > 0) ? calculateMortgageEligibility({
+    creditScore,
+    loanAmount: singleLoanAmount[0],
+    propertyValue: selectedProperty.value,
+    propertyMonthlyRent: selectedProperty.monthlyIncome,
+    providerBaseRate: singleProviderData.baseRate,
+    providerMinCreditScore: singleProviderData.minCreditScore,
+    providerMaxLTV: singleProviderData.maxLTV,
+    providerId: singleProviderData.id,
+    termYears: singleTermYears,
+    mortgageType: singleMortgageType,
+    existingMonthlyMortgagePayments,
+    totalRentalIncome,
+    ownedPropertyCount: ownedProperties.length,
+  }) : null;
+  const portfolioMode = ownedProperties.length >= 3;
+  const stressLabel = portfolioMode ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
+  const stressThreshold = portfolioMode ? 1.25 : 1.0;
+  const icrPasses = !eligibility || (eligibility.icrRatio !== undefined && eligibility.icrRatio >= stressThreshold);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -195,12 +215,12 @@ export function MortgageManagement({
                   </div>
                 </div>
 
-                {/* ICR Warning */}
-                {icrRatio !== null && !icrPasses && (
+                {/* Stress test warning (portfolio-aware) */}
+                {eligibility && !icrPasses && eligibility.icrRatio !== undefined && (
                   <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
                     <span className="text-red-400">
-                      <strong>Stress Test Warning:</strong> Rental income (£{selectedProperty.monthlyIncome}/mo) is only {((icrRatio || 0) * 100).toFixed(0)}% of the monthly payment. Banks require 125% coverage. Reduce the loan amount or this will be rejected.
+                      <strong>{stressLabel} — Failing:</strong> Coverage is only {(eligibility.icrRatio * 100).toFixed(0)}%. Banks require {Math.round(stressThreshold * 100)}% coverage. Reduce the loan amount{portfolioMode ? " or grow your rental portfolio" : ""}.
                     </span>
                   </div>
                 )}
@@ -279,12 +299,17 @@ export function MortgageManagement({
                             )}
                           </span>
                         </div>
-                        {icrRatio !== null && (
+                        {eligibility?.icrRatio !== undefined && (
                           <div className="col-span-2">
-                            <span className="text-muted-foreground">Stress Test (ICR):</span>
+                            <span className="text-muted-foreground">{stressLabel}:</span>
                             <span className={`ml-1 font-medium ${icrPasses ? 'text-green-400' : 'text-red-400'}`}>
-                              {((icrRatio || 0) * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : '✗ Fail (need 125%)'}
+                              {(eligibility.icrRatio * 100).toFixed(0)}% {icrPasses ? '✓ Pass' : `✗ Fail (need ${Math.round(stressThreshold * 100)}%)`}
                             </span>
+                          </div>
+                        )}
+                        {eligibility && !eligibility.eligible && eligibility.reason && (
+                          <div className="col-span-2 p-2 rounded border border-red-500/40 bg-red-500/10 text-xs text-red-400">
+                            {eligibility.reason}
                           </div>
                         )}
                       </div>
@@ -295,7 +320,7 @@ export function MortgageManagement({
                 <Button 
                   className="w-full" 
                   onClick={handleRefinance}
-                  disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses}
+                  disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses || (eligibility ? !eligibility.eligible : false)}
                 >
                   <TrendingDown className="h-4 w-4 mr-2" />
                   Refinance Property
