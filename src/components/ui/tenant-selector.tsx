@@ -353,6 +353,10 @@ export function TenantSelector({
                         <DollarSign className="h-3 w-3" />
                         £{potentialRent.toLocaleString()}/mo
                       </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        £{Math.round(displayBaseRent).toLocaleString()} × {profileMult.toFixed(2)}
+                        {conditionMult !== 1 && ` × ${conditionMult.toFixed(2)} ${condition}`}
+                      </div>
                     </div>
                   </div>
 
