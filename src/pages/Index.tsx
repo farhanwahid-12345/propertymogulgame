@@ -358,6 +358,7 @@ const Index = () => {
                 const activeRenoIds = (gameState.renovations || [])
                   .filter(r => r.propertyId === property.id)
                   .map(r => r.type.id);
+                const tenantRec = gameState.tenants.find(t => t.propertyId === property.id);
                 return (
                   <PropertyCard
                     key={property.id}
@@ -368,7 +369,9 @@ const Index = () => {
                     onUpgradeCondition={gameState.upgradeCondition}
                     activeRenovationIds={activeRenoIds}
                     playerCash={gameState.cash}
-                    currentTenant={gameState.tenants.find(t => t.propertyId === property.id)?.tenant}
+                    currentTenant={tenantRec?.tenant}
+                    tenantSatisfaction={tenantRec?.satisfaction}
+                    tenantSatisfactionReasons={tenantRec?.satisfactionReasons}
                     mortgages={gameState.mortgages}
                     monthsPlayed={gameState.monthsPlayed}
                     isInConveyancing={!!conv}
