@@ -28,6 +28,7 @@ import {
   calculateIncomeTax, calculateCorporationTax, calculateCGT,
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
 } from '@/lib/engine/taxation';
+import { calcTenantRent } from '@/lib/tenantRent';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -1157,14 +1158,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         const currentBaseRent = property.baseRent || property.monthlyIncome;
-        let newAdj = 1.0;
-        if (tenant.profile === 'premium') newAdj = 1.10;
-        else if (tenant.profile === 'budget') newAdj = 0.90;
-        else if (tenant.profile === 'risky') newAdj = 1.05;
-
-        // Apply condition multiplier
-        const conditionMult = getConditionRentMultiplier(property.condition);
-        const newRent = Math.floor(currentBaseRent * newAdj * conditionMult);
+        // Use shared helper so the displayed preview matches the actual rent
+        const newRent = calcTenantRent(currentBaseRent, tenant, property.condition);
         const isIncrease = newRent > property.monthlyIncome;
 
         if (isIncrease && property.lastTenantChange !== undefined) {
