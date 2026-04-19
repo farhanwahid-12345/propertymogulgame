@@ -475,36 +475,118 @@ export const PropertyCard = memo(function PropertyCard({
                                 <span className="text-xs">{(provider.baseRate * 100).toFixed(1)}%</span>
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {eligible ? `£${estimatedMonthly.toLocaleString()}/mo (${mortgageType})` : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
+                                {eligible ? `£${Math.round(estimatedMonthly).toLocaleString()}/mo (${mortgageType})` : `Requires ${provider.minCreditScore}+ credit, ${(provider.maxLTV * 100)}% max LTV`}
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     </div>
+
+                    {/* Inline mortgage summary + eligibility */}
+                    {(() => {
+                      if (!selectedProviderId) return null;
+                      const provider = mortgageProviders.find((p: any) => p.id === selectedProviderId);
+                      if (!provider) return null;
+
+                      const providerBaseRate = (providerRates[provider.id] ?? provider.baseRate) + currentMarketRate - baseMarketRate;
+                      const eligibility = calculateMortgageEligibility({
+                        creditScore,
+                        loanAmount: mortgageAmount,
+                        propertyValue: property.price,
+                        propertyMonthlyRent: property.monthlyIncome,
+                        providerBaseRate,
+                        providerMinCreditScore: provider.minCreditScore,
+                        providerMaxLTV: provider.maxLTV,
+                        providerId: provider.id,
+                        termYears: parseInt(mortgageTermYears),
+                        mortgageType,
+                        existingMonthlyMortgagePayments,
+                        totalRentalIncome,
+                        ownedPropertyCount,
+                      });
+
+                      const monthly = eligibility.monthlyPayment;
+                      const totalPayable = mortgageType === 'interest-only'
+                        ? monthly * parseInt(mortgageTermYears) * 12 + mortgageAmount
+                        : monthly * parseInt(mortgageTermYears) * 12;
+                      const totalInterest = totalPayable - mortgageAmount;
+                      const stressLabel = ownedPropertyCount >= 3 ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="rounded border border-border bg-muted/30 p-3 space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Monthly Payment:</span>
+                              <span className="font-bold text-foreground">£{Math.round(monthly).toLocaleString()}/mo</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Payable:</span>
+                              <span className="font-medium">£{Math.round(totalPayable).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Interest:</span>
+                              <span className="font-medium">£{Math.round(totalInterest).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-border/50">
+                              <span className="text-muted-foreground">{stressLabel}:</span>
+                              <span className={cn("font-medium", eligibility.icrRatio && eligibility.icrRatio >= (ownedPropertyCount >= 3 ? 1.25 : 1) ? "text-success" : "text-danger")}>
+                                {eligibility.icrRatio ? `${(eligibility.icrRatio * 100).toFixed(0)}%` : '—'}
+                              </span>
+                            </div>
+                          </div>
+                          {!eligibility.eligible && (
+                            <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
+                              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                              <span>{eligibility.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    className="w-full bg-gradient-primary hover:opacity-90" 
-                    onClick={handleBuyWithMortgage}
-                    disabled={!canAffordMortgage || isLoading || (mortgageAmount > 0 && !selectedProviderId)}
-                  >
-                    {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : "Buy"}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setShowMortgageOptions(false);
-                      setSelectedProviderId("");
-                      setMortgageTermYears("25");
-                      setMortgageType('repayment');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+                {(() => {
+                  // Compute eligibility for the buy button disable
+                  let inlineBlocked = false;
+                  if (mortgageAmount > 0 && selectedProviderId) {
+                    const provider = mortgageProviders.find((p: any) => p.id === selectedProviderId);
+                    if (provider) {
+                      const providerBaseRate = (providerRates[provider.id] ?? provider.baseRate) + currentMarketRate - baseMarketRate;
+                      const elig = calculateMortgageEligibility({
+                        creditScore, loanAmount: mortgageAmount, propertyValue: property.price,
+                        propertyMonthlyRent: property.monthlyIncome, providerBaseRate,
+                        providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
+                        providerId: provider.id, termYears: parseInt(mortgageTermYears), mortgageType,
+                        existingMonthlyMortgagePayments, totalRentalIncome, ownedPropertyCount,
+                      });
+                      inlineBlocked = !elig.eligible;
+                    }
+                  }
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        className="w-full bg-gradient-primary hover:opacity-90" 
+                        onClick={handleBuyWithMortgage}
+                        disabled={!canAffordMortgage || isLoading || (mortgageAmount > 0 && !selectedProviderId) || inlineBlocked}
+                      >
+                        {isLoading ? "Buying..." : !canAffordMortgage ? "Not Enough Cash" : inlineBlocked ? "Not Eligible" : "Buy"}
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setShowMortgageOptions(false);
+                          setSelectedProviderId("");
+                          setMortgageTermYears("25");
+                          setMortgageType('repayment');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
