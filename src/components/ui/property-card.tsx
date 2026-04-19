@@ -54,6 +54,13 @@ interface PropertyCardProps {
   conveyancingStatus?: 'buying' | 'selling';
   conveyancingCompletion?: number;
   propertyLTV?: number;
+  // Portfolio context for inline mortgage stress test
+  ownedPropertyCount?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
+  currentMarketRate?: number;
+  baseMarketRate?: number;
+  providerRates?: Record<string, number>;
 }
 
 const PropertyTypeIcon = {
@@ -73,19 +80,22 @@ export const PropertyCard = memo(function PropertyCard({
   onBuy, 
   onSell,
   onSelectTenant,
-  onRemortgage,
   playerCash = 0, 
   creditScore = 600,
   mortgageProviders = [],
   currentTenant,
-  propertyListings = [],
-  removeTenant,
   mortgages = [],
   monthsPlayed = 0,
   isInConveyancing = false,
   conveyancingStatus,
   conveyancingCompletion,
   propertyLTV = 0,
+  ownedPropertyCount = 0,
+  totalRentalIncome = 0,
+  existingMonthlyMortgagePayments = 0,
+  currentMarketRate = 0.05,
+  baseMarketRate = 0.05,
+  providerRates = {},
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
