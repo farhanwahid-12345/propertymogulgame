@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Building2, Calculator, TrendingDown, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { cn } from "@/lib/utils";
 
 interface MortgageManagementProps {
   ownedProperties: Property[];
@@ -18,6 +19,8 @@ interface MortgageManagementProps {
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
+  totalRentalIncome?: number; // pounds
+  existingMonthlyMortgagePayments?: number; // pounds
 }
 
 export function MortgageManagement({ 
@@ -26,7 +29,9 @@ export function MortgageManagement({
   onRefinance, 
   cash, 
   setCash,
-  creditScore = 580
+  creditScore = 580,
+  totalRentalIncome = 0,
+  existingMonthlyMortgagePayments = 0,
 }: MortgageManagementProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -66,11 +71,26 @@ export function MortgageManagement({
     singleLoanAmount[0], adjustedRate, singleTermYears, singleMortgageType
   ) : 0;
 
-  // ICR check preview
-  const icrRatio = selectedProperty && singleMonthlyPayment > 0 
-    ? selectedProperty.monthlyIncome / singleMonthlyPayment 
-    : null;
-  const icrPasses = icrRatio === null || icrRatio >= 1.25;
+  // Centralized portfolio-aware eligibility (125% ICR if 3+ owned, 100% otherwise)
+  const eligibility = (selectedProperty && singleProviderData && singleLoanAmount[0] > 0) ? calculateMortgageEligibility({
+    creditScore,
+    loanAmount: singleLoanAmount[0],
+    propertyValue: selectedProperty.value,
+    propertyMonthlyRent: selectedProperty.monthlyIncome,
+    providerBaseRate: singleProviderData.baseRate,
+    providerMinCreditScore: singleProviderData.minCreditScore,
+    providerMaxLTV: singleProviderData.maxLTV,
+    providerId: singleProviderData.id,
+    termYears: singleTermYears,
+    mortgageType: singleMortgageType,
+    existingMonthlyMortgagePayments,
+    totalRentalIncome,
+    ownedPropertyCount: ownedProperties.length,
+  }) : null;
+  const portfolioMode = ownedProperties.length >= 3;
+  const stressLabel = portfolioMode ? 'Portfolio Stress Test (125%)' : 'Property Stress Test (100%)';
+  const stressThreshold = portfolioMode ? 1.25 : 1.0;
+  const icrPasses = !eligibility || (eligibility.icrRatio !== undefined && eligibility.icrRatio >= stressThreshold);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
