@@ -1178,13 +1178,21 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
         const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
-        const rec: PropertyTenant = { propertyId, tenant, rentMultiplier: tenant.rentMultiplier, startDate: Date.now() };
+        const rec: PropertyTenant = {
+          propertyId,
+          tenant,
+          rentMultiplier: tenant.rentMultiplier,
+          startDate: Date.now(),
+          satisfaction: 80,
+          lastSatisfactionUpdate: prev.monthsPlayed,
+          satisfactionReasons: [],
+        };
         let updatedTenants;
         if (existingIdx >= 0) { updatedTenants = [...prev.tenants]; updatedTenants[existingIdx] = rec; }
         else updatedTenants = [...prev.tenants, rec];
 
         const updatedProps = prev.ownedProperties.map(p =>
-          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed } : p
+          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
         showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo`);
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
