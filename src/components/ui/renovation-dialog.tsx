@@ -298,18 +298,25 @@ export function RenovationDialog({
                   const isSelected = selectedRenovation?.id === renovation.id;
                   const affordable = canAfford(renovation);
                   const inProgress = isInProgress(renovation);
-                  
+                  const ineligible = ineligibilityReason(renovation);
+                  const blocked = !!ineligible || inProgress;
+
+                  // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
+                  const valueLow = Math.round(renovation.valueIncrease * 0.3);
+                  const valueHigh = renovation.valueIncrease;
+                  const valueTypical = Math.round(renovation.valueIncrease * 0.85);
+
                   return (
-                    <Card 
+                    <Card
                       key={renovation.id}
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
                         isSelected && "ring-2 ring-primary",
                         !affordable && "opacity-60",
-                        inProgress && "opacity-40 pointer-events-none",
+                        blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
-                      onClick={() => affordable && !inProgress && setSelectedRenovation(renovation)}
+                      onClick={() => affordable && !blocked && setSelectedRenovation(renovation)}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -322,10 +329,16 @@ export function RenovationDialog({
                           </Badge>
                         </div>
                       </CardHeader>
-                      
+
                       <CardContent className="space-y-3">
                         <p className="text-sm text-muted-foreground">{renovation.description}</p>
-                        
+
+                        {ineligible && (
+                          <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
+                            ⚠️ {ineligible}
+                          </div>
+                        )}
+
                         {inProgress && (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
@@ -335,7 +348,7 @@ export function RenovationDialog({
                             <Progress value={50} className="h-2" />
                           </div>
                         )}
-                        
+
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span>Cost:</span>
@@ -346,26 +359,30 @@ export function RenovationDialog({
                               £{renovation.cost.toLocaleString()}
                             </span>
                           </div>
-                          
+
                           <div className="flex justify-between">
-                            <span>Rent Increase:</span>
+                            <span>Rent +/mo (typical):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.rentIncrease}/mo
+                              +£{renovation.rentIncrease}
                             </span>
                           </div>
-                          
+
                           <div className="flex justify-between">
-                            <span>Value Increase:</span>
+                            <span>Value + (range):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.valueIncrease.toLocaleString()}
+                              £{valueLow.toLocaleString()}–£{valueHigh.toLocaleString()}
                             </span>
                           </div>
-                          
+
+                          <div className="text-[10px] text-muted-foreground italic">
+                            Outcomes vary: typical ≈ £{valueTypical.toLocaleString()}, 5% chance of net loss.
+                          </div>
+
                           <div className="pt-2 border-t">
                             <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>ROI (Annual):</span>
+                              <span>ROI (Annual, expected):</span>
                               <span>
-                                {((renovation.rentIncrease * 12 / renovation.cost) * 100).toFixed(1)}%
+                                {((renovation.rentIncrease * 12 * 0.85 / renovation.cost) * 100).toFixed(1)}%
                               </span>
                             </div>
                           </div>
