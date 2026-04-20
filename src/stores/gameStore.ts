@@ -209,8 +209,17 @@ function migrateState(persisted: any): GameState {
 
   // v3 → v4: add tenantConcerns
   if (persisted._version < 4) {
-    persisted.tenantConcerns = persisted.tenantConcerns || [];
     persisted._version = 4;
+  }
+
+  // v4 → v5: ensure tenantConcerns exists (repairs stale v4 saves missing the field)
+  if (persisted._version < 5) {
+    persisted._version = 5;
+  }
+
+  // Always backfill tenantConcerns regardless of version — defensive against schema drift
+  if (!Array.isArray(persisted.tenantConcerns)) {
+    persisted.tenantConcerns = [];
   }
 
   // Backfill satisfaction on existing tenants (any save version)
