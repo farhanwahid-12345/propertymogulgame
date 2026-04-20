@@ -266,6 +266,14 @@ export function useGameState() {
     store.setEntityType(type);
   }, [store.setEntityType]);
 
+  const resolveTenantConcern = useCallback((concernId: string) => {
+    store.resolveTenantConcern(concernId);
+  }, [store.resolveTenantConcern]);
+
+  const dismissTenantConcern = useCallback((concernId: string) => {
+    store.dismissTenantConcern(concernId);
+  }, [store.dismissTenantConcern]);
+
   // ── Return same shape as old hook ───────────────────────
   return {
     // State values (pounds)
@@ -301,6 +309,7 @@ export function useGameState() {
     conveyancing: store.conveyancing,
     taxRecords: store.taxRecords,
     totalTaxPaid: fromPennies(store.totalTaxPaid),
+    tenantConcerns: store.tenantConcerns || [],
 
     // Derived values
     netWorth: netWorth - totalDebt,
@@ -355,5 +364,7 @@ export function useGameState() {
     acceptBuyerCounter,
     rejectBuyerCounter,
     setEntityType,
+    resolveTenantConcern,
+    dismissTenantConcern,
   };
 }
