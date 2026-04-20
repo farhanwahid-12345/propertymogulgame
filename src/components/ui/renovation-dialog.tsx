@@ -36,6 +36,11 @@ interface RenovationDialogProps {
   playerCash: number;
   onRenovate: (propertyId: string, renovation: RenovationType) => void;
   activeRenovations?: string[]; // IDs of renovations in progress
+  /** Required for conversion / extension gating. */
+  propertyType?: "residential" | "commercial" | "luxury";
+  internalSqft?: number;
+  plotSqft?: number;
+  currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
@@ -217,13 +222,17 @@ const CategoryColors = {
   conversion: "text-amber-300 border-amber-400/30 bg-amber-400/5",
 };
 
-export function RenovationDialog({ 
-  propertyId, 
-  propertyValue, 
-  currentRent, 
-  playerCash, 
+export function RenovationDialog({
+  propertyId,
+  propertyValue,
+  currentRent,
+  playerCash,
   onRenovate,
-  activeRenovations = []
+  activeRenovations = [],
+  propertyType,
+  internalSqft,
+  plotSqft,
+  currentSubtype,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -238,6 +247,26 @@ export function RenovationDialog({
 
   const canAfford = (renovation: RenovationType) => playerCash >= renovation.cost;
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
+
+  /** Returns null if eligible, else a short reason string. */
+  const ineligibilityReason = (r: RenovationType): string | null => {
+    if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
+      return `Only for ${r.allowedTypes.join('/')}`;
+    }
+    if (r.minPropertyValue && propertyValue < r.minPropertyValue) {
+      return `Needs value ≥ £${r.minPropertyValue.toLocaleString()}`;
+    }
+    if (r.minInternalSqft && internalSqft !== undefined && internalSqft < r.minInternalSqft) {
+      return `Needs ${r.minInternalSqft}+ sqft int (have ${internalSqft})`;
+    }
+    if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
+      return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
+    }
+    if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
+      return `Already converted to ${currentSubtype}`;
+    }
+    return null;
+  };
 
   const groupedRenovations = RENOVATION_OPTIONS.reduce((acc, renovation) => {
     if (!acc[renovation.category]) acc[renovation.category] = [];
