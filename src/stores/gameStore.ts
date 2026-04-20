@@ -532,6 +532,82 @@ export const useGameStore = create<GameState & GameActions>()(
         newTenants = satisfactionAdjustedTenants;
         newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
 
+        // ── Tenant concerns: monthly generation + satisfaction decay + auto-resolution ──
+        const CONCERN_TEMPLATES: Array<{ category: import('@/types/game').ConcernCategory; descriptions: string[]; baseCostPct: [number, number]; penalty: number }> = [
+          { category: 'maintenance', descriptions: ['Boiler not heating properly', 'Leaking tap in kitchen', 'Cracked window seal'], baseCostPct: [0.0008, 0.003], penalty: 3 },
+          { category: 'noise', descriptions: ['Noisy neighbours late at night', 'Construction work next door'], baseCostPct: [0.0005, 0.0015], penalty: 2 },
+          { category: 'mould', descriptions: ['Mould appearing in bathroom', 'Damp patch on bedroom wall'], baseCostPct: [0.0015, 0.005], penalty: 5 },
+          { category: 'appliance', descriptions: ['Washing machine stopped working', 'Oven element broken', 'Fridge not cooling'], baseCostPct: [0.001, 0.0035], penalty: 3 },
+          { category: 'safety', descriptions: ['Smoke alarm faulty', 'Loose stair railing', 'Front door lock broken'], baseCostPct: [0.0008, 0.003], penalty: 6 },
+        ];
+
+        const newConcerns: import('@/types/game').TenantConcern[] = [];
+        const existingActiveByProp = new Map<string, number>();
+        prev.tenantConcerns.filter(c => !c.resolvedMonth).forEach(c => {
+          existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
+        });
+
+        newTenants.forEach(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property) return;
+          if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
+
+          let chance = 0.06;
+          if (property.condition === 'dilapidated') chance += 0.06;
+          else if (property.condition === 'premium') chance -= 0.02;
+          if (t.tenant.profile === 'premium') chance += 0.02;
+          else if (t.tenant.profile === 'risky') chance -= 0.04;
+          chance = Math.max(0.005, chance);
+
+          if (Math.random() >= chance) return;
+
+          const tpl = CONCERN_TEMPLATES[Math.floor(Math.random() * CONCERN_TEMPLATES.length)];
+          const desc = tpl.descriptions[Math.floor(Math.random() * tpl.descriptions.length)];
+          const [lo, hi] = tpl.baseCostPct;
+          const pct = lo + Math.random() * (hi - lo);
+          const cost = Math.max(toPennies(150), Math.min(toPennies(3000), Math.round(property.value * pct)));
+          const penaltyMod = t.tenant.profile === 'premium' ? 1 : t.tenant.profile === 'budget' ? 0.7 : 1;
+          newConcerns.push({
+            id: `concern_${newMonthNumber}_${t.propertyId}_${Math.random().toString(36).slice(2, 7)}`,
+            propertyId: t.propertyId,
+            tenantProfile: t.tenant.profile as any,
+            category: tpl.category,
+            description: desc,
+            raisedMonth: newMonthNumber,
+            resolveCost: cost,
+            satisfactionPenaltyIfIgnored: Math.round(tpl.penalty * penaltyMod),
+          });
+          existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
+        });
+
+        if (newConcerns.length > 0) {
+          showToast("New Tenant Concern 🛠️", `${newConcerns.length} new concern${newConcerns.length > 1 ? 's' : ''} raised — check the feed.`);
+        }
+
+        // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
+        let updatedConcerns = [...prev.tenantConcerns, ...newConcerns];
+        const satPenaltyByProp = new Map<string, number>();
+        updatedConcerns = updatedConcerns.map(c => {
+          if (c.resolvedMonth) return c;
+          const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
+          if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
+            return { ...c, resolvedMonth: newMonthNumber };
+          }
+          if (c.raisedMonth < newMonthNumber) {
+            satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
+          }
+          return c;
+        });
+        if (satPenaltyByProp.size > 0) {
+          newTenants = newTenants.map(t => {
+            const pen = satPenaltyByProp.get(t.propertyId);
+            if (!pen) return t;
+            return { ...t, satisfaction: Math.max(0, t.satisfaction - pen) };
+          });
+        }
+        // Trim long-resolved
+        updatedConcerns = updatedConcerns.filter(c => !c.resolvedMonth || (newMonthNumber - c.resolvedMonth) <= 6);
+
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
