@@ -1799,6 +1799,22 @@ export const useGameStore = create<GameState & GameActions>()(
         // Always run migrateState — idempotent and repairs any stale field shape
         return migrateState(persisted);
       },
+      merge: (persistedState: any, currentState) => {
+        // Zustand only calls migrate() on version mismatch; merge() hardens hydration for
+        // malformed current-version saves so missing fields can't blank the app.
+        if (!persistedState || typeof persistedState !== 'object') {
+          return currentState;
+        }
+
+        try {
+          return {
+            ...currentState,
+            ...migrateState(persistedState),
+          };
+        } catch {
+          return currentState;
+        }
+      },
       partialize: (state) => {
         const { clockTick, processMonthEnd, processMarketUpdate, processCounterResponses,
           buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
