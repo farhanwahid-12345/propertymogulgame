@@ -785,13 +785,40 @@ export const useGameStore = create<GameState & GameActions>()(
         completedRenovations.forEach(renovation => {
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
           if (idx >= 0) {
+            // ROI variability roll: realistic outcome distribution
+            //  60% — full uplift  · 25% — under-delivery (×0.7) · 10% — break-even (×0.3) · 5% — net loss (×0)
+            const roll = Math.random();
+            let valueMult = 1.0, rentMult = 1.0, outcomeNote = '';
+            if (roll < 0.60) { outcomeNote = 'on spec'; }
+            else if (roll < 0.85) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'under-delivered'; }
+            else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
+            else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
+
+            const actualValueGain = Math.round(toPennies(renovation.type.valueIncrease) * valueMult);
+            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult);
+
+            const subtypeUpdate = (renovation.type as any).resultingSubtype
+              ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
+              : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
-              value: updatedProperties[idx].value + toPennies(renovation.type.valueIncrease),
-              monthlyIncome: updatedProperties[idx].monthlyIncome + toPennies(renovation.type.rentIncrease),
-              monthsSinceLastRenovation: 0, // Reset depreciation timer
+              value: updatedProperties[idx].value + actualValueGain,
+              marketValue: (updatedProperties[idx].marketValue || updatedProperties[idx].value) + actualValueGain,
+              monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
+              baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
+              monthsSinceLastRenovation: 0,
+              ...subtypeUpdate,
             };
-            showToast("Renovation Complete!", `${renovation.type.name} finished on ${updatedProperties[idx].name}!`);
+            const expectedValue = renovation.type.valueIncrease;
+            const actualValuePounds = fromPennies(actualValueGain);
+            showToast(
+              `Renovation Complete (${outcomeNote})!`,
+              valueMult === 1
+                ? `${renovation.type.name} on ${updatedProperties[idx].name} delivered the full +£${expectedValue.toLocaleString()} uplift.`
+                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`,
+              valueMult === 0 ? 'destructive' : undefined,
+            );
           }
         });
 
