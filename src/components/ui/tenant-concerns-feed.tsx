@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wrench, Volume2, Droplets, Plug, ShieldAlert, Smile } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { fromPennies } from "@/lib/formatCurrency";
 import type { TenantConcern } from "@/types/game";
 import type { Property } from "@/types/game";

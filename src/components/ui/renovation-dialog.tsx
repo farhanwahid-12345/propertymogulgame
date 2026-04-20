@@ -11,12 +11,22 @@ export interface RenovationType {
   id: string;
   name: string;
   cost: number;
-  rentIncrease: number; // Monthly rent increase
-  valueIncrease: number; // Property value increase
+  rentIncrease: number; // Monthly rent increase (typical/expected)
+  valueIncrease: number; // Property value increase (typical/expected)
   duration: number; // Days to complete
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  category: "maintenance" | "improvement" | "extension";
+  category: "maintenance" | "improvement" | "extension" | "conversion";
+  /** Minimum internal sqft required to start this renovation. */
+  minInternalSqft?: number;
+  /** Minimum plot sqft required (e.g. extensions need garden). */
+  minPlotSqft?: number;
+  /** Allowed property types — defaults to all when omitted. */
+  allowedTypes?: Array<"residential" | "commercial" | "luxury">;
+  /** Minimum property value (pounds). */
+  minPropertyValue?: number;
+  /** Subtype set on completion (HMO, flats, etc.). */
+  resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 interface RenovationDialogProps {
