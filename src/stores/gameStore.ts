@@ -86,6 +86,9 @@ interface GameActions {
   // Market management
   removeAuctionProperty: (propertyId: string) => void;
   replenishMarket: () => void;
+  // Tenant concerns
+  resolveTenantConcern: (concernId: string) => void;
+  dismissTenantConcern: (concernId: string) => void;
   // Game
   resetGame: () => void;
 }
@@ -94,7 +97,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 3,
+    _version: 4,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -129,6 +132,7 @@ function createInitialState(): GameState {
     tenantEvents: [],
     taxRecords: [],
     totalTaxPaid: 0,
+    tenantConcerns: [],
   };
 }
 
@@ -199,6 +203,12 @@ function migrateState(persisted: any): GameState {
       persisted.creditScore = 750;
     }
     persisted._version = 3;
+  }
+
+  // v3 → v4: add tenantConcerns
+  if (persisted._version < 4) {
+    persisted.tenantConcerns = persisted.tenantConcerns || [];
+    persisted._version = 4;
   }
 
   // Backfill satisfaction on existing tenants (any save version)
@@ -306,7 +316,9 @@ export const useGameStore = create<GameState & GameActions>()(
             : (prop.value > 0 ? Math.floor((prop.value * (effectiveYield / 100)) / 12) : 0);
           const purchased: Property = {
             ...prop, owned: true, price: conv.purchasePrice || prop.price,
-            marketValue: prop.value, yield: effectiveYield,
+            // Settling-in: marketValue is at-least the purchase price so fees don't show as instant paper loss
+            marketValue: Math.max(prop.value, conv.purchasePrice || prop.price),
+            yield: effectiveYield,
             monthlyIncome: effectiveRent,
             lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
           };
@@ -1615,6 +1627,35 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ auctionProperties: auctions, estateAgentProperties: estate });
       },
 
+      // ─── TENANT CONCERNS ───────────────────
+      resolveTenantConcern: (concernId) => {
+        const prev = get();
+        const concern = prev.tenantConcerns.find(c => c.id === concernId && !c.resolvedMonth);
+        if (!concern) return;
+        if (prev.cash < concern.resolveCost) {
+          showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} to resolve.`, "destructive");
+          return;
+        }
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === concern.propertyId
+            ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
+            : t
+        );
+        showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+        set({
+          cash: prev.cash - concern.resolveCost,
+          tenants: updatedTenants,
+          tenantConcerns: prev.tenantConcerns.map(c =>
+            c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
+          ),
+        });
+      },
+
+      dismissTenantConcern: (concernId) => {
+        // "Snooze" — keep in feed; satisfaction will decay each month it remains unresolved
+        showToast("Concern Snoozed", "It'll keep nagging until resolved.");
+      },
+
       // ─── RESET ─────────────────────────────
       resetGame: () => {
         const fresh = createInitialState();
@@ -1625,9 +1666,9 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 3,
+      version: 4,
       migrate: (persisted: any, version: number) => {
-        if (version < 3) return migrateState(persisted);
+        if (version < 4) return migrateState(persisted);
         return persisted;
       },
       partialize: (state) => {
@@ -1639,6 +1680,7 @@ export const useGameStore = create<GameState & GameActions>()(
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
+          resolveTenantConcern, dismissTenantConcern,
           ...data } = state;
         return data;
       },

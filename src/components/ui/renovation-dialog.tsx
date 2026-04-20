@@ -11,12 +11,22 @@ export interface RenovationType {
   id: string;
   name: string;
   cost: number;
-  rentIncrease: number; // Monthly rent increase
-  valueIncrease: number; // Property value increase
+  rentIncrease: number; // Monthly rent increase (typical/expected)
+  valueIncrease: number; // Property value increase (typical/expected)
   duration: number; // Days to complete
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  category: "maintenance" | "improvement" | "extension";
+  category: "maintenance" | "improvement" | "extension" | "conversion";
+  /** Minimum internal sqft required to start this renovation. */
+  minInternalSqft?: number;
+  /** Minimum plot sqft required (e.g. extensions need garden). */
+  minPlotSqft?: number;
+  /** Allowed property types — defaults to all when omitted. */
+  allowedTypes?: Array<"residential" | "commercial" | "luxury">;
+  /** Minimum property value (pounds). */
+  minPropertyValue?: number;
+  /** Subtype set on completion (HMO, flats, etc.). */
+  resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 interface RenovationDialogProps {
@@ -26,6 +36,11 @@ interface RenovationDialogProps {
   playerCash: number;
   onRenovate: (propertyId: string, renovation: RenovationType) => void;
   activeRenovations?: string[]; // IDs of renovations in progress
+  /** Required for conversion / extension gating. */
+  propertyType?: "residential" | "commercial" | "luxury";
+  internalSqft?: number;
+  plotSqft?: number;
+  currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
@@ -109,18 +124,22 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 45,
     description: "Convert loft space into additional bedroom",
     icon: Plus,
-    category: "extension"
+    category: "extension",
+    minInternalSqft: 700,
+    allowedTypes: ["residential", "luxury"],
   },
   {
     id: "rear_extension",
-    name: "Single-Story Extension", 
+    name: "Single-Story Extension",
     cost: 25000,
     rentIncrease: 450,
     valueIncrease: 35000,
     duration: 60,
     description: "Add extra room to rear of property",
     icon: Plus,
-    category: "extension"
+    category: "extension",
+    minPlotSqft: 2200,
+    allowedTypes: ["residential", "luxury"],
   },
   {
     id: "conservatory",
@@ -131,23 +150,89 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 30,
     description: "Glass conservatory extension",
     icon: Plus,
-    category: "extension"
-  }
+    category: "extension",
+    minPlotSqft: 1800,
+    allowedTypes: ["residential", "luxury"],
+  },
+
+  // Conversions — change the property's character/use
+  {
+    id: "convert_hmo_4",
+    name: "Convert to HMO (4-bed)",
+    cost: 18000,
+    rentIncrease: 600,
+    valueIncrease: 8000,
+    duration: 60,
+    description: "License & remodel into a 4-bed shared house. Higher rent, more management.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minPropertyValue: 80000,
+    minInternalSqft: 850,
+    resultingSubtype: "hmo",
+  },
+  {
+    id: "convert_hmo_6",
+    name: "Convert to HMO (6-bed)",
+    cost: 35000,
+    rentIncrease: 1100,
+    valueIncrease: 15000,
+    duration: 90,
+    description: "Larger HMO with 6 lettable rooms.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minPropertyValue: 120000,
+    minInternalSqft: 1300,
+    resultingSubtype: "hmo",
+  },
+  {
+    id: "convert_flats",
+    name: "Convert to Flats (2 units)",
+    cost: 55000,
+    rentIncrease: 900,
+    valueIncrease: 40000,
+    duration: 120,
+    description: "Split into two self-contained flats with separate entrances.",
+    icon: Plus,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minInternalSqft: 1400,
+    resultingSubtype: "flats",
+  },
+  {
+    id: "convert_commercial_to_residential",
+    name: "Commercial → Residential",
+    cost: 40000,
+    rentIncrease: 500,
+    valueIncrease: 25000,
+    duration: 90,
+    description: "Change-of-use from retail/office into a residential let.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["commercial"],
+    resultingSubtype: "standard",
+  },
 ];
 
 const CategoryColors = {
   maintenance: "text-secondary border-secondary/20 bg-secondary/5",
   improvement: "text-primary border-primary/20 bg-primary/5",
-  extension: "text-luxury border-luxury/20 bg-luxury/5"
+  extension: "text-luxury border-luxury/20 bg-luxury/5",
+  conversion: "text-amber-300 border-amber-400/30 bg-amber-400/5",
 };
 
-export function RenovationDialog({ 
-  propertyId, 
-  propertyValue, 
-  currentRent, 
-  playerCash, 
+export function RenovationDialog({
+  propertyId,
+  propertyValue,
+  currentRent,
+  playerCash,
   onRenovate,
-  activeRenovations = []
+  activeRenovations = [],
+  propertyType,
+  internalSqft,
+  plotSqft,
+  currentSubtype,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -162,6 +247,26 @@ export function RenovationDialog({
 
   const canAfford = (renovation: RenovationType) => playerCash >= renovation.cost;
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
+
+  /** Returns null if eligible, else a short reason string. */
+  const ineligibilityReason = (r: RenovationType): string | null => {
+    if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
+      return `Only for ${r.allowedTypes.join('/')}`;
+    }
+    if (r.minPropertyValue && propertyValue < r.minPropertyValue) {
+      return `Needs value ≥ £${r.minPropertyValue.toLocaleString()}`;
+    }
+    if (r.minInternalSqft && internalSqft !== undefined && internalSqft < r.minInternalSqft) {
+      return `Needs ${r.minInternalSqft}+ sqft int (have ${internalSqft})`;
+    }
+    if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
+      return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
+    }
+    if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
+      return `Already converted to ${currentSubtype}`;
+    }
+    return null;
+  };
 
   const groupedRenovations = RENOVATION_OPTIONS.reduce((acc, renovation) => {
     if (!acc[renovation.category]) acc[renovation.category] = [];
@@ -193,18 +298,25 @@ export function RenovationDialog({
                   const isSelected = selectedRenovation?.id === renovation.id;
                   const affordable = canAfford(renovation);
                   const inProgress = isInProgress(renovation);
-                  
+                  const ineligible = ineligibilityReason(renovation);
+                  const blocked = !!ineligible || inProgress;
+
+                  // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
+                  const valueLow = Math.round(renovation.valueIncrease * 0.3);
+                  const valueHigh = renovation.valueIncrease;
+                  const valueTypical = Math.round(renovation.valueIncrease * 0.85);
+
                   return (
-                    <Card 
+                    <Card
                       key={renovation.id}
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
                         isSelected && "ring-2 ring-primary",
                         !affordable && "opacity-60",
-                        inProgress && "opacity-40 pointer-events-none",
+                        blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
-                      onClick={() => affordable && !inProgress && setSelectedRenovation(renovation)}
+                      onClick={() => affordable && !blocked && setSelectedRenovation(renovation)}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
@@ -217,10 +329,16 @@ export function RenovationDialog({
                           </Badge>
                         </div>
                       </CardHeader>
-                      
+
                       <CardContent className="space-y-3">
                         <p className="text-sm text-muted-foreground">{renovation.description}</p>
-                        
+
+                        {ineligible && (
+                          <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
+                            ⚠️ {ineligible}
+                          </div>
+                        )}
+
                         {inProgress && (
                           <div className="space-y-1">
                             <div className="flex justify-between text-xs">
@@ -230,7 +348,7 @@ export function RenovationDialog({
                             <Progress value={50} className="h-2" />
                           </div>
                         )}
-                        
+
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span>Cost:</span>
@@ -241,26 +359,30 @@ export function RenovationDialog({
                               £{renovation.cost.toLocaleString()}
                             </span>
                           </div>
-                          
+
                           <div className="flex justify-between">
-                            <span>Rent Increase:</span>
+                            <span>Rent +/mo (typical):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.rentIncrease}/mo
+                              +£{renovation.rentIncrease}
                             </span>
                           </div>
-                          
+
                           <div className="flex justify-between">
-                            <span>Value Increase:</span>
+                            <span>Value + (range):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.valueIncrease.toLocaleString()}
+                              £{valueLow.toLocaleString()}–£{valueHigh.toLocaleString()}
                             </span>
                           </div>
-                          
+
+                          <div className="text-[10px] text-muted-foreground italic">
+                            Outcomes vary: typical ≈ £{valueTypical.toLocaleString()}, 5% chance of net loss.
+                          </div>
+
                           <div className="pt-2 border-t">
                             <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>ROI (Annual):</span>
+                              <span>ROI (Annual, expected):</span>
                               <span>
-                                {((renovation.rentIncrease * 12 / renovation.cost) * 100).toFixed(1)}%
+                                {((renovation.rentIncrease * 12 * 0.85 / renovation.cost) * 100).toFixed(1)}%
                               </span>
                             </div>
                           </div>

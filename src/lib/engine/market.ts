@@ -27,6 +27,19 @@ export function generateRandomProperty(level: number): Property {
   const conditionRoll = Math.random();
   const condition = conditionRoll < 0.2 ? 'dilapidated' as const : conditionRoll < 0.85 ? 'standard' as const : 'premium' as const;
 
+  // Sqft generation by type
+  let internalSqft: number, plotSqft: number;
+  if (type === 'commercial') {
+    internalSqft = Math.round(800 + Math.random() * 3200);
+    plotSqft = Math.round(internalSqft * 1.2);
+  } else if (type === 'luxury') {
+    internalSqft = Math.round(1500 + Math.random() * 3500);
+    plotSqft = Math.round(5000 + Math.random() * 15000);
+  } else {
+    internalSqft = Math.round(500 + Math.random() * 1300);
+    plotSqft = Math.round(1500 + Math.random() * 4500);
+  }
+
   return {
     id,
     name: `${houseNumber} ${streetName}`,
@@ -41,5 +54,25 @@ export function generateRandomProperty(level: number): Property {
     lastRentIncrease: 0,
     condition,
     monthsSinceLastRenovation: 0,
+    internalSqft,
+    plotSqft,
+    subtype: 'standard',
   };
+}
+
+/** Derive plausible sqft for legacy properties that don't have it stored. */
+export function deriveSqft(p: { type: 'residential' | 'commercial' | 'luxury'; value: number; internalSqft?: number; plotSqft?: number }): { internalSqft: number; plotSqft: number } {
+  if (p.internalSqft && p.plotSqft) return { internalSqft: p.internalSqft, plotSqft: p.plotSqft };
+  // Use value as a rough proxy (pennies → pounds → sqft band)
+  const valuePounds = p.value / 100;
+  if (p.type === 'commercial') {
+    const internal = Math.round(800 + (valuePounds / 350) ); // gentle scaling
+    return { internalSqft: Math.min(4000, Math.max(800, internal)), plotSqft: Math.round(Math.min(4000, Math.max(800, internal)) * 1.2) };
+  }
+  if (p.type === 'luxury') {
+    const internal = Math.round(1500 + (valuePounds / 200));
+    return { internalSqft: Math.min(5000, Math.max(1500, internal)), plotSqft: Math.round(5000 + (valuePounds / 80)) };
+  }
+  const internal = Math.round(500 + (valuePounds / 150));
+  return { internalSqft: Math.min(1800, Math.max(500, internal)), plotSqft: Math.round(1500 + (valuePounds / 50)) };
 }

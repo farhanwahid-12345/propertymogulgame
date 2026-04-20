@@ -53,6 +53,25 @@ export interface Property {
   // Condition & depreciation
   condition: PropertyCondition;
   monthsSinceLastRenovation: number;
+  // Sizing — optional on legacy entries, derived on display when missing
+  internalSqft?: number;
+  plotSqft?: number;
+  // Conversion subtype set by post-purchase renovations
+  subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+}
+
+// Tenant concerns — issues raised that decay satisfaction if ignored
+export type ConcernCategory = 'maintenance' | 'noise' | 'mould' | 'appliance' | 'safety';
+export interface TenantConcern {
+  id: string;
+  propertyId: string;
+  tenantProfile: 'premium' | 'standard' | 'budget' | 'risky';
+  category: ConcernCategory;
+  description: string;
+  raisedMonth: number;
+  resolveCost: number; // pennies
+  satisfactionPenaltyIfIgnored: number; // -X per month unresolved
+  resolvedMonth?: number;
 }
 
 export interface MortgageProvider {
@@ -216,7 +235,9 @@ export interface GameState {
   // Tax
   taxRecords: TaxRecord[];
   totalTaxPaid: number; // pennies - lifetime
+  // Tenant concerns
+  tenantConcerns: TenantConcern[];
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
