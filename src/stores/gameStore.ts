@@ -597,7 +597,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
-        let updatedConcerns = [...prev.tenantConcerns, ...newConcerns];
+        let updatedConcerns = [...prevConcerns, ...newConcerns];
         const satPenaltyByProp = new Map<string, number>();
         updatedConcerns = updatedConcerns.map(c => {
           if (c.resolvedMonth) return c;
