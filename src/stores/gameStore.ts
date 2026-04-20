@@ -1757,7 +1757,8 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── TENANT CONCERNS ───────────────────
       resolveTenantConcern: (concernId) => {
         const prev = get();
-        const concern = prev.tenantConcerns.find(c => c.id === concernId && !c.resolvedMonth);
+        const concerns = prev.tenantConcerns || [];
+        const concern = concerns.find(c => c.id === concernId && !c.resolvedMonth);
         if (!concern) return;
         if (prev.cash < concern.resolveCost) {
           showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} to resolve.`, "destructive");
@@ -1772,7 +1773,7 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           cash: prev.cash - concern.resolveCost,
           tenants: updatedTenants,
-          tenantConcerns: prev.tenantConcerns.map(c =>
+          tenantConcerns: concerns.map(c =>
             c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
           ),
         });
