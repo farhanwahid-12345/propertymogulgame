@@ -86,6 +86,9 @@ interface GameActions {
   // Market management
   removeAuctionProperty: (propertyId: string) => void;
   replenishMarket: () => void;
+  // Tenant concerns
+  resolveTenantConcern: (concernId: string) => void;
+  dismissTenantConcern: (concernId: string) => void;
   // Game
   resetGame: () => void;
 }
@@ -313,7 +316,9 @@ export const useGameStore = create<GameState & GameActions>()(
             : (prop.value > 0 ? Math.floor((prop.value * (effectiveYield / 100)) / 12) : 0);
           const purchased: Property = {
             ...prop, owned: true, price: conv.purchasePrice || prop.price,
-            marketValue: prop.value, yield: effectiveYield,
+            // Settling-in: marketValue is at-least the purchase price so fees don't show as instant paper loss
+            marketValue: Math.max(prop.value, conv.purchasePrice || prop.price),
+            yield: effectiveYield,
             monthlyIncome: effectiveRent,
             lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
           };
