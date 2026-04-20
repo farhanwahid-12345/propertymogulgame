@@ -32,6 +32,9 @@ export interface Property {
   lastTenantChange?: number;
   condition: "dilapidated" | "standard" | "premium";
   monthsSinceLastRenovation: number;
+  internalSqft?: number;
+  plotSqft?: number;
+  subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 interface PropertyCardProps {
@@ -62,6 +65,8 @@ interface PropertyCardProps {
   conveyancingStatus?: 'buying' | 'selling';
   conveyancingCompletion?: number;
   propertyLTV?: number;
+  /** Number of active (unresolved) tenant concerns for this property. */
+  activeConcernCount?: number;
   // Portfolio context for inline mortgage stress test
   ownedPropertyCount?: number;
   totalRentalIncome?: number; // pounds
