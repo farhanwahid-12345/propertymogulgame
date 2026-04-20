@@ -1792,10 +1792,10 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 4,
-      migrate: (persisted: any, version: number) => {
-        if (version < 4) return migrateState(persisted);
-        return persisted;
+      version: 5,
+      migrate: (persisted: any, _version: number) => {
+        // Always run migrateState — idempotent and repairs any stale field shape
+        return migrateState(persisted);
       },
       partialize: (state) => {
         const { clockTick, processMonthEnd, processMarketUpdate, processCounterResponses,
