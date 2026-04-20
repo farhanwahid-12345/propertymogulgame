@@ -140,6 +140,8 @@ function createInitialState(): GameState {
 
 // ─── Save migration ───────────────────────────────────────
 function migrateState(persisted: any): GameState {
+  const initial = createInitialState();
+
   // v1 (or no version) = pounds; v2 = pennies
   if (!persisted._version || persisted._version < 2) {
     const moneyFields = ['cash', 'overdraftLimit', 'overdraftUsed', 'yearlyNetProfit'];
@@ -222,6 +224,23 @@ function migrateState(persisted: any): GameState {
     persisted.tenantConcerns = [];
   }
 
+  const arrayKeys: Array<keyof GameState> = [
+    'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
+    'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
+    'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
+    'taxRecords', 'tenantConcerns',
+  ];
+
+  arrayKeys.forEach((key) => {
+    if (!Array.isArray(persisted[key])) {
+      persisted[key] = initial[key];
+    }
+  });
+
+  if (!persisted.mortgageProviderRates || typeof persisted.mortgageProviderRates !== 'object' || Array.isArray(persisted.mortgageProviderRates)) {
+    persisted.mortgageProviderRates = initial.mortgageProviderRates;
+  }
+
   // Backfill satisfaction on existing tenants (any save version)
   if (Array.isArray(persisted.tenants)) {
     persisted.tenants = persisted.tenants.map((t: any) => ({
@@ -240,7 +259,6 @@ function migrateState(persisted: any): GameState {
     persisted.auctionProperties = AVAILABLE_PROPERTIES.filter((p: Property) => persisted.auctionPropertyIds.includes(p.id));
   }
 
-  const initial = createInitialState();
   return { ...initial, ...persisted };
 }
 
