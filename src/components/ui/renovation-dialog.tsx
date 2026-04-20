@@ -119,18 +119,22 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 45,
     description: "Convert loft space into additional bedroom",
     icon: Plus,
-    category: "extension"
+    category: "extension",
+    minInternalSqft: 700,
+    allowedTypes: ["residential", "luxury"],
   },
   {
     id: "rear_extension",
-    name: "Single-Story Extension", 
+    name: "Single-Story Extension",
     cost: 25000,
     rentIncrease: 450,
     valueIncrease: 35000,
     duration: 60,
     description: "Add extra room to rear of property",
     icon: Plus,
-    category: "extension"
+    category: "extension",
+    minPlotSqft: 2200,
+    allowedTypes: ["residential", "luxury"],
   },
   {
     id: "conservatory",
@@ -141,14 +145,76 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 30,
     description: "Glass conservatory extension",
     icon: Plus,
-    category: "extension"
-  }
+    category: "extension",
+    minPlotSqft: 1800,
+    allowedTypes: ["residential", "luxury"],
+  },
+
+  // Conversions — change the property's character/use
+  {
+    id: "convert_hmo_4",
+    name: "Convert to HMO (4-bed)",
+    cost: 18000,
+    rentIncrease: 600,
+    valueIncrease: 8000,
+    duration: 60,
+    description: "License & remodel into a 4-bed shared house. Higher rent, more management.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minPropertyValue: 80000,
+    minInternalSqft: 850,
+    resultingSubtype: "hmo",
+  },
+  {
+    id: "convert_hmo_6",
+    name: "Convert to HMO (6-bed)",
+    cost: 35000,
+    rentIncrease: 1100,
+    valueIncrease: 15000,
+    duration: 90,
+    description: "Larger HMO with 6 lettable rooms.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minPropertyValue: 120000,
+    minInternalSqft: 1300,
+    resultingSubtype: "hmo",
+  },
+  {
+    id: "convert_flats",
+    name: "Convert to Flats (2 units)",
+    cost: 55000,
+    rentIncrease: 900,
+    valueIncrease: 40000,
+    duration: 120,
+    description: "Split into two self-contained flats with separate entrances.",
+    icon: Plus,
+    category: "conversion",
+    allowedTypes: ["residential"],
+    minInternalSqft: 1400,
+    resultingSubtype: "flats",
+  },
+  {
+    id: "convert_commercial_to_residential",
+    name: "Commercial → Residential",
+    cost: 40000,
+    rentIncrease: 500,
+    valueIncrease: 25000,
+    duration: 90,
+    description: "Change-of-use from retail/office into a residential let.",
+    icon: Home,
+    category: "conversion",
+    allowedTypes: ["commercial"],
+    resultingSubtype: "standard",
+  },
 ];
 
 const CategoryColors = {
   maintenance: "text-secondary border-secondary/20 bg-secondary/5",
   improvement: "text-primary border-primary/20 bg-primary/5",
-  extension: "text-luxury border-luxury/20 bg-luxury/5"
+  extension: "text-luxury border-luxury/20 bg-luxury/5",
+  conversion: "text-amber-300 border-amber-400/30 bg-amber-400/5",
 };
 
 export function RenovationDialog({ 
