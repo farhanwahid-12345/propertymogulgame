@@ -94,7 +94,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 3,
+    _version: 4,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -129,6 +129,7 @@ function createInitialState(): GameState {
     tenantEvents: [],
     taxRecords: [],
     totalTaxPaid: 0,
+    tenantConcerns: [],
   };
 }
 
@@ -199,6 +200,12 @@ function migrateState(persisted: any): GameState {
       persisted.creditScore = 750;
     }
     persisted._version = 3;
+  }
+
+  // v3 → v4: add tenantConcerns
+  if (persisted._version < 4) {
+    persisted.tenantConcerns = persisted.tenantConcerns || [];
+    persisted._version = 4;
   }
 
   // Backfill satisfaction on existing tenants (any save version)
