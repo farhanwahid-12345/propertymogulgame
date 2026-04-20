@@ -532,6 +532,82 @@ export const useGameStore = create<GameState & GameActions>()(
         newTenants = satisfactionAdjustedTenants;
         newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
 
+        // ── Tenant concerns: monthly generation + satisfaction decay + auto-resolution ──
+        const CONCERN_TEMPLATES: Array<{ category: import('@/types/game').ConcernCategory; descriptions: string[]; baseCostPct: [number, number]; penalty: number }> = [
+          { category: 'maintenance', descriptions: ['Boiler not heating properly', 'Leaking tap in kitchen', 'Cracked window seal'], baseCostPct: [0.0008, 0.003], penalty: 3 },
+          { category: 'noise', descriptions: ['Noisy neighbours late at night', 'Construction work next door'], baseCostPct: [0.0005, 0.0015], penalty: 2 },
+          { category: 'mould', descriptions: ['Mould appearing in bathroom', 'Damp patch on bedroom wall'], baseCostPct: [0.0015, 0.005], penalty: 5 },
+          { category: 'appliance', descriptions: ['Washing machine stopped working', 'Oven element broken', 'Fridge not cooling'], baseCostPct: [0.001, 0.0035], penalty: 3 },
+          { category: 'safety', descriptions: ['Smoke alarm faulty', 'Loose stair railing', 'Front door lock broken'], baseCostPct: [0.0008, 0.003], penalty: 6 },
+        ];
+
+        const newConcerns: import('@/types/game').TenantConcern[] = [];
+        const existingActiveByProp = new Map<string, number>();
+        prev.tenantConcerns.filter(c => !c.resolvedMonth).forEach(c => {
+          existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
+        });
+
+        newTenants.forEach(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property) return;
+          if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
+
+          let chance = 0.06;
+          if (property.condition === 'dilapidated') chance += 0.06;
+          else if (property.condition === 'premium') chance -= 0.02;
+          if (t.tenant.profile === 'premium') chance += 0.02;
+          else if (t.tenant.profile === 'risky') chance -= 0.04;
+          chance = Math.max(0.005, chance);
+
+          if (Math.random() >= chance) return;
+
+          const tpl = CONCERN_TEMPLATES[Math.floor(Math.random() * CONCERN_TEMPLATES.length)];
+          const desc = tpl.descriptions[Math.floor(Math.random() * tpl.descriptions.length)];
+          const [lo, hi] = tpl.baseCostPct;
+          const pct = lo + Math.random() * (hi - lo);
+          const cost = Math.max(toPennies(150), Math.min(toPennies(3000), Math.round(property.value * pct)));
+          const penaltyMod = t.tenant.profile === 'premium' ? 1 : t.tenant.profile === 'budget' ? 0.7 : 1;
+          newConcerns.push({
+            id: `concern_${newMonthNumber}_${t.propertyId}_${Math.random().toString(36).slice(2, 7)}`,
+            propertyId: t.propertyId,
+            tenantProfile: t.tenant.profile as any,
+            category: tpl.category,
+            description: desc,
+            raisedMonth: newMonthNumber,
+            resolveCost: cost,
+            satisfactionPenaltyIfIgnored: Math.round(tpl.penalty * penaltyMod),
+          });
+          existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
+        });
+
+        if (newConcerns.length > 0) {
+          showToast("New Tenant Concern 🛠️", `${newConcerns.length} new concern${newConcerns.length > 1 ? 's' : ''} raised — check the feed.`);
+        }
+
+        // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
+        let updatedConcerns = [...prev.tenantConcerns, ...newConcerns];
+        const satPenaltyByProp = new Map<string, number>();
+        updatedConcerns = updatedConcerns.map(c => {
+          if (c.resolvedMonth) return c;
+          const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
+          if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
+            return { ...c, resolvedMonth: newMonthNumber };
+          }
+          if (c.raisedMonth < newMonthNumber) {
+            satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
+          }
+          return c;
+        });
+        if (satPenaltyByProp.size > 0) {
+          newTenants = newTenants.map(t => {
+            const pen = satPenaltyByProp.get(t.propertyId);
+            if (!pen) return t;
+            return { ...t, satisfaction: Math.max(0, t.satisfaction - pen) };
+          });
+        }
+        // Trim long-resolved
+        updatedConcerns = updatedConcerns.filter(c => !c.resolvedMonth || (newMonthNumber - c.resolvedMonth) <= 6);
+
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
@@ -550,24 +626,35 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Level Up!", `Congratulations! You reached level ${newLevel}!`);
         }
 
-        // Annual property growth (every 12 months)
+        // ── Monthly property value drift (~5.5%/yr nominal w/ occasional dips) ──
+        // Replaces the old once-yearly 2-4% bump. Long-run trend is gentle and upward,
+        // so freshly-bought properties don't show losses immediately after fees.
+        updatedOwnedProperties = updatedOwnedProperties.map(property => {
+          const monthlyDrift = 0.0045 + (Math.random() - 0.5) * 0.004; // ~0.25%–0.65%
+          const isDip = Math.random() < 0.015;
+          const change = isDip ? -(0.005 + Math.random() * 0.01) : monthlyDrift;
+          return {
+            ...property,
+            value: Math.round(property.value * (1 + change)),
+            marketValue: Math.round((property.marketValue || property.value) * (1 + change)),
+          };
+        });
+
+        // Annual rent uplift (kept on its own yearly schedule)
         let newLastYearlyGrowth = prev.lastYearlyGrowth;
         if (newMonthNumber > 0 && newMonthNumber % 12 === 0 && newMonthNumber !== prev.lastYearlyGrowth) {
-          const annualGrowthRate = 0.02 + Math.random() * 0.04;
           const rentIncreaseRate = 0.03;
           updatedOwnedProperties = updatedOwnedProperties.map(property => {
             const newBaseRent = Math.floor((property.baseRent || property.monthlyIncome) * (1 + rentIncreaseRate));
             return {
               ...property,
-              value: Math.round(property.value * (1 + annualGrowthRate)),
-              marketValue: Math.round((property.marketValue || property.value) * (1 + annualGrowthRate)),
               monthlyIncome: Math.floor(property.monthlyIncome * (1 + rentIncreaseRate)),
               baseRent: newBaseRent,
               lastRentIncrease: newMonthNumber,
             };
           });
           newLastYearlyGrowth = newMonthNumber;
-          showToast("Annual Property Growth!", `Properties increased in value and rents increased by 3%`);
+          showToast("Annual Rent Uplift!", `Rents increased by 3% across your portfolio.`);
         }
 
         // Fluctuate provider rates
@@ -681,6 +768,7 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyListings: newPropertyListings,
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
+          tenantConcerns: updatedConcerns,
         });
       },
 
@@ -697,13 +785,40 @@ export const useGameStore = create<GameState & GameActions>()(
         completedRenovations.forEach(renovation => {
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
           if (idx >= 0) {
+            // ROI variability roll: realistic outcome distribution
+            //  60% — full uplift  · 25% — under-delivery (×0.7) · 10% — break-even (×0.3) · 5% — net loss (×0)
+            const roll = Math.random();
+            let valueMult = 1.0, rentMult = 1.0, outcomeNote = '';
+            if (roll < 0.60) { outcomeNote = 'on spec'; }
+            else if (roll < 0.85) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'under-delivered'; }
+            else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
+            else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
+
+            const actualValueGain = Math.round(toPennies(renovation.type.valueIncrease) * valueMult);
+            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult);
+
+            const subtypeUpdate = (renovation.type as any).resultingSubtype
+              ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
+              : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
-              value: updatedProperties[idx].value + toPennies(renovation.type.valueIncrease),
-              monthlyIncome: updatedProperties[idx].monthlyIncome + toPennies(renovation.type.rentIncrease),
-              monthsSinceLastRenovation: 0, // Reset depreciation timer
+              value: updatedProperties[idx].value + actualValueGain,
+              marketValue: (updatedProperties[idx].marketValue || updatedProperties[idx].value) + actualValueGain,
+              monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
+              baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
+              monthsSinceLastRenovation: 0,
+              ...subtypeUpdate,
             };
-            showToast("Renovation Complete!", `${renovation.type.name} finished on ${updatedProperties[idx].name}!`);
+            const expectedValue = renovation.type.valueIncrease;
+            const actualValuePounds = fromPennies(actualValueGain);
+            showToast(
+              `Renovation Complete (${outcomeNote})!`,
+              valueMult === 1
+                ? `${renovation.type.name} on ${updatedProperties[idx].name} delivered the full +£${expectedValue.toLocaleString()} uplift.`
+                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`,
+              valueMult === 0 ? 'destructive' : undefined,
+            );
           }
         });
 

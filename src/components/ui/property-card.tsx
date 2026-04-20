@@ -32,6 +32,9 @@ export interface Property {
   lastTenantChange?: number;
   condition: "dilapidated" | "standard" | "premium";
   monthsSinceLastRenovation: number;
+  internalSqft?: number;
+  plotSqft?: number;
+  subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
 }
 
 interface PropertyCardProps {
@@ -62,6 +65,8 @@ interface PropertyCardProps {
   conveyancingStatus?: 'buying' | 'selling';
   conveyancingCompletion?: number;
   propertyLTV?: number;
+  /** Number of active (unresolved) tenant concerns for this property. */
+  activeConcernCount?: number;
   // Portfolio context for inline mortgage stress test
   ownedPropertyCount?: number;
   totalRentalIncome?: number; // pounds
@@ -103,6 +108,7 @@ export const PropertyCard = memo(function PropertyCard({
   conveyancingStatus,
   conveyancingCompletion,
   propertyLTV = 0,
+  activeConcernCount = 0,
   ownedPropertyCount = 0,
   totalRentalIncome = 0,
   existingMonthlyMortgagePayments = 0,
@@ -216,6 +222,27 @@ export const PropertyCard = memo(function PropertyCard({
           </div>
         </div>
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
+        {/* Sqft + concern chips row */}
+        {(property.internalSqft || activeConcernCount > 0 || property.subtype) && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {property.internalSqft && (
+              <span className="text-[10px] text-muted-foreground">
+                📐 {property.internalSqft.toLocaleString()} sqft
+                {property.plotSqft ? ` · ${property.plotSqft.toLocaleString()} plot` : ''}
+              </span>
+            )}
+            {property.subtype && property.subtype !== 'standard' && (
+              <Badge variant="outline" className="text-[10px] uppercase border-primary/40 text-primary">
+                {property.subtype}
+              </Badge>
+            )}
+            {activeConcernCount > 0 && (
+              <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
+                🛠️ {activeConcernCount} concern{activeConcernCount > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4 flex-1 flex flex-col">
