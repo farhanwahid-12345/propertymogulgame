@@ -39,7 +39,7 @@ export function TenantConcernsFeed({
   onResolve,
   onSnooze,
 }: Props) {
-  const active = concerns.filter(c => !c.resolvedMonth);
+  const active = concerns.filter(c => c && !c.resolvedMonth);
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
 
   return (
@@ -62,10 +62,10 @@ export function TenantConcernsFeed({
           </div>
         ) : (
           active.map(c => {
-            const Icon = CATEGORY_ICON[c.category];
-            const monthsOpen = monthsPlayed - c.raisedMonth;
-            const cost = fromPennies(c.resolveCost);
-            const canAfford = playerCash >= c.resolveCost;
+            const Icon = CATEGORY_ICON[c.category] || Wrench;
+            const monthsOpen = Math.max(0, monthsPlayed - (c.raisedMonth || 0));
+            const cost = fromPennies(c.resolveCost || 0);
+            const canAfford = playerCash >= (c.resolveCost || 0);
             return (
               <div
                 key={c.id}
@@ -76,15 +76,15 @@ export function TenantConcernsFeed({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">{propName(c.propertyId)}</span>
                     <Badge variant="outline" className="text-[10px] capitalize">
-                      {CATEGORY_LABEL[c.category]}
+                      {CATEGORY_LABEL[c.category] || "Maintenance"}
                     </Badge>
                     {monthsOpen > 0 && (
                       <Badge variant="outline" className="text-[10px] border-red-400/30 text-red-400">
-                        {monthsOpen}mo open · -{c.satisfactionPenaltyIfIgnored}/mo
+                        {monthsOpen}mo open · -{c.satisfactionPenaltyIfIgnored || 0}/mo
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{c.description || "Tenant concern"}</p>
                 </div>
                 <div className="flex flex-col gap-1.5 shrink-0">
                   <Button

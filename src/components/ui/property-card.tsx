@@ -124,7 +124,8 @@ export const PropertyCard = memo(function PropertyCard({
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
   
-  const Icon = PropertyTypeIcon[property.type];
+  const propertyType = property.type in PropertyTypeIcon ? property.type : "residential";
+  const Icon = PropertyTypeIcon[propertyType];
   const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
   const cashRequired = property.price - mortgageAmount;
   const canAffordCash = playerCash >= property.price;
@@ -186,14 +187,14 @@ export const PropertyCard = memo(function PropertyCard({
   return (
     <Card className={cn(
       "glass border-t-4 transition-all duration-300 hover:scale-[1.02] flex flex-col h-full",
-      typeBorderColor[property.type],
-      typeGlow[property.type],
+      typeBorderColor[propertyType],
+      typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{typeEmoji[property.type]}</span>
+            <span className="text-lg">{typeEmoji[propertyType]}</span>
             <CardTitle className="text-base">{property.name}</CardTitle>
           </div>
           <div className="flex items-center gap-1">
@@ -217,7 +218,7 @@ export const PropertyCard = memo(function PropertyCard({
               <TrendingDown className="h-4 w-4 text-danger" />
             ) : null}
             <Badge variant="outline" className="capitalize text-xs">
-              {property.type}
+              {propertyType}
             </Badge>
           </div>
         </div>

@@ -24,6 +24,9 @@ export function RenovationTracker({ renovations, ownedProperties }: RenovationTr
 
       <div className="space-y-3">
         {renovations.map((r) => {
+          const renovationType = r?.type;
+          if (!renovationType) return null;
+
           const property = ownedProperties.find((p) => p.id === r.propertyId);
           const total = Math.max(1, r.completionDate - r.startDate);
           const elapsed = Math.max(0, Math.min(total, now - r.startDate));
@@ -31,7 +34,7 @@ export function RenovationTracker({ renovations, ownedProperties }: RenovationTr
           const msRemaining = Math.max(0, r.completionDate - now);
           // 1 in-game month = 180s = 180_000ms
           const monthsRemaining = Math.ceil(msRemaining / 180_000);
-          const Icon = r.type.icon || Hammer;
+          const Icon = renovationType.icon || Hammer;
 
           return (
             <div key={r.id} className="glass p-3 space-y-2">
@@ -42,11 +45,11 @@ export function RenovationTracker({ renovations, ownedProperties }: RenovationTr
                     {property?.name || "Unknown Property"}
                   </span>
                   <Badge variant="outline" className="text-[10px]">
-                    {r.type.name}
+                    {renovationType.name}
                   </Badge>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  Spent: <span className="text-foreground font-medium">£{r.type.cost.toLocaleString()}</span>
+                  Spent: <span className="text-foreground font-medium">£{renovationType.cost.toLocaleString()}</span>
                 </span>
               </div>
 
@@ -63,8 +66,8 @@ export function RenovationTracker({ renovations, ownedProperties }: RenovationTr
               </div>
 
               <div className="flex justify-between text-xs">
-                <span className="text-success">+£{r.type.rentIncrease}/mo rent</span>
-                <span className="text-success">+£{r.type.valueIncrease.toLocaleString()} value</span>
+                <span className="text-success">+£{renovationType.rentIncrease}/mo rent</span>
+                <span className="text-success">+£{renovationType.valueIncrease.toLocaleString()} value</span>
               </div>
             </div>
           );

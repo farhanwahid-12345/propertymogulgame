@@ -372,7 +372,7 @@ const Index = () => {
                 const propertyDebt = getDebtForProperty(property.id);
                 const propertyLTV = property.value > 0 ? (propertyDebt / property.value) * 100 : 0;
                 const activeRenoIds = (gameState.renovations || [])
-                  .filter(r => r.propertyId === property.id)
+                  .filter(r => r.propertyId === property.id && r?.type?.id)
                   .map(r => r.type.id);
                 const tenantRec = gameState.tenants.find(t => t.propertyId === property.id);
                 const concernCount = (gameState.tenantConcerns || []).filter(
