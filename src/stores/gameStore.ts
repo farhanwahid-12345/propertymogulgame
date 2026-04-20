@@ -554,7 +554,8 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const newConcerns: import('@/types/game').TenantConcern[] = [];
         const existingActiveByProp = new Map<string, number>();
-        prev.tenantConcerns.filter(c => !c.resolvedMonth).forEach(c => {
+        const prevConcerns = prev.tenantConcerns || [];
+        prevConcerns.filter(c => !c.resolvedMonth).forEach(c => {
           existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
         });
 
