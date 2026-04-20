@@ -550,24 +550,35 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Level Up!", `Congratulations! You reached level ${newLevel}!`);
         }
 
-        // Annual property growth (every 12 months)
+        // ── Monthly property value drift (~5.5%/yr nominal w/ occasional dips) ──
+        // Replaces the old once-yearly 2-4% bump. Long-run trend is gentle and upward,
+        // so freshly-bought properties don't show losses immediately after fees.
+        updatedOwnedProperties = updatedOwnedProperties.map(property => {
+          const monthlyDrift = 0.0045 + (Math.random() - 0.5) * 0.004; // ~0.25%–0.65%
+          const isDip = Math.random() < 0.015;
+          const change = isDip ? -(0.005 + Math.random() * 0.01) : monthlyDrift;
+          return {
+            ...property,
+            value: Math.round(property.value * (1 + change)),
+            marketValue: Math.round((property.marketValue || property.value) * (1 + change)),
+          };
+        });
+
+        // Annual rent uplift (kept on its own yearly schedule)
         let newLastYearlyGrowth = prev.lastYearlyGrowth;
         if (newMonthNumber > 0 && newMonthNumber % 12 === 0 && newMonthNumber !== prev.lastYearlyGrowth) {
-          const annualGrowthRate = 0.02 + Math.random() * 0.04;
           const rentIncreaseRate = 0.03;
           updatedOwnedProperties = updatedOwnedProperties.map(property => {
             const newBaseRent = Math.floor((property.baseRent || property.monthlyIncome) * (1 + rentIncreaseRate));
             return {
               ...property,
-              value: Math.round(property.value * (1 + annualGrowthRate)),
-              marketValue: Math.round((property.marketValue || property.value) * (1 + annualGrowthRate)),
               monthlyIncome: Math.floor(property.monthlyIncome * (1 + rentIncreaseRate)),
               baseRent: newBaseRent,
               lastRentIncrease: newMonthNumber,
             };
           });
           newLastYearlyGrowth = newMonthNumber;
-          showToast("Annual Property Growth!", `Properties increased in value and rents increased by 3%`);
+          showToast("Annual Rent Uplift!", `Rents increased by 3% across your portfolio.`);
         }
 
         // Fluctuate provider rates
