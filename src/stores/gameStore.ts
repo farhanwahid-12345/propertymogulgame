@@ -27,6 +27,7 @@ import {
 import {
   calculateIncomeTax, calculateCorporationTax, calculateCGT,
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
+  getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 
@@ -488,15 +489,20 @@ export const useGameStore = create<GameState & GameActions>()(
             const derivedRent = reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0;
             prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
-          // Ensure baseRent is non-zero — fall back to value × yield/12 if monthlyIncome is missing
+          // Bargain reflected in net worth: settle value to min(listed, paid).
+          // Recompute rent from displayed yield × settled value so realised yield matches the label.
+          const listedValue = prop.value;
+          const paid = conv.purchasePrice || prop.price;
+          const settledValue = Math.min(listedValue, paid);
           const effectiveYield = prop.yield || (6 + Math.random() * 9);
-          const effectiveRent = prop.monthlyIncome > 0
-            ? prop.monthlyIncome
-            : (prop.value > 0 ? Math.floor((prop.value * (effectiveYield / 100)) / 12) : 0);
+          const effectiveRent = settledValue > 0
+            ? Math.floor((settledValue * (effectiveYield / 100)) / 12)
+            : prop.monthlyIncome;
           const purchased: Property = {
-            ...prop, owned: true, price: conv.purchasePrice || prop.price,
-            // Settling-in: marketValue is at-least the purchase price so fees don't show as instant paper loss
-            marketValue: Math.max(prop.value, conv.purchasePrice || prop.price),
+            ...prop, owned: true, price: paid,
+            value: settledValue,
+            // marketValue clamped to purchase price so overpaying doesn't book an instant paper loss from fees
+            marketValue: Math.max(settledValue, paid),
             yield: effectiveYield,
             monthlyIncome: effectiveRent,
             lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
@@ -1623,11 +1629,21 @@ export const useGameStore = create<GameState & GameActions>()(
         const baseRent = property.baseRent || property.monthlyIncome;
         const newRent = Math.floor(baseRent * getConditionRentMultiplier(targetCondition));
 
-        showToast("🔨 Condition Upgrade!", `${property.name} upgraded to ${targetCondition}. Rent now £${fromPennies(newRent).toLocaleString()}/mo`);
+        const valueMultiplier = getConditionValueUplift(property.condition, targetCondition);
+        const newValue = Math.round(property.value * valueMultiplier);
+        const newMarketValue = Math.round((property.marketValue ?? property.value) * valueMultiplier);
+        const valueDelta = newValue - property.value;
+
+        showToast(
+          "🔨 Condition Upgrade!",
+          `${property.name} upgraded to ${targetCondition}. Rent £${fromPennies(newRent).toLocaleString()}/mo, value +£${fromPennies(valueDelta).toLocaleString()}`,
+        );
         set({
           cash: prev.cash - cost,
           ownedProperties: prev.ownedProperties.map(p =>
-            p.id === propertyId ? { ...p, condition: targetCondition, monthsSinceLastRenovation: 0, monthlyIncome: newRent } : p
+            p.id === propertyId
+              ? { ...p, condition: targetCondition, monthsSinceLastRenovation: 0, monthlyIncome: newRent, value: newValue, marketValue: newMarketValue }
+              : p
           ),
         });
       },
