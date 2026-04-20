@@ -99,7 +99,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 4,
+    _version: 5,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
