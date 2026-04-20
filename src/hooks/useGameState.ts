@@ -70,15 +70,23 @@ function tenantEventToPounds(e: any) {
 
 export function useGameState() {
   const store = useGameStore();
+  const ownedPropertiesRaw = Array.isArray(store.ownedProperties) ? store.ownedProperties : [];
+  const estateAgentPropertiesRaw = Array.isArray(store.estateAgentProperties) ? store.estateAgentProperties : [];
+  const auctionPropertiesRaw = Array.isArray(store.auctionProperties) ? store.auctionProperties : [];
+  const mortgagesRaw = Array.isArray(store.mortgages) ? store.mortgages : [];
+  const propertyListingsRaw = Array.isArray(store.propertyListings) ? store.propertyListings : [];
+  const pendingDamagesRaw = Array.isArray(store.pendingDamages) ? store.pendingDamages : [];
+  const tenantEventsRaw = Array.isArray(store.tenantEvents) ? store.tenantEvents : [];
+  const tenantsRaw = Array.isArray(store.tenants) ? store.tenants : [];
 
   // ── Derived values (in pounds) ──────────────────────────
-  const ownedProperties = useMemo(() => store.ownedProperties.map(propertyToPounds), [store.ownedProperties]);
-  const estateAgentProperties = useMemo(() => store.estateAgentProperties.map(propertyToPounds), [store.estateAgentProperties]);
-  const auctionProperties = useMemo(() => store.auctionProperties.map(propertyToPounds), [store.auctionProperties]);
-  const mortgages = useMemo(() => store.mortgages.map(mortgageToPounds), [store.mortgages]);
-  const propertyListings = useMemo(() => store.propertyListings.map(listingToPounds), [store.propertyListings]);
-  const pendingDamages = useMemo(() => store.pendingDamages.map(damageToPounds), [store.pendingDamages]);
-  const tenantEvents = useMemo(() => store.tenantEvents.map(tenantEventToPounds), [store.tenantEvents]);
+  const ownedProperties = useMemo(() => ownedPropertiesRaw.map(propertyToPounds), [ownedPropertiesRaw]);
+  const estateAgentProperties = useMemo(() => estateAgentPropertiesRaw.map(propertyToPounds), [estateAgentPropertiesRaw]);
+  const auctionProperties = useMemo(() => auctionPropertiesRaw.map(propertyToPounds), [auctionPropertiesRaw]);
+  const mortgages = useMemo(() => mortgagesRaw.map(mortgageToPounds), [mortgagesRaw]);
+  const propertyListings = useMemo(() => propertyListingsRaw.map(listingToPounds), [propertyListingsRaw]);
+  const pendingDamages = useMemo(() => pendingDamagesRaw.map(damageToPounds), [pendingDamagesRaw]);
+  const tenantEvents = useMemo(() => tenantEventsRaw.map(tenantEventToPounds), [tenantEventsRaw]);
 
   const cash = fromPennies(store.cash);
   const overdraftLimit = fromPennies(store.overdraftLimit);
@@ -88,10 +96,10 @@ export function useGameState() {
   const totalMonthlyIncome = ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
   const mortgageExpenses = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
   const councilTaxExpenses = ownedProperties.reduce((sum, p) => {
-    const hasTenant = store.tenants.some(t => t.propertyId === p.id);
+    const hasTenant = tenantsRaw.some(t => t.propertyId === p.id);
     return sum + (!hasTenant ? fromPennies(COUNCIL_TAX_BAND_D) : 0);
   }, 0);
-  const emptyPropertiesCount = ownedProperties.filter(p => !store.tenants.some(t => t.propertyId === p.id)).length;
+  const emptyPropertiesCount = ownedProperties.filter(p => !tenantsRaw.some(t => t.propertyId === p.id)).length;
   const totalMonthlyExpenses = mortgageExpenses + councilTaxExpenses;
   const totalDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
 
@@ -280,8 +288,8 @@ export function useGameState() {
     cash,
     ownedProperties,
     mortgages,
-    tenants: store.tenants,
-    renovations: store.renovations,
+    tenants: tenantsRaw,
+    renovations: Array.isArray(store.renovations) ? store.renovations : [],
     level: store.level,
     experience: store.experience,
     experienceToNext: store.experienceToNext,
@@ -291,23 +299,23 @@ export function useGameState() {
     creditScore,
     currentMarketRate: store.currentMarketRate,
     tenantEvents,
-    voidPeriods: store.voidPeriods,
+    voidPeriods: Array.isArray(store.voidPeriods) ? store.voidPeriods : [],
     propertyListings,
     overdraftLimit,
     overdraftUsed,
     pendingDamages,
-    annualRepairCosts: store.annualRepairCosts,
-    damageHistory: store.damageHistory,
+    annualRepairCosts: Array.isArray(store.annualRepairCosts) ? store.annualRepairCosts : [],
+    damageHistory: Array.isArray(store.damageHistory) ? store.damageHistory : [],
     lastYearlyGrowth: store.lastYearlyGrowth,
-    mortgageProviderRates: store.mortgageProviderRates,
+    mortgageProviderRates: store.mortgageProviderRates && typeof store.mortgageProviderRates === 'object' ? store.mortgageProviderRates : {},
     yearlyNetProfit: fromPennies(store.yearlyNetProfit),
     lastCorporationTaxMonth: store.lastCorporationTaxMonth,
     lastGlobalDamageMonth: store.lastGlobalDamageMonth,
     nextEconomicEventMonth: store.nextEconomicEventMonth,
-    economicEvents: store.economicEvents,
+    economicEvents: Array.isArray(store.economicEvents) ? store.economicEvents : [],
     entityType: store.entityType,
-    conveyancing: store.conveyancing,
-    taxRecords: store.taxRecords,
+    conveyancing: Array.isArray(store.conveyancing) ? store.conveyancing : [],
+    taxRecords: Array.isArray(store.taxRecords) ? store.taxRecords : [],
     totalTaxPaid: fromPennies(store.totalTaxPaid),
     tenantConcerns: store.tenantConcerns || [],
 
