@@ -119,6 +119,14 @@ export function getDepreciationMonths(condition: string): number {
   }
 }
 
+// Asset value uplift when upgrading condition (multiplier on current value)
+export function getConditionValueUplift(fromCondition: string, toCondition: string): number {
+  if (fromCondition === 'standard' && toCondition === 'premium') return 1.15;
+  if (fromCondition === 'dilapidated' && toCondition === 'standard') return 1.25;
+  if (fromCondition === 'dilapidated' && toCondition === 'premium') return 1.40;
+  return 1.0;
+}
+
 // Renovation costs to upgrade condition (in pennies, based on property value)
 export function getConditionUpgradeCost(
   propertyValue: number,
