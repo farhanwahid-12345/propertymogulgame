@@ -32,9 +32,11 @@ import { calcTenantRent } from '@/lib/tenantRent';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
-  import('@/hooks/use-toast').then(({ toast }) => {
-    toast({ title, description, variant });
-  });
+  import('@/hooks/use-toast')
+    .then(({ toast }) => {
+      try { toast({ title, description, variant }); } catch (e) { /* noop */ }
+    })
+    .catch(() => { /* noop — never let toast import crash the app */ });
 }
 
 // ─── Actions interface ───────────────────────────────────
@@ -97,7 +99,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 4,
+    _version: 5,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -207,8 +209,17 @@ function migrateState(persisted: any): GameState {
 
   // v3 → v4: add tenantConcerns
   if (persisted._version < 4) {
-    persisted.tenantConcerns = persisted.tenantConcerns || [];
     persisted._version = 4;
+  }
+
+  // v4 → v5: ensure tenantConcerns exists (repairs stale v4 saves missing the field)
+  if (persisted._version < 5) {
+    persisted._version = 5;
+  }
+
+  // Always backfill tenantConcerns regardless of version — defensive against schema drift
+  if (!Array.isArray(persisted.tenantConcerns)) {
+    persisted.tenantConcerns = [];
   }
 
   // Backfill satisfaction on existing tenants (any save version)
@@ -543,7 +554,8 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const newConcerns: import('@/types/game').TenantConcern[] = [];
         const existingActiveByProp = new Map<string, number>();
-        prev.tenantConcerns.filter(c => !c.resolvedMonth).forEach(c => {
+        const prevConcerns = prev.tenantConcerns || [];
+        prevConcerns.filter(c => !c.resolvedMonth).forEach(c => {
           existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
         });
 
@@ -585,7 +597,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
-        let updatedConcerns = [...prev.tenantConcerns, ...newConcerns];
+        let updatedConcerns = [...prevConcerns, ...newConcerns];
         const satPenaltyByProp = new Map<string, number>();
         updatedConcerns = updatedConcerns.map(c => {
           if (c.resolvedMonth) return c;
@@ -1745,7 +1757,8 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── TENANT CONCERNS ───────────────────
       resolveTenantConcern: (concernId) => {
         const prev = get();
-        const concern = prev.tenantConcerns.find(c => c.id === concernId && !c.resolvedMonth);
+        const concerns = prev.tenantConcerns || [];
+        const concern = concerns.find(c => c.id === concernId && !c.resolvedMonth);
         if (!concern) return;
         if (prev.cash < concern.resolveCost) {
           showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} to resolve.`, "destructive");
@@ -1760,7 +1773,7 @@ export const useGameStore = create<GameState & GameActions>()(
         set({
           cash: prev.cash - concern.resolveCost,
           tenants: updatedTenants,
-          tenantConcerns: prev.tenantConcerns.map(c =>
+          tenantConcerns: concerns.map(c =>
             c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
           ),
         });
@@ -1781,10 +1794,10 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 4,
-      migrate: (persisted: any, version: number) => {
-        if (version < 4) return migrateState(persisted);
-        return persisted;
+      version: 5,
+      migrate: (persisted: any, _version: number) => {
+        // Always run migrateState — idempotent and repairs any stale field shape
+        return migrateState(persisted);
       },
       partialize: (state) => {
         const { clockTick, processMonthEnd, processMarketUpdate, processCounterResponses,
