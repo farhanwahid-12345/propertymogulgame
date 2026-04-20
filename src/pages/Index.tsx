@@ -14,6 +14,7 @@ import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
+import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
@@ -287,6 +288,21 @@ const Index = () => {
           ownedProperties={gameState.ownedProperties}
         />
 
+        {/* Tenant concerns feed */}
+        {gameState.ownedProperties.length > 0 && (
+          <TenantConcernsFeed
+            concerns={(gameState.tenantConcerns || []).map((c: any) => ({
+              ...c,
+              // store keeps pennies — feed expects pennies for the cost too (uses fromPennies internally)
+            }))}
+            ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
+            playerCash={gameState.cash * 100} // pounds → pennies for comparison
+            monthsPlayed={gameState.monthsPlayed}
+            onResolve={gameState.resolveTenantConcern}
+            onSnooze={gameState.dismissTenantConcern}
+          />
+        )}
+
         {/* Listed Properties */}
         <ListedProperties 
           propertyListings={gameState.propertyListings}
@@ -333,7 +349,7 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
               {/* Conveyancing-buying properties (pending) */}
               {conveyancingBuyProperties.map((property) => {
                 const conv = (gameState.conveyancing || []).find(c => c.propertyId === property.id);
