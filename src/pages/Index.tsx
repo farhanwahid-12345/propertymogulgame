@@ -375,6 +375,9 @@ const Index = () => {
                   .filter(r => r.propertyId === property.id)
                   .map(r => r.type.id);
                 const tenantRec = gameState.tenants.find(t => t.propertyId === property.id);
+                const concernCount = (gameState.tenantConcerns || []).filter(
+                  (c: any) => c.propertyId === property.id && !c.resolvedMonth
+                ).length;
                 return (
                   <PropertyCard
                     key={property.id}
@@ -394,6 +397,7 @@ const Index = () => {
                     conveyancingStatus={conv?.status}
                     conveyancingCompletion={conv?.completionMonth}
                     propertyLTV={propertyLTV}
+                    activeConcernCount={concernCount}
                   />
                 );
               })}
