@@ -32,9 +32,11 @@ import { calcTenantRent } from '@/lib/tenantRent';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
-  import('@/hooks/use-toast').then(({ toast }) => {
-    toast({ title, description, variant });
-  });
+  import('@/hooks/use-toast')
+    .then(({ toast }) => {
+      try { toast({ title, description, variant }); } catch (e) { /* noop */ }
+    })
+    .catch(() => { /* noop — never let toast import crash the app */ });
 }
 
 // ─── Actions interface ───────────────────────────────────
