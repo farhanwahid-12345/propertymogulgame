@@ -1916,7 +1916,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
 
         const costPennies = toPennies(scaledCostPounds);
-        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, costPennies);
+        if (!debited) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()} (even with overdraft).`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId)) { showToast("Renovation in Progress", "Already renovating!", "destructive"); return; }
 
         // Persist scaled values onto the renovation record so completion uses the same numbers
@@ -1931,8 +1932,9 @@ export const useGameStore = create<GameState & GameActions>()(
           type: scaledRenovationType, startDate: Date.now(),
           completionDate: Date.now() + (renovationType.duration * 60 * 1000),
         };
-        showToast("Renovation Started!", `${renovationType.name} begun.`);
-        set(s => ({ cash: s.cash - costPennies, renovations: [...s.renovations, renovation] }));
+        const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+        showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
+        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, renovations: [...prev.renovations, renovation] });
       },
 
       upgradeCondition: (propertyId, targetCondition) => {
