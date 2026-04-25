@@ -1977,6 +1977,12 @@ export const useGameStore = create<GameState & GameActions>()(
         set(fresh);
         showToast("Game Reset", "Started fresh with £100K!");
       },
+
+      setGameSpeed: (speed) => {
+        const clamped = Math.max(0.25, Math.min(8, speed));
+        set({ gameSpeed: clamped });
+      },
+
     }),
     {
       name: 'propertyTycoonSave',
