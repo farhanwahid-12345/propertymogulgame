@@ -5,6 +5,7 @@ import type {
   PropertyListing, PropertyOffer, Renovation,
   PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
+  DepositDispute,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
