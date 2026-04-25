@@ -244,6 +244,8 @@ interface GameActions {
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
   dismissTenantConcern: (concernId: string) => void;
+  // Speed
+  setGameSpeed: (speed: number) => void;
   // Game
   resetGame: () => void;
 }
