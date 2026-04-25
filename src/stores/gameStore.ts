@@ -339,6 +339,7 @@ function createInitialState(): GameState {
     tenantConcerns: [],
     pendingEvictions: [],
     propertyLocks: [],
+    depositDisputes: [],
   };
 }
 
