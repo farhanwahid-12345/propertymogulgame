@@ -225,6 +225,8 @@ export interface GameState {
   // Time
   monthsPlayed: number;
   timeUntilNextMonth: number;
+  /** Wall-clock-to-game-time multiplier. 1 = normal, 2 = 2x, 0.5 = half. */
+  gameSpeed: number;
   lastYearlyGrowth: number;
   yearlyNetProfit: number; // pennies
   lastCorporationTaxMonth: number;
