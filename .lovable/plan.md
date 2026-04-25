@@ -1,131 +1,178 @@
-# Plan: Three fixes — concerns merge, one-shot renovations, net worth audit
+# Plan: Renovation gating, grant removal, renters' rights & auto-overdraft
 
-## 1. Remove the Property Damage dialog — fold damage into Tenant Concerns
-
-**Problem:** The damage dialog interrupts gameplay with a modal, duplicating what the concerns feed already does inline.
-
-**Strategy:** Convert each newly-generated `PropertyDamage` into a `TenantConcern` (category `maintenance`) at the moment it's created. Then delete the dialog entirely.
-
-### Changes
-
-**`src/stores/gameStore.ts`** — `processMarketUpdate` damage-generation block (around line 1100-1132):
-- Replace `pendingDamages.push(...)` with concern-creation logic. Each damage becomes:
-  ```ts
-  {
-    id: `concern_damage_${Date.now()}_${propertyId}`,
-    propertyId,
-    tenantProfile: tenant.profile,
-    category: 'maintenance',
-    description: `Repair needed: ${randomDamageDescription()}`, // e.g. "Boiler repair", "Roof leak"
-    raisedMonth: prev.monthsPlayed,
-    resolveCost: Math.floor(maxDmg), // already in pennies
-    satisfactionPenaltyIfIgnored: 5, // higher than typical concerns since it's actual damage
-  }
-  ```
-- Append to `tenantConcerns` instead of `pendingDamages`.
-- Keep `damageHistory` and `annualRepairCosts` updates so the cap & cooldown still work — but move them into the concern-resolve path (see below).
-
-**`src/stores/gameStore.ts`** — `resolveTenantConcern` (line 1969):
-- When the concern's id starts with `concern_damage_` (or add an explicit `isDamage: boolean` flag on the concern), also update `annualRepairCosts` and `damageHistory` to keep the cap and 48-month cooldown enforced.
-- Cleaner: extend `TenantConcern` type with optional `source?: 'damage' | 'tenant'` and branch on that.
-
-**`src/types/game.ts`:**
-- Add `source?: 'damage' | 'tenant'` to `TenantConcern`.
-- Leave `PropertyDamage` type in place but unused — flag for removal in a later cleanup pass.
-
-**`src/pages/Index.tsx`:**
-- Delete the entire damage-dialog block: imports (line 13), `damageDialogOpen` state, `currentDamageRef`, the `useEffect` (lines 28-42), `handlePayDamage`/`handleTakeLoan`/`handleDismissDamage`, and the `<PropertyDamageDialog>` JSX (lines 409-420).
-
-**`src/components/ui/property-damage-dialog.tsx`:**
-- Delete the file.
-
-**`src/components/ui/tenant-concerns-feed.tsx`:**
-- Add a small visual marker for damage-sourced concerns (e.g. `🔧 Damage` red badge instead of standard maintenance badge) so the player can tell "real damage" apart from cosmetic complaints. Look up `c.source === 'damage'` and render a destructive-variant badge.
-
-**Migration safety:** existing saves may still have `pendingDamages`. Add a one-time migration in `migrateState` (`src/stores/gameStore.ts` line ~334) that converts any leftover `pendingDamages` into concerns and clears the array.
+Four targeted changes across the renovation system, macro events, tenant lifecycle, and cash-spending plumbing.
 
 ---
 
-## 2. One-shot renovations — disable per-property after completion
+## 1. Vacancy-gated large-scale renovations
 
-**Problem:** After completing a `kitchen_upgrade`, the dialog still lets you click it again. Same for every renovation.
-
-**Strategy:** Persist a per-property list of completed renovation type ids. The dialog already has an `activeRenovations` list of ids — extend the same mechanism with a `completedRenovations` list.
+**Problem:** Major works (extensions, conversions, central heating, full redecoration) realistically can't happen with a tenant in residence — but the dialog allows them anytime.
 
 ### Changes
-
-**`src/types/game.ts`:**
-- Add to `Property`: `completedRenovationIds?: string[]` (defaults to `[]`).
-
-**`src/stores/gameStore.ts`:**
-- `processMarketUpdate` completion block (line 980-1018): when applying `completedRenovations.forEach`, append `renovation.type.id` to `updatedProperties[idx].completedRenovationIds`:
-  ```ts
-  completedRenovationIds: [...(updatedProperties[idx].completedRenovationIds || []), renovation.type.id],
-  ```
-- `sanitizeProperty` (line ~70): backfill `completedRenovationIds: asArray(property?.completedRenovationIds, [])` for legacy saves.
-- `migrateState`: bump `SAVE_VERSION` to 6 and ensure backfill runs.
 
 **`src/components/ui/renovation-dialog.tsx`:**
-- Add prop: `completedRenovationIds?: string[]`.
-- Add a helper `isCompleted = (r) => completedRenovationIds.includes(r.id)`.
-- Treat `completed` like `inProgress` — disabled, opacity-40, but show a distinct ✅ badge ("Completed") and update the in-progress conditional to render either the completion badge or the progress bar.
-- Block selection: include `isCompleted(renovation)` in the `blocked` check.
+- Add a new optional flag on `RenovationType`: `requiresVacant?: boolean`.
+- Mark these as `requiresVacant: true`:
+  - `full_redecoration`
+  - `central_heating`
+  - `loft_conversion`, `rear_extension`, `conservatory`
+  - All four `convert_*` options (HMO 4, HMO 6, flats, commercial→residential)
+- Leave these tenant-friendly (no flag): `basic_repair`, `kitchen_upgrade`, `bathroom_renovation`, `double_glazing`.
+- Add a new optional prop `hasTenant?: boolean` to `RenovationDialogProps`.
+- Extend `ineligibilityReason` to return `"Property must be vacant"` when `r.requiresVacant && hasTenant`.
+- The existing `blocked` flag already grays out + blocks selection — no extra UI work.
 
 **`src/components/ui/property-card.tsx`:**
-- Pass `property.completedRenovationIds` through to `<RenovationDialog>`.
+- Where `<RenovationDialog>` is rendered, pass `hasTenant={!!tenant}` (the card already has the tenant record in scope).
 
 **`src/pages/Index.tsx`:**
-- No change — already passes `property` whole; just pipe through the new field via property card props.
-
-**Conversions special case:** Conversions (`hmo`, `flats`, etc.) are already gated by `currentSubtype !== 'standard'` (renovation-dialog line 272). Leave that logic — it'll naturally exclude them once a conversion is done. But also add their id to `completedRenovationIds` for consistency (so a player who reverts the subtype somehow can't re-do).
-
-**Toast/notification:** No new toast needed — the existing "Renovation Complete" toast already fires.
+- No change — props flow through `property-card`.
 
 ---
 
-## 3. Net worth audit — confirm/fix the over-counting
+## 2. Remove the Government Landlord Grant
 
-**Reported symptom:** "net worth is going up too quickly".
+**Problem:** Cash injections from the government are unrealistic.
 
-### Likely causes (ranked)
+### Changes
 
-1. **Double-counting condition upgrades.** In `upgradeCondition` (line 1672), we replace `value` with `newValue = property.value × multiplier`. This is correct. But: monthly appreciation drift in `processMonthEnd` (line 648-672) ALSO multiplies `value` regardless of recent upgrade. If both run in the same month, you compound. **Fix:** This is acceptable (both are real value sources). No change needed unless we observe runaway growth.
+**`src/stores/gameStore.ts`** (`processMonthEnd`, around line 925-957):
+- Remove the `grant` entry from the `eventTypes` array.
+- Remove the `else if (chosen.type === 'grant') { ... }` block (line 952-954).
+- Remove the `eventCashBonus > 0` portion of the toast (line 956) — simplify to just `chosen.description`.
+- Drop the `eventCashBonus` accumulator and `cash: finalCash + eventCashBonus` → `cash: finalCash` (line 969).
 
-2. **Renovation completion + appreciation overlap.** `completedRenovations` adds `actualValueGain` to value (line 1001). Same month, monthly drift multiplies that already-uplifted value. Compounding is real but small (drift is ~0.45%/mo). **No change needed.**
+**`src/types/game.ts`:**
+- Remove `'grant'` from the `MacroEconomicEvent['type']` union (line 188).
 
-3. **🚩 Real bug — `marketValue` drift in cards but `value` in netWorth.** `useGameState` netWorth uses `p.value` (line 112), but the portfolio summary in `Index.tsx` uses `p.marketValue || p.value` (line 89). If `marketValue` and `value` ever diverge (and they do — appreciation drift updates `value`, renovation only updates one of them in some paths), the user sees TWO different totals on screen.
+No migration needed — historic `'grant'` entries in `economicEvents` will still render their stored name/description harmlessly; the type narrowing only affects future events.
 
-4. **🚩 Real bug — escrow double-counting.** `useGameState` `netWorth` adds `inflightBuyCapital` (line 109-112). But when conveyancing **completes**, the property is added to `ownedProperties` with its full `value` AND the cash was already deducted from `cash` at purchase-time (it lives in `conv.cashHeld` until completion). The flow:
-   - **At purchase:** cash debited, `cashHeld` set on conveyancing record. NetWorth = (cash - paid) + cashHeld + 0 properties = cash − 0 ✅
-   - **At completion:** `cashHeld` cleared, property `value` added. NetWorth = cash + 0 escrow + propertyValue ✅
-   - This actually looks correct. Need to double-check the timing in `processMonthEnd`/conveyancing completion to ensure `cashHeld` is zeroed in the same `set()` call that adds the property.
+---
 
-5. **🚩 Real bug — fees & stamp duty are paid from cash, but the property's `value` is set to the (higher) listed price.** When you buy a £100k property for £80k with £4k of fees, cash drops by £84k, property value reads £80k (post fix #1 from earlier), so net worth dropped by £4k — correct. But for at-or-above-listed purchases, value stays at the listing price while cash absorbs the full purchase price + fees → net worth dips by fees only. Also correct.
+## 3. Renters' Rights compliance for tenant changes
 
-### Proposed audit + fixes
+**Problem:** The current `removeTenant` lets the landlord evict instantly, with no notice, no grounds, no deposit. Doesn't reflect the Renters' Rights Bill (Section 21 abolished, periodic tenancies, mandatory deposits, etc.).
+
+### New mechanics
+
+**Deposit handling (Tenancy Deposit Scheme):**
+- On `selectTenant`, take a deposit equal to **5 weeks' rent** (UK Tenant Fees Act cap) from the player's cash and hold it on the tenancy record (`depositHeld: number` in pennies).
+- On `removeTenant` (landlord-initiated), refund the deposit in full to the tenant — player loses it.
+- On natural tenant departure (low satisfaction early-exit, end of tenancy), refund the deposit fully unless the property is in `dilapidated` condition (treat as damage withholding — keep 50%).
+
+**Eviction grounds & notice (Renters' Rights Bill):**
+- Replace the no-questions `removeTenant` with `evictTenant(propertyId, ground)` accepting one of four grounds:
+  - `rent_arrears` → 4-week notice. Only valid if tenant has missed ≥2 months rent (track via `tenantEvents` with `type: 'default'`).
+  - `landlord_sale` → 4-month notice. Always valid, but the property is locked from sale for 12 months afterwards if eviction completes without a sale (anti-abuse rule from the Bill).
+  - `landlord_move_in` → 4-month notice. Always valid, but locks the property from re-letting for 12 months.
+  - `antisocial_behaviour` → 2-week notice. Only valid for `risky` profile tenants with an active `noise` or `safety` concern unresolved >1 month.
+- Notice period implemented as: tenant stays for N months after `evictTenant` is called; after the period expires the void begins. Track via a new `pendingEvictions: PendingEviction[]` field on state.
+- Player cannot raise rent on a tenant under eviction notice.
+
+**Periodic tenancies:**
+- Remove the implicit 12-month fixed term — tenants leave when satisfied <25 (already implemented) or when evicted.
+- The 3-month wait between rent-raising tenant-swaps (existing `lastTenantChange` rule) stays — it's a sensible cooldown.
+
+### File changes
+
+**`src/types/game.ts`:**
+- Add `depositHeld: number` (pennies) and `evictionNoticeMonth?: number` and `evictionGround?: EvictionGround` to `PropertyTenant`.
+- Add new `EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'`.
+- Add new `PendingEviction { propertyId; tenantId; ground; servedMonth; effectiveMonth }` interface.
+- Add `pendingEvictions: PendingEviction[]` to `GameState`.
+- Add `propertyLocks: { propertyId; reason: 'sale_lock' | 'relet_lock'; untilMonth: number }[]` to enforce the 12-month restrictions.
+- Bump `SAVE_VERSION` to 7.
 
 **`src/stores/gameStore.ts`:**
-- Add a dev-only invariant log (`if (import.meta.env.DEV) console.debug(...)`) that prints net-worth components every month-end so we can spot the spike.
+- `selectTenant` (line 1602): compute `depositHeld = Math.floor(newRent * 5 * 12 / 52)` (5 weeks of rent), check `prev.cash >= depositHeld`, deduct from cash, store on `rec`. Show toast mentioning the deposit.
+- Replace `removeTenant` (line 1652) with `evictTenant(propertyId, ground)`:
+  - Validate ground based on tenant profile, concerns, and arrears history.
+  - Push entry to `pendingEvictions` with `effectiveMonth` based on ground notice period.
+  - Show toast with notice period.
+- Add `processMonthEnd` logic to:
+  - Walk `pendingEvictions`, when `effectiveMonth <= monthsPlayed`: refund deposit (50% if dilapidated), remove tenant, start void, add `propertyLocks` entry where applicable.
+- Add `cancelEviction(propertyId)` action (player can withdraw notice).
+- `sellProperty` / listing actions: refuse if property has an active `sale_lock` or a current tenant under non-`landlord_sale` eviction.
+- Migration v6→v7: backfill `depositHeld: 0` on existing tenants (grandfathered, no retroactive deposit), init `pendingEvictions: []` and `propertyLocks: []`.
 
-**`src/pages/Index.tsx`:**
-- Change line 89 from `(p.marketValue || p.value)` → `p.value` so the portfolio "Total Value" matches the netWorth calc. This eliminates the visual mismatch and removes a +5-10% phantom uplift that comes from `marketValue` being stale-high vs `value`.
+**`src/components/ui/tenant-selector.tsx`** (read separately — likely just a prop wiring change):
+- Show the deposit requirement on each tenant card: "Deposit required: £X (5 weeks)".
+- Disable selection if `cash < requiredDeposit + ...` (defer to store check; show warning).
 
-**`src/stores/gameStore.ts` — conveyancing completion** (line 491-503):
-- Verify `cashHeld` is set to 0 (or the buy is removed from `conveyancing[]`) in the **same** `set()` as adding the property to `ownedProperties`. From the code I read it is removed from the array, so the escrow contribution drops to 0 and value contribution kicks in atomically. ✅ No change required, just verify by inspection.
+**New `src/components/ui/eviction-dialog.tsx`:**
+- Replaces the inline "Remove tenant" button.
+- Lists the 4 grounds with brief explanation, notice period, and validity check (greyed out + tooltip if invalid).
+- Confirms eviction → calls `evictTenant`.
 
-**`src/stores/gameStore.ts` — `processMarketUpdate` renovation completion**:
-- Currently bumps both `value` and `marketValue` by `actualValueGain` (lines 1001-1002). Good — keeps them in sync.
+**`src/components/ui/property-card.tsx`:**
+- Replace direct `removeTenant` call with the new `<EvictionDialog>`.
+- If a `pendingEvictions` entry exists for this property, show a banner "Eviction served — N months remaining (Ground: X)" with a "Cancel notice" button.
 
-**`src/stores/gameStore.ts` — `upgradeCondition`**:
-- Already updates both `value` and `marketValue` (line 1672). Good.
+**`mem://game-mechanics/property-management/tenant-management`** (new memory file):
+- Document deposits, eviction grounds, notice periods, and 12-month locks.
 
-**`src/stores/gameStore.ts` — monthly appreciation** (line 648-672):
-- Currently only updates `value`. **Fix:** also update `marketValue` proportionally so the two never drift:
+### Implementation note
+This is the largest of the four changes. We'll implement the **deposit + replace `removeTenant` with grounds-based `evictTenant`** path first; the `propertyLocks` system is genuinely new state surface and adds complexity to the listing flow — flag for a follow-up if time-boxed.
+
+---
+
+## 4. Auto-use overdraft when cash hits zero
+
+**Problem:** Spending actions hard-fail with "Insufficient Funds" even when the player has overdraft headroom available.
+
+**Strategy:** Wrap all cash deductions in a helper that draws from `cash` first, then dips into `overdraftUsed` up to `overdraftLimit`.
+
+### Changes
+
+**`src/stores/gameStore.ts`:**
+- Add a pure helper near the top:
   ```ts
-  const drift = newValue / p.value;
-  return { ...p, value: newValue, marketValue: Math.round((p.marketValue || p.value) * drift), monthsSinceLastRenovation: resetMonths };
+  /** Returns { cash, overdraftUsed } after debiting `amount`, or null if insufficient combined funds. */
+  function debit(state: { cash: number; overdraftUsed: number; overdraftLimit: number }, amount: number)
+    : { cash: number; overdraftUsed: number } | null {
+    const totalAvailable = state.cash + (state.overdraftLimit - state.overdraftUsed);
+    if (totalAvailable < amount) return null;
+    if (state.cash >= amount) return { cash: state.cash - amount, overdraftUsed: state.overdraftUsed };
+    const fromCash = state.cash;
+    const fromOverdraft = amount - fromCash;
+    return { cash: 0, overdraftUsed: state.overdraftUsed + fromOverdraft };
+  }
   ```
-- This is the **most likely cause** of net worth visually outpacing reality: `marketValue` is rendered in tiles and was ratcheting up while `value` did its own (slower or different) drift, so the two compound side-by-side in the player's perception.
+- Refactor every spending site to use it. Audit list (line numbers from the search above):
+  - 469 — entity incorporation fee
+  - 1239, 1297 — buy with mortgage (cash required)
+  - 1320, 1375 — auction win
+  - 1692 — start renovation
+  - 1719 — upgrade condition
+  - 1740, 1743, 1748 — mortgage settle / partial repay
+  - 1905, 1923 — pay damage / take loan (will be removed when we fully retire pendingDamages, but patch them too for now)
+  - 2061 — resolve tenant concern
+- Each site replaces the pre-check + manual subtraction with:
+  ```ts
+  const debited = debit(prev, costPennies);
+  if (!debited) { showToast("Insufficient Funds", "Even with your overdraft, you can't afford this.", "destructive"); return; }
+  set({ ...debited, /* other state */ });
+  ```
+- For income-receiving sites (rent collection, sale proceeds), do the inverse: if `overdraftUsed > 0`, repay overdraft first before adding to cash. Add a `credit(state, amount)` helper:
+  ```ts
+  function credit(state: { cash: number; overdraftUsed: number }, amount: number) {
+    if (state.overdraftUsed > 0) {
+      const repay = Math.min(state.overdraftUsed, amount);
+      return { cash: state.cash + (amount - repay), overdraftUsed: state.overdraftUsed - repay };
+    }
+    return { cash: state.cash + amount, overdraftUsed: state.overdraftUsed };
+  }
+  ```
+- Use `credit` in `processMonthEnd` for rent/sale income (around the `finalCash` computation) so the overdraft naturally pays itself down.
+
+**Toast messaging:**
+- When a debit pulls from overdraft (i.e. `prev.cash < amount && debited`), fire an info toast: `"Used £X overdraft. Balance now £Y/£Z."` so the player notices the silent draw.
+
+**`src/components/ui/credit-overdraft.tsx`:**
+- No functional change; the dialog still allows manual draw/repay. The auto-use is purely on the spending side.
+
+**`mem://game-mechanics/banking/overdraft-auto-use`** (new memory):
+- Note: cash-spending actions auto-tap the overdraft when cash is short; rent/sale income auto-repays overdraft first.
 
 ---
 
@@ -133,14 +180,19 @@
 
 | File | Change |
 |---|---|
-| `src/types/game.ts` | Add `source?` to `TenantConcern`; add `completedRenovationIds?` to `Property`; bump `SAVE_VERSION` to 6 |
-| `src/stores/gameStore.ts` | Damage→concern conversion in `processMarketUpdate`; track `completedRenovationIds` on completion; sync `marketValue` with monthly drift; one-time migration of `pendingDamages`; sanitizer backfills |
-| `src/pages/Index.tsx` | Delete damage dialog wiring (~25 LOC); change Total Value to use `p.value` |
-| `src/components/ui/property-damage-dialog.tsx` | **Delete file** |
-| `src/components/ui/tenant-concerns-feed.tsx` | Show distinct badge for `source === 'damage'` concerns |
-| `src/components/ui/renovation-dialog.tsx` | Accept `completedRenovationIds`; render ✅ Completed state; block selection |
-| `src/components/ui/property-card.tsx` | Pipe `completedRenovationIds` to `RenovationDialog` |
-| `mem://game-mechanics/property-management/maintenance` | Update — damage now flows through tenant concerns, no separate dialog |
-| `mem://game-mechanics/property-management/renovation-and-depreciation` | Note one-shot per property |
+| `src/types/game.ts` | `requiresVacant` (renovation type), `depositHeld`/eviction fields on `PropertyTenant`, new `PendingEviction`/`PropertyLock`, drop `'grant'` from event union, bump `SAVE_VERSION` to 7 |
+| `src/stores/gameStore.ts` | Remove grant event; add `debit`/`credit` helpers and refactor all cash sites; replace `removeTenant` with `evictTenant`; deposit handling in `selectTenant`; eviction tick in `processMonthEnd`; add `cancelEviction`; v6→v7 migration |
+| `src/components/ui/renovation-dialog.tsx` | `requiresVacant` flag on heavy options; new `hasTenant` prop; vacancy ineligibility message |
+| `src/components/ui/property-card.tsx` | Pass `hasTenant` to renovation dialog; mount `<EvictionDialog>` instead of remove button; pending-eviction banner |
+| `src/components/ui/tenant-selector.tsx` | Surface 5-week deposit requirement |
+| `src/components/ui/eviction-dialog.tsx` | **New file** — 4 grounds with validity gating |
+| `mem://game-mechanics/property-management/tenant-management` | Update — Renters' Rights eviction grounds & deposits |
+| `mem://game-mechanics/banking/overdraft-auto-use` | **New** — auto-use behaviour |
+| `mem://game-mechanics/macro-economic-events` | Update — grant removed |
 
-No changes to engine math; the net-worth fix is a sync issue between `value` and `marketValue`, not a recalc.
+---
+
+## Risks / open questions
+- **Legacy saves with active tenants** won't have deposits. We'll grandfather them (`depositHeld: 0`) so eviction returns nothing rather than refunding phantom money.
+- **Property locks are new state and touch listings** — if scope is tight, we can ship grounds + deposits + auto-overdraft first and defer locks to a follow-up.
+- **Rent arrears tracking** for `rent_arrears` ground reads from `tenantEvents` filtered to `type: 'default'` for the property — existing data, no schema change.
