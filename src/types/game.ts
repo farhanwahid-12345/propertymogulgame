@@ -283,7 +283,9 @@ export interface GameState {
   // Renters' Rights — eviction notice queue & post-eviction property locks
   pendingEvictions: PendingEviction[];
   propertyLocks: PropertyLock[];
+  // Player-raised TDS deposit disputes
+  depositDisputes: DepositDispute[];
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
