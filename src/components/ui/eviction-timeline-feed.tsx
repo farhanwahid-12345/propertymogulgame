@@ -33,6 +33,7 @@ export function EvictionTimelineFeed({
   ownedProperties,
   tenants,
   monthsPlayed,
+  onAppealEviction,
 }: Props) {
   if (!pendingEvictions || pendingEvictions.length === 0) return null;
 
