@@ -2030,10 +2030,38 @@ export const useGameStore = create<GameState & GameActions>()(
             ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
             : t
         );
-        showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+
+        // Damage-sourced concerns also update annual repair cap and 48-month cooldown
+        let updatedAnnual = prev.annualRepairCosts;
+        let updatedHistory = prev.damageHistory;
+        if (concern.source === 'damage') {
+          const currentYear = Math.floor(prev.monthsPlayed / 12);
+          const existing = prev.annualRepairCosts.find(a => a.propertyId === concern.propertyId && a.year === currentYear);
+          updatedAnnual = existing
+            ? prev.annualRepairCosts.map(a =>
+                a.propertyId === concern.propertyId && a.year === currentYear
+                  ? { ...a, totalCost: a.totalCost + concern.resolveCost }
+                  : a
+              )
+            : [...prev.annualRepairCosts, { propertyId: concern.propertyId, year: currentYear, totalCost: concern.resolveCost }];
+          const dmgHist = prev.damageHistory.find(dh => dh.propertyId === concern.propertyId);
+          updatedHistory = dmgHist
+            ? prev.damageHistory.map(dh =>
+                dh.propertyId === concern.propertyId
+                  ? { ...dh, lastDamageMonth: prev.monthsPlayed }
+                  : dh
+              )
+            : [...prev.damageHistory, { propertyId: concern.propertyId, lastDamageMonth: prev.monthsPlayed }];
+          showToast("🔧 Damage Repaired", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} on repairs.`);
+        } else {
+          showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+        }
+
         set({
           cash: prev.cash - concern.resolveCost,
           tenants: updatedTenants,
+          annualRepairCosts: updatedAnnual,
+          damageHistory: updatedHistory,
           tenantConcerns: concerns.map(c =>
             c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
           ),
