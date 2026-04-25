@@ -480,7 +480,7 @@ function migrateState(persisted: any): GameState {
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
-    'taxRecords', 'tenantConcerns',
+    'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
   ];
 
   arrayKeys.forEach((key) => {
