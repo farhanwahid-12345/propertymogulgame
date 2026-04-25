@@ -232,6 +232,7 @@ export function RenovationDialog({
   playerCash,
   onRenovate,
   activeRenovations = [],
+  completedRenovationIds = [],
   propertyType,
   internalSqft,
   plotSqft,
@@ -256,6 +257,7 @@ export function RenovationDialog({
 
   const canAfford = (renovation: RenovationType) => playerCash >= scaledCost(renovation);
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
+  const isCompleted = (renovation: RenovationType) => completedRenovationIds.includes(renovation.id);
 
   /** Returns null if eligible, else a short reason string. */
   const ineligibilityReason = (r: RenovationType): string | null => {
