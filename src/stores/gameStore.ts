@@ -1010,7 +1010,24 @@ export const useGameStore = create<GameState & GameActions>()(
           lastCorpTaxMonth = newMonthNumber;
         }
 
-        const finalCash = Math.max(0, newCashBeforeTax - taxPaid);
+        // Cashflow: subtract outflows (mortgage + council + tax) directly,
+        // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
+        // through credit() so any drawn overdraft repays first.
+        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - taxPaid;
+        let postOutflowOverdraft = prev.overdraftUsed;
+        let cashAfterCredit = cashAfterOutflows;
+        // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
+        if (cashAfterCredit < 0) {
+          const shortfall = -cashAfterCredit;
+          const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
+          const taken = Math.min(shortfall, overdraftAvail);
+          cashAfterCredit = -shortfall + taken;
+          postOutflowOverdraft = prev.overdraftUsed + taken;
+        }
+        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
+        const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
+        const finalCash = Math.max(0, credited.cash);
+        const finalOverdraftUsed = credited.overdraftUsed;
 
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
