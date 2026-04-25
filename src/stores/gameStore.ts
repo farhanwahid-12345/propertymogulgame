@@ -265,7 +265,8 @@ interface GameActions {
   rejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   // Tenants
   selectTenant: (propertyId: string, tenant: Tenant) => void;
-  removeTenant: (propertyId: string) => void;
+  evictTenant: (propertyId: string, ground: EvictionGround) => void;
+  cancelEviction: (propertyId: string) => void;
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
@@ -335,6 +336,8 @@ function createInitialState(): GameState {
     taxRecords: [],
     totalTaxPaid: 0,
     tenantConcerns: [],
+    pendingEvictions: [],
+    propertyLocks: [],
   };
 }
 
