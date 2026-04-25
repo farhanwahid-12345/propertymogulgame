@@ -1660,6 +1660,12 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
         }
+        // Can't let to a new tenant during a relet lock (post move-in eviction)
+        const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth);
+        if (releLock) {
+          showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
+          return;
+        }
 
         // Robust base-rent fallback: stored baseRent → current monthlyIncome →
         // value × yield/12 (last-resort for properties created via inline conveyancing)
@@ -1680,6 +1686,45 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
+        // Renters' Rights / Tenant Fees Act: 5-week deposit (capped) goes to TDS
+        const existingTenant = prev.tenants.find(t => t.propertyId === propertyId);
+        const previousDeposit = existingTenant?.depositHeld || 0;
+        const requiredDeposit = calcDeposit(newRent);
+        const depositDelta = requiredDeposit - previousDeposit; // refund prior, take new
+
+        if (depositDelta > 0) {
+          const debited = debit(prev, depositDelta);
+          if (!debited) {
+            showToast("Deposit Required", `Need £${fromPennies(requiredDeposit).toLocaleString()} (5 weeks rent) for the protected deposit.`, "destructive");
+            return;
+          }
+          const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
+          const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
+          const rec: PropertyTenant = {
+            propertyId,
+            tenant,
+            rentMultiplier: tenant.rentMultiplier,
+            startDate: Date.now(),
+            satisfaction: 80,
+            lastSatisfactionUpdate: prev.monthsPlayed,
+            satisfactionReasons: [],
+            depositHeld: requiredDeposit,
+          };
+          const updatedTenants = existingIdx >= 0
+            ? prev.tenants.map((t, i) => i === existingIdx ? rec : t)
+            : [...prev.tenants, rec];
+          const updatedProps = prev.ownedProperties.map(p =>
+            p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
+          );
+          const depositMsg = debited.usedOverdraft > 0
+            ? ` Deposit £${fromPennies(requiredDeposit).toLocaleString()} taken (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft).`
+            : ` Deposit £${fromPennies(requiredDeposit).toLocaleString()} taken.`;
+          showToast("Tenant Moved In!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo.${depositMsg}`);
+          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+          return;
+        }
+
+        // No additional deposit needed (lower rent or same)
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
         const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
         const rec: PropertyTenant = {
@@ -1690,27 +1735,101 @@ export const useGameStore = create<GameState & GameActions>()(
           satisfaction: 80,
           lastSatisfactionUpdate: prev.monthsPlayed,
           satisfactionReasons: [],
+          depositHeld: requiredDeposit,
         };
-        let updatedTenants;
-        if (existingIdx >= 0) { updatedTenants = [...prev.tenants]; updatedTenants[existingIdx] = rec; }
-        else updatedTenants = [...prev.tenants, rec];
-
+        const updatedTenants = existingIdx >= 0
+          ? prev.tenants.map((t, i) => i === existingIdx ? rec : t)
+          : [...prev.tenants, rec];
         const updatedProps = prev.ownedProperties.map(p =>
           p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
-        showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo`);
-        set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+        // If previous deposit was higher, refund the difference back to cash
+        const refund = previousDeposit - requiredDeposit;
+        if (refund > 0) {
+          const credited = credit(prev, refund);
+          showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. Refunded £${fromPennies(refund).toLocaleString()} surplus deposit.`);
+          set({ cash: credited.cash, overdraftUsed: credited.overdraftUsed, tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+        } else {
+          showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo`);
+          set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+        }
       },
 
-      removeTenant: (propertyId) => {
-        const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
-        const voidPeriod: VoidPeriod = { propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration };
-        showToast("Tenant Removed", `Property void for ${Math.floor(voidDuration / (24 * 60 * 60 * 1000))} days.`);
-        set(s => ({
-          tenants: s.tenants.filter(t => t.propertyId !== propertyId),
-          voidPeriods: [...s.voidPeriods, voidPeriod],
-        }));
+      // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
+      evictTenant: (propertyId, ground) => {
+        const prev = get();
+        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
+        if (!tenant) { showToast("No Tenant", "There is no tenant to evict.", "destructive"); return; }
+        if (prev.pendingEvictions.some(e => e.propertyId === propertyId)) {
+          showToast("Eviction Already Served", "Notice already in effect. Cancel it first.", "destructive"); return;
+        }
+
+        // Validate ground
+        const recentDefaults = prev.tenantEvents.filter(e => e.propertyId === propertyId && e.type === 'default').length;
+        const concerns = prev.tenantConcerns.filter(c => c.propertyId === propertyId && !c.resolvedMonth);
+        const longstandingASB = concerns.some(c =>
+          (c.category === 'noise' || c.category === 'safety') && (prev.monthsPlayed - c.raisedMonth) >= 1
+        );
+
+        let noticeMonths = 4;
+        let validReason = '';
+
+        switch (ground) {
+          case 'rent_arrears':
+            if (recentDefaults < 2) {
+              showToast("Invalid Ground", "Rent arrears requires ≥2 missed payments.", "destructive"); return;
+            }
+            noticeMonths = 1; // 4 weeks ≈ 1 month
+            validReason = `Rent arrears (${recentDefaults} missed payments)`;
+            break;
+          case 'antisocial_behaviour':
+            if (tenant.tenant.profile !== 'risky' || !longstandingASB) {
+              showToast("Invalid Ground", "ASB requires risky tenant + unresolved noise/safety concern >1 month.", "destructive"); return;
+            }
+            noticeMonths = 1; // 2 weeks rounded up to 1 month tick
+            validReason = 'Antisocial behaviour';
+            break;
+          case 'landlord_sale':
+            noticeMonths = 4;
+            validReason = 'Landlord intends to sell (4-month notice)';
+            break;
+          case 'landlord_move_in':
+            noticeMonths = 4;
+            validReason = 'Landlord moving in (4-month notice)';
+            break;
+        }
+
+        const effectiveMonth = prev.monthsPlayed + noticeMonths;
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground } : t
+        );
+        const newEviction: PendingEviction = {
+          propertyId,
+          tenantName: tenant.tenant.name,
+          ground,
+          servedMonth: prev.monthsPlayed,
+          effectiveMonth,
+        };
+        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.`);
+        set({
+          tenants: updatedTenants,
+          pendingEvictions: [...prev.pendingEvictions, newEviction],
+        });
       },
+
+      cancelEviction: (propertyId) => {
+        const prev = get();
+        if (!prev.pendingEvictions.some(e => e.propertyId === propertyId)) return;
+        showToast("Eviction Withdrawn", "Notice cancelled — tenant stays.");
+        set({
+          pendingEvictions: prev.pendingEvictions.filter(e => e.propertyId !== propertyId),
+          tenants: prev.tenants.map(t =>
+            t.propertyId === propertyId ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined } : t
+          ),
+        });
+      },
+
+
 
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
@@ -2168,7 +2287,7 @@ export const useGameStore = create<GameState & GameActions>()(
           buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
           listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
-          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, removeTenant,
+          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, evictTenant, cancelEviction,
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
