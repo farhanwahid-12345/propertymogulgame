@@ -519,12 +519,13 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         if (type === 'ltd') {
           const incorporationFee = toPennies(1000);
-          if (prev.cash < incorporationFee) {
-            showToast("Insufficient Funds", "Need £1,000 to incorporate.", "destructive");
+          const debited = debit(prev, incorporationFee);
+          if (!debited) {
+            showToast("Insufficient Funds", "Need £1,000 (even with overdraft) to incorporate.", "destructive");
             return;
           }
-          set({ entityType: type, cash: prev.cash - incorporationFee });
-          showToast("Incorporated! 🏢", "You are now trading as a Limited Company. Mortgage interest is fully tax-deductible.");
+          set({ entityType: type, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+          showToast("Incorporated! 🏢", `You are now trading as a Limited Company. Mortgage interest is fully tax-deductible.${debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft.)` : ''}`);
         } else {
           set({ entityType: type });
         }
@@ -885,6 +886,46 @@ export const useGameStore = create<GameState & GameActions>()(
         // Trim long-resolved
         updatedConcerns = updatedConcerns.filter(c => !c.resolvedMonth || (newMonthNumber - c.resolvedMonth) <= 6);
 
+        // ── Pending evictions: tick down notice periods, end tenancies, refund deposits, add locks ──
+        let activePendingEvictions: PendingEviction[] = [];
+        let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
+        let evictionDepositRefund = 0;
+        prev.pendingEvictions.forEach(ev => {
+          if (newMonthNumber < ev.effectiveMonth) {
+            activePendingEvictions.push(ev);
+            return;
+          }
+          // Notice expired — tenant vacates
+          const tenantRec = newTenants.find(t => t.propertyId === ev.propertyId);
+          const property = updatedOwnedProperties.find(p => p.id === ev.propertyId);
+          if (!tenantRec) return;
+
+          // Refund deposit (50% withheld if property is dilapidated — damage retention)
+          const refund = property?.condition === 'dilapidated'
+            ? Math.floor((tenantRec.depositHeld || 0) * 0.5)
+            : (tenantRec.depositHeld || 0);
+          evictionDepositRefund += refund;
+
+          // Remove tenant + start a void period
+          newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
+          const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+          newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+
+          // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
+          if (ev.ground === 'landlord_sale') {
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'sale_lock', untilMonth: newMonthNumber + 12 });
+          } else if (ev.ground === 'landlord_move_in') {
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12 });
+          }
+
+          showToast(
+            "Eviction Complete",
+            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${refund < (tenantRec.depositHeld || 0) ? ' (50% withheld for damage)' : ''}.`,
+          );
+        });
+        // Drop expired locks
+        newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
+
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
@@ -970,7 +1011,24 @@ export const useGameStore = create<GameState & GameActions>()(
           lastCorpTaxMonth = newMonthNumber;
         }
 
-        const finalCash = Math.max(0, newCashBeforeTax - taxPaid);
+        // Cashflow: subtract outflows (mortgage + council + tax) directly,
+        // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
+        // through credit() so any drawn overdraft repays first.
+        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - taxPaid;
+        let postOutflowOverdraft = prev.overdraftUsed;
+        let cashAfterCredit = cashAfterOutflows;
+        // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
+        if (cashAfterCredit < 0) {
+          const shortfall = -cashAfterCredit;
+          const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
+          const taken = Math.min(shortfall, overdraftAvail);
+          cashAfterCredit = -shortfall + taken;
+          postOutflowOverdraft = prev.overdraftUsed + taken;
+        }
+        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
+        const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
+        const finalCash = Math.max(0, credited.cash);
+        const finalOverdraftUsed = credited.overdraftUsed;
 
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
@@ -1020,6 +1078,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         set({
           cash: finalCash,
+          overdraftUsed: finalOverdraftUsed,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           level: newLevel,
@@ -1042,6 +1101,8 @@ export const useGameStore = create<GameState & GameActions>()(
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
           tenantConcerns: updatedConcerns,
+          pendingEvictions: activePendingEvictions,
+          propertyLocks: newPropertyLocks,
         });
       },
 
@@ -1291,7 +1352,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(property.price * 0.01) : 0;
         const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        if (prev.cash < cashRequired) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
@@ -1346,8 +1408,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
 
+        if (debited.usedOverdraft > 0) {
+          showToast("Overdraft Used", `Tapped £${fromPennies(debited.usedOverdraft).toLocaleString()} overdraft for the deposit.`);
+        }
         set({
-          cash: prev.cash - cashRequired,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           conveyancing: [...prev.conveyancing, conv],
           // Hide property from market while in conveyancing
           estateAgentProperties: prev.estateAgentProperties.filter(p => p.id !== property.id),
@@ -1372,7 +1438,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(purchasePrice * 0.01) : 0;
         const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        if (prev.cash < cashRequired) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
@@ -1424,8 +1491,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
 
+        if (debited.usedOverdraft > 0) {
+          showToast("Overdraft Used", `Tapped £${fromPennies(debited.usedOverdraft).toLocaleString()} overdraft for the deposit.`);
+        }
         set({
-          cash: prev.cash - cashRequired,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           conveyancing: [...prev.conveyancing, conv],
           // Hide property from market while in conveyancing
           estateAgentProperties: prev.estateAgentProperties.filter(p => p.id !== property.id),
@@ -1845,7 +1916,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
 
         const costPennies = toPennies(scaledCostPounds);
-        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, costPennies);
+        if (!debited) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()} (even with overdraft).`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId)) { showToast("Renovation in Progress", "Already renovating!", "destructive"); return; }
 
         // Persist scaled values onto the renovation record so completion uses the same numbers
@@ -1860,8 +1932,9 @@ export const useGameStore = create<GameState & GameActions>()(
           type: scaledRenovationType, startDate: Date.now(),
           completionDate: Date.now() + (renovationType.duration * 60 * 1000),
         };
-        showToast("Renovation Started!", `${renovationType.name} begun.`);
-        set(s => ({ cash: s.cash - costPennies, renovations: [...s.renovations, renovation] }));
+        const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+        showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
+        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, renovations: [...prev.renovations, renovation] });
       },
 
       upgradeCondition: (propertyId, targetCondition) => {
@@ -1873,7 +1946,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const cost = getConditionUpgradeCost(property.value, property.condition, targetCondition);
         if (cost <= 0) { showToast("Invalid Upgrade", "Cannot upgrade to this condition.", "destructive"); return; }
-        if (prev.cash < cost) { showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, cost);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         const baseRent = property.baseRent || property.monthlyIncome;
         const newRent = Math.floor(baseRent * getConditionRentMultiplier(targetCondition));
@@ -1888,7 +1962,8 @@ export const useGameStore = create<GameState & GameActions>()(
           `${property.name} upgraded to ${targetCondition}. Rent £${fromPennies(newRent).toLocaleString()}/mo, value +£${fromPennies(valueDelta).toLocaleString()}`,
         );
         set({
-          cash: prev.cash - cost,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           ownedProperties: prev.ownedProperties.map(p =>
             p.id === propertyId
               ? { ...p, condition: targetCondition, monthsSinceLastRenovation: 0, monthlyIncome: newRent, value: newValue, marketValue: newMarketValue }
@@ -1905,28 +1980,34 @@ export const useGameStore = create<GameState & GameActions>()(
 
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
-            if (prev.cash < partialAmount) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()}`, "destructive"); return; }
+            const debited = debit(prev, partialAmount);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()} (even with overdraft).`, "destructive"); return; }
             const newBal = mortgage.remainingBalance - partialAmount;
+            const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
             if (newBal <= 0) {
-              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}`);
-              set({ cash: prev.cash - partialAmount, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
+              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}${odNote}`);
+              set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
             } else {
-              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
-              set({ cash: prev.cash - partialAmount, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
+              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}${odNote}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
+              set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
             }
           } else {
-            if (prev.cash < mortgage.remainingBalance) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()}`, "destructive"); return; }
-            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}`);
-            set({ cash: prev.cash - mortgage.remainingBalance, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
+            const debited = debit(prev, mortgage.remainingBalance);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}${odNote}`);
+            set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
           }
         } else {
           const settleProp = prev.ownedProperties.find(p => p.id === settlementPropertyId);
           if (!settleProp) { showToast("Settlement Failed", "Property not found!", "destructive"); return; }
           if (settleProp.value < mortgage.remainingBalance) { showToast("Insufficient Value", "Property value too low!", "destructive"); return; }
           const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE);
+          const credited = credit(prev, cashFromSale);
           showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}`);
           set({
-            cash: prev.cash + cashFromSale,
+            cash: credited.cash,
+            overdraftUsed: credited.overdraftUsed,
             ownedProperties: prev.ownedProperties.filter(p => p.id !== settlementPropertyId),
             mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
             tenants: prev.tenants.filter(t => t.propertyId !== settlementPropertyId),
@@ -1959,9 +2040,11 @@ export const useGameStore = create<GameState & GameActions>()(
           interestRate: rate, termYears: 25, mortgageType: 'repayment',
           providerId, startDate: Date.now(),
         };
-        showToast("Remortgage Complete!", `Cash raised: £${fromPennies(cashRaised).toLocaleString()}`);
+        const credited = credit(prev, cashRaised);
+        showToast("Remortgage Complete!", `Cash raised: £${fromPennies(cashRaised).toLocaleString()}${credited.overdraftUsed < prev.overdraftUsed ? ` (£${fromPennies(prev.overdraftUsed - credited.overdraftUsed).toLocaleString()} repaid overdraft)` : ''}`);
         set({
-          cash: prev.cash + cashRaised,
+          cash: credited.cash,
+          overdraftUsed: credited.overdraftUsed,
           mortgages: existing ? prev.mortgages.map(m => m.propertyId === propertyId ? newMortgage : m) : [...prev.mortgages, newMortgage],
         });
       },
@@ -2001,9 +2084,19 @@ export const useGameStore = create<GameState & GameActions>()(
           providerId: provider.id, startDate: Date.now(),
         };
         const cashDelta = newLoanAmount - currentBal;
+        // cashDelta can be positive (cash out) or negative (paying down). Route through credit/debit.
+        let cashUpdate: { cash: number; overdraftUsed: number };
+        if (cashDelta >= 0) {
+          cashUpdate = credit(prev, cashDelta);
+        } else {
+          const dbg = debit(prev, -cashDelta);
+          if (!dbg) { showToast("Insufficient Cash", `Need £${fromPennies(-cashDelta).toLocaleString()} (even with overdraft) for refi.`, "destructive"); return; }
+          cashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
+        }
         showToast("Refinance Complete!", cashDelta > 0 ? `£${fromPennies(cashDelta).toLocaleString()} released.` : `Refinanced for £${fromPennies(newLoanAmount).toLocaleString()}`);
         set({
-          cash: prev.cash + cashDelta,
+          cash: cashUpdate.cash,
+          overdraftUsed: cashUpdate.overdraftUsed,
           mortgages: existing ? prev.mortgages.map(m => m.propertyId === propertyId ? newMortgage : m) : [...prev.mortgages, newMortgage],
         });
       },
@@ -2050,7 +2143,15 @@ export const useGameStore = create<GameState & GameActions>()(
         };
         const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
         const cashDelta = loanAmount - totalCurrentMortgages;
-        set({ cash: prev.cash + cashDelta, mortgages: [...remainingMortgages, portfolioMortgage] });
+        let pmCashUpdate: { cash: number; overdraftUsed: number };
+        if (cashDelta >= 0) {
+          pmCashUpdate = credit(prev, cashDelta);
+        } else {
+          const dbg = debit(prev, -cashDelta);
+          if (!dbg) { showToast("Insufficient Cash", `Need £${fromPennies(-cashDelta).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+          pmCashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
+        }
+        set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
       // ─── OVERDRAFT / CASH ─────────────────
@@ -2193,8 +2294,9 @@ export const useGameStore = create<GameState & GameActions>()(
         const concerns = prev.tenantConcerns || [];
         const concern = concerns.find(c => c.id === concernId && !c.resolvedMonth);
         if (!concern) return;
-        if (prev.cash < concern.resolveCost) {
-          showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} to resolve.`, "destructive");
+        const debited = debit(prev, concern.resolveCost);
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} (even with overdraft) to resolve.`, "destructive");
           return;
         }
         const updatedTenants = prev.tenants.map(t =>
@@ -2230,7 +2332,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         set({
-          cash: prev.cash - concern.resolveCost,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           tenants: updatedTenants,
           annualRepairCosts: updatedAnnual,
           damageHistory: updatedHistory,

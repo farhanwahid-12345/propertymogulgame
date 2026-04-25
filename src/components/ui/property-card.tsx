@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
+import { EvictionDialog } from "@/components/ui/eviction-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -119,6 +120,10 @@ export const PropertyCard = memo(function PropertyCard({
   currentMarketRate = 0.05,
   baseMarketRate = 0.05,
   providerRates = {},
+  evictTenant,
+  cancelEviction,
+  pendingEviction,
+  rentArrearsCount = 0,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -453,6 +458,38 @@ export const PropertyCard = memo(function PropertyCard({
                     <div className="text-[10px] text-amber-400 italic px-1">
                       ⏳ Rent pending — tenant just moved in
                     </div>
+                  )}
+                  {/* Eviction notice banner OR serve-notice button */}
+                  {currentTenant && pendingEviction && (
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 flex items-center justify-between gap-2">
+                      <div className="text-[11px]">
+                        <div className="font-semibold text-destructive">Eviction notice served</div>
+                        <div className="text-muted-foreground">
+                          Ground: {pendingEviction.ground.replace(/_/g, ' ')} · Vacates by month {pendingEviction.effectiveMonth}
+                        </div>
+                      </div>
+                      {cancelEviction && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-[10px] h-7"
+                          onClick={() => cancelEviction(property.id)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {currentTenant && !pendingEviction && evictTenant && (
+                    <EvictionDialog
+                      propertyId={property.id}
+                      propertyName={property.name}
+                      tenantName={currentTenant.name}
+                      tenantProfile={currentTenant.profile}
+                      rentArrearsCount={rentArrearsCount}
+                      hasLongstandingASB={false}
+                      onEvict={evictTenant}
+                    />
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
