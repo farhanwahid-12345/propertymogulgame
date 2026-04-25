@@ -157,6 +157,7 @@ function sanitizeTenantConcern(record: any): import('@/types/game').TenantConcer
     resolveCost: asNumber(record?.resolveCost),
     satisfactionPenaltyIfIgnored: asNumber(record?.satisfactionPenaltyIfIgnored),
     resolvedMonth: typeof record?.resolvedMonth === 'number' ? record.resolvedMonth : undefined,
+    source: record?.source === 'damage' || record?.source === 'tenant' ? record.source : undefined,
   };
 }
 
