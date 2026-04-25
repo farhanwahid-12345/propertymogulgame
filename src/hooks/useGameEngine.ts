@@ -25,9 +25,12 @@ export function useGameEngine() {
 
   useEffect(() => {
     const handleTick = (deltaMs: number) => {
-      accumulatedSec.current += deltaMs / 1000;
-      marketAccumSec.current += deltaMs / 1000;
-      counterAccumSec.current += deltaMs / 1000;
+      // Scale wall-clock delta by user-selected game speed multiplier.
+      const speed = useGameStore.getState().gameSpeed || 1;
+      const scaledMs = deltaMs * speed;
+      accumulatedSec.current += scaledMs / 1000;
+      marketAccumSec.current += scaledMs / 1000;
+      counterAccumSec.current += scaledMs / 1000;
 
       // Whole-second clock ticks (catch up multiple seconds if needed)
       while (accumulatedSec.current >= 1) {
