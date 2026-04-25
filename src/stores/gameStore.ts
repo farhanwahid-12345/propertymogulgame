@@ -1351,7 +1351,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(property.price * 0.01) : 0;
         const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        if (prev.cash < cashRequired) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
