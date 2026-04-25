@@ -460,6 +460,11 @@ export const PropertyCard = memo(function PropertyCard({
                       playerCash={playerCash}
                       onRenovate={onRenovate}
                       activeRenovations={activeRenovationIds}
+                      completedRenovationIds={property.completedRenovationIds}
+                      propertyType={propertyType}
+                      internalSqft={property.internalSqft}
+                      plotSqft={property.plotSqft}
+                      currentSubtype={property.subtype}
                     />
                   )}
                   {onUpgradeCondition && property.condition !== 'premium' && (() => {
