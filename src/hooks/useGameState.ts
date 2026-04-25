@@ -171,9 +171,13 @@ export function useGameState() {
     store.selectTenant(propertyId, tenant);
   }, [store.selectTenant]);
 
-  const removeTenant = useCallback((propertyId: string) => {
-    store.removeTenant(propertyId);
-  }, [store.removeTenant]);
+  const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => {
+    store.evictTenant(propertyId, ground);
+  }, [store.evictTenant]);
+
+  const cancelEviction = useCallback((propertyId: string) => {
+    store.cancelEviction(propertyId);
+  }, [store.cancelEviction]);
 
   const startRenovation = useCallback((propertyId: string, renovationType: any) => {
     store.startRenovation(propertyId, renovationType);
@@ -361,7 +365,8 @@ export function useGameState() {
     buyPropertyAtPrice,
     sellProperty,
     selectTenant,
-    removeTenant,
+    evictTenant,
+    cancelEviction,
     startRenovation,
     upgradeCondition,
     settleMortgage,
