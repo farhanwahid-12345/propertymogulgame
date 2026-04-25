@@ -2085,8 +2085,19 @@ export const useGameStore = create<GameState & GameActions>()(
         };
         const cashDelta = newLoanAmount - currentBal;
         showToast("Refinance Complete!", cashDelta > 0 ? `£${fromPennies(cashDelta).toLocaleString()} released.` : `Refinanced for £${fromPennies(newLoanAmount).toLocaleString()}`);
+        // cashDelta can be positive (cash out) or negative (paying down). Route through credit/debit.
+        let cashUpdate: { cash: number; overdraftUsed: number };
+        if (cashDelta >= 0) {
+          cashUpdate = credit(prev, cashDelta);
+        } else {
+          const dbg = debit(prev, -cashDelta);
+          if (!dbg) { showToast("Insufficient Cash", `Need £${fromPennies(-cashDelta).toLocaleString()} (even with overdraft) for refi.`, "destructive"); return; }
+          cashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
+        }
+        showToast("Refinance Complete!", cashDelta > 0 ? `£${fromPennies(cashDelta).toLocaleString()} released.` : `Refinanced for £${fromPennies(newLoanAmount).toLocaleString()}`);
         set({
-          cash: prev.cash + cashDelta,
+          cash: cashUpdate.cash,
+          overdraftUsed: cashUpdate.overdraftUsed,
           mortgages: existing ? prev.mortgages.map(m => m.propertyId === propertyId ? newMortgage : m) : [...prev.mortgages, newMortgage],
         });
       },
