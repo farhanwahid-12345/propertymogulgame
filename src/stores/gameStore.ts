@@ -278,6 +278,7 @@ function createInitialState(): GameState {
     currentMarketRate: BASE_MARKET_RATE,
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
+    gameSpeed: 1,
     lastYearlyGrowth: 0,
     yearlyNetProfit: 0,
     lastCorporationTaxMonth: 0,
