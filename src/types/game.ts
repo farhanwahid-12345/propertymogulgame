@@ -131,8 +131,24 @@ export interface PendingEviction {
 
 export interface PropertyLock {
   propertyId: string;
-  reason: 'sale_lock' | 'relet_lock';
+  reason: 'sale_lock' | 'relet_lock' | 'appeal_cooldown';
   untilMonth: number;
+}
+
+/** Player-raised dispute over a withheld portion of a tenant's deposit (TDS adjudication). */
+export interface DepositDispute {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  /** Pennies withheld from the tenant at eviction completion. */
+  withheldAmount: number;
+  /** Pennies already refunded to the tenant. */
+  refundedAmount: number;
+  raisedMonth: number;
+  status: 'open' | 'won' | 'lost' | 'settled';
+  /** monthsPlayed when the dispute was resolved (for hide-after-1-month UI). */
+  resolvedMonth?: number;
 }
 
 export interface VoidPeriod {
