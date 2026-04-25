@@ -41,8 +41,8 @@ const Index = () => {
     return yieldB - yieldA;
   });
 
-  // Portfolio summary calculations
-  const totalPortfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + (p.marketValue || p.value), 0);
+  // Portfolio summary calculations — use `value` (matches netWorth calc; marketValue can drift)
+  const totalPortfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
   const totalPortfolioIncome = gameState.ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
   const avgYield = totalPortfolioValue > 0 
     ? ((totalPortfolioIncome * 12 / totalPortfolioValue) * 100).toFixed(1) 
