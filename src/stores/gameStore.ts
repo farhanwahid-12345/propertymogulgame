@@ -4,7 +4,7 @@ import type {
   GameState, Property, Mortgage, PropertyTenant, VoidPeriod,
   PropertyListing, PropertyOffer, Renovation,
   PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
-  EntityType, PropertyCondition,
+  EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
@@ -39,6 +39,42 @@ function showToast(title: string, description: string, variant?: 'destructive') 
       try { toast({ title, description, variant }); } catch (e) { /* noop */ }
     })
     .catch(() => { /* noop — never let toast import crash the app */ });
+}
+
+// ─── Cash debit/credit helpers ──────────────────────────────
+// All cash-spending sites use `debit` so the overdraft is auto-tapped when
+// available cash isn't enough. All income sites use `credit` so any drawn
+// overdraft is auto-repaid before fresh cash hits the wallet.
+function debit(
+  state: { cash: number; overdraftUsed: number; overdraftLimit: number },
+  amount: number,
+): { cash: number; overdraftUsed: number; usedOverdraft: number } | null {
+  if (amount <= 0) return { cash: state.cash, overdraftUsed: state.overdraftUsed, usedOverdraft: 0 };
+  const overdraftAvailable = Math.max(0, state.overdraftLimit - state.overdraftUsed);
+  const totalAvailable = state.cash + overdraftAvailable;
+  if (totalAvailable < amount) return null;
+  if (state.cash >= amount) {
+    return { cash: state.cash - amount, overdraftUsed: state.overdraftUsed, usedOverdraft: 0 };
+  }
+  const fromOverdraft = amount - state.cash;
+  return { cash: 0, overdraftUsed: state.overdraftUsed + fromOverdraft, usedOverdraft: fromOverdraft };
+}
+
+function credit(
+  state: { cash: number; overdraftUsed: number },
+  amount: number,
+): { cash: number; overdraftUsed: number } {
+  if (amount <= 0) return { cash: state.cash, overdraftUsed: state.overdraftUsed };
+  if (state.overdraftUsed > 0) {
+    const repay = Math.min(state.overdraftUsed, amount);
+    return { cash: state.cash + (amount - repay), overdraftUsed: state.overdraftUsed - repay };
+  }
+  return { cash: state.cash + amount, overdraftUsed: state.overdraftUsed };
+}
+
+/** 5 weeks of monthly rent (Tenant Fees Act 2019 cap). Pass rent in pennies, get pennies. */
+function calcDeposit(monthlyRentPennies: number): number {
+  return Math.floor((monthlyRentPennies * 12 * 5) / 52);
 }
 
 const VALID_PROPERTY_TYPES = ['residential', 'commercial', 'luxury'] as const;
