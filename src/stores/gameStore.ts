@@ -30,6 +30,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from '@/lib/engine/renovation';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
