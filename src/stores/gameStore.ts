@@ -1118,13 +1118,21 @@ export const useGameStore = create<GameState & GameActions>()(
         const endedVoids = prev.voidPeriods.filter(vp => currentTime >= vp.endDate);
         endedVoids.forEach(() => showToast("Void Period Ended", "Your property is now ready for a new tenant!"));
 
-        // Damage events
-        const newDamages: PropertyDamage[] = [];
+        // Damage events — now flow through the tenant concerns feed (no more interrupt dialog)
+        const newDamageConcerns: import('@/types/game').TenantConcern[] = [];
         const globalCooldown = prev.lastGlobalDamageMonth !== undefined ? prev.monthsPlayed - prev.lastGlobalDamageMonth : 999;
         if (globalCooldown >= 6) {
           const currentYear = Math.floor(prev.monthsPlayed / 12);
+          const damageDescriptions = [
+            'Boiler breakdown — heating system needs repair',
+            'Roof leak causing interior damage',
+            'Major plumbing failure under kitchen',
+            'Electrical fault — RCD tripping repeatedly',
+            'Damaged flooring requiring replacement',
+            'Broken window and frame, security risk',
+          ];
           prev.tenants.forEach(({ propertyId, tenant }) => {
-            if (newDamages.length > 0) return;
+            if (newDamageConcerns.length > 0) return;
             if (Math.random() >= tenant.damageRisk / 100) return;
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (!property) return;
@@ -1137,10 +1145,23 @@ export const useGameStore = create<GameState & GameActions>()(
             if (currentCost >= annualCap) return;
             const maxDmg = Math.min(Math.round(property.value * (0.01 + Math.random() * 0.01)), annualCap - currentCost);
             if (maxDmg > 0) {
-              newDamages.push({
-                id: `damage_${Date.now()}_${propertyId}`, propertyId,
-                propertyName: property.name, repairCost: Math.floor(maxDmg), timestamp: Date.now(),
+              const desc = damageDescriptions[Math.floor(Math.random() * damageDescriptions.length)];
+              newDamageConcerns.push({
+                id: `concern_damage_${Date.now()}_${propertyId}`,
+                propertyId,
+                tenantProfile: tenant.profile as any,
+                category: 'maintenance',
+                description: desc,
+                raisedMonth: prev.monthsPlayed,
+                resolveCost: Math.floor(maxDmg),
+                satisfactionPenaltyIfIgnored: 6,
+                source: 'damage',
               });
+              showToast(
+                "🔧 Property Damage",
+                `${property.name}: ${desc}. Resolve in the Concerns feed.`,
+                "destructive",
+              );
             }
           });
         }
@@ -1154,8 +1175,8 @@ export const useGameStore = create<GameState & GameActions>()(
           currentMarketRate: newMarketRate,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
-          pendingDamages: [...prev.pendingDamages, ...newDamages],
-          lastGlobalDamageMonth: newDamages.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
+          tenantConcerns: [...(prev.tenantConcerns || []), ...newDamageConcerns],
+          lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
         });
       },
