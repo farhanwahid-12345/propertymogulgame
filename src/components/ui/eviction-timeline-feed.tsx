@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Gavel, Home, UserMinus, AlertTriangle, ShieldAlert } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
+import { EvictionAppealDialog } from "@/components/ui/eviction-appeal-dialog";
 import type { PendingEviction, Property, PropertyTenant, EvictionGround } from "@/types/game";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   ownedProperties: Pick<Property, 'id' | 'name' | 'condition'>[];
   tenants: PropertyTenant[];
   monthsPlayed: number;
+  onAppealEviction?: (propertyId: string) => void;
 }
 
 const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; tone: string }> = {
@@ -31,6 +33,7 @@ export function EvictionTimelineFeed({
   ownedProperties,
   tenants,
   monthsPlayed,
+  onAppealEviction,
 }: Props) {
   if (!pendingEvictions || pendingEvictions.length === 0) return null;
 
@@ -120,6 +123,18 @@ export function EvictionTimelineFeed({
                 </div>
                 <Progress value={progressPct} className="h-1.5" />
               </div>
+
+              {onAppealEviction && monthsRemaining > 0 && (
+                <div className="flex justify-end pt-1">
+                  <EvictionAppealDialog
+                    propertyId={ev.propertyId}
+                    propertyName={property?.name || ev.propertyId}
+                    tenantName={ev.tenantName}
+                    ground={ev.ground}
+                    onAppeal={onAppealEviction}
+                  />
+                </div>
+              )}
             </div>
           );
         })}

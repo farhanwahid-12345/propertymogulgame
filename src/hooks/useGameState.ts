@@ -179,6 +179,18 @@ export function useGameState() {
     store.cancelEviction(propertyId);
   }, [store.cancelEviction]);
 
+  const appealEviction = useCallback((propertyId: string) => {
+    store.appealEviction(propertyId);
+  }, [store.appealEviction]);
+
+  const disputeDeposit = useCallback((disputeId: string) => {
+    store.disputeDeposit(disputeId);
+  }, [store.disputeDeposit]);
+
+  const dismissDispute = useCallback((disputeId: string) => {
+    store.dismissDispute(disputeId);
+  }, [store.dismissDispute]);
+
   const startRenovation = useCallback((propertyId: string, renovationType: any) => {
     store.startRenovation(propertyId, renovationType);
   }, [store.startRenovation]);
@@ -322,6 +334,7 @@ export function useGameState() {
     tenantEvents,
     pendingEvictions: Array.isArray(store.pendingEvictions) ? store.pendingEvictions : [],
     propertyLocks: Array.isArray(store.propertyLocks) ? store.propertyLocks : [],
+    depositDisputes: Array.isArray(store.depositDisputes) ? store.depositDisputes : [],
     voidPeriods: Array.isArray(store.voidPeriods) ? store.voidPeriods : [],
     propertyListings,
     overdraftLimit,
@@ -369,6 +382,9 @@ export function useGameState() {
     selectTenant,
     evictTenant,
     cancelEviction,
+    appealEviction,
+    disputeDeposit,
+    dismissDispute,
     startRenovation,
     upgradeCondition,
     settleMortgage,

@@ -5,6 +5,7 @@ import type {
   PropertyListing, PropertyOffer, Renovation,
   PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
+  DepositDispute,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
@@ -267,6 +268,9 @@ interface GameActions {
   selectTenant: (propertyId: string, tenant: Tenant) => void;
   evictTenant: (propertyId: string, ground: EvictionGround) => void;
   cancelEviction: (propertyId: string) => void;
+  appealEviction: (propertyId: string) => void;
+  disputeDeposit: (disputeId: string) => void;
+  dismissDispute: (disputeId: string) => void;
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
@@ -338,6 +342,7 @@ function createInitialState(): GameState {
     tenantConcerns: [],
     pendingEvictions: [],
     propertyLocks: [],
+    depositDisputes: [],
   };
 }
 
@@ -458,6 +463,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 7;
   }
 
+  // v7 → v8: add depositDisputes slice
+  if (persisted._version < 8) {
+    if (!Array.isArray(persisted.depositDisputes)) persisted.depositDisputes = [];
+    persisted._version = 8;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -472,7 +483,7 @@ function migrateState(persisted: any): GameState {
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
-    'taxRecords', 'tenantConcerns',
+    'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
   ];
 
   arrayKeys.forEach((key) => {
@@ -890,6 +901,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let activePendingEvictions: PendingEviction[] = [];
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
         let evictionDepositRefund = 0;
+        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || [])];
         prev.pendingEvictions.forEach(ev => {
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);
@@ -901,10 +913,26 @@ export const useGameStore = create<GameState & GameActions>()(
           if (!tenantRec) return;
 
           // Refund deposit (50% withheld if property is dilapidated — damage retention)
+          const heldAmount = tenantRec.depositHeld || 0;
           const refund = property?.condition === 'dilapidated'
-            ? Math.floor((tenantRec.depositHeld || 0) * 0.5)
-            : (tenantRec.depositHeld || 0);
+            ? Math.floor(heldAmount * 0.5)
+            : heldAmount;
+          const withheld = heldAmount - refund;
           evictionDepositRefund += refund;
+
+          // If we withheld anything, raise an open dispute the player can respond to
+          if (withheld > 0) {
+            newDepositDisputes.push({
+              id: `dispute_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              propertyId: ev.propertyId,
+              propertyName: property?.name || ev.propertyId,
+              tenantName: tenantRec.tenant.name,
+              withheldAmount: withheld,
+              refundedAmount: refund,
+              raisedMonth: newMonthNumber,
+              status: 'open',
+            });
+          }
 
           // Remove tenant + start a void period
           newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
@@ -920,11 +948,17 @@ export const useGameStore = create<GameState & GameActions>()(
 
           showToast(
             "Eviction Complete",
-            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${refund < (tenantRec.depositHeld || 0) ? ' (50% withheld for damage)' : ''}.`,
+            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${withheld > 0 ? ` (£${fromPennies(withheld).toLocaleString()} withheld — tenant may dispute)` : ''}.`,
           );
         });
         // Drop expired locks
         newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
+        // Auto-expire deposit disputes 6 months after raised (only the closed ones — keep open ones forever until acted on)
+        newDepositDisputes = newDepositDisputes.filter(d => {
+          if (d.status === 'open') return true;
+          const ageSinceResolved = newMonthNumber - (d.resolvedMonth ?? d.raisedMonth);
+          return ageSinceResolved <= 1;
+        });
 
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
@@ -944,17 +978,25 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Level Up!", `Congratulations! You reached level ${newLevel}!`);
         }
 
-        // ── Monthly property value drift (~5.5%/yr nominal w/ occasional dips) ──
-        // Replaces the old once-yearly 2-4% bump. Long-run trend is gentle and upward,
-        // so freshly-bought properties don't show losses immediately after fees.
+        // ── Monthly property value drift (~3%/yr nominal w/ small frequent dips) ──
+        // Tempered to realistic UK long-run growth. A 2.5× purchase-price soft cap
+        // prevents runaway compounding on long-held assets — once value hits 2.5× the
+        // original purchase price, only `marketValue` drifts (the "asking" signal),
+        // while booked `value` (used for net worth) is held at the cap.
         updatedOwnedProperties = updatedOwnedProperties.map(property => {
-          const monthlyDrift = 0.0045 + (Math.random() - 0.5) * 0.004; // ~0.25%–0.65%
-          const isDip = Math.random() < 0.015;
-          const change = isDip ? -(0.005 + Math.random() * 0.01) : monthlyDrift;
+          const monthlyDrift = 0.0025 + (Math.random() - 0.5) * 0.003; // ~0.10%–0.40%/mo
+          const isDip = Math.random() < 0.04; // 4% chance/month — small corrections more frequent
+          const change = isDip ? -(0.004 + Math.random() * 0.012) : monthlyDrift; // dips up to ~1.6%/mo
+          const purchaseBasis = property.price || property.value;
+          const valueCap = Math.round(purchaseBasis * 2.5);
+          const drifted = Math.round(property.value * (1 + change));
+          const driftedMarket = Math.round((property.marketValue || property.value) * (1 + change));
+          // Apply soft cap on booked value; allow market value to drift either way still
+          const newValue = change > 0 ? Math.min(drifted, valueCap) : drifted;
           return {
             ...property,
-            value: Math.round(property.value * (1 + change)),
-            marketValue: Math.round((property.marketValue || property.value) * (1 + change)),
+            value: newValue,
+            marketValue: driftedMarket,
           };
         });
 
@@ -1038,8 +1080,8 @@ export const useGameStore = create<GameState & GameActions>()(
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
           const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
             { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%.' },
-            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values and rents increase by 15%.' },
-            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5% and property values drop 10%.' },
+            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values rise 8% and rents nudge up 5%.' },
+            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5%, values drop 10%, rents soften 3%.' },
           ];
           const chosen = eventTypes[Math.floor(Math.random() * eventTypes.length)];
           const event: MacroEconomicEvent = {
@@ -1050,17 +1092,24 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (chosen.type === 'rate_cut') eventRateAdjust = -0.01;
           else if (chosen.type === 'tech_boom') {
-            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-              ...p, value: Math.floor(p.value * 1.15),
-              marketValue: Math.floor((p.marketValue || p.value) * 1.15),
-              monthlyIncome: Math.floor(p.monthlyIncome * 1.15),
-              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.15),
-            }));
+            updatedOwnedProperties = updatedOwnedProperties.map(p => {
+              const purchaseBasis = p.price || p.value;
+              const valueCap = Math.round(purchaseBasis * 2.5);
+              const newValue = Math.min(Math.floor(p.value * 1.08), valueCap);
+              return {
+                ...p, value: newValue,
+                marketValue: Math.floor((p.marketValue || p.value) * 1.08),
+                monthlyIncome: Math.floor(p.monthlyIncome * 1.05),
+                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.05),
+              };
+            });
           } else if (chosen.type === 'recession') {
             eventRateAdjust = 0.015;
             updatedOwnedProperties = updatedOwnedProperties.map(p => ({
               ...p, value: Math.floor(p.value * 0.90),
               marketValue: Math.floor((p.marketValue || p.value) * 0.90),
+              monthlyIncome: Math.floor(p.monthlyIncome * 0.97),
+              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.97),
             }));
           }
 
@@ -1103,6 +1152,7 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantConcerns: updatedConcerns,
           pendingEvictions: activePendingEvictions,
           propertyLocks: newPropertyLocks,
+          depositDisputes: newDepositDisputes,
         });
       },
 
@@ -1900,7 +1950,165 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
+      // ─── RENTERS' RIGHTS — APPEALS & DISPUTES ──────────────
+      // Tenant-side appeal of a served eviction notice. £400 tribunal fee.
+      // 60% upheld (notice stands), 40% overturned (notice removed, tenant
+      // satisfaction bumped, 6-month re-attempt cooldown for landlord-grounds).
+      appealEviction: (propertyId) => {
+        const prev = get();
+        const eviction = prev.pendingEvictions.find(e => e.propertyId === propertyId);
+        if (!eviction) {
+          showToast("No Notice", "There is no eviction notice on this property to appeal.", "destructive");
+          return;
+        }
+        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
+        if (!tenant) {
+          showToast("No Tenant", "Cannot appeal — the tenant has already vacated.", "destructive");
+          return;
+        }
 
+        const FEE = toPennies(400);
+        const debited = debit(prev, FEE);
+        if (!debited) {
+          showToast("Insufficient Funds", "You can't afford the £400 tribunal fee, even with overdraft.", "destructive");
+          return;
+        }
+        if (debited.usedOverdraft > 0) {
+          showToast("Overdraft Used", `Tribunal fee of £400 drawn from overdraft.`);
+        }
+
+        const upheld = Math.random() < 0.60;
+        if (upheld) {
+          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+          showToast(
+            "Tribunal Ruling: Upheld",
+            `The tribunal upheld your eviction notice on ${eviction.tenantName}. The notice stands.`,
+          );
+          return;
+        }
+
+        // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
+        const newPendingEvictions = prev.pendingEvictions.filter(e => e.propertyId !== propertyId);
+        const newTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId
+            ? {
+                ...t,
+                satisfaction: Math.min(100, (t.satisfaction || 0) + 15),
+                evictionNoticeMonth: undefined,
+                evictionGround: undefined,
+              }
+            : t,
+        );
+        const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
+        const newPropertyLocks = cooldownGrounds.includes(eviction.ground)
+          ? [
+              ...prev.propertyLocks,
+              { propertyId, reason: 'appeal_cooldown' as const, untilMonth: prev.monthsPlayed + 6 },
+            ]
+          : prev.propertyLocks;
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          pendingEvictions: newPendingEvictions,
+          tenants: newTenants,
+          propertyLocks: newPropertyLocks,
+        });
+        showToast(
+          "Tribunal Ruling: Overturned",
+          `The tribunal sided with ${eviction.tenantName}. Notice removed; tenant satisfaction restored.${cooldownGrounds.includes(eviction.ground) ? ' 6-month re-attempt cooldown applied.' : ''}`,
+        );
+      },
+
+      // Player raises a TDS adjudication on a withheld deposit.
+      // 35% landlord wins (no further refund) | 50% partial settle (half withheld back)
+      // 15% tenant wins (full withheld back). TDS is free.
+      disputeDeposit: (disputeId) => {
+        const prev = get();
+        const dispute = (prev.depositDisputes || []).find(d => d.id === disputeId && d.status === 'open');
+        if (!dispute) {
+          showToast("No Open Dispute", "This dispute is no longer open.", "destructive");
+          return;
+        }
+        const roll = Math.random();
+        let outcome: 'won' | 'settled' | 'lost';
+        let extraRefund = 0;
+        if (roll < 0.35) { outcome = 'won'; extraRefund = 0; }
+        else if (roll < 0.85) { outcome = 'settled'; extraRefund = Math.floor(dispute.withheldAmount * 0.5); }
+        else { outcome = 'lost'; extraRefund = dispute.withheldAmount; }
+
+        if (extraRefund > 0) {
+          const debited = debit(prev, extraRefund);
+          if (!debited) {
+            showToast(
+              "Insufficient Funds",
+              `Tribunal ordered £${fromPennies(extraRefund).toLocaleString()} refund — you can't cover it even with overdraft.`,
+              "destructive",
+            );
+            return;
+          }
+          set({
+            cash: debited.cash,
+            overdraftUsed: debited.overdraftUsed,
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: outcome, refundedAmount: d.refundedAmount + extraRefund, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+        } else {
+          set({
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: outcome, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+        }
+
+        const titles: Record<typeof outcome, string> = {
+          won: "Adjudication: Landlord Wins",
+          settled: "Adjudication: Partial Settlement",
+          lost: "Adjudication: Tenant Wins",
+        };
+        const descriptions: Record<typeof outcome, string> = {
+          won: `TDS sided with you — no further refund owed on ${dispute.propertyName}.`,
+          settled: `TDS ordered a 50/50 split — £${fromPennies(extraRefund).toLocaleString()} refunded to ${dispute.tenantName}.`,
+          lost: `TDS sided with the tenant — full £${fromPennies(extraRefund).toLocaleString()} withheld amount refunded.`,
+        };
+        showToast(titles[outcome], descriptions[outcome], outcome === 'lost' ? 'destructive' : undefined);
+      },
+
+      dismissDispute: (disputeId) => {
+        const prev = get();
+        const dispute = (prev.depositDisputes || []).find(d => d.id === disputeId);
+        if (!dispute) return;
+        // If still open, treat dismiss as accepting tenant's request — refund the withheld amount
+        if (dispute.status === 'open') {
+          const debited = debit(prev, dispute.withheldAmount);
+          if (!debited) {
+            showToast(
+              "Insufficient Funds",
+              `You can't afford the £${fromPennies(dispute.withheldAmount).toLocaleString()} refund.`,
+              "destructive",
+            );
+            return;
+          }
+          set({
+            cash: debited.cash,
+            overdraftUsed: debited.overdraftUsed,
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: 'lost', refundedAmount: d.refundedAmount + dispute.withheldAmount, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+          showToast("Refund Issued", `Full £${fromPennies(dispute.withheldAmount).toLocaleString()} refunded to ${dispute.tenantName}.`);
+        } else {
+          // Already resolved — just drop the record
+          set({ depositDisputes: prev.depositDisputes.filter(d => d.id !== disputeId) });
+        }
+      },
 
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
@@ -2391,6 +2599,7 @@ export const useGameStore = create<GameState & GameActions>()(
           listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
           reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, evictTenant, cancelEviction,
+          appealEviction, disputeDeposit, dismissDispute,
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
