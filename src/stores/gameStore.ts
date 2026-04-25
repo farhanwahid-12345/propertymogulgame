@@ -1407,8 +1407,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
 
+        if (debited.usedOverdraft > 0) {
+          showToast("Overdraft Used", `Tapped £${fromPennies(debited.usedOverdraft).toLocaleString()} overdraft for the deposit.`);
+        }
         set({
-          cash: prev.cash - cashRequired,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           conveyancing: [...prev.conveyancing, conv],
           // Hide property from market while in conveyancing
           estateAgentProperties: prev.estateAgentProperties.filter(p => p.id !== property.id),
