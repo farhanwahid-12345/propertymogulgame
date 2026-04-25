@@ -24,6 +24,17 @@ const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
+  const getDebtForProperty = (propertyId: string) => {
+    return gameState.mortgages.reduce((sum, m) => {
+      if (m.propertyId === propertyId) return sum + m.remainingBalance;
+      if (m.collateralPropertyIds?.includes(propertyId)) {
+        const share = m.remainingBalance / (m.collateralPropertyIds.length || 1);
+        return sum + share;
+      }
+      return sum;
+    }, 0);
+  };
+
   const sortedOwnedProperties = [...gameState.ownedProperties].sort((a, b) => {
     const yieldA = a.value > 0 ? (a.monthlyIncome / a.value) * 12 * 100 : 0;
     const yieldB = b.value > 0 ? (b.monthlyIncome / b.value) * 12 * 100 : 0;
