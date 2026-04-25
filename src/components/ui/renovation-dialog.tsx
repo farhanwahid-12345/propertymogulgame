@@ -308,10 +308,15 @@ export function RenovationDialog({
                   const ineligible = ineligibilityReason(renovation);
                   const blocked = !!ineligible || inProgress;
 
+                  // Scaled cost/uplifts for THIS property's size & value
+                  const cost = scaledCost(renovation);
+                  const rentUp = scaledRent(renovation);
+                  const valueUp = scaledValue(renovation);
+
                   // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
-                  const valueLow = Math.round(renovation.valueIncrease * 0.3);
-                  const valueHigh = renovation.valueIncrease;
-                  const valueTypical = Math.round(renovation.valueIncrease * 0.85);
+                  const valueLow = Math.round(valueUp * 0.3);
+                  const valueHigh = valueUp;
+                  const valueTypical = Math.round(valueUp * 0.85);
 
                   return (
                     <Card
