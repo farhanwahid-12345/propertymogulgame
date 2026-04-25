@@ -334,6 +334,12 @@ const Index = () => {
                 const concernCount = (gameState.tenantConcerns || []).filter(
                   (c: any) => c.propertyId === property.id && !c.resolvedMonth
                 ).length;
+                const pendingEv = (gameState.pendingEvictions || []).find(
+                  (e: any) => e.propertyId === property.id
+                );
+                const arrearsCount = (gameState.tenantEvents || []).filter(
+                  (e: any) => e.propertyId === property.id && e.type === 'default'
+                ).length;
                 return (
                   <PropertyCard
                     key={property.id}
@@ -354,6 +360,10 @@ const Index = () => {
                     conveyancingCompletion={conv?.completionMonth}
                     propertyLTV={propertyLTV}
                     activeConcernCount={concernCount}
+                    evictTenant={gameState.evictTenant}
+                    cancelEviction={gameState.cancelEviction}
+                    pendingEviction={pendingEv ? { ground: pendingEv.ground, effectiveMonth: pendingEv.effectiveMonth, servedMonth: pendingEv.servedMonth } : undefined}
+                    rentArrearsCount={arrearsCount}
                   />
                 );
               })}
