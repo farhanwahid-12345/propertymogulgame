@@ -151,6 +151,11 @@ function sanitizeTenantRecord(record: any, monthsPlayed: number): PropertyTenant
     satisfaction: asNumber(record?.satisfaction, 80),
     lastSatisfactionUpdate: asNumber(record?.lastSatisfactionUpdate, monthsPlayed),
     satisfactionReasons: Array.isArray(record?.satisfactionReasons) ? record.satisfactionReasons : [],
+    depositHeld: asNumber(record?.depositHeld, 0),
+    evictionNoticeMonth: typeof record?.evictionNoticeMonth === 'number' ? record.evictionNoticeMonth : undefined,
+    evictionGround: ['rent_arrears', 'landlord_sale', 'landlord_move_in', 'antisocial_behaviour'].includes(record?.evictionGround)
+      ? record.evictionGround
+      : undefined,
   };
 }
 
