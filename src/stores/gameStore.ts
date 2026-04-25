@@ -898,6 +898,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let activePendingEvictions: PendingEviction[] = [];
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
         let evictionDepositRefund = 0;
+        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || [])];
         prev.pendingEvictions.forEach(ev => {
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);
@@ -909,10 +910,26 @@ export const useGameStore = create<GameState & GameActions>()(
           if (!tenantRec) return;
 
           // Refund deposit (50% withheld if property is dilapidated — damage retention)
+          const heldAmount = tenantRec.depositHeld || 0;
           const refund = property?.condition === 'dilapidated'
-            ? Math.floor((tenantRec.depositHeld || 0) * 0.5)
-            : (tenantRec.depositHeld || 0);
+            ? Math.floor(heldAmount * 0.5)
+            : heldAmount;
+          const withheld = heldAmount - refund;
           evictionDepositRefund += refund;
+
+          // If we withheld anything, raise an open dispute the player can respond to
+          if (withheld > 0) {
+            newDepositDisputes.push({
+              id: `dispute_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              propertyId: ev.propertyId,
+              propertyName: property?.name || ev.propertyId,
+              tenantName: tenantRec.tenant.name,
+              withheldAmount: withheld,
+              refundedAmount: refund,
+              raisedMonth: newMonthNumber,
+              status: 'open',
+            });
+          }
 
           // Remove tenant + start a void period
           newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
@@ -928,11 +945,17 @@ export const useGameStore = create<GameState & GameActions>()(
 
           showToast(
             "Eviction Complete",
-            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${refund < (tenantRec.depositHeld || 0) ? ' (50% withheld for damage)' : ''}.`,
+            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${withheld > 0 ? ` (£${fromPennies(withheld).toLocaleString()} withheld — tenant may dispute)` : ''}.`,
           );
         });
         // Drop expired locks
         newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
+        // Auto-expire deposit disputes 6 months after raised (only the closed ones — keep open ones forever until acted on)
+        newDepositDisputes = newDepositDisputes.filter(d => {
+          if (d.status === 'open') return true;
+          const ageSinceResolved = newMonthNumber - (d.resolvedMonth ?? d.raisedMonth);
+          return ageSinceResolved <= 1;
+        });
 
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
