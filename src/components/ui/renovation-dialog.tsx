@@ -28,6 +28,8 @@ export interface RenovationType {
   minPropertyValue?: number;
   /** Subtype set on completion (HMO, flats, etc.). */
   resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  /** Heavy works that disturb living conditions — blocked while a tenant is in residence. */
+  requiresVacant?: boolean;
 }
 
 interface RenovationDialogProps {
@@ -44,6 +46,8 @@ interface RenovationDialogProps {
   internalSqft?: number;
   plotSqft?: number;
   currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  /** True if a tenant is currently in residence — blocks `requiresVacant` renovations. */
+  hasTenant?: boolean;
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
