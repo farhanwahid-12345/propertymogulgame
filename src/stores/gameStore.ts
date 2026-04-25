@@ -1950,7 +1950,165 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
+      // ─── RENTERS' RIGHTS — APPEALS & DISPUTES ──────────────
+      // Tenant-side appeal of a served eviction notice. £400 tribunal fee.
+      // 60% upheld (notice stands), 40% overturned (notice removed, tenant
+      // satisfaction bumped, 6-month re-attempt cooldown for landlord-grounds).
+      appealEviction: (propertyId) => {
+        const prev = get();
+        const eviction = prev.pendingEvictions.find(e => e.propertyId === propertyId);
+        if (!eviction) {
+          showToast("No Notice", "There is no eviction notice on this property to appeal.", "destructive");
+          return;
+        }
+        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
+        if (!tenant) {
+          showToast("No Tenant", "Cannot appeal — the tenant has already vacated.", "destructive");
+          return;
+        }
 
+        const FEE = toPennies(400);
+        const debited = debit(prev, FEE);
+        if (!debited) {
+          showToast("Insufficient Funds", "You can't afford the £400 tribunal fee, even with overdraft.", "destructive");
+          return;
+        }
+        if (debited.usedOverdraft > 0) {
+          showToast("Overdraft Used", `Tribunal fee of £400 drawn from overdraft.`);
+        }
+
+        const upheld = Math.random() < 0.60;
+        if (upheld) {
+          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+          showToast(
+            "Tribunal Ruling: Upheld",
+            `The tribunal upheld your eviction notice on ${eviction.tenantName}. The notice stands.`,
+          );
+          return;
+        }
+
+        // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
+        const newPendingEvictions = prev.pendingEvictions.filter(e => e.propertyId !== propertyId);
+        const newTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId
+            ? {
+                ...t,
+                satisfaction: Math.min(100, (t.satisfaction || 0) + 15),
+                evictionNoticeMonth: undefined,
+                evictionGround: undefined,
+              }
+            : t,
+        );
+        const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
+        const newPropertyLocks = cooldownGrounds.includes(eviction.ground)
+          ? [
+              ...prev.propertyLocks,
+              { propertyId, reason: 'appeal_cooldown' as const, untilMonth: prev.monthsPlayed + 6 },
+            ]
+          : prev.propertyLocks;
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          pendingEvictions: newPendingEvictions,
+          tenants: newTenants,
+          propertyLocks: newPropertyLocks,
+        });
+        showToast(
+          "Tribunal Ruling: Overturned",
+          `The tribunal sided with ${eviction.tenantName}. Notice removed; tenant satisfaction restored.${cooldownGrounds.includes(eviction.ground) ? ' 6-month re-attempt cooldown applied.' : ''}`,
+        );
+      },
+
+      // Player raises a TDS adjudication on a withheld deposit.
+      // 35% landlord wins (no further refund) | 50% partial settle (half withheld back)
+      // 15% tenant wins (full withheld back). TDS is free.
+      disputeDeposit: (disputeId) => {
+        const prev = get();
+        const dispute = (prev.depositDisputes || []).find(d => d.id === disputeId && d.status === 'open');
+        if (!dispute) {
+          showToast("No Open Dispute", "This dispute is no longer open.", "destructive");
+          return;
+        }
+        const roll = Math.random();
+        let outcome: 'won' | 'settled' | 'lost';
+        let extraRefund = 0;
+        if (roll < 0.35) { outcome = 'won'; extraRefund = 0; }
+        else if (roll < 0.85) { outcome = 'settled'; extraRefund = Math.floor(dispute.withheldAmount * 0.5); }
+        else { outcome = 'lost'; extraRefund = dispute.withheldAmount; }
+
+        if (extraRefund > 0) {
+          const debited = debit(prev, extraRefund);
+          if (!debited) {
+            showToast(
+              "Insufficient Funds",
+              `Tribunal ordered £${fromPennies(extraRefund).toLocaleString()} refund — you can't cover it even with overdraft.`,
+              "destructive",
+            );
+            return;
+          }
+          set({
+            cash: debited.cash,
+            overdraftUsed: debited.overdraftUsed,
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: outcome, refundedAmount: d.refundedAmount + extraRefund, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+        } else {
+          set({
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: outcome, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+        }
+
+        const titles: Record<typeof outcome, string> = {
+          won: "Adjudication: Landlord Wins",
+          settled: "Adjudication: Partial Settlement",
+          lost: "Adjudication: Tenant Wins",
+        };
+        const descriptions: Record<typeof outcome, string> = {
+          won: `TDS sided with you — no further refund owed on ${dispute.propertyName}.`,
+          settled: `TDS ordered a 50/50 split — £${fromPennies(extraRefund).toLocaleString()} refunded to ${dispute.tenantName}.`,
+          lost: `TDS sided with the tenant — full £${fromPennies(extraRefund).toLocaleString()} withheld amount refunded.`,
+        };
+        showToast(titles[outcome], descriptions[outcome], outcome === 'lost' ? 'destructive' : undefined);
+      },
+
+      dismissDispute: (disputeId) => {
+        const prev = get();
+        const dispute = (prev.depositDisputes || []).find(d => d.id === disputeId);
+        if (!dispute) return;
+        // If still open, treat dismiss as accepting tenant's request — refund the withheld amount
+        if (dispute.status === 'open') {
+          const debited = debit(prev, dispute.withheldAmount);
+          if (!debited) {
+            showToast(
+              "Insufficient Funds",
+              `You can't afford the £${fromPennies(dispute.withheldAmount).toLocaleString()} refund.`,
+              "destructive",
+            );
+            return;
+          }
+          set({
+            cash: debited.cash,
+            overdraftUsed: debited.overdraftUsed,
+            depositDisputes: prev.depositDisputes.map(d =>
+              d.id === disputeId
+                ? { ...d, status: 'lost', refundedAmount: d.refundedAmount + dispute.withheldAmount, resolvedMonth: prev.monthsPlayed }
+                : d,
+            ),
+          });
+          showToast("Refund Issued", `Full £${fromPennies(dispute.withheldAmount).toLocaleString()} refunded to ${dispute.tenantName}.`);
+        } else {
+          // Already resolved — just drop the record
+          set({ depositDisputes: prev.depositDisputes.filter(d => d.id !== disputeId) });
+        }
+      },
 
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
