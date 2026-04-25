@@ -380,6 +380,11 @@ function migrateState(persisted: any): GameState {
     persisted.tenantConcerns = [];
   }
 
+  // Backfill gameSpeed for older saves
+  if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
+    persisted.gameSpeed = 1;
+  }
+
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
