@@ -245,6 +245,14 @@ const Index = () => {
           ownedProperties={gameState.ownedProperties}
         />
 
+        {/* Eviction timeline */}
+        <EvictionTimelineFeed
+          pendingEvictions={gameState.pendingEvictions || []}
+          ownedProperties={gameState.ownedProperties}
+          tenants={gameState.tenants}
+          monthsPlayed={gameState.monthsPlayed}
+        />
+
         {/* Tenant concerns feed */}
         {gameState.ownedProperties.length > 0 && (
           <TenantConcernsFeed
