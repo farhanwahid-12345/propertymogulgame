@@ -238,6 +238,12 @@ export function RenovationDialog({
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
+  // All headline costs/rent/value uplifts are scaled to this property's profile
+  const scaleInputs = { internalSqft, propertyValue };
+  const scaledCost = (r: RenovationType) => scaleRenovationCost(r.cost, scaleInputs);
+  const scaledRent = (r: RenovationType) => scaleRenovationRent(r.rentIncrease, scaleInputs);
+  const scaledValue = (r: RenovationType) => scaleRenovationValue(r.valueIncrease, scaleInputs);
+
   const handleRenovate = () => {
     if (selectedRenovation) {
       onRenovate(propertyId, selectedRenovation);
@@ -246,7 +252,7 @@ export function RenovationDialog({
     }
   };
 
-  const canAfford = (renovation: RenovationType) => playerCash >= renovation.cost;
+  const canAfford = (renovation: RenovationType) => playerCash >= scaledCost(renovation);
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
 
   /** Returns null if eligible, else a short reason string. */
