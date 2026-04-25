@@ -35,6 +35,7 @@ export interface Property {
   internalSqft?: number;
   plotSqft?: number;
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  completedRenovationIds?: string[];
 }
 
 interface PropertyCardProps {
