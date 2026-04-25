@@ -2332,7 +2332,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         set({
-          cash: prev.cash - concern.resolveCost,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           tenants: updatedTenants,
           annualRepairCosts: updatedAnnual,
           damageHistory: updatedHistory,
