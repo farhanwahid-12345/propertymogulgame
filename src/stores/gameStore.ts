@@ -1028,6 +1028,10 @@ export const useGameStore = create<GameState & GameActions>()(
               monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
               baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
               monthsSinceLastRenovation: 0,
+              completedRenovationIds: [
+                ...(updatedProperties[idx].completedRenovationIds || []),
+                renovation.type.id,
+              ],
               ...subtypeUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
