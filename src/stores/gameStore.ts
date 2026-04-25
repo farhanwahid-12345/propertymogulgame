@@ -1946,7 +1946,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const cost = getConditionUpgradeCost(property.value, property.condition, targetCondition);
         if (cost <= 0) { showToast("Invalid Upgrade", "Cannot upgrade to this condition.", "destructive"); return; }
-        if (prev.cash < cost) { showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()}`, "destructive"); return; }
+        const debited = debit(prev, cost);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         const baseRent = property.baseRent || property.monthlyIncome;
         const newRent = Math.floor(baseRent * getConditionRentMultiplier(targetCondition));
