@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from "@/lib/engine/renovation";
 
 export interface RenovationType {
   id: string;
