@@ -18,12 +18,21 @@ import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import { Property } from "@/components/ui/property-card";
 import { COUNCIL_TAX_BAND_D, MORTGAGE_PROVIDERS } from "@/lib/engine/constants";
 import { calculateDTI, getMaxPropertiesForLevel, getAvailablePropertyTypes, getMaxPropertyValue } from "@/lib/engine/financials";
+import { deriveSqft } from "@/lib/engine/market";
 import type { Tenant } from "@/components/ui/tenant-selector";
 
 // ─── Helpers ──────────────────────────────────────────────
 
 /** Convert a store Property (pennies) to a UI Property (pounds). */
 function propertyToPounds(p: any): Property {
+  // Backfill sqft for legacy properties so cards always show size.
+  let internalSqft = p.internalSqft;
+  let plotSqft = p.plotSqft;
+  if (!internalSqft || !plotSqft) {
+    const derived = deriveSqft({ type: p.type, value: p.value, internalSqft, plotSqft });
+    internalSqft = internalSqft || derived.internalSqft;
+    plotSqft = plotSqft || derived.plotSqft;
+  }
   return {
     ...p,
     price: fromPennies(p.price),
@@ -32,6 +41,8 @@ function propertyToPounds(p: any): Property {
     mortgageRemaining: p.mortgageRemaining != null ? fromPennies(p.mortgageRemaining) : undefined,
     marketValue: p.marketValue != null ? fromPennies(p.marketValue) : undefined,
     baseRent: p.baseRent != null ? fromPennies(p.baseRent) : undefined,
+    internalSqft,
+    plotSqft,
   };
 }
 
