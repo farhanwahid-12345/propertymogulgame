@@ -368,14 +368,20 @@ export function RenovationDialog({
                               "font-semibold",
                               affordable ? "text-foreground" : "text-danger"
                             )}>
-                              £{renovation.cost.toLocaleString()}
+                          <div className="flex justify-between">
+                            <span>Cost:</span>
+                            <span className={cn(
+                              "font-semibold",
+                              affordable ? "text-foreground" : "text-danger"
+                            )}>
+                              £{cost.toLocaleString()}
                             </span>
                           </div>
 
                           <div className="flex justify-between">
                             <span>Rent +/mo (typical):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.rentIncrease}
+                              +£{rentUp.toLocaleString()}
                             </span>
                           </div>
 
@@ -394,7 +400,7 @@ export function RenovationDialog({
                             <div className="flex justify-between text-xs text-muted-foreground">
                               <span>ROI (Annual, expected):</span>
                               <span>
-                                {((renovation.rentIncrease * 12 * 0.85 / renovation.cost) * 100).toFixed(1)}%
+                                {((rentUp * 12 * 0.85 / Math.max(1, cost)) * 100).toFixed(1)}%
                               </span>
                             </div>
                           </div>
