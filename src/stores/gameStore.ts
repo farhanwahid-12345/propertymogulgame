@@ -1611,12 +1611,30 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
         const prev = get();
-        const costPennies = toPennies(renovationType.cost);
-        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${renovationType.cost.toLocaleString()}`, "destructive"); return; }
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        // Scale headline cost & uplifts by property size/value so renovating a
+        // luxury 2,500 sqft house costs more (and pays more) than a tiny terrace.
+        const scaleInputs = property
+          ? { internalSqft: property.internalSqft, propertyValue: fromPennies(property.value) }
+          : { propertyValue: fromPennies(renovationType.cost) * 5 };
+        const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
+        const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
+        const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
+
+        const costPennies = toPennies(scaledCostPounds);
+        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()}`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId)) { showToast("Renovation in Progress", "Already renovating!", "destructive"); return; }
+
+        // Persist scaled values onto the renovation record so completion uses the same numbers
+        const scaledRenovationType = {
+          ...renovationType,
+          cost: scaledCostPounds,
+          rentIncrease: scaledRent,
+          valueIncrease: scaledValue,
+        };
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
-          type: renovationType, startDate: Date.now(),
+          type: scaledRenovationType, startDate: Date.now(),
           completionDate: Date.now() + (renovationType.duration * 60 * 1000),
         };
         showToast("Renovation Started!", `${renovationType.name} begun.`);
