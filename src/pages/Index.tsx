@@ -14,6 +14,7 @@ import { ListedProperties } from "@/components/ui/listed-properties";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
+import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
