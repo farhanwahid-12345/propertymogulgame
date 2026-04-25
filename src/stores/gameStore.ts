@@ -1962,7 +1962,8 @@ export const useGameStore = create<GameState & GameActions>()(
           `${property.name} upgraded to ${targetCondition}. Rent £${fromPennies(newRent).toLocaleString()}/mo, value +£${fromPennies(valueDelta).toLocaleString()}`,
         );
         set({
-          cash: prev.cash - cost,
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
           ownedProperties: prev.ownedProperties.map(p =>
             p.id === propertyId
               ? { ...p, condition: targetCondition, monthsSinceLastRenovation: 0, monthlyIncome: newRent, value: newValue, marketValue: newMarketValue }
