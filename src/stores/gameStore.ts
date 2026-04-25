@@ -885,6 +885,46 @@ export const useGameStore = create<GameState & GameActions>()(
         // Trim long-resolved
         updatedConcerns = updatedConcerns.filter(c => !c.resolvedMonth || (newMonthNumber - c.resolvedMonth) <= 6);
 
+        // ── Pending evictions: tick down notice periods, end tenancies, refund deposits, add locks ──
+        let activePendingEvictions: PendingEviction[] = [];
+        let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
+        let evictionDepositRefund = 0;
+        prev.pendingEvictions.forEach(ev => {
+          if (newMonthNumber < ev.effectiveMonth) {
+            activePendingEvictions.push(ev);
+            return;
+          }
+          // Notice expired — tenant vacates
+          const tenantRec = newTenants.find(t => t.propertyId === ev.propertyId);
+          const property = updatedOwnedProperties.find(p => p.id === ev.propertyId);
+          if (!tenantRec) return;
+
+          // Refund deposit (50% withheld if property is dilapidated — damage retention)
+          const refund = property?.condition === 'dilapidated'
+            ? Math.floor((tenantRec.depositHeld || 0) * 0.5)
+            : (tenantRec.depositHeld || 0);
+          evictionDepositRefund += refund;
+
+          // Remove tenant + start a void period
+          newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
+          const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+          newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+
+          // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
+          if (ev.ground === 'landlord_sale') {
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'sale_lock', untilMonth: newMonthNumber + 12 });
+          } else if (ev.ground === 'landlord_move_in') {
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12 });
+          }
+
+          showToast(
+            "Eviction Complete",
+            `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${refund < (tenantRec.depositHeld || 0) ? ' (50% withheld for damage)' : ''}.`,
+          );
+        });
+        // Drop expired locks
+        newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
+
 
         const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
         if (isBankrupt && !prev.isBankrupt) {
