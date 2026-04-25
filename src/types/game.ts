@@ -246,4 +246,4 @@ export interface GameState {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
