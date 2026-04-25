@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,6 @@ import { MortgageManagement } from "@/components/ui/mortgage-management";
 import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
-import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
