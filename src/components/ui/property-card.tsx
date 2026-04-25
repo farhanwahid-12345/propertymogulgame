@@ -120,6 +120,10 @@ export const PropertyCard = memo(function PropertyCard({
   currentMarketRate = 0.05,
   baseMarketRate = 0.05,
   providerRates = {},
+  evictTenant,
+  cancelEviction,
+  pendingEviction,
+  rentArrearsCount = 0,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
