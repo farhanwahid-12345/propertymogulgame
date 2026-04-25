@@ -2294,8 +2294,9 @@ export const useGameStore = create<GameState & GameActions>()(
         const concerns = prev.tenantConcerns || [];
         const concern = concerns.find(c => c.id === concernId && !c.resolvedMonth);
         if (!concern) return;
-        if (prev.cash < concern.resolveCost) {
-          showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} to resolve.`, "destructive");
+        const debited = debit(prev, concern.resolveCost);
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} (even with overdraft) to resolve.`, "destructive");
           return;
         }
         const updatedTenants = prev.tenants.map(t =>
