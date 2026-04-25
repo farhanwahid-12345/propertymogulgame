@@ -86,6 +86,7 @@ function sanitizeProperty(property: any): Property {
     subtype: property?.subtype === 'hmo' || property?.subtype === 'flats' || property?.subtype === 'multi-let' || property?.subtype === 'standard'
       ? property.subtype
       : undefined,
+    completedRenovationIds: Array.isArray(property?.completedRenovationIds) ? property.completedRenovationIds.filter((x: any) => typeof x === 'string') : [],
   };
 }
 
@@ -156,6 +157,7 @@ function sanitizeTenantConcern(record: any): import('@/types/game').TenantConcer
     resolveCost: asNumber(record?.resolveCost),
     satisfactionPenaltyIfIgnored: asNumber(record?.satisfactionPenaltyIfIgnored),
     resolvedMonth: typeof record?.resolvedMonth === 'number' ? record.resolvedMonth : undefined,
+    source: record?.source === 'damage' || record?.source === 'tenant' ? record.source : undefined,
   };
 }
 
@@ -374,6 +376,29 @@ function migrateState(persisted: any): GameState {
   // v4 → v5: ensure tenantConcerns exists (repairs stale v4 saves missing the field)
   if (persisted._version < 5) {
     persisted._version = 5;
+  }
+
+  // v5 → v6: migrate pendingDamages → tenantConcerns (damage now flows through concerns feed)
+  if (persisted._version < 6) {
+    if (Array.isArray(persisted.pendingDamages) && persisted.pendingDamages.length > 0) {
+      if (!Array.isArray(persisted.tenantConcerns)) persisted.tenantConcerns = [];
+      const monthsPlayed = asNumber(persisted.monthsPlayed);
+      persisted.pendingDamages.forEach((d: any) => {
+        persisted.tenantConcerns.push({
+          id: `concern_damage_${d.id || Math.random().toString(36).slice(2, 8)}`,
+          propertyId: asString(d.propertyId),
+          tenantProfile: 'standard',
+          category: 'maintenance',
+          description: `Repair needed at ${d.propertyName || 'property'}`,
+          raisedMonth: monthsPlayed,
+          resolveCost: asNumber(d.repairCost),
+          satisfactionPenaltyIfIgnored: 5,
+          source: 'damage',
+        });
+      });
+    }
+    persisted.pendingDamages = [];
+    persisted._version = 6;
   }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
@@ -1003,6 +1028,10 @@ export const useGameStore = create<GameState & GameActions>()(
               monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
               baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
               monthsSinceLastRenovation: 0,
+              completedRenovationIds: [
+                ...(updatedProperties[idx].completedRenovationIds || []),
+                renovation.type.id,
+              ],
               ...subtypeUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
@@ -1093,13 +1122,21 @@ export const useGameStore = create<GameState & GameActions>()(
         const endedVoids = prev.voidPeriods.filter(vp => currentTime >= vp.endDate);
         endedVoids.forEach(() => showToast("Void Period Ended", "Your property is now ready for a new tenant!"));
 
-        // Damage events
-        const newDamages: PropertyDamage[] = [];
+        // Damage events — now flow through the tenant concerns feed (no more interrupt dialog)
+        const newDamageConcerns: import('@/types/game').TenantConcern[] = [];
         const globalCooldown = prev.lastGlobalDamageMonth !== undefined ? prev.monthsPlayed - prev.lastGlobalDamageMonth : 999;
         if (globalCooldown >= 6) {
           const currentYear = Math.floor(prev.monthsPlayed / 12);
+          const damageDescriptions = [
+            'Boiler breakdown — heating system needs repair',
+            'Roof leak causing interior damage',
+            'Major plumbing failure under kitchen',
+            'Electrical fault — RCD tripping repeatedly',
+            'Damaged flooring requiring replacement',
+            'Broken window and frame, security risk',
+          ];
           prev.tenants.forEach(({ propertyId, tenant }) => {
-            if (newDamages.length > 0) return;
+            if (newDamageConcerns.length > 0) return;
             if (Math.random() >= tenant.damageRisk / 100) return;
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (!property) return;
@@ -1112,10 +1149,23 @@ export const useGameStore = create<GameState & GameActions>()(
             if (currentCost >= annualCap) return;
             const maxDmg = Math.min(Math.round(property.value * (0.01 + Math.random() * 0.01)), annualCap - currentCost);
             if (maxDmg > 0) {
-              newDamages.push({
-                id: `damage_${Date.now()}_${propertyId}`, propertyId,
-                propertyName: property.name, repairCost: Math.floor(maxDmg), timestamp: Date.now(),
+              const desc = damageDescriptions[Math.floor(Math.random() * damageDescriptions.length)];
+              newDamageConcerns.push({
+                id: `concern_damage_${Date.now()}_${propertyId}`,
+                propertyId,
+                tenantProfile: tenant.profile as any,
+                category: 'maintenance',
+                description: desc,
+                raisedMonth: prev.monthsPlayed,
+                resolveCost: Math.floor(maxDmg),
+                satisfactionPenaltyIfIgnored: 6,
+                source: 'damage',
               });
+              showToast(
+                "🔧 Property Damage",
+                `${property.name}: ${desc}. Resolve in the Concerns feed.`,
+                "destructive",
+              );
             }
           });
         }
@@ -1129,8 +1179,8 @@ export const useGameStore = create<GameState & GameActions>()(
           currentMarketRate: newMarketRate,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
-          pendingDamages: [...prev.pendingDamages, ...newDamages],
-          lastGlobalDamageMonth: newDamages.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
+          tenantConcerns: [...(prev.tenantConcerns || []), ...newDamageConcerns],
+          lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
         });
       },
@@ -1980,10 +2030,38 @@ export const useGameStore = create<GameState & GameActions>()(
             ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
             : t
         );
-        showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+
+        // Damage-sourced concerns also update annual repair cap and 48-month cooldown
+        let updatedAnnual = prev.annualRepairCosts;
+        let updatedHistory = prev.damageHistory;
+        if (concern.source === 'damage') {
+          const currentYear = Math.floor(prev.monthsPlayed / 12);
+          const existing = prev.annualRepairCosts.find(a => a.propertyId === concern.propertyId && a.year === currentYear);
+          updatedAnnual = existing
+            ? prev.annualRepairCosts.map(a =>
+                a.propertyId === concern.propertyId && a.year === currentYear
+                  ? { ...a, totalCost: a.totalCost + concern.resolveCost }
+                  : a
+              )
+            : [...prev.annualRepairCosts, { propertyId: concern.propertyId, year: currentYear, totalCost: concern.resolveCost }];
+          const dmgHist = prev.damageHistory.find(dh => dh.propertyId === concern.propertyId);
+          updatedHistory = dmgHist
+            ? prev.damageHistory.map(dh =>
+                dh.propertyId === concern.propertyId
+                  ? { ...dh, lastDamageMonth: prev.monthsPlayed }
+                  : dh
+              )
+            : [...prev.damageHistory, { propertyId: concern.propertyId, lastDamageMonth: prev.monthsPlayed }];
+          showToast("🔧 Damage Repaired", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} on repairs.`);
+        } else {
+          showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+        }
+
         set({
           cash: prev.cash - concern.resolveCost,
           tenants: updatedTenants,
+          annualRepairCosts: updatedAnnual,
+          damageHistory: updatedHistory,
           tenantConcerns: concerns.map(c =>
             c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
           ),

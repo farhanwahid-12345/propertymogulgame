@@ -37,6 +37,8 @@ interface RenovationDialogProps {
   playerCash: number;
   onRenovate: (propertyId: string, renovation: RenovationType) => void;
   activeRenovations?: string[]; // IDs of renovations in progress
+  /** IDs of renovations already completed on this property — disables one-shot re-do. */
+  completedRenovationIds?: string[];
   /** Required for conversion / extension gating. */
   propertyType?: "residential" | "commercial" | "luxury";
   internalSqft?: number;
@@ -230,6 +232,7 @@ export function RenovationDialog({
   playerCash,
   onRenovate,
   activeRenovations = [],
+  completedRenovationIds = [],
   propertyType,
   internalSqft,
   plotSqft,
@@ -254,6 +257,7 @@ export function RenovationDialog({
 
   const canAfford = (renovation: RenovationType) => playerCash >= scaledCost(renovation);
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
+  const isCompleted = (renovation: RenovationType) => completedRenovationIds.includes(renovation.id);
 
   /** Returns null if eligible, else a short reason string. */
   const ineligibilityReason = (r: RenovationType): string | null => {
@@ -305,8 +309,9 @@ export function RenovationDialog({
                   const isSelected = selectedRenovation?.id === renovation.id;
                   const affordable = canAfford(renovation);
                   const inProgress = isInProgress(renovation);
+                  const completed = isCompleted(renovation);
                   const ineligible = ineligibilityReason(renovation);
-                  const blocked = !!ineligible || inProgress;
+                  const blocked = !!ineligible || inProgress || completed;
 
                   // Scaled cost/uplifts for THIS property's size & value
                   const cost = scaledCost(renovation);
@@ -324,7 +329,7 @@ export function RenovationDialog({
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
                         isSelected && "ring-2 ring-primary",
-                        !affordable && "opacity-60",
+                        !affordable && !completed && "opacity-60",
                         blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
@@ -336,16 +341,28 @@ export function RenovationDialog({
                             <Icon className="h-5 w-5" />
                             <CardTitle className="text-base">{renovation.name}</CardTitle>
                           </div>
-                          <Badge variant="outline" className="text-xs">
-                            {renovation.duration}d
-                          </Badge>
+                          {completed ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                              ✅ Completed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {renovation.duration}d
+                            </Badge>
+                          )}
                         </div>
                       </CardHeader>
 
                       <CardContent className="space-y-3">
                         <p className="text-sm text-muted-foreground">{renovation.description}</p>
 
-                        {ineligible && (
+                        {completed && (
+                          <div className="text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 rounded px-2 py-1">
+                            ✅ Already completed on this property
+                          </div>
+                        )}
+
+                        {ineligible && !completed && (
                           <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
                             ⚠️ {ineligible}
                           </div>

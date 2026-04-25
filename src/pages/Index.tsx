@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,6 @@ import { MortgageManagement } from "@/components/ui/mortgage-management";
 import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
-import { PropertyDamageDialog } from "@/components/ui/property-damage-dialog";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
@@ -24,22 +23,6 @@ const Index = () => {
   useGameEngine();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
-
-  // Controlled damage dialog state to prevent stuck overlays
-  const [damageDialogOpen, setDamageDialogOpen] = useState(false);
-  const currentDamageRef = useRef(gameState.pendingDamages?.[0]);
-
-  // Only open damage dialog when a new damage appears; don't force-close on re-render
-  useEffect(() => {
-    const currentDamage = gameState.pendingDamages?.[0];
-    if (currentDamage && currentDamage.id !== currentDamageRef.current?.id) {
-      currentDamageRef.current = currentDamage;
-      setDamageDialogOpen(true);
-    } else if (!currentDamage) {
-      currentDamageRef.current = undefined;
-      setDamageDialogOpen(false);
-    }
-  }, [gameState.pendingDamages]);
 
   const getDebtForProperty = (propertyId: string) => {
     return gameState.mortgages.reduce((sum, m) => {
@@ -58,35 +41,8 @@ const Index = () => {
     return yieldB - yieldA;
   });
 
-  const currentDamage = gameState.pendingDamages?.[0];
-
-  const handlePayDamage = (cost: number) => {
-    if (currentDamage) {
-      if (gameState.cash >= cost) {
-        gameState.payDamageWithCash(currentDamage.id, cost);
-      } else {
-        gameState.payDamageWithLoan(currentDamage.id, cost);
-      }
-    }
-    setDamageDialogOpen(false);
-  };
-
-  const handleTakeLoan = (cost: number) => {
-    if (currentDamage) {
-      gameState.payDamageWithLoan(currentDamage.id, cost);
-    }
-    setDamageDialogOpen(false);
-  };
-
-  const handleDismissDamage = () => {
-    if (currentDamage) {
-      gameState.dismissDamage(currentDamage.id);
-    }
-    setDamageDialogOpen(false);
-  };
-
-  // Portfolio summary calculations
-  const totalPortfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + (p.marketValue || p.value), 0);
+  // Portfolio summary calculations — use `value` (matches netWorth calc; marketValue can drift)
+  const totalPortfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + p.value, 0);
   const totalPortfolioIncome = gameState.ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
   const avgYield = totalPortfolioValue > 0 
     ? ((totalPortfolioIncome * 12 / totalPortfolioValue) * 100).toFixed(1) 
@@ -405,19 +361,6 @@ const Index = () => {
           </div>
         )}
       </div>
-
-      {/* Property Damage Dialog — controlled open state */}
-      {currentDamage && (
-        <PropertyDamageDialog
-          open={damageDialogOpen}
-          propertyName={currentDamage.propertyName}
-          repairCost={currentDamage.repairCost}
-          playerCash={gameState.cash}
-          onPayCash={handlePayDamage}
-          onTakeLoan={handleTakeLoan}
-          onCancel={handleDismissDamage}
-        />
-      )}
     </div>
   );
 };

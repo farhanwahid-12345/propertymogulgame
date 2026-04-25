@@ -58,6 +58,8 @@ export interface Property {
   plotSqft?: number;
   // Conversion subtype set by post-purchase renovations
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  /** IDs of renovation types completed on this property (one-shot per type). */
+  completedRenovationIds?: string[];
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
@@ -72,6 +74,8 @@ export interface TenantConcern {
   resolveCost: number; // pennies
   satisfactionPenaltyIfIgnored: number; // -X per month unresolved
   resolvedMonth?: number;
+  /** 'damage' = real property damage (linked to repair-cap/cooldown); 'tenant' = lifestyle concern. */
+  source?: 'damage' | 'tenant';
 }
 
 export interface MortgageProvider {
@@ -242,4 +246,4 @@ export interface GameState {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;

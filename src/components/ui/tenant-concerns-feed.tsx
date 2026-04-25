@@ -71,13 +71,19 @@ export function TenantConcernsFeed({
                 key={c.id}
                 className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/40"
               >
-                <Icon className="h-4 w-4 mt-0.5 shrink-0 text-amber-400" />
+                <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${c.source === 'damage' ? 'text-red-400' : 'text-amber-400'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">{propName(c.propertyId)}</span>
-                    <Badge variant="outline" className="text-[10px] capitalize">
-                      {CATEGORY_LABEL[c.category] || "Maintenance"}
-                    </Badge>
+                    {c.source === 'damage' ? (
+                      <Badge variant="destructive" className="text-[10px]">
+                        🔧 Damage
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {CATEGORY_LABEL[c.category] || "Maintenance"}
+                      </Badge>
+                    )}
                     {monthsOpen > 0 && (
                       <Badge variant="outline" className="text-[10px] border-red-400/30 text-red-400">
                         {monthsOpen}mo open · -{c.satisfactionPenaltyIfIgnored || 0}/mo
