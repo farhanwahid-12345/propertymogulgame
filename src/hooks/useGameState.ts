@@ -103,7 +103,13 @@ export function useGameState() {
   const overdraftLimit = fromPennies(store.overdraftLimit);
   const overdraftUsed = fromPennies(store.overdraftUsed);
 
-  const netWorth = cash + ownedProperties.reduce((sum, p) => sum + p.value, 0);
+  // Cash held in escrow on in-flight buys still belongs to the player —
+  // include it so net worth doesn't dip during conveyancing.
+  const conveyancingRaw = Array.isArray(store.conveyancing) ? store.conveyancing : [];
+  const inflightBuyCapital = conveyancingRaw
+    .filter((c: any) => c.status === 'buying')
+    .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
+  const netWorth = cash + inflightBuyCapital + ownedProperties.reduce((sum, p) => sum + p.value, 0);
   const totalMonthlyIncome = ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
   const mortgageExpenses = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
   const councilTaxExpenses = ownedProperties.reduce((sum, p) => {
