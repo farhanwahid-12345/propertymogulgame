@@ -123,6 +123,18 @@ export function EvictionTimelineFeed({
                 </div>
                 <Progress value={progressPct} className="h-1.5" />
               </div>
+
+              {onAppealEviction && monthsRemaining > 0 && (
+                <div className="flex justify-end pt-1">
+                  <EvictionAppealDialog
+                    propertyId={ev.propertyId}
+                    propertyName={property?.name || ev.propertyId}
+                    tenantName={ev.tenantName}
+                    ground={ev.ground}
+                    onAppeal={onAppealEviction}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
