@@ -30,6 +30,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from '@/lib/engine/renovation';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -244,6 +245,8 @@ interface GameActions {
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
   dismissTenantConcern: (concernId: string) => void;
+  // Speed
+  setGameSpeed: (speed: number) => void;
   // Game
   resetGame: () => void;
 }
@@ -278,6 +281,7 @@ function createInitialState(): GameState {
     currentMarketRate: BASE_MARKET_RATE,
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
+    gameSpeed: 1,
     lastYearlyGrowth: 0,
     yearlyNetProfit: 0,
     lastCorporationTaxMonth: 0,
@@ -375,6 +379,11 @@ function migrateState(persisted: any): GameState {
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
+  }
+
+  // Backfill gameSpeed for older saves
+  if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
+    persisted.gameSpeed = 1;
   }
 
   const arrayKeys: Array<keyof GameState> = [
@@ -1603,12 +1612,30 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
         const prev = get();
-        const costPennies = toPennies(renovationType.cost);
-        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${renovationType.cost.toLocaleString()}`, "destructive"); return; }
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        // Scale headline cost & uplifts by property size/value so renovating a
+        // luxury 2,500 sqft house costs more (and pays more) than a tiny terrace.
+        const scaleInputs = property
+          ? { internalSqft: property.internalSqft, propertyValue: fromPennies(property.value) }
+          : { propertyValue: fromPennies(renovationType.cost) * 5 };
+        const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
+        const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
+        const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
+
+        const costPennies = toPennies(scaledCostPounds);
+        if (prev.cash < costPennies) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()}`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId)) { showToast("Renovation in Progress", "Already renovating!", "destructive"); return; }
+
+        // Persist scaled values onto the renovation record so completion uses the same numbers
+        const scaledRenovationType = {
+          ...renovationType,
+          cost: scaledCostPounds,
+          rentIncrease: scaledRent,
+          valueIncrease: scaledValue,
+        };
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
-          type: renovationType, startDate: Date.now(),
+          type: scaledRenovationType, startDate: Date.now(),
           completionDate: Date.now() + (renovationType.duration * 60 * 1000),
         };
         showToast("Renovation Started!", `${renovationType.name} begun.`);
@@ -1974,6 +2001,12 @@ export const useGameStore = create<GameState & GameActions>()(
         set(fresh);
         showToast("Game Reset", "Started fresh with £100K!");
       },
+
+      setGameSpeed: (speed) => {
+        const clamped = Math.max(0.25, Math.min(8, speed));
+        set({ gameSpeed: clamped });
+      },
+
     }),
     {
       name: 'propertyTycoonSave',

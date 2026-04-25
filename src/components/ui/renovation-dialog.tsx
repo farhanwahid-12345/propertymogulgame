@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from "@/lib/engine/renovation";
 
 export interface RenovationType {
   id: string;
@@ -237,6 +238,12 @@ export function RenovationDialog({
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
+  // All headline costs/rent/value uplifts are scaled to this property's profile
+  const scaleInputs = { internalSqft, propertyValue };
+  const scaledCost = (r: RenovationType) => scaleRenovationCost(r.cost, scaleInputs);
+  const scaledRent = (r: RenovationType) => scaleRenovationRent(r.rentIncrease, scaleInputs);
+  const scaledValue = (r: RenovationType) => scaleRenovationValue(r.valueIncrease, scaleInputs);
+
   const handleRenovate = () => {
     if (selectedRenovation) {
       onRenovate(propertyId, selectedRenovation);
@@ -245,7 +252,7 @@ export function RenovationDialog({
     }
   };
 
-  const canAfford = (renovation: RenovationType) => playerCash >= renovation.cost;
+  const canAfford = (renovation: RenovationType) => playerCash >= scaledCost(renovation);
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
 
   /** Returns null if eligible, else a short reason string. */
@@ -301,10 +308,15 @@ export function RenovationDialog({
                   const ineligible = ineligibilityReason(renovation);
                   const blocked = !!ineligible || inProgress;
 
+                  // Scaled cost/uplifts for THIS property's size & value
+                  const cost = scaledCost(renovation);
+                  const rentUp = scaledRent(renovation);
+                  const valueUp = scaledValue(renovation);
+
                   // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
-                  const valueLow = Math.round(renovation.valueIncrease * 0.3);
-                  const valueHigh = renovation.valueIncrease;
-                  const valueTypical = Math.round(renovation.valueIncrease * 0.85);
+                  const valueLow = Math.round(valueUp * 0.3);
+                  const valueHigh = valueUp;
+                  const valueTypical = Math.round(valueUp * 0.85);
 
                   return (
                     <Card
@@ -356,14 +368,14 @@ export function RenovationDialog({
                               "font-semibold",
                               affordable ? "text-foreground" : "text-danger"
                             )}>
-                              £{renovation.cost.toLocaleString()}
+                              £{cost.toLocaleString()}
                             </span>
                           </div>
 
                           <div className="flex justify-between">
                             <span>Rent +/mo (typical):</span>
                             <span className="text-success font-semibold">
-                              +£{renovation.rentIncrease}
+                              +£{rentUp.toLocaleString()}
                             </span>
                           </div>
 
@@ -382,7 +394,7 @@ export function RenovationDialog({
                             <div className="flex justify-between text-xs text-muted-foreground">
                               <span>ROI (Annual, expected):</span>
                               <span>
-                                {((renovation.rentIncrease * 12 * 0.85 / renovation.cost) * 100).toFixed(1)}%
+                                {((rentUp * 12 * 0.85 / Math.max(1, cost)) * 100).toFixed(1)}%
                               </span>
                             </div>
                           </div>
@@ -404,14 +416,14 @@ export function RenovationDialog({
                 <span className="text-muted-foreground">New Monthly Rent:</span>
                 <br />
                 <span className="font-semibold text-success">
-                  £{(currentRent + selectedRenovation.rentIncrease).toLocaleString()}/mo
+                  £{(currentRent + scaledRent(selectedRenovation)).toLocaleString()}/mo
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">New Property Value:</span>
                 <br />
                 <span className="font-semibold text-success">
-                  £{(propertyValue + selectedRenovation.valueIncrease).toLocaleString()}
+                  £{(propertyValue + scaledValue(selectedRenovation)).toLocaleString()}
                 </span>
               </div>
             </div>
