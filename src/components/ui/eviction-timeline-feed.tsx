@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Gavel, Home, UserMinus, AlertTriangle, ShieldAlert } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
+import { EvictionAppealDialog } from "@/components/ui/eviction-appeal-dialog";
 import type { PendingEviction, Property, PropertyTenant, EvictionGround } from "@/types/game";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   ownedProperties: Pick<Property, 'id' | 'name' | 'condition'>[];
   tenants: PropertyTenant[];
   monthsPlayed: number;
+  onAppealEviction?: (propertyId: string) => void;
 }
 
 const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; tone: string }> = {
