@@ -2040,9 +2040,11 @@ export const useGameStore = create<GameState & GameActions>()(
           interestRate: rate, termYears: 25, mortgageType: 'repayment',
           providerId, startDate: Date.now(),
         };
-        showToast("Remortgage Complete!", `Cash raised: £${fromPennies(cashRaised).toLocaleString()}`);
+        const credited = credit(prev, cashRaised);
+        showToast("Remortgage Complete!", `Cash raised: £${fromPennies(cashRaised).toLocaleString()}${credited.overdraftUsed < prev.overdraftUsed ? ` (£${fromPennies(prev.overdraftUsed - credited.overdraftUsed).toLocaleString()} repaid overdraft)` : ''}`);
         set({
-          cash: prev.cash + cashRaised,
+          cash: credited.cash,
+          overdraftUsed: credited.overdraftUsed,
           mortgages: existing ? prev.mortgages.map(m => m.propertyId === propertyId ? newMortgage : m) : [...prev.mortgages, newMortgage],
         });
       },
