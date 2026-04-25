@@ -252,6 +252,14 @@ const Index = () => {
           ownedProperties={gameState.ownedProperties}
           tenants={gameState.tenants}
           monthsPlayed={gameState.monthsPlayed}
+          onAppealEviction={gameState.appealEviction}
+        />
+
+        {/* Deposit disputes */}
+        <DepositDisputesFeed
+          disputes={gameState.depositDisputes || []}
+          onDispute={gameState.disputeDeposit}
+          onDismiss={gameState.dismissDispute}
         />
 
         {/* Tenant concerns feed */}
