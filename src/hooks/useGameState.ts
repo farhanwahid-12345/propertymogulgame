@@ -179,6 +179,18 @@ export function useGameState() {
     store.cancelEviction(propertyId);
   }, [store.cancelEviction]);
 
+  const appealEviction = useCallback((propertyId: string) => {
+    store.appealEviction(propertyId);
+  }, [store.appealEviction]);
+
+  const disputeDeposit = useCallback((disputeId: string) => {
+    store.disputeDeposit(disputeId);
+  }, [store.disputeDeposit]);
+
+  const dismissDispute = useCallback((disputeId: string) => {
+    store.dismissDispute(disputeId);
+  }, [store.dismissDispute]);
+
   const startRenovation = useCallback((propertyId: string, renovationType: any) => {
     store.startRenovation(propertyId, renovationType);
   }, [store.startRenovation]);
