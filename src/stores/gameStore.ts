@@ -445,6 +445,19 @@ function migrateState(persisted: any): GameState {
     persisted._version = 6;
   }
 
+  // v6 → v7: Renters' Rights — add deposit/eviction fields, init pendingEvictions and propertyLocks
+  if (persisted._version < 7) {
+    if (Array.isArray(persisted.tenants)) {
+      persisted.tenants = persisted.tenants.map((t: any) => ({
+        ...t,
+        depositHeld: typeof t?.depositHeld === 'number' ? t.depositHeld : 0,
+      }));
+    }
+    if (!Array.isArray(persisted.pendingEvictions)) persisted.pendingEvictions = [];
+    if (!Array.isArray(persisted.propertyLocks)) persisted.propertyLocks = [];
+    persisted._version = 7;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -962,7 +975,6 @@ export const useGameStore = create<GameState & GameActions>()(
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
         let economicEvents = [...prev.economicEvents];
-        let eventCashBonus = 0;
         let eventRateAdjust = 0;
 
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
@@ -970,7 +982,6 @@ export const useGameStore = create<GameState & GameActions>()(
             { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%.' },
             { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values and rents increase by 15%.' },
             { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5% and property values drop 10%.' },
-            { type: 'grant', name: '🏛️ Government Landlord Grant', description: 'You receive a cash injection!' },
           ];
           const chosen = eventTypes[Math.floor(Math.random() * eventTypes.length)];
           const event: MacroEconomicEvent = {
@@ -993,11 +1004,9 @@ export const useGameStore = create<GameState & GameActions>()(
               ...p, value: Math.floor(p.value * 0.90),
               marketValue: Math.floor((p.marketValue || p.value) * 0.90),
             }));
-          } else if (chosen.type === 'grant') {
-            eventCashBonus = toPennies(5000 + Math.floor(Math.random() * 15000));
           }
 
-          showToast(chosen.name, chosen.description + (eventCashBonus > 0 ? ` You received £${fromPennies(eventCashBonus).toLocaleString()}!` : ''));
+          showToast(chosen.name, chosen.description);
           nextEventMonth = newMonthNumber + 3 + Math.floor(Math.random() * 4);
         }
 
@@ -1010,7 +1019,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         set({
-          cash: finalCash + eventCashBonus,
+          cash: finalCash,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           level: newLevel,
