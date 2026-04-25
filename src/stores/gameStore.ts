@@ -1054,8 +1054,8 @@ export const useGameStore = create<GameState & GameActions>()(
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
           const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
             { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%.' },
-            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values and rents increase by 15%.' },
-            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5% and property values drop 10%.' },
+            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values rise 8% and rents nudge up 5%.' },
+            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5%, values drop 10%, rents soften 3%.' },
           ];
           const chosen = eventTypes[Math.floor(Math.random() * eventTypes.length)];
           const event: MacroEconomicEvent = {
@@ -1066,17 +1066,24 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (chosen.type === 'rate_cut') eventRateAdjust = -0.01;
           else if (chosen.type === 'tech_boom') {
-            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-              ...p, value: Math.floor(p.value * 1.15),
-              marketValue: Math.floor((p.marketValue || p.value) * 1.15),
-              monthlyIncome: Math.floor(p.monthlyIncome * 1.15),
-              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.15),
-            }));
+            updatedOwnedProperties = updatedOwnedProperties.map(p => {
+              const purchaseBasis = p.price || p.value;
+              const valueCap = Math.round(purchaseBasis * 2.5);
+              const newValue = Math.min(Math.floor(p.value * 1.08), valueCap);
+              return {
+                ...p, value: newValue,
+                marketValue: Math.floor((p.marketValue || p.value) * 1.08),
+                monthlyIncome: Math.floor(p.monthlyIncome * 1.05),
+                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.05),
+              };
+            });
           } else if (chosen.type === 'recession') {
             eventRateAdjust = 0.015;
             updatedOwnedProperties = updatedOwnedProperties.map(p => ({
               ...p, value: Math.floor(p.value * 0.90),
               marketValue: Math.floor((p.marketValue || p.value) * 0.90),
+              monthlyIncome: Math.floor(p.monthlyIncome * 0.97),
+              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.97),
             }));
           }
 
