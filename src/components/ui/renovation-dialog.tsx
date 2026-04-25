@@ -368,12 +368,6 @@ export function RenovationDialog({
                               "font-semibold",
                               affordable ? "text-foreground" : "text-danger"
                             )}>
-                          <div className="flex justify-between">
-                            <span>Cost:</span>
-                            <span className={cn(
-                              "font-semibold",
-                              affordable ? "text-foreground" : "text-danger"
-                            )}>
                               £{cost.toLocaleString()}
                             </span>
                           </div>
