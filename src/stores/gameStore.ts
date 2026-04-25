@@ -460,6 +460,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 7;
   }
 
+  // v7 → v8: add depositDisputes slice
+  if (persisted._version < 8) {
+    if (!Array.isArray(persisted.depositDisputes)) persisted.depositDisputes = [];
+    persisted._version = 8;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
