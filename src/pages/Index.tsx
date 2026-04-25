@@ -361,19 +361,6 @@ const Index = () => {
           </div>
         )}
       </div>
-
-      {/* Property Damage Dialog — controlled open state */}
-      {currentDamage && (
-        <PropertyDamageDialog
-          open={damageDialogOpen}
-          propertyName={currentDamage.propertyName}
-          repairCost={currentDamage.repairCost}
-          playerCash={gameState.cash}
-          onPayCash={handlePayDamage}
-          onTakeLoan={handleTakeLoan}
-          onCancel={handleDismissDamage}
-        />
-      )}
     </div>
   );
 };
