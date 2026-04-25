@@ -2084,7 +2084,6 @@ export const useGameStore = create<GameState & GameActions>()(
           providerId: provider.id, startDate: Date.now(),
         };
         const cashDelta = newLoanAmount - currentBal;
-        showToast("Refinance Complete!", cashDelta > 0 ? `£${fromPennies(cashDelta).toLocaleString()} released.` : `Refinanced for £${fromPennies(newLoanAmount).toLocaleString()}`);
         // cashDelta can be positive (cash out) or negative (paying down). Route through credit/debit.
         let cashUpdate: { cash: number; overdraftUsed: number };
         if (cashDelta >= 0) {
