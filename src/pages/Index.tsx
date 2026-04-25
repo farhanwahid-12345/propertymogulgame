@@ -24,65 +24,11 @@ const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
-  // Controlled damage dialog state to prevent stuck overlays
-  const [damageDialogOpen, setDamageDialogOpen] = useState(false);
-  const currentDamageRef = useRef(gameState.pendingDamages?.[0]);
-
-  // Only open damage dialog when a new damage appears; don't force-close on re-render
-  useEffect(() => {
-    const currentDamage = gameState.pendingDamages?.[0];
-    if (currentDamage && currentDamage.id !== currentDamageRef.current?.id) {
-      currentDamageRef.current = currentDamage;
-      setDamageDialogOpen(true);
-    } else if (!currentDamage) {
-      currentDamageRef.current = undefined;
-      setDamageDialogOpen(false);
-    }
-  }, [gameState.pendingDamages]);
-
-  const getDebtForProperty = (propertyId: string) => {
-    return gameState.mortgages.reduce((sum, m) => {
-      if (m.propertyId === propertyId) return sum + m.remainingBalance;
-      if (m.collateralPropertyIds?.includes(propertyId)) {
-        const share = m.remainingBalance / (m.collateralPropertyIds.length || 1);
-        return sum + share;
-      }
-      return sum;
-    }, 0);
-  };
-
   const sortedOwnedProperties = [...gameState.ownedProperties].sort((a, b) => {
     const yieldA = a.value > 0 ? (a.monthlyIncome / a.value) * 12 * 100 : 0;
     const yieldB = b.value > 0 ? (b.monthlyIncome / b.value) * 12 * 100 : 0;
     return yieldB - yieldA;
   });
-
-  const currentDamage = gameState.pendingDamages?.[0];
-
-  const handlePayDamage = (cost: number) => {
-    if (currentDamage) {
-      if (gameState.cash >= cost) {
-        gameState.payDamageWithCash(currentDamage.id, cost);
-      } else {
-        gameState.payDamageWithLoan(currentDamage.id, cost);
-      }
-    }
-    setDamageDialogOpen(false);
-  };
-
-  const handleTakeLoan = (cost: number) => {
-    if (currentDamage) {
-      gameState.payDamageWithLoan(currentDamage.id, cost);
-    }
-    setDamageDialogOpen(false);
-  };
-
-  const handleDismissDamage = () => {
-    if (currentDamage) {
-      gameState.dismissDamage(currentDamage.id);
-    }
-    setDamageDialogOpen(false);
-  };
 
   // Portfolio summary calculations
   const totalPortfolioValue = gameState.ownedProperties.reduce((sum, p) => sum + (p.marketValue || p.value), 0);
