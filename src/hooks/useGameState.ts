@@ -334,6 +334,7 @@ export function useGameState() {
     tenantEvents,
     pendingEvictions: Array.isArray(store.pendingEvictions) ? store.pendingEvictions : [],
     propertyLocks: Array.isArray(store.propertyLocks) ? store.propertyLocks : [],
+    depositDisputes: Array.isArray(store.depositDisputes) ? store.depositDisputes : [],
     voidPeriods: Array.isArray(store.voidPeriods) ? store.voidPeriods : [],
     propertyListings,
     overdraftLimit,
