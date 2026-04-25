@@ -1077,6 +1077,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         set({
           cash: finalCash,
+          overdraftUsed: finalOverdraftUsed,
           ownedProperties: updatedOwnedProperties,
           mortgages: finalMortgages,
           level: newLevel,
@@ -1099,6 +1100,8 @@ export const useGameStore = create<GameState & GameActions>()(
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
           tenantConcerns: updatedConcerns,
+          pendingEvictions: activePendingEvictions,
+          propertyLocks: newPropertyLocks,
         });
       },
 
