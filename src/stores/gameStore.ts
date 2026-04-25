@@ -378,6 +378,29 @@ function migrateState(persisted: any): GameState {
     persisted._version = 5;
   }
 
+  // v5 → v6: migrate pendingDamages → tenantConcerns (damage now flows through concerns feed)
+  if (persisted._version < 6) {
+    if (Array.isArray(persisted.pendingDamages) && persisted.pendingDamages.length > 0) {
+      if (!Array.isArray(persisted.tenantConcerns)) persisted.tenantConcerns = [];
+      const monthsPlayed = asNumber(persisted.monthsPlayed);
+      persisted.pendingDamages.forEach((d: any) => {
+        persisted.tenantConcerns.push({
+          id: `concern_damage_${d.id || Math.random().toString(36).slice(2, 8)}`,
+          propertyId: asString(d.propertyId),
+          tenantProfile: 'standard',
+          category: 'maintenance',
+          description: `Repair needed at ${d.propertyName || 'property'}`,
+          raisedMonth: monthsPlayed,
+          resolveCost: asNumber(d.repairCost),
+          satisfactionPenaltyIfIgnored: 5,
+          source: 'damage',
+        });
+      });
+    }
+    persisted.pendingDamages = [];
+    persisted._version = 6;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
