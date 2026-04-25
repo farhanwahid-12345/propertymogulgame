@@ -320,6 +320,8 @@ export function useGameState() {
     creditScore,
     currentMarketRate: store.currentMarketRate,
     tenantEvents,
+    pendingEvictions: Array.isArray(store.pendingEvictions) ? store.pendingEvictions : [],
+    propertyLocks: Array.isArray(store.propertyLocks) ? store.propertyLocks : [],
     voidPeriods: Array.isArray(store.voidPeriods) ? store.voidPeriods : [],
     propertyListings,
     overdraftLimit,
