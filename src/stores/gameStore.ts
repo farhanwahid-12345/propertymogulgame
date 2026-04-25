@@ -268,6 +268,9 @@ interface GameActions {
   selectTenant: (propertyId: string, tenant: Tenant) => void;
   evictTenant: (propertyId: string, ground: EvictionGround) => void;
   cancelEviction: (propertyId: string) => void;
+  appealEviction: (propertyId: string) => void;
+  disputeDeposit: (disputeId: string) => void;
+  dismissDispute: (disputeId: string) => void;
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
