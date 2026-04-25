@@ -37,6 +37,8 @@ interface RenovationDialogProps {
   playerCash: number;
   onRenovate: (propertyId: string, renovation: RenovationType) => void;
   activeRenovations?: string[]; // IDs of renovations in progress
+  /** IDs of renovations already completed on this property — disables one-shot re-do. */
+  completedRenovationIds?: string[];
   /** Required for conversion / extension gating. */
   propertyType?: "residential" | "commercial" | "luxury";
   internalSqft?: number;
