@@ -72,7 +72,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 14,
     description: "Complete interior painting and minor cosmetic updates",
     icon: Paintbrush,
-    category: "maintenance"
+    category: "maintenance",
+    requiresVacant: true,
   },
   
   // Improvements
@@ -107,7 +108,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 10,
     description: "Install or upgrade central heating and insulation",
     icon: Zap,
-    category: "improvement"
+    category: "improvement",
+    requiresVacant: true,
   },
   {
     id: "double_glazing",
@@ -134,6 +136,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minInternalSqft: 700,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
   {
     id: "rear_extension",
@@ -147,6 +150,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minPlotSqft: 2200,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
   {
     id: "conservatory",
@@ -160,6 +164,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minPlotSqft: 1800,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
 
   // Conversions — change the property's character/use
