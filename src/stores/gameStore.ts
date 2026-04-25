@@ -1980,28 +1980,34 @@ export const useGameStore = create<GameState & GameActions>()(
 
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
-            if (prev.cash < partialAmount) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()}`, "destructive"); return; }
+            const debited = debit(prev, partialAmount);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()} (even with overdraft).`, "destructive"); return; }
             const newBal = mortgage.remainingBalance - partialAmount;
+            const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
             if (newBal <= 0) {
-              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}`);
-              set({ cash: prev.cash - partialAmount, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
+              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}${odNote}`);
+              set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
             } else {
-              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
-              set({ cash: prev.cash - partialAmount, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
+              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}${odNote}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
+              set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
             }
           } else {
-            if (prev.cash < mortgage.remainingBalance) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()}`, "destructive"); return; }
-            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}`);
-            set({ cash: prev.cash - mortgage.remainingBalance, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
+            const debited = debit(prev, mortgage.remainingBalance);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}${odNote}`);
+            set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
           }
         } else {
           const settleProp = prev.ownedProperties.find(p => p.id === settlementPropertyId);
           if (!settleProp) { showToast("Settlement Failed", "Property not found!", "destructive"); return; }
           if (settleProp.value < mortgage.remainingBalance) { showToast("Insufficient Value", "Property value too low!", "destructive"); return; }
           const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE);
+          const credited = credit(prev, cashFromSale);
           showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}`);
           set({
-            cash: prev.cash + cashFromSale,
+            cash: credited.cash,
+            overdraftUsed: credited.overdraftUsed,
             ownedProperties: prev.ownedProperties.filter(p => p.id !== settlementPropertyId),
             mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId),
             tenants: prev.tenants.filter(t => t.propertyId !== settlementPropertyId),
