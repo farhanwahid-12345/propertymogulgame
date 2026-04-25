@@ -101,6 +101,8 @@ export interface Mortgage {
   startDate: number;
 }
 
+export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour';
+
 export interface PropertyTenant {
   propertyId: string;
   tenant: Tenant;
@@ -112,6 +114,25 @@ export interface PropertyTenant {
   lastSatisfactionUpdate: number;
   /** Reasons array for the last satisfaction adjustment, surfaced in tooltips. */
   satisfactionReasons?: Array<{ reason: string; delta: number }>;
+  /** Deposit held under TDS (pennies). 5 weeks of rent on tenancy start. 0 for grandfathered tenants. */
+  depositHeld: number;
+  /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
+  evictionNoticeMonth?: number;
+  evictionGround?: EvictionGround;
+}
+
+export interface PendingEviction {
+  propertyId: string;
+  tenantName: string;
+  ground: EvictionGround;
+  servedMonth: number;
+  effectiveMonth: number;
+}
+
+export interface PropertyLock {
+  propertyId: string;
+  reason: 'sale_lock' | 'relet_lock';
+  untilMonth: number;
 }
 
 export interface VoidPeriod {
@@ -185,7 +206,7 @@ export interface MacroEconomicEvent {
   name: string;
   description: string;
   month: number;
-  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
+  type: 'rate_cut' | 'tech_boom' | 'recession';
 }
 
 // Tax record for tracking
@@ -243,7 +264,10 @@ export interface GameState {
   totalTaxPaid: number; // pennies - lifetime
   // Tenant concerns
   tenantConcerns: TenantConcern[];
+  // Renters' Rights — eviction notice queue & post-eviction property locks
+  pendingEvictions: PendingEviction[];
+  propertyLocks: PropertyLock[];
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;

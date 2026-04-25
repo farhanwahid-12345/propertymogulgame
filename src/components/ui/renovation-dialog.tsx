@@ -28,6 +28,8 @@ export interface RenovationType {
   minPropertyValue?: number;
   /** Subtype set on completion (HMO, flats, etc.). */
   resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  /** Heavy works that disturb living conditions — blocked while a tenant is in residence. */
+  requiresVacant?: boolean;
 }
 
 interface RenovationDialogProps {
@@ -44,6 +46,8 @@ interface RenovationDialogProps {
   internalSqft?: number;
   plotSqft?: number;
   currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  /** True if a tenant is currently in residence — blocks `requiresVacant` renovations. */
+  hasTenant?: boolean;
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
@@ -68,7 +72,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 14,
     description: "Complete interior painting and minor cosmetic updates",
     icon: Paintbrush,
-    category: "maintenance"
+    category: "maintenance",
+    requiresVacant: true,
   },
   
   // Improvements
@@ -103,7 +108,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     duration: 10,
     description: "Install or upgrade central heating and insulation",
     icon: Zap,
-    category: "improvement"
+    category: "improvement",
+    requiresVacant: true,
   },
   {
     id: "double_glazing",
@@ -130,6 +136,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minInternalSqft: 700,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
   {
     id: "rear_extension",
@@ -143,6 +150,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minPlotSqft: 2200,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
   {
     id: "conservatory",
@@ -156,6 +164,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "extension",
     minPlotSqft: 1800,
     allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
   },
 
   // Conversions — change the property's character/use

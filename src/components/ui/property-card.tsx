@@ -55,7 +55,10 @@ interface PropertyCardProps {
   tenantSatisfaction?: number;
   tenantSatisfactionReasons?: Array<{ reason: string; delta: number }>;
   propertyListings?: any[];
-  removeTenant?: (propertyId: string) => void;
+  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => void;
+  cancelEviction?: (propertyId: string) => void;
+  pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'; effectiveMonth: number; servedMonth: number };
+  rentArrearsCount?: number;
   mortgages?: Array<{
     propertyId: string;
     monthlyPayment: number;
