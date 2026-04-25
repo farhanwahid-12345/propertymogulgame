@@ -416,14 +416,14 @@ export function RenovationDialog({
                 <span className="text-muted-foreground">New Monthly Rent:</span>
                 <br />
                 <span className="font-semibold text-success">
-                  £{(currentRent + selectedRenovation.rentIncrease).toLocaleString()}/mo
+                  £{(currentRent + scaledRent(selectedRenovation)).toLocaleString()}/mo
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">New Property Value:</span>
                 <br />
                 <span className="font-semibold text-success">
-                  £{(propertyValue + selectedRenovation.valueIncrease).toLocaleString()}
+                  £{(propertyValue + scaledValue(selectedRenovation)).toLocaleString()}
                 </span>
               </div>
             </div>
