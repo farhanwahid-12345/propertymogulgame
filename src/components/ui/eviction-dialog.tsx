@@ -145,7 +145,7 @@ export function EvictionDialog({
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{g.description}</p>
                     {g.warning && !invalid && (
-                      <p className="text-[11px] text-amber-400 mt-1">⚠ {g.warning}</p>
+                      <p className="text-[11px] text-warning mt-1">⚠ {g.warning}</p>
                     )}
                     {invalid && (
                       <p className="text-[11px] text-destructive mt-1">✕ {invalid}</p>
