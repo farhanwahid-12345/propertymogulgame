@@ -86,6 +86,7 @@ function sanitizeProperty(property: any): Property {
     subtype: property?.subtype === 'hmo' || property?.subtype === 'flats' || property?.subtype === 'multi-let' || property?.subtype === 'standard'
       ? property.subtype
       : undefined,
+    completedRenovationIds: Array.isArray(property?.completedRenovationIds) ? property.completedRenovationIds.filter((x: any) => typeof x === 'string') : [],
   };
 }
 
