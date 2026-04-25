@@ -2143,7 +2143,15 @@ export const useGameStore = create<GameState & GameActions>()(
         };
         const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
         const cashDelta = loanAmount - totalCurrentMortgages;
-        set({ cash: prev.cash + cashDelta, mortgages: [...remainingMortgages, portfolioMortgage] });
+        let pmCashUpdate: { cash: number; overdraftUsed: number };
+        if (cashDelta >= 0) {
+          pmCashUpdate = credit(prev, cashDelta);
+        } else {
+          const dbg = debit(prev, -cashDelta);
+          if (!dbg) { showToast("Insufficient Cash", `Need £${fromPennies(-cashDelta).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+          pmCashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
+        }
+        set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
       // ─── OVERDRAFT / CASH ─────────────────
