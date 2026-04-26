@@ -203,6 +203,31 @@ function sanitizeTenantConcern(record: any): import('@/types/game').TenantConcer
   };
 }
 
+/**
+ * Merge multiple concern lists by id. Resolution always wins —
+ * a `resolvedMonth` set on any copy is preserved. Prevents tick races
+ * (processMarketUpdate vs processMonthlyTick) from clobbering each other.
+ */
+function mergeConcernsById(
+  ...lists: Array<import('@/types/game').TenantConcern[] | undefined>
+): import('@/types/game').TenantConcern[] {
+  const map = new Map<string, import('@/types/game').TenantConcern>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const c of list) {
+      if (!c?.id) continue;
+      const existing = map.get(c.id);
+      if (!existing) {
+        map.set(c.id, c);
+        continue;
+      }
+      if (existing.resolvedMonth && !c.resolvedMonth) continue;
+      map.set(c.id, c);
+    }
+  }
+  return Array.from(map.values());
+}
+
 function sanitizeOffer(offer: any): PropertyOffer {
   return {
     ...offer,
