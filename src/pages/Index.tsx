@@ -244,6 +244,7 @@ const Index = () => {
         <RenovationTracker
           renovations={gameState.renovations || []}
           ownedProperties={gameState.ownedProperties}
+          monthsPlayed={gameState.monthsPlayed}
         />
 
         {/* Eviction timeline */}
