@@ -882,7 +882,11 @@ export const useGameStore = create<GameState & GameActions>()(
           if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
             return { ...c, resolvedMonth: newMonthNumber };
           }
-          if (c.raisedMonth < newMonthNumber) {
+          // Grace period before satisfaction starts decaying:
+          // urgent (safety/noise) and damage-sourced → 1 month; everything else → 2 months
+          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+          const monthsOpen = newMonthNumber - c.raisedMonth;
+          if (monthsOpen > grace) {
             satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
           }
           return c;
