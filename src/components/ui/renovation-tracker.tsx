@@ -7,9 +7,11 @@ import type { Property } from "@/components/ui/property-card";
 interface RenovationTrackerProps {
   renovations: Renovation[];
   ownedProperties: Property[];
+  /** Current in-game month — used for game-time progress. */
+  monthsPlayed: number;
 }
 
-export function RenovationTracker({ renovations, ownedProperties }: RenovationTrackerProps) {
+export function RenovationTracker({ renovations, ownedProperties, monthsPlayed }: RenovationTrackerProps) {
   if (!renovations || renovations.length === 0) return null;
 
   const now = Date.now();
@@ -28,12 +30,22 @@ export function RenovationTracker({ renovations, ownedProperties }: RenovationTr
           if (!renovationType) return null;
 
           const property = ownedProperties.find((p) => p.id === r.propertyId);
-          const total = Math.max(1, r.completionDate - r.startDate);
-          const elapsed = Math.max(0, Math.min(total, now - r.startDate));
-          const progress = (elapsed / total) * 100;
-          const msRemaining = Math.max(0, r.completionDate - now);
-          // 1 in-game month = 180s = 180_000ms
-          const monthsRemaining = Math.ceil(msRemaining / 180_000);
+
+          // Prefer in-game-month timing; fall back to wall-clock for legacy records.
+          let progress: number;
+          let monthsRemaining: number;
+          if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') {
+            const total = Math.max(1, r.completionMonth - r.startMonth);
+            const elapsed = Math.max(0, Math.min(total, monthsPlayed - r.startMonth));
+            progress = (elapsed / total) * 100;
+            monthsRemaining = Math.max(0, r.completionMonth - monthsPlayed);
+          } else {
+            const total = Math.max(1, r.completionDate - r.startDate);
+            const elapsed = Math.max(0, Math.min(total, now - r.startDate));
+            progress = (elapsed / total) * 100;
+            monthsRemaining = Math.ceil(Math.max(0, r.completionDate - now) / 180_000);
+          }
+
           const Icon = renovationType.icon || Hammer;
 
           return (
