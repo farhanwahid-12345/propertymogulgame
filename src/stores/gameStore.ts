@@ -2265,10 +2265,19 @@ export const useGameStore = create<GameState & GameActions>()(
           rentIncrease: scaledRent,
           valueIncrease: scaledValue,
         };
+        // Convert "days" duration into in-game months (~30 days/month).
+        // This makes actual completion match the dialog's headline number AND
+        // makes renovations honour gameSpeed (they're tied to monthsPlayed).
+        const monthsToComplete = Math.max(1, Math.round(renovationType.duration / 30));
+        const startMonth = prev.monthsPlayed;
+        const completionMonth = startMonth + monthsToComplete;
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
           type: scaledRenovationType, startDate: Date.now(),
-          completionDate: Date.now() + (renovationType.duration * 60 * 1000),
+          // Wall-clock fallback kept for backward-compat; not used for completion any more.
+          completionDate: Date.now() + (monthsToComplete * 180 * 1000),
+          startMonth,
+          completionMonth,
         };
         const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
         showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
