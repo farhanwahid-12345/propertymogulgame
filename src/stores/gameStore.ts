@@ -1239,9 +1239,14 @@ export const useGameStore = create<GameState & GameActions>()(
         const marketChange = (Math.random() - 0.5) * 0.002;
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
 
-        // Completed renovations
-        const completedRenovations = prev.renovations.filter(r => currentTime >= r.completionDate);
-        const activeRenovations = prev.renovations.filter(r => currentTime < r.completionDate);
+        // Completed renovations — driven by in-game months so duration matches
+        // the dialog's headline and respects gameSpeed. Wall-clock is fallback only.
+        const isRenoComplete = (r: Renovation) =>
+          typeof r.completionMonth === 'number'
+            ? prev.monthsPlayed >= r.completionMonth
+            : currentTime >= r.completionDate;
+        const completedRenovations = prev.renovations.filter(isRenoComplete);
+        const activeRenovations = prev.renovations.filter(r => !isRenoComplete(r));
         let updatedProperties = [...prev.ownedProperties];
         completedRenovations.forEach(renovation => {
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
