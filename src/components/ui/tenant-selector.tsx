@@ -256,32 +256,36 @@ export function TenantSelector({
     displayBaseRent = Math.floor((propertyValue * (yieldPct / 100)) / 12);
   }
 
+  const hasSittingTenant = !!currentTenant;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {currentTenant ? currentTenant.name : "Select Tenant"}
+            {hasSittingTenant ? `Tenant: ${currentTenant!.name}` : "Select Tenant"}
           </div>
         </Button>
       </DialogTrigger>
 
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Choose Tenant for Property</DialogTitle>
+          <DialogTitle>{hasSittingTenant ? 'Tenant Currently in Place' : 'Choose Tenant for Property'}</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            Different tenants offer different rent and risk profiles. The market refreshes each time you look!
-            {displayBaseRent > 0 && (
+            {hasSittingTenant
+              ? "Under the Renters' Rights Act, you can't replace a sitting tenant. Use \"Propose Rent Increase\" on the property card to negotiate rent (Section 13), or serve a valid eviction notice and wait the notice period before re-letting."
+              : 'Different tenants offer different rent and risk profiles. The market refreshes each time you look!'}
+            {!hasSittingTenant && displayBaseRent > 0 && (
               <span className="block mt-1 text-foreground">
                 Base rent: £{Math.round(displayBaseRent).toLocaleString()}/mo
               </span>
             )}
-            {currentTenant && typeof currentSatisfaction === 'number' && (
+            {hasSittingTenant && typeof currentSatisfaction === 'number' && (
               <span className="block mt-2 p-2 rounded-md bg-muted/50 border border-border text-foreground">
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-medium text-xs">
-                    Current: {currentTenant.name} —
+                    Current: {currentTenant!.name} —
                     <span className={cn(
                       "ml-1",
                       currentSatisfaction >= 70 ? "text-emerald-400" :
@@ -299,7 +303,7 @@ export function TenantSelector({
                 )}
               </span>
             )}
-            {lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
+            {!hasSittingTenant && lastTenantChange !== undefined && monthsPlayed - lastTenantChange < 3 && (
               <span className="text-amber-400 block mt-1">
                 ⚠️ Higher-rent tenants unavailable for {3 - (monthsPlayed - lastTenantChange)} more month(s)
               </span>
@@ -307,6 +311,19 @@ export function TenantSelector({
           </p>
         </DialogHeader>
 
+        {hasSittingTenant ? (
+          <div className="p-4 rounded-lg bg-muted/30 border border-border text-sm space-y-3">
+            <p className="text-foreground font-medium">To change tenant or rent:</p>
+            <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+              <li><strong className="text-foreground">Raise rent</strong> — close this dialog and click <em>"Propose Rent Increase"</em> on the property card.</li>
+              <li><strong className="text-foreground">Remove tenant</strong> — close this dialog and click <em>"Serve eviction notice"</em>; pick a valid ground and wait the notice period.</li>
+            </ul>
+            <div className="flex justify-end pt-1">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
             // Use shared formula so preview matches what the tenant actually pays
@@ -404,6 +421,8 @@ export function TenantSelector({
             Select Tenant
           </Button>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

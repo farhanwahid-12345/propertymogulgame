@@ -382,6 +382,7 @@ const Index = () => {
                     cancelEviction={gameState.cancelEviction}
                     pendingEviction={pendingEv ? { ground: pendingEv.ground, effectiveMonth: pendingEv.effectiveMonth, servedMonth: pendingEv.servedMonth } : undefined}
                     rentArrearsCount={arrearsCount}
+                    applyRentIncrease={gameState.applyRentIncrease}
                   />
                 );
               })}

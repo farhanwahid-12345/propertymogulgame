@@ -266,6 +266,7 @@ interface GameActions {
   rejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   // Tenants
   selectTenant: (propertyId: string, tenant: Tenant) => void;
+  applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number) => void;
   evictTenant: (propertyId: string, ground: EvictionGround) => void;
   cancelEviction: (propertyId: string) => void;
   appealEviction: (propertyId: string) => void;
@@ -1082,43 +1083,75 @@ export const useGameStore = create<GameState & GameActions>()(
         let eventRateAdjust = 0;
 
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
-          const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
-            { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%.' },
-            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values rise 8% and rents nudge up 5%.' },
-            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5%, values drop 10%, rents soften 3%.' },
-          ];
-          const chosen = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-          const event: MacroEconomicEvent = {
-            id: `event_${newMonthNumber}`, name: chosen.name,
-            description: chosen.description, month: newMonthNumber, type: chosen.type,
-          };
-          economicEvents = [...economicEvents.slice(-9), event];
+          // 30% chance the timer fires but nothing newsworthy happens — quiet stretches
+          const skipRoll = Math.random();
+          if (skipRoll < 0.30) {
+            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
+          } else {
+            const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string; weight: number }> = [
+              // Big shocks — rarer
+              { type: 'rate_cut',         name: '📉 Base Rates Cut',           description: 'The Bank of England has cut base rates by 0.5%.',                            weight: 1 },
+              { type: 'tech_boom',        name: '🚀 Tech Boom in the City',    description: 'Property values rise 4% and rents nudge up 2%.',                              weight: 1 },
+              { type: 'recession',        name: '📉 Economic Recession',       description: 'Base rates rise 1%, values drop 5%, rents soften 2%.',                       weight: 1 },
+              // Small/neutral — more common
+              { type: 'mild_correction',  name: '〰️ Mild Market Correction',   description: 'Property values dip 2%; rents unchanged.',                                   weight: 2 },
+              { type: 'rate_hike',        name: '📈 Rate Hike',                 description: 'Base rates rise 0.5% — borrowing gets pricier.',                              weight: 2 },
+              { type: 'rate_cut_small',   name: '📉 Modest Rate Cut',           description: 'Base rates trim by 0.5%.',                                                    weight: 2 },
+            ];
+            // Weighted pick
+            const totalWeight = eventTypes.reduce((s, e) => s + e.weight, 0);
+            let r = Math.random() * totalWeight;
+            const chosen = eventTypes.find(e => (r -= e.weight) <= 0) || eventTypes[0];
+            const event: MacroEconomicEvent = {
+              id: `event_${newMonthNumber}`, name: chosen.name,
+              description: chosen.description, month: newMonthNumber, type: chosen.type,
+            };
+            economicEvents = [...economicEvents.slice(-9), event];
 
-          if (chosen.type === 'rate_cut') eventRateAdjust = -0.01;
-          else if (chosen.type === 'tech_boom') {
-            updatedOwnedProperties = updatedOwnedProperties.map(p => {
-              const purchaseBasis = p.price || p.value;
-              const valueCap = Math.round(purchaseBasis * 2.5);
-              const newValue = Math.min(Math.floor(p.value * 1.08), valueCap);
-              return {
-                ...p, value: newValue,
-                marketValue: Math.floor((p.marketValue || p.value) * 1.08),
-                monthlyIncome: Math.floor(p.monthlyIncome * 1.05),
-                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.05),
-              };
-            });
-          } else if (chosen.type === 'recession') {
-            eventRateAdjust = 0.015;
-            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-              ...p, value: Math.floor(p.value * 0.90),
-              marketValue: Math.floor((p.marketValue || p.value) * 0.90),
-              monthlyIncome: Math.floor(p.monthlyIncome * 0.97),
-              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.97),
-            }));
+            // Single-tick swing clamp helper — never move a value more than ±6% per event
+            const clampSwing = (oldV: number, newV: number) => {
+              const minV = Math.floor(oldV * 0.94);
+              const maxV = Math.floor(oldV * 1.06);
+              return Math.max(minV, Math.min(maxV, newV));
+            };
+
+            if (chosen.type === 'rate_cut') {
+              eventRateAdjust = -0.005;
+            } else if (chosen.type === 'rate_cut_small') {
+              eventRateAdjust = -0.005;
+            } else if (chosen.type === 'rate_hike') {
+              eventRateAdjust = 0.005;
+            } else if (chosen.type === 'tech_boom') {
+              updatedOwnedProperties = updatedOwnedProperties.map(p => {
+                const purchaseBasis = p.price || p.value;
+                const valueCap = Math.round(purchaseBasis * 2.5);
+                const raw = Math.floor(p.value * 1.04);
+                const newValue = Math.min(clampSwing(p.value, raw), valueCap);
+                return {
+                  ...p, value: newValue,
+                  marketValue: Math.floor((p.marketValue || p.value) * 1.04),
+                  monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
+                  baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                };
+              });
+            } else if (chosen.type === 'recession') {
+              eventRateAdjust = 0.01;
+              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
+                marketValue: Math.floor((p.marketValue || p.value) * 0.95),
+                monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
+                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
+              }));
+            } else if (chosen.type === 'mild_correction') {
+              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.98)),
+                marketValue: Math.floor((p.marketValue || p.value) * 0.98),
+              }));
+            }
+
+            showToast(chosen.name, chosen.description);
+            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
           }
-
-          showToast(chosen.name, chosen.description);
-          nextEventMonth = newMonthNumber + 3 + Math.floor(Math.random() * 4);
         }
 
         let finalProviderRates = newProviderRates;
@@ -1791,6 +1824,16 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
+        // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
+        // valid eviction notice and wait out the notice period before re-letting.
+        if (prev.tenants.some(t => t.propertyId === propertyId)) {
+          showToast(
+            "Tenant in Place",
+            "You can't replace a sitting tenant — serve a valid eviction notice first.",
+            "destructive"
+          );
+          return;
+        }
 
         // Robust base-rent fallback: stored baseRent → current monthlyIncome →
         // value × yield/12 (last-resort for properties created via inline conveyancing)
@@ -1839,6 +1882,66 @@ export const useGameStore = create<GameState & GameActions>()(
           `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
         );
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+      },
+
+      // Section 13 rent increase — applies a negotiated rent and (if tribunal) debits fee.
+      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        const tenantRec = prev.tenants.find(t => t.propertyId === propertyId);
+        if (!property || !tenantRec) {
+          showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
+        }
+        if (newRentPennies <= property.monthlyIncome) {
+          showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
+        }
+
+        let cashUpdate: Partial<{ cash: number; overdraftUsed: number }> = {};
+        if (tribunalFeePennies > 0) {
+          const debited = debit(prev, tribunalFeePennies);
+          if (!debited) {
+            showToast("Insufficient Funds", `Need £${fromPennies(tribunalFeePennies).toLocaleString()} for the tribunal fee.`, "destructive"); return;
+          }
+          cashUpdate = { cash: debited.cash, overdraftUsed: debited.overdraftUsed };
+        }
+
+        const satDelta =
+          outcome === 'accepted'          ? -3 :
+          outcome === 'counter_accepted'  ? -2 :
+          outcome === 'tribunal_landlord' ? -10 :
+          outcome === 'tribunal_tenant'   ? -5 : -3;
+
+        const reasonLabel =
+          outcome === 'tribunal_landlord' ? 'Tribunal sided with landlord' :
+          outcome === 'tribunal_tenant'   ? 'Tribunal sided with tenant'   :
+          outcome === 'counter_accepted'  ? 'Accepted tenant counter-offer' :
+                                             'Section 13 rent rise accepted';
+
+        const newSatisfaction = Math.max(0, Math.min(100, tenantRec.satisfaction + satDelta));
+        const newReasons = [
+          { reason: reasonLabel, delta: satDelta },
+          ...(tenantRec.satisfactionReasons || []).slice(0, 4),
+        ];
+
+        const updatedProps = prev.ownedProperties.map(p =>
+          p.id === propertyId
+            ? { ...p, monthlyIncome: newRentPennies, baseRent: newRentPennies, lastRentIncrease: prev.monthsPlayed }
+            : p
+        );
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId
+            ? { ...t, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
+            : t
+        );
+
+        showToast(
+          outcome === 'tribunal_landlord' || outcome === 'tribunal_tenant'
+            ? '⚖️ Tribunal Decision Applied'
+            : '📜 Rent Increase Applied',
+          `${reasonLabel}. New rent: £${fromPennies(newRentPennies).toLocaleString()}/mo${tribunalFeePennies > 0 ? ` (tribunal fee £${fromPennies(tribunalFeePennies).toLocaleString()})` : ''}.`
+        );
+
+        set({ ...cashUpdate, ownedProperties: updatedProps, tenants: updatedTenants });
       },
 
       // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
@@ -2563,7 +2666,7 @@ export const useGameStore = create<GameState & GameActions>()(
           buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
           listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
-          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, evictTenant, cancelEviction,
+          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction,
           appealEviction, disputeDeposit, dismissDispute,
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,

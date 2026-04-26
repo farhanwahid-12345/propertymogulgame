@@ -171,6 +171,15 @@ export function useGameState() {
     store.selectTenant(propertyId, tenant);
   }, [store.selectTenant]);
 
+  const applyRentIncrease = useCallback((
+    propertyId: string,
+    newRentPounds: number,
+    outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant',
+    tribunalFeePounds: number,
+  ) => {
+    store.applyRentIncrease(propertyId, toPennies(newRentPounds), outcome, toPennies(tribunalFeePounds));
+  }, [store.applyRentIncrease]);
+
   const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => {
     store.evictTenant(propertyId, ground);
   }, [store.evictTenant]);
@@ -380,6 +389,7 @@ export function useGameState() {
     buyPropertyAtPrice,
     sellProperty,
     selectTenant,
+    applyRentIncrease,
     evictTenant,
     cancelEviction,
     appealEviction,

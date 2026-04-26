@@ -14,7 +14,7 @@ interface EconomicEvent {
   name: string;
   description: string;
   month: number;
-  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant';
+  type: 'rate_cut' | 'tech_boom' | 'recession' | 'grant' | 'mild_correction' | 'rate_hike' | 'rate_cut_small';
 }
 
 interface GameStatsProps {
