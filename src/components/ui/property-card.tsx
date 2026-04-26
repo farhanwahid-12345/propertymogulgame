@@ -485,15 +485,38 @@ export const PropertyCard = memo(function PropertyCard({
                     </div>
                   )}
                   {currentTenant && !pendingEviction && evictTenant && (
-                    <EvictionDialog
-                      propertyId={property.id}
-                      propertyName={property.name}
-                      tenantName={currentTenant.name}
-                      tenantProfile={currentTenant.profile}
-                      rentArrearsCount={rentArrearsCount}
-                      hasLongstandingASB={false}
-                      onEvict={evictTenant}
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      {applyRentIncrease && (
+                        <RentNegotiationDialog
+                          propertyId={property.id}
+                          propertyName={property.name}
+                          currentRent={property.monthlyIncome}
+                          marketRent={
+                            property.value > 0
+                              ? Math.round((property.value * ((property.yield ?? 7) / 100)) / 12)
+                              : property.monthlyIncome
+                          }
+                          monthsSinceLastIncrease={
+                            property.lastRentIncrease !== undefined
+                              ? Math.max(0, (monthsPlayed ?? 0) - property.lastRentIncrease)
+                              : 999
+                          }
+                          tenant={currentTenant}
+                          tenantSatisfaction={tenantSatisfaction ?? 80}
+                          playerCash={playerCash ?? 0}
+                          onApply={applyRentIncrease}
+                        />
+                      )}
+                      <EvictionDialog
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        tenantName={currentTenant.name}
+                        tenantProfile={currentTenant.profile}
+                        rentArrearsCount={rentArrearsCount}
+                        hasLongstandingASB={false}
+                        onEvict={evictTenant}
+                      />
+                    </div>
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
