@@ -1194,7 +1194,7 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        set({
+        set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
           ownedProperties: updatedOwnedProperties,
@@ -1218,11 +1218,13 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyListings: newPropertyListings,
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
-          tenantConcerns: updatedConcerns,
+          // Merge with current store state — preserves any concerns added
+          // by an interleaved processMarketUpdate (e.g. damage events).
+          tenantConcerns: mergeConcernsById(s.tenantConcerns, updatedConcerns),
           pendingEvictions: activePendingEvictions,
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
-        });
+        }));
       },
 
       processMarketUpdate: () => {
