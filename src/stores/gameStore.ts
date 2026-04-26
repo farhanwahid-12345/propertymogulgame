@@ -1823,6 +1823,16 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
+        // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
+        // valid eviction notice and wait out the notice period before re-letting.
+        if (prev.tenants.some(t => t.propertyId === propertyId)) {
+          showToast(
+            "Tenant in Place",
+            "You can't replace a sitting tenant — serve a valid eviction notice first.",
+            "destructive"
+          );
+          return;
+        }
 
         // Robust base-rent fallback: stored baseRent → current monthlyIncome →
         // value × yield/12 (last-resort for properties created via inline conveyancing)
