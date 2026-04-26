@@ -222,7 +222,7 @@ export interface MacroEconomicEvent {
   name: string;
   description: string;
   month: number;
-  type: 'rate_cut' | 'tech_boom' | 'recession';
+  type: 'rate_cut' | 'tech_boom' | 'recession' | 'mild_correction' | 'rate_hike' | 'rate_cut_small';
 }
 
 // Tax record for tracking

@@ -1082,43 +1082,75 @@ export const useGameStore = create<GameState & GameActions>()(
         let eventRateAdjust = 0;
 
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
-          const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string }> = [
-            { type: 'rate_cut', name: '📉 Base Rates Cut!', description: 'The Bank of England has cut base rates by 1%.' },
-            { type: 'tech_boom', name: '🚀 Tech Boom in the City!', description: 'Property values rise 8% and rents nudge up 5%.' },
-            { type: 'recession', name: '📉 Economic Recession', description: 'Base rates rise 1.5%, values drop 10%, rents soften 3%.' },
-          ];
-          const chosen = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-          const event: MacroEconomicEvent = {
-            id: `event_${newMonthNumber}`, name: chosen.name,
-            description: chosen.description, month: newMonthNumber, type: chosen.type,
-          };
-          economicEvents = [...economicEvents.slice(-9), event];
+          // 30% chance the timer fires but nothing newsworthy happens — quiet stretches
+          const skipRoll = Math.random();
+          if (skipRoll < 0.30) {
+            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
+          } else {
+            const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string; weight: number }> = [
+              // Big shocks — rarer
+              { type: 'rate_cut',         name: '📉 Base Rates Cut',           description: 'The Bank of England has cut base rates by 0.5%.',                            weight: 1 },
+              { type: 'tech_boom',        name: '🚀 Tech Boom in the City',    description: 'Property values rise 4% and rents nudge up 2%.',                              weight: 1 },
+              { type: 'recession',        name: '📉 Economic Recession',       description: 'Base rates rise 1%, values drop 5%, rents soften 2%.',                       weight: 1 },
+              // Small/neutral — more common
+              { type: 'mild_correction',  name: '〰️ Mild Market Correction',   description: 'Property values dip 2%; rents unchanged.',                                   weight: 2 },
+              { type: 'rate_hike',        name: '📈 Rate Hike',                 description: 'Base rates rise 0.5% — borrowing gets pricier.',                              weight: 2 },
+              { type: 'rate_cut_small',   name: '📉 Modest Rate Cut',           description: 'Base rates trim by 0.5%.',                                                    weight: 2 },
+            ];
+            // Weighted pick
+            const totalWeight = eventTypes.reduce((s, e) => s + e.weight, 0);
+            let r = Math.random() * totalWeight;
+            const chosen = eventTypes.find(e => (r -= e.weight) <= 0) || eventTypes[0];
+            const event: MacroEconomicEvent = {
+              id: `event_${newMonthNumber}`, name: chosen.name,
+              description: chosen.description, month: newMonthNumber, type: chosen.type,
+            };
+            economicEvents = [...economicEvents.slice(-9), event];
 
-          if (chosen.type === 'rate_cut') eventRateAdjust = -0.01;
-          else if (chosen.type === 'tech_boom') {
-            updatedOwnedProperties = updatedOwnedProperties.map(p => {
-              const purchaseBasis = p.price || p.value;
-              const valueCap = Math.round(purchaseBasis * 2.5);
-              const newValue = Math.min(Math.floor(p.value * 1.08), valueCap);
-              return {
-                ...p, value: newValue,
-                marketValue: Math.floor((p.marketValue || p.value) * 1.08),
-                monthlyIncome: Math.floor(p.monthlyIncome * 1.05),
-                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.05),
-              };
-            });
-          } else if (chosen.type === 'recession') {
-            eventRateAdjust = 0.015;
-            updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-              ...p, value: Math.floor(p.value * 0.90),
-              marketValue: Math.floor((p.marketValue || p.value) * 0.90),
-              monthlyIncome: Math.floor(p.monthlyIncome * 0.97),
-              baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.97),
-            }));
+            // Single-tick swing clamp helper — never move a value more than ±6% per event
+            const clampSwing = (oldV: number, newV: number) => {
+              const minV = Math.floor(oldV * 0.94);
+              const maxV = Math.floor(oldV * 1.06);
+              return Math.max(minV, Math.min(maxV, newV));
+            };
+
+            if (chosen.type === 'rate_cut') {
+              eventRateAdjust = -0.005;
+            } else if (chosen.type === 'rate_cut_small') {
+              eventRateAdjust = -0.005;
+            } else if (chosen.type === 'rate_hike') {
+              eventRateAdjust = 0.005;
+            } else if (chosen.type === 'tech_boom') {
+              updatedOwnedProperties = updatedOwnedProperties.map(p => {
+                const purchaseBasis = p.price || p.value;
+                const valueCap = Math.round(purchaseBasis * 2.5);
+                const raw = Math.floor(p.value * 1.04);
+                const newValue = Math.min(clampSwing(p.value, raw), valueCap);
+                return {
+                  ...p, value: newValue,
+                  marketValue: Math.floor((p.marketValue || p.value) * 1.04),
+                  monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
+                  baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                };
+              });
+            } else if (chosen.type === 'recession') {
+              eventRateAdjust = 0.01;
+              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
+                marketValue: Math.floor((p.marketValue || p.value) * 0.95),
+                monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
+                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
+              }));
+            } else if (chosen.type === 'mild_correction') {
+              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
+                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.98)),
+                marketValue: Math.floor((p.marketValue || p.value) * 0.98),
+              }));
+            }
+
+            showToast(chosen.name, chosen.description);
+            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
           }
-
-          showToast(chosen.name, chosen.description);
-          nextEventMonth = newMonthNumber + 3 + Math.floor(Math.random() * 4);
         }
 
         let finalProviderRates = newProviderRates;
