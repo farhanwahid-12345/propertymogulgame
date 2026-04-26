@@ -421,6 +421,8 @@ export function TenantSelector({
             Select Tenant
           </Button>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
