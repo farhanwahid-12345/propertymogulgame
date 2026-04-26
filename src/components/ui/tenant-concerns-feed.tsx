@@ -64,6 +64,9 @@ export function TenantConcernsFeed({
           active.map(c => {
             const Icon = CATEGORY_ICON[c.category] || Wrench;
             const monthsOpen = Math.max(0, monthsPlayed - (c.raisedMonth || 0));
+            const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+            const graceRemaining = Math.max(0, grace - monthsOpen);
+            const isDecaying = monthsOpen > grace;
             const cost = fromPennies(c.resolveCost || 0);
             const canAfford = playerCash >= (c.resolveCost || 0);
             return (
@@ -84,9 +87,13 @@ export function TenantConcernsFeed({
                         {CATEGORY_LABEL[c.category] || "Maintenance"}
                       </Badge>
                     )}
-                    {monthsOpen > 0 && (
-                      <Badge variant="outline" className="text-[10px] border-red-400/30 text-red-400">
-                        {monthsOpen}mo open · -{c.satisfactionPenaltyIfIgnored || 0}/mo
+                    {isDecaying ? (
+                      <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
+                        ⚠ Decaying · -{c.satisfactionPenaltyIfIgnored || 0}/mo
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300">
+                        ⏳ Resolve in {graceRemaining}mo
                       </Badge>
                     )}
                   </div>
