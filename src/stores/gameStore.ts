@@ -1368,11 +1368,24 @@ export const useGameStore = create<GameState & GameActions>()(
             'Damaged flooring requiring replacement',
             'Broken window and frame, security risk',
           ];
+          // Snapshot: properties currently being sold or already gone
+          const sellingPropIds = new Set(
+            (prev.conveyancing || []).filter(c => c.status === 'selling').map(c => c.propertyId)
+          );
+          const listedForSalePropIds = new Set((prev.propertyListings || []).map(l => l.propertyId));
+          const evictedPropIds = new Set(
+            (prev.pendingEvictions || [])
+              .filter(ev => prev.monthsPlayed >= ev.effectiveMonth)
+              .map(ev => ev.propertyId)
+          );
+
           prev.tenants.forEach(({ propertyId, tenant }) => {
             if (newDamageConcerns.length > 0) return;
             if (Math.random() >= tenant.damageRisk / 100) return;
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (!property) return;
+            // Don't generate damage on properties leaving the portfolio
+            if (sellingPropIds.has(propertyId) || listedForSalePropIds.has(propertyId) || evictedPropIds.has(propertyId)) return;
             const dmgHist = prev.damageHistory.find(dh => dh.propertyId === propertyId);
             const monthsSinceLast = dmgHist ? prev.monthsPlayed - dmgHist.lastDamageMonth : 999;
             if (monthsSinceLast < 48) return;
@@ -1394,11 +1407,6 @@ export const useGameStore = create<GameState & GameActions>()(
                 satisfactionPenaltyIfIgnored: 6,
                 source: 'damage',
               });
-              showToast(
-                "🔧 Property Damage",
-                `${property.name}: ${desc}. Resolve in the Concerns feed.`,
-                "destructive",
-              );
             }
           });
         }
@@ -1406,15 +1414,29 @@ export const useGameStore = create<GameState & GameActions>()(
         // Build final state — don't remove sold properties yet (they're in conveyancing now)
         const salePropIds = new Set(completedSales.map(s => s.propertyId));
 
-        set({
+        // Functional set — merge by id with whatever's currently in the store
+        // so concurrent monthly ticks can't clobber the new damage concerns.
+        set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
-          tenantConcerns: [...(prev.tenantConcerns || []), ...newDamageConcerns],
+          tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
+        }));
+
+        // Toast AFTER state commit — guarantees the matching concern is in the feed
+        // before the user sees the notification.
+        newDamageConcerns.forEach(c => {
+          const property = prev.ownedProperties.find(p => p.id === c.propertyId);
+          if (!property) return;
+          showToast(
+            "🔧 Property Damage",
+            `${property.name}: ${c.description}. Resolve in the Concerns feed.`,
+            "destructive",
+          );
         });
       },
 
