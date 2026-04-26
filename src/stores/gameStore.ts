@@ -528,6 +528,12 @@ function migrateState(persisted: any): GameState {
   persisted.tenants = persisted.tenants.map((t: any) => sanitizeTenantRecord(t, asNumber(persisted.monthsPlayed)));
   persisted.renovations = persisted.renovations.map(sanitizeRenovation);
   persisted.tenantConcerns = persisted.tenantConcerns.map(sanitizeTenantConcern);
+  // Drop orphaned concerns whose property no longer exists in the portfolio
+  // (cleans up bugged saves where damage was raised against a sold property).
+  {
+    const ownedIds = new Set((persisted.ownedProperties || []).map((p: any) => p?.id).filter(Boolean));
+    persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => c?.propertyId && ownedIds.has(c.propertyId));
+  }
   persisted.propertyListings = persisted.propertyListings.map(sanitizePropertyListing);
 
   // Migrate old save fields
