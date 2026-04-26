@@ -184,6 +184,9 @@ function sanitizeRenovation(record: any): Renovation {
     type: sanitizedType,
     startDate: asNumber(record?.startDate, Date.now()),
     completionDate: asNumber(record?.completionDate, Date.now()),
+    // Months are optional on disk for backward-compat; the store handles missing values.
+    startMonth: typeof record?.startMonth === 'number' ? record.startMonth : undefined,
+    completionMonth: typeof record?.completionMonth === 'number' ? record.completionMonth : undefined,
   };
 }
 
