@@ -189,6 +189,10 @@ export interface Renovation {
   type: RenovationType;
   startDate: number;
   completionDate: number;
+  /** In-game month when work began. Drives progress + completion. */
+  startMonth?: number;
+  /** In-game month when work completes. Drives completion check. */
+  completionMonth?: number;
 }
 
 export interface TenantEvent {

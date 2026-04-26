@@ -184,6 +184,9 @@ function sanitizeRenovation(record: any): Renovation {
     type: sanitizedType,
     startDate: asNumber(record?.startDate, Date.now()),
     completionDate: asNumber(record?.completionDate, Date.now()),
+    // Months are optional on disk for backward-compat; the store handles missing values.
+    startMonth: typeof record?.startMonth === 'number' ? record.startMonth : undefined,
+    completionMonth: typeof record?.completionMonth === 'number' ? record.completionMonth : undefined,
   };
 }
 
@@ -527,6 +530,24 @@ function migrateState(persisted: any): GameState {
   persisted.auctionProperties = persisted.auctionProperties.map(sanitizeProperty);
   persisted.tenants = persisted.tenants.map((t: any) => sanitizeTenantRecord(t, asNumber(persisted.monthsPlayed)));
   persisted.renovations = persisted.renovations.map(sanitizeRenovation);
+  // Backfill startMonth/completionMonth on legacy renovation records using the
+  // dialog's "days" duration (~30 days/month). Floor at 1 month remaining.
+  {
+    const monthsPlayed = asNumber(persisted.monthsPlayed);
+    persisted.renovations = persisted.renovations.map((r: any) => {
+      if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') return r;
+      const durationDays = asNumber(r?.type?.duration, 30);
+      const totalMonths = Math.max(1, Math.round(durationDays / 30));
+      // For legacy in-flight renos we don't know the original startMonth; assume
+      // they're roughly halfway done so the player isn't punished by the migration.
+      const remaining = Math.max(1, Math.round(totalMonths / 2));
+      return {
+        ...r,
+        startMonth: typeof r.startMonth === 'number' ? r.startMonth : monthsPlayed - (totalMonths - remaining),
+        completionMonth: typeof r.completionMonth === 'number' ? r.completionMonth : monthsPlayed + remaining,
+      };
+    });
+  }
   persisted.tenantConcerns = persisted.tenantConcerns.map(sanitizeTenantConcern);
   // Drop orphaned concerns whose property no longer exists in the portfolio
   // (cleans up bugged saves where damage was raised against a sold property).
@@ -1239,9 +1260,14 @@ export const useGameStore = create<GameState & GameActions>()(
         const marketChange = (Math.random() - 0.5) * 0.002;
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
 
-        // Completed renovations
-        const completedRenovations = prev.renovations.filter(r => currentTime >= r.completionDate);
-        const activeRenovations = prev.renovations.filter(r => currentTime < r.completionDate);
+        // Completed renovations — driven by in-game months so duration matches
+        // the dialog's headline and respects gameSpeed. Wall-clock is fallback only.
+        const isRenoComplete = (r: Renovation) =>
+          typeof r.completionMonth === 'number'
+            ? prev.monthsPlayed >= r.completionMonth
+            : currentTime >= r.completionDate;
+        const completedRenovations = prev.renovations.filter(isRenoComplete);
+        const activeRenovations = prev.renovations.filter(r => !isRenoComplete(r));
         let updatedProperties = [...prev.ownedProperties];
         completedRenovations.forEach(renovation => {
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
@@ -2265,10 +2291,19 @@ export const useGameStore = create<GameState & GameActions>()(
           rentIncrease: scaledRent,
           valueIncrease: scaledValue,
         };
+        // Convert "days" duration into in-game months (~30 days/month).
+        // This makes actual completion match the dialog's headline number AND
+        // makes renovations honour gameSpeed (they're tied to monthsPlayed).
+        const monthsToComplete = Math.max(1, Math.round(renovationType.duration / 30));
+        const startMonth = prev.monthsPlayed;
+        const completionMonth = startMonth + monthsToComplete;
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
           type: scaledRenovationType, startDate: Date.now(),
-          completionDate: Date.now() + (renovationType.duration * 60 * 1000),
+          // Wall-clock fallback kept for backward-compat; not used for completion any more.
+          completionDate: Date.now() + (monthsToComplete * 180 * 1000),
+          startMonth,
+          completionMonth,
         };
         const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
         showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
