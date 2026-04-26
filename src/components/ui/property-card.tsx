@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
 import { EvictionDialog } from "@/components/ui/eviction-dialog";
+import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,8 @@ interface PropertyCardProps {
   cancelEviction?: (propertyId: string) => void;
   pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'; effectiveMonth: number; servedMonth: number };
   rentArrearsCount?: number;
+  /** Tenant satisfaction passed for negotiation acceptance probability. */
+  applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number) => void;
   mortgages?: Array<{
     propertyId: string;
     monthlyPayment: number;
