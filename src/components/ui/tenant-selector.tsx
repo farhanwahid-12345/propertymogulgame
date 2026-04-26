@@ -256,20 +256,22 @@ export function TenantSelector({
     displayBaseRent = Math.floor((propertyValue * (yieldPct / 100)) / 12);
   }
 
+  const hasSittingTenant = !!currentTenant;
+
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {currentTenant ? currentTenant.name : "Select Tenant"}
+            {hasSittingTenant ? `Tenant: ${currentTenant!.name}` : "Select Tenant"}
           </div>
         </Button>
       </DialogTrigger>
 
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Choose Tenant for Property</DialogTitle>
+          <DialogTitle>{hasSittingTenant ? 'Tenant Currently in Place' : 'Choose Tenant for Property'}</DialogTitle>
           <p className="text-sm text-muted-foreground mt-2">
             Different tenants offer different rent and risk profiles. The market refreshes each time you look!
             {displayBaseRent > 0 && (
