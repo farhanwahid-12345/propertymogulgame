@@ -882,7 +882,11 @@ export const useGameStore = create<GameState & GameActions>()(
           if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
             return { ...c, resolvedMonth: newMonthNumber };
           }
-          if (c.raisedMonth < newMonthNumber) {
+          // Grace period before satisfaction starts decaying:
+          // urgent (safety/noise) and damage-sourced → 1 month; everything else → 2 months
+          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+          const monthsOpen = newMonthNumber - c.raisedMonth;
+          if (monthsOpen > grace) {
             satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
           }
           return c;
@@ -1807,45 +1811,11 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Renters' Rights / Tenant Fees Act: 5-week deposit (capped) goes to TDS
-        const existingTenant = prev.tenants.find(t => t.propertyId === propertyId);
-        const previousDeposit = existingTenant?.depositHeld || 0;
+        // Renters' Rights / Tenant Fees Act: 5-week deposit (capped) is paid by the
+        // TENANT and held in TDS protection — landlord cash is NOT debited at move-in.
+        // Landlord only loses cash if they wrongly withhold and lose a deposit dispute.
         const requiredDeposit = calcDeposit(newRent);
-        const depositDelta = requiredDeposit - previousDeposit; // refund prior, take new
 
-        if (depositDelta > 0) {
-          const debited = debit(prev, depositDelta);
-          if (!debited) {
-            showToast("Deposit Required", `Need £${fromPennies(requiredDeposit).toLocaleString()} (5 weeks rent) for the protected deposit.`, "destructive");
-            return;
-          }
-          const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
-          const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
-          const rec: PropertyTenant = {
-            propertyId,
-            tenant,
-            rentMultiplier: tenant.rentMultiplier,
-            startDate: Date.now(),
-            satisfaction: 80,
-            lastSatisfactionUpdate: prev.monthsPlayed,
-            satisfactionReasons: [],
-            depositHeld: requiredDeposit,
-          };
-          const updatedTenants = existingIdx >= 0
-            ? prev.tenants.map((t, i) => i === existingIdx ? rec : t)
-            : [...prev.tenants, rec];
-          const updatedProps = prev.ownedProperties.map(p =>
-            p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
-          );
-          const depositMsg = debited.usedOverdraft > 0
-            ? ` Deposit £${fromPennies(requiredDeposit).toLocaleString()} taken (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft).`
-            : ` Deposit £${fromPennies(requiredDeposit).toLocaleString()} taken.`;
-          showToast("Tenant Moved In!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo.${depositMsg}`);
-          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
-          return;
-        }
-
-        // No additional deposit needed (lower rent or same)
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
         const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
         const rec: PropertyTenant = {
@@ -1864,16 +1834,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const updatedProps = prev.ownedProperties.map(p =>
           p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
-        // If previous deposit was higher, refund the difference back to cash
-        const refund = previousDeposit - requiredDeposit;
-        if (refund > 0) {
-          const credited = credit(prev, refund);
-          showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. Refunded £${fromPennies(refund).toLocaleString()} surplus deposit.`);
-          set({ cash: credited.cash, overdraftUsed: credited.overdraftUsed, tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
-        } else {
-          showToast("Tenant Selected!", `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo`);
-          set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
-        }
+        showToast(
+          "Tenant Moved In!",
+          `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
+        );
+        set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
       },
 
       // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
