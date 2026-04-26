@@ -39,7 +39,9 @@ export function TenantConcernsFeed({
   onResolve,
   onSnooze,
 }: Props) {
-  const active = concerns.filter(c => c && !c.resolvedMonth);
+  const ownedIds = new Set(ownedProperties.map(p => p.id));
+  // Hide resolved concerns AND orphans (concerns for properties no longer owned).
+  const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
 
   return (
