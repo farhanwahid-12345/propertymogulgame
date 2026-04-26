@@ -530,6 +530,24 @@ function migrateState(persisted: any): GameState {
   persisted.auctionProperties = persisted.auctionProperties.map(sanitizeProperty);
   persisted.tenants = persisted.tenants.map((t: any) => sanitizeTenantRecord(t, asNumber(persisted.monthsPlayed)));
   persisted.renovations = persisted.renovations.map(sanitizeRenovation);
+  // Backfill startMonth/completionMonth on legacy renovation records using the
+  // dialog's "days" duration (~30 days/month). Floor at 1 month remaining.
+  {
+    const monthsPlayed = asNumber(persisted.monthsPlayed);
+    persisted.renovations = persisted.renovations.map((r: any) => {
+      if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') return r;
+      const durationDays = asNumber(r?.type?.duration, 30);
+      const totalMonths = Math.max(1, Math.round(durationDays / 30));
+      // For legacy in-flight renos we don't know the original startMonth; assume
+      // they're roughly halfway done so the player isn't punished by the migration.
+      const remaining = Math.max(1, Math.round(totalMonths / 2));
+      return {
+        ...r,
+        startMonth: typeof r.startMonth === 'number' ? r.startMonth : monthsPlayed - (totalMonths - remaining),
+        completionMonth: typeof r.completionMonth === 'number' ? r.completionMonth : monthsPlayed + remaining,
+      };
+    });
+  }
   persisted.tenantConcerns = persisted.tenantConcerns.map(sanitizeTenantConcern);
   // Drop orphaned concerns whose property no longer exists in the portfolio
   // (cleans up bugged saves where damage was raised against a sold property).
