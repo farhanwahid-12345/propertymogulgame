@@ -880,7 +880,14 @@ export const useGameStore = create<GameState & GameActions>()(
         updatedConcerns = updatedConcerns.map(c => {
           if (c.resolvedMonth) return c;
           const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
-          if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
+          // Premium condition only auto-resolves organic tenant concerns —
+          // real property damage (boiler, roof, etc.) always requires a paid repair.
+          if (
+            property &&
+            property.condition === 'premium' &&
+            c.source !== 'damage' &&
+            (c.category === 'maintenance' || c.category === 'mould')
+          ) {
             return { ...c, resolvedMonth: newMonthNumber };
           }
           // Grace period before satisfaction starts decaying:
