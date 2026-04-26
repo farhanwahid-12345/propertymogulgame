@@ -203,6 +203,31 @@ function sanitizeTenantConcern(record: any): import('@/types/game').TenantConcer
   };
 }
 
+/**
+ * Merge multiple concern lists by id. Resolution always wins —
+ * a `resolvedMonth` set on any copy is preserved. Prevents tick races
+ * (processMarketUpdate vs processMonthlyTick) from clobbering each other.
+ */
+function mergeConcernsById(
+  ...lists: Array<import('@/types/game').TenantConcern[] | undefined>
+): import('@/types/game').TenantConcern[] {
+  const map = new Map<string, import('@/types/game').TenantConcern>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const c of list) {
+      if (!c?.id) continue;
+      const existing = map.get(c.id);
+      if (!existing) {
+        map.set(c.id, c);
+        continue;
+      }
+      if (existing.resolvedMonth && !c.resolvedMonth) continue;
+      map.set(c.id, c);
+    }
+  }
+  return Array.from(map.values());
+}
+
 function sanitizeOffer(offer: any): PropertyOffer {
   return {
     ...offer,
@@ -503,6 +528,12 @@ function migrateState(persisted: any): GameState {
   persisted.tenants = persisted.tenants.map((t: any) => sanitizeTenantRecord(t, asNumber(persisted.monthsPlayed)));
   persisted.renovations = persisted.renovations.map(sanitizeRenovation);
   persisted.tenantConcerns = persisted.tenantConcerns.map(sanitizeTenantConcern);
+  // Drop orphaned concerns whose property no longer exists in the portfolio
+  // (cleans up bugged saves where damage was raised against a sold property).
+  {
+    const ownedIds = new Set((persisted.ownedProperties || []).map((p: any) => p?.id).filter(Boolean));
+    persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => c?.propertyId && ownedIds.has(c.propertyId));
+  }
   persisted.propertyListings = persisted.propertyListings.map(sanitizePropertyListing);
 
   // Migrate old save fields
@@ -880,7 +911,14 @@ export const useGameStore = create<GameState & GameActions>()(
         updatedConcerns = updatedConcerns.map(c => {
           if (c.resolvedMonth) return c;
           const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
-          if (property && property.condition === 'premium' && (c.category === 'maintenance' || c.category === 'mould')) {
+          // Premium condition only auto-resolves organic tenant concerns —
+          // real property damage (boiler, roof, etc.) always requires a paid repair.
+          if (
+            property &&
+            property.condition === 'premium' &&
+            c.source !== 'damage' &&
+            (c.category === 'maintenance' || c.category === 'mould')
+          ) {
             return { ...c, resolvedMonth: newMonthNumber };
           }
           // Grace period before satisfaction starts decaying:
@@ -1162,7 +1200,7 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        set({
+        set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
           ownedProperties: updatedOwnedProperties,
@@ -1186,11 +1224,13 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyListings: newPropertyListings,
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
-          tenantConcerns: updatedConcerns,
+          // Merge with current store state — preserves any concerns added
+          // by an interleaved processMarketUpdate (e.g. damage events).
+          tenantConcerns: mergeConcernsById(s.tenantConcerns, updatedConcerns),
           pendingEvictions: activePendingEvictions,
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
-        });
+        }));
       },
 
       processMarketUpdate: () => {
@@ -1336,11 +1376,24 @@ export const useGameStore = create<GameState & GameActions>()(
             'Damaged flooring requiring replacement',
             'Broken window and frame, security risk',
           ];
+          // Snapshot: properties currently being sold or already gone
+          const sellingPropIds = new Set(
+            (prev.conveyancing || []).filter(c => c.status === 'selling').map(c => c.propertyId)
+          );
+          const listedForSalePropIds = new Set((prev.propertyListings || []).map(l => l.propertyId));
+          const evictedPropIds = new Set(
+            (prev.pendingEvictions || [])
+              .filter(ev => prev.monthsPlayed >= ev.effectiveMonth)
+              .map(ev => ev.propertyId)
+          );
+
           prev.tenants.forEach(({ propertyId, tenant }) => {
             if (newDamageConcerns.length > 0) return;
             if (Math.random() >= tenant.damageRisk / 100) return;
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (!property) return;
+            // Don't generate damage on properties leaving the portfolio
+            if (sellingPropIds.has(propertyId) || listedForSalePropIds.has(propertyId) || evictedPropIds.has(propertyId)) return;
             const dmgHist = prev.damageHistory.find(dh => dh.propertyId === propertyId);
             const monthsSinceLast = dmgHist ? prev.monthsPlayed - dmgHist.lastDamageMonth : 999;
             if (monthsSinceLast < 48) return;
@@ -1362,11 +1415,6 @@ export const useGameStore = create<GameState & GameActions>()(
                 satisfactionPenaltyIfIgnored: 6,
                 source: 'damage',
               });
-              showToast(
-                "🔧 Property Damage",
-                `${property.name}: ${desc}. Resolve in the Concerns feed.`,
-                "destructive",
-              );
             }
           });
         }
@@ -1374,15 +1422,29 @@ export const useGameStore = create<GameState & GameActions>()(
         // Build final state — don't remove sold properties yet (they're in conveyancing now)
         const salePropIds = new Set(completedSales.map(s => s.propertyId));
 
-        set({
+        // Functional set — merge by id with whatever's currently in the store
+        // so concurrent monthly ticks can't clobber the new damage concerns.
+        set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
-          tenantConcerns: [...(prev.tenantConcerns || []), ...newDamageConcerns],
+          tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
+        }));
+
+        // Toast AFTER state commit — guarantees the matching concern is in the feed
+        // before the user sees the notification.
+        newDamageConcerns.forEach(c => {
+          const property = prev.ownedProperties.find(p => p.id === c.propertyId);
+          if (!property) return;
+          showToast(
+            "🔧 Property Damage",
+            `${property.name}: ${c.description}. Resolve in the Concerns feed.`,
+            "destructive",
+          );
         });
       },
 
