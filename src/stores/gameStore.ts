@@ -1883,6 +1883,66 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
       },
 
+      // Section 13 rent increase — applies a negotiated rent and (if tribunal) debits fee.
+      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        const tenantRec = prev.tenants.find(t => t.propertyId === propertyId);
+        if (!property || !tenantRec) {
+          showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
+        }
+        if (newRentPennies <= property.monthlyIncome) {
+          showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
+        }
+
+        let cashUpdate: Partial<{ cash: number; overdraftUsed: number }> = {};
+        if (tribunalFeePennies > 0) {
+          const debited = debit(prev, tribunalFeePennies);
+          if (!debited) {
+            showToast("Insufficient Funds", `Need £${fromPennies(tribunalFeePennies).toLocaleString()} for the tribunal fee.`, "destructive"); return;
+          }
+          cashUpdate = { cash: debited.cash, overdraftUsed: debited.overdraftUsed };
+        }
+
+        const satDelta =
+          outcome === 'accepted'          ? -3 :
+          outcome === 'counter_accepted'  ? -2 :
+          outcome === 'tribunal_landlord' ? -10 :
+          outcome === 'tribunal_tenant'   ? -5 : -3;
+
+        const reasonLabel =
+          outcome === 'tribunal_landlord' ? 'Tribunal sided with landlord' :
+          outcome === 'tribunal_tenant'   ? 'Tribunal sided with tenant'   :
+          outcome === 'counter_accepted'  ? 'Accepted tenant counter-offer' :
+                                             'Section 13 rent rise accepted';
+
+        const newSatisfaction = Math.max(0, Math.min(100, tenantRec.satisfaction + satDelta));
+        const newReasons = [
+          { reason: reasonLabel, delta: satDelta },
+          ...(tenantRec.satisfactionReasons || []).slice(0, 4),
+        ];
+
+        const updatedProps = prev.ownedProperties.map(p =>
+          p.id === propertyId
+            ? { ...p, monthlyIncome: newRentPennies, baseRent: newRentPennies, lastRentIncrease: prev.monthsPlayed }
+            : p
+        );
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId
+            ? { ...t, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
+            : t
+        );
+
+        showToast(
+          outcome === 'tribunal_landlord' || outcome === 'tribunal_tenant'
+            ? '⚖️ Tribunal Decision Applied'
+            : '📜 Rent Increase Applied',
+          `${reasonLabel}. New rent: £${fromPennies(newRentPennies).toLocaleString()}/mo${tribunalFeePennies > 0 ? ` (tribunal fee £${fromPennies(tribunalFeePennies).toLocaleString()})` : ''}.`
+        );
+
+        set({ ...cashUpdate, ownedProperties: updatedProps, tenants: updatedTenants });
+      },
+
       // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
       evictTenant: (propertyId, ground) => {
         const prev = get();
