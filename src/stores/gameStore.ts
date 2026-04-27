@@ -304,6 +304,9 @@ interface GameActions {
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
+  // Planning permission
+  submitPlanningApplication: (propertyId: string, renovationType: RenovationType) => void;
+  acknowledgePlanningDecision: (applicationId: string) => void;
   // Mortgages
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
