@@ -574,12 +574,26 @@ export function RenovationDialog({
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleRenovate}
-              disabled={!selectedRenovation || !canAfford(selectedRenovation!)}
-            >
-              Start Renovation
-            </Button>
+            {(() => {
+              if (!selectedRenovation) {
+                return <Button disabled>Start Renovation</Button>;
+              }
+              const app = selectedRenovation.requiresPlanning ? findApplication(selectedRenovation.id) : undefined;
+              const needsApplication = selectedRenovation.requiresPlanning && app?.status !== 'approved';
+              const fee = selectedRenovation.planningFee ?? 250;
+              const disabled = needsApplication
+                ? playerCash < fee || app?.status === 'pending' || (inPlanningCooldown && app?.status !== 'approved')
+                : !canAfford(selectedRenovation);
+              const label = needsApplication
+                ? `Submit Planning (£${fee.toLocaleString()})`
+                : 'Start Renovation';
+              return (
+                <Button onClick={handleRenovate} disabled={disabled}>
+                  {needsApplication && <FileText className="h-4 w-4 mr-1" />}
+                  {label}
+                </Button>
+              );
+            })()}
           </div>
         </div>
       </DialogContent>
