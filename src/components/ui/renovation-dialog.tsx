@@ -145,6 +145,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minInternalSqft: 700,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.80,
   },
   {
     id: "rear_extension",
@@ -159,9 +163,11 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPlotSqft: 2200,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.70,
   },
-  {
-    id: "conservatory",
     name: "Conservatory",
     cost: 12000,
     rentIncrease: 250,
@@ -173,9 +179,11 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPlotSqft: 1800,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.90,
   },
-
-  // Conversions — change the property's character/use
   {
     id: "convert_hmo_4",
     name: "Convert to HMO (4-bed)",
