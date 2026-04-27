@@ -22,74 +22,146 @@ export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, 
   const now = Date.now();
 
   return (
-    <div className="glass p-5 animate-fade-in">
-      <div className="flex items-center gap-2 mb-4">
-        <Hammer className="h-5 w-5 text-orange-400" />
-        <h2 className="text-xl font-bold text-foreground">Active Renovations</h2>
-        <Badge variant="secondary" className="text-xs">{renovations.length}</Badge>
-      </div>
+    <div className="glass p-5 animate-fade-in space-y-5">
+      {renovations.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Hammer className="h-5 w-5 text-orange-400" />
+            <h2 className="text-xl font-bold text-foreground">Active Renovations</h2>
+            <Badge variant="secondary" className="text-xs">{renovations.length}</Badge>
+          </div>
 
-      <div className="space-y-3">
-        {renovations.map((r) => {
-          const renovationType = r?.type;
-          if (!renovationType) return null;
+          <div className="space-y-3">
+            {renovations.map((r) => {
+              const renovationType = r?.type;
+              if (!renovationType) return null;
 
-          const property = ownedProperties.find((p) => p.id === r.propertyId);
+              const property = ownedProperties.find((p) => p.id === r.propertyId);
 
-          // Prefer in-game-month timing; fall back to wall-clock for legacy records.
-          let progress: number;
-          let monthsRemaining: number;
-          if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') {
-            const total = Math.max(1, r.completionMonth - r.startMonth);
-            const elapsed = Math.max(0, Math.min(total, monthsPlayed - r.startMonth));
-            progress = (elapsed / total) * 100;
-            monthsRemaining = Math.max(0, r.completionMonth - monthsPlayed);
-          } else {
-            const total = Math.max(1, r.completionDate - r.startDate);
-            const elapsed = Math.max(0, Math.min(total, now - r.startDate));
-            progress = (elapsed / total) * 100;
-            monthsRemaining = Math.ceil(Math.max(0, r.completionDate - now) / 180_000);
-          }
+              // Prefer in-game-month timing; fall back to wall-clock for legacy records.
+              let progress: number;
+              let monthsRemaining: number;
+              if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') {
+                const total = Math.max(1, r.completionMonth - r.startMonth);
+                const elapsed = Math.max(0, Math.min(total, monthsPlayed - r.startMonth));
+                progress = (elapsed / total) * 100;
+                monthsRemaining = Math.max(0, r.completionMonth - monthsPlayed);
+              } else {
+                const total = Math.max(1, r.completionDate - r.startDate);
+                const elapsed = Math.max(0, Math.min(total, now - r.startDate));
+                progress = (elapsed / total) * 100;
+                monthsRemaining = Math.ceil(Math.max(0, r.completionDate - now) / 180_000);
+              }
 
-          const Icon = renovationType.icon || Hammer;
+              const Icon = renovationType.icon || Hammer;
 
-          return (
-            <div key={r.id} className="glass p-3 space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Icon className="h-4 w-4 text-orange-400 shrink-0" />
-                  <span className="font-semibold text-sm truncate">
-                    {property?.name || "Unknown Property"}
-                  </span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {renovationType.name}
-                  </Badge>
+              return (
+                <div key={r.id} className="glass p-3 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="h-4 w-4 text-orange-400 shrink-0" />
+                      <span className="font-semibold text-sm truncate">
+                        {property?.name || "Unknown Property"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {renovationType.name}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Spent: <span className="text-foreground font-medium">£{renovationType.cost.toLocaleString()}</span>
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {monthsRemaining === 0
+                          ? "Completes shortly"
+                          : `Completes in ~${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
+                      </span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+
+                  <div className="flex justify-between text-xs">
+                    <span className="text-success">+£{renovationType.rentIncrease}/mo rent</span>
+                    <span className="text-success">+£{renovationType.valueIncrease.toLocaleString()} value</span>
+                  </div>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  Spent: <span className="text-foreground font-medium">£{renovationType.cost.toLocaleString()}</span>
-                </span>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    {monthsRemaining === 0
-                      ? "Completes shortly"
-                      : `Completes in ~${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
-                  </span>
-                  <span>{Math.round(progress)}%</span>
+      {visibleApplications.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-amber-300" />
+            <h2 className="text-xl font-bold text-foreground">Planning Applications</h2>
+            <Badge variant="secondary" className="text-xs">{visibleApplications.length}</Badge>
+          </div>
+
+          <div className="space-y-3">
+            {visibleApplications.map((app) => {
+              const property = ownedProperties.find((p) => p.id === app.propertyId);
+              const total = Math.max(1, app.decisionMonth - app.submittedMonth);
+              const elapsed = Math.max(0, Math.min(total, monthsPlayed - app.submittedMonth));
+              const progress = (elapsed / total) * 100;
+              const monthsRemaining = Math.max(0, app.decisionMonth - monthsPlayed);
+              const isPending = app.status === 'pending';
+              const isRefused = app.status === 'refused';
+
+              return (
+                <div key={app.id} className="glass p-3 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 text-amber-300 shrink-0" />
+                      <span className="font-semibold text-sm truncate">
+                        {property?.name || "Unknown Property"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {app.renovationName}
+                      </Badge>
+                    </div>
+                    {isRefused && (
+                      <Badge className="bg-danger/20 text-danger border-danger/30 text-[10px]">
+                        Refused — 6mo cooldown
+                      </Badge>
+                    )}
+                    {isPending && (
+                      <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-300">
+                        Pending LPA decision
+                      </Badge>
+                    )}
+                  </div>
+
+                  {isPending && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>
+                          {monthsRemaining === 0
+                            ? "Decision imminent"
+                            : `Decision in ~${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
+                        </span>
+                        <span>{Math.round(progress)}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  )}
+
+                  {isRefused && app.refusalReason && (
+                    <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
+                      {app.refusalReason}
+                    </div>
+                  )}
                 </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-
-              <div className="flex justify-between text-xs">
-                <span className="text-success">+£{renovationType.rentIncrease}/mo rent</span>
-                <span className="text-success">+£{renovationType.valueIncrease.toLocaleString()} value</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
