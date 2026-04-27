@@ -168,6 +168,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     planningFee: 250,
     baseApprovalProb: 0.70,
   },
+  {
+    id: "conservatory",
     name: "Conservatory",
     cost: 12000,
     rentIncrease: 250,
