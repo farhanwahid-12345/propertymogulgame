@@ -375,7 +375,6 @@ const Index = () => {
                     onSell={gameState.sellProperty}
                     onSelectTenant={gameState.selectTenant}
                     onRenovate={gameState.startRenovation}
-                    onUpgradeCondition={gameState.upgradeCondition}
                     activeRenovationIds={activeRenoIds}
                     playerCash={gameState.cash}
                     currentTenant={tenantRec?.tenant}
