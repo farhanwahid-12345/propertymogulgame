@@ -205,6 +205,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     planningFee: 500,
     baseApprovalProb: 0.65,
   },
+  {
+    id: "convert_hmo_6",
     name: "Convert to HMO (6-bed)",
     cost: 35000,
     rentIncrease: 1100,
@@ -222,6 +224,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     planningFee: 500,
     baseApprovalProb: 0.50,
   },
+  {
+    id: "convert_flats",
     name: "Convert to Flats (2 units)",
     cost: 55000,
     rentIncrease: 900,
@@ -238,6 +242,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     planningFee: 500,
     baseApprovalProb: 0.55,
   },
+  {
+    id: "convert_commercial_to_residential",
     name: "Commercial → Residential",
     cost: 40000,
     rentIncrease: 500,
