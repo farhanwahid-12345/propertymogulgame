@@ -1029,6 +1029,41 @@ export const useGameStore = create<GameState & GameActions>()(
         });
         // Drop expired locks
         newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
+
+        // ── Resolve pending planning applications whose decision month has arrived ──
+        let newPlanningApplications = [...(prev.planningApplications || [])];
+        newPlanningApplications = newPlanningApplications.map(app => {
+          if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
+            const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
+            const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
+            if (app.approved) {
+              showToast(
+                "Planning Approved! ✅",
+                `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
+              );
+            } else {
+              showToast(
+                "Planning Refused ❌",
+                `${app.renovationName} on ${propName} refused: ${app.refusalReason || 'planning grounds'}. 6-month cooldown before resubmission.`,
+                "destructive",
+              );
+              // Add 6-month cooldown lock so the player can't immediately resubmit
+              newPropertyLocks.push({
+                propertyId: app.propertyId,
+                reason: 'planning_cooldown',
+                untilMonth: newMonthNumber + 6,
+              });
+            }
+            return resolved;
+          }
+          return app;
+        });
+        // Drop refused applications that have been visible for 1+ month (acknowledged via toast)
+        newPlanningApplications = newPlanningApplications.filter(app => {
+          if (app.status === 'refused' && newMonthNumber - app.decisionMonth >= 2) return false;
+          return true;
+        });
+
         // Auto-expire deposit disputes 6 months after raised (only the closed ones — keep open ones forever until acted on)
         newDepositDisputes = newDepositDisputes.filter(d => {
           if (d.status === 'open') return true;
