@@ -395,7 +395,6 @@ export function RenovationDialog({
                   const { uplift: cappedValueUp, diminishingFactor } = ceilingPrice > 0
                     ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
                     : { uplift: valueUp, diminishingFactor: 1 };
-                  const ceilingTrimmed = diminishingFactor < 0.95;
 
                   // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
                   const valueLow = Math.round(cappedValueUp * 0.3);
