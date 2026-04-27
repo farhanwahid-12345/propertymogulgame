@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Hammer, Paintbrush, Home, Plus, Wrench, Zap } from "lucide-react";
+import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from "@/lib/engine/renovation";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from "@/lib/engine/renovation";
+import { getCeilingPrice } from "@/lib/engine/constants";
 
 export interface RenovationType {
   id: string;
@@ -56,6 +57,14 @@ interface RenovationDialogProps {
   currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** True if a tenant is currently in residence — blocks `requiresVacant` renovations. */
   hasTenant?: boolean;
+  /** Neighborhood — drives ceiling-price warnings on extensions/conversions. */
+  neighborhood?: string;
+  /** Pending/approved planning applications for this property. */
+  planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** Current in-game month — for displaying "decision in N mo" countdowns. */
+  monthsPlayed?: number;
+  /** True if this property is in a planning_cooldown lock (recent refusal). */
+  inPlanningCooldown?: boolean;
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
@@ -280,6 +289,10 @@ export function RenovationDialog({
   internalSqft,
   plotSqft,
   currentSubtype,
+  neighborhood,
+  planningApplications = [],
+  monthsPlayed = 0,
+  inPlanningCooldown = false,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -289,6 +302,17 @@ export function RenovationDialog({
   const scaledCost = (r: RenovationType) => scaleRenovationCost(r.cost, scaleInputs);
   const scaledRent = (r: RenovationType) => scaleRenovationRent(r.rentIncrease, scaleInputs);
   const scaledValue = (r: RenovationType) => scaleRenovationValue(r.valueIncrease, scaleInputs);
+
+  // Ceiling-price awareness — applies to extensions/conversions
+  const ceilingPrice = neighborhood && propertyType
+    ? getCeilingPrice({ neighborhood, type: propertyType })
+    : 0;
+  const ceilingRatio = ceilingPrice > 0 ? propertyValue / ceilingPrice : 0;
+  const atCeiling = ceilingRatio >= 0.95;
+
+  /** Lookup helpers for planning state per renovation */
+  const findApplication = (renoId: string) =>
+    planningApplications.find(a => a.renovationTypeId === renoId);
 
   const handleRenovate = () => {
     if (selectedRenovation) {
@@ -354,17 +378,28 @@ export function RenovationDialog({
                   const inProgress = isInProgress(renovation);
                   const completed = isCompleted(renovation);
                   const ineligible = ineligibilityReason(renovation);
-                  const blocked = !!ineligible || inProgress || completed;
+
+                  // Planning state for this renovation
+                  const application = renovation.requiresPlanning ? findApplication(renovation.id) : undefined;
+                  const planningPending = application?.status === 'pending';
+                  const planningApproved = application?.status === 'approved';
+                  const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
+                  const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
 
                   // Scaled cost/uplifts for THIS property's size & value
                   const cost = scaledCost(renovation);
                   const rentUp = scaledRent(renovation);
                   const valueUp = scaledValue(renovation);
 
+                  // Ceiling diminishing — preview the actual uplift the player will get
+                  const { uplift: cappedValueUp, diminishingFactor } = ceilingPrice > 0
+                    ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
+                    : { uplift: valueUp, diminishingFactor: 1 };
+
                   // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
-                  const valueLow = Math.round(valueUp * 0.3);
-                  const valueHigh = valueUp;
-                  const valueTypical = Math.round(valueUp * 0.85);
+                  const valueLow = Math.round(cappedValueUp * 0.3);
+                  const valueHigh = cappedValueUp;
+                  const valueTypical = Math.round(cappedValueUp * 0.85);
 
                   return (
                     <Card
@@ -379,20 +414,28 @@ export function RenovationDialog({
                       onClick={() => affordable && !blocked && setSelectedRenovation(renovation)}
                     >
                       <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-5 w-5" />
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon className="h-5 w-5 shrink-0" />
                             <CardTitle className="text-base">{renovation.name}</CardTitle>
                           </div>
-                          {completed ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                              ✅ Completed
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              {renovation.duration}d
-                            </Badge>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            {completed ? (
+                              <Badge className="bg-success/20 text-success border-success/30 text-xs">
+                                ✅ Completed
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                {renovation.duration}d
+                              </Badge>
+                            )}
+                            {renovation.requiresPlanning && !completed && (
+                              <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-300 bg-amber-400/5">
+                                <FileText className="h-3 w-3 mr-1" />
+                                Planning required
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
 
@@ -400,7 +443,7 @@ export function RenovationDialog({
                         <p className="text-sm text-muted-foreground">{renovation.description}</p>
 
                         {completed && (
-                          <div className="text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 rounded px-2 py-1">
+                          <div className="text-xs text-success border border-success/30 bg-success/5 rounded px-2 py-1">
                             ✅ Already completed on this property
                           </div>
                         )}
@@ -408,6 +451,39 @@ export function RenovationDialog({
                         {ineligible && !completed && (
                           <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
                             ⚠️ {ineligible}
+                          </div>
+                        )}
+
+                        {/* Planning state banners */}
+                        {planningPending && application && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            📋 Planning application pending — decision in {Math.max(0, application.decisionMonth - monthsPlayed)} mo
+                          </div>
+                        )}
+                        {planningApproved && (
+                          <div className="text-xs text-success border border-success/30 bg-success/5 rounded px-2 py-1">
+                            ✅ Planning approved — start work to consume approval
+                          </div>
+                        )}
+                        {blockedByCooldown && (
+                          <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
+                            ⛔ Recent refusal — 6-mo cooldown before resubmission
+                          </div>
+                        )}
+                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (
+                          <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1">
+                            <FileText className="h-3 w-3 inline mr-1" />
+                            Submitting will charge a £{(renovation.planningFee ?? 250).toLocaleString()} non-refundable fee. Decision in ~{renovation.planningWaitMonths ?? 2} mo. Base approval ~{Math.round((renovation.baseApprovalProb ?? 0.7) * 100)}%.
+                          </div>
+                        )}
+
+                        {/* Ceiling-price warning */}
+                        {ceilingPrice > 0 && diminishingFactor < 0.95 && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            <AlertTriangle className="h-3 w-3 inline mr-1" />
+                            {atCeiling
+                              ? `At area ceiling (£${ceilingPrice.toLocaleString()}). Value uplift reduced ~${Math.round((1 - diminishingFactor) * 100)}%.`
+                              : `Approaching area ceiling. Uplift trimmed ~${Math.round((1 - diminishingFactor) * 100)}%.`}
                           </div>
                         )}
 
@@ -498,12 +574,26 @@ export function RenovationDialog({
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleRenovate}
-              disabled={!selectedRenovation || !canAfford(selectedRenovation!)}
-            >
-              Start Renovation
-            </Button>
+            {(() => {
+              if (!selectedRenovation) {
+                return <Button disabled>Start Renovation</Button>;
+              }
+              const app = selectedRenovation.requiresPlanning ? findApplication(selectedRenovation.id) : undefined;
+              const needsApplication = selectedRenovation.requiresPlanning && app?.status !== 'approved';
+              const fee = selectedRenovation.planningFee ?? 250;
+              const disabled = needsApplication
+                ? playerCash < fee || app?.status === 'pending' || (inPlanningCooldown && app?.status !== 'approved')
+                : !canAfford(selectedRenovation);
+              const label = needsApplication
+                ? `Submit Planning (£${fee.toLocaleString()})`
+                : 'Start Renovation';
+              return (
+                <Button onClick={handleRenovate} disabled={disabled}>
+                  {needsApplication && <FileText className="h-4 w-4 mr-1" />}
+                  {label}
+                </Button>
+              );
+            })()}
           </div>
         </div>
       </DialogContent>

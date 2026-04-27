@@ -82,6 +82,10 @@ interface PropertyCardProps {
   currentMarketRate?: number;
   baseMarketRate?: number;
   providerRates?: Record<string, number>;
+  /** Pending/approved planning applications scoped to THIS property. */
+  planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** True if this property has an active planning_cooldown lock. */
+  inPlanningCooldown?: boolean;
 }
 
 const PropertyTypeIcon = {
@@ -123,6 +127,8 @@ export const PropertyCard = memo(function PropertyCard({
   currentMarketRate = 0.05,
   baseMarketRate = 0.05,
   providerRates = {},
+  planningApplications = [],
+  inPlanningCooldown = false,
   evictTenant,
   cancelEviction,
   pendingEviction,
@@ -533,6 +539,10 @@ export const PropertyCard = memo(function PropertyCard({
                       internalSqft={property.internalSqft}
                       plotSqft={property.plotSqft}
                       currentSubtype={property.subtype}
+                      neighborhood={property.neighborhood}
+                      planningApplications={planningApplications}
+                      monthsPlayed={monthsPlayed}
+                      inPlanningCooldown={inPlanningCooldown}
                     />
                   )}
                   {onUpgradeCondition && property.condition !== 'premium' && (() => {
