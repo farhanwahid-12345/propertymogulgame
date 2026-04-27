@@ -127,6 +127,8 @@ export const PropertyCard = memo(function PropertyCard({
   currentMarketRate = 0.05,
   baseMarketRate = 0.05,
   providerRates = {},
+  planningApplications = [],
+  inPlanningCooldown = false,
   evictTenant,
   cancelEviction,
   pendingEviction,
