@@ -245,6 +245,7 @@ const Index = () => {
           renovations={gameState.renovations || []}
           ownedProperties={gameState.ownedProperties}
           monthsPlayed={gameState.monthsPlayed}
+          planningApplications={(gameState as any).planningApplications || []}
         />
 
         {/* Eviction timeline */}
