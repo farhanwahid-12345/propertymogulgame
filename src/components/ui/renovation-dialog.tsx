@@ -30,6 +30,14 @@ export interface RenovationType {
   resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** Heavy works that disturb living conditions — blocked while a tenant is in residence. */
   requiresVacant?: boolean;
+  /** Major works that need a Local Planning Authority decision before starting. */
+  requiresPlanning?: boolean;
+  /** In-game months between submission and decision (default 2). */
+  planningWaitMonths?: number;
+  /** Application fee (pounds). 0 = waived (e.g. Class MA prior approval). */
+  planningFee?: number;
+  /** Base approval probability before modifiers (0..1). */
+  baseApprovalProb?: number;
 }
 
 interface RenovationDialogProps {
@@ -137,6 +145,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minInternalSqft: 700,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.80,
   },
   {
     id: "rear_extension",
@@ -151,6 +163,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPlotSqft: 2200,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.70,
   },
   {
     id: "conservatory",
@@ -165,9 +181,11 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPlotSqft: 1800,
     allowedTypes: ["residential", "luxury"],
     requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 250,
+    baseApprovalProb: 0.90,
   },
-
-  // Conversions — change the property's character/use
   {
     id: "convert_hmo_4",
     name: "Convert to HMO (4-bed)",
@@ -182,6 +200,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPropertyValue: 80000,
     minInternalSqft: 850,
     resultingSubtype: "hmo",
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 500,
+    baseApprovalProb: 0.65,
   },
   {
     id: "convert_hmo_6",
@@ -197,6 +219,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     minPropertyValue: 120000,
     minInternalSqft: 1300,
     resultingSubtype: "hmo",
+    requiresPlanning: true,
+    planningWaitMonths: 3,
+    planningFee: 500,
+    baseApprovalProb: 0.50,
   },
   {
     id: "convert_flats",
@@ -211,6 +237,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     allowedTypes: ["residential"],
     minInternalSqft: 1400,
     resultingSubtype: "flats",
+    requiresPlanning: true,
+    planningWaitMonths: 3,
+    planningFee: 500,
+    baseApprovalProb: 0.55,
   },
   {
     id: "convert_commercial_to_residential",
@@ -224,6 +254,10 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     category: "conversion",
     allowedTypes: ["commercial"],
     resultingSubtype: "standard",
+    requiresPlanning: true,
+    planningWaitMonths: 2,
+    planningFee: 0,
+    baseApprovalProb: 0.75,
   },
 ];
 

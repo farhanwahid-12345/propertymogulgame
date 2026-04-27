@@ -1,77 +1,182 @@
-## Problem
+# Renovation Realism: Planning Permission + Ceiling Prices
 
-The renovation dialog shows e.g. "Loft Conversion 45d", but in practice it takes vastly longer than 45 in-game days. Two compounding bugs:
+Two related improvements that make heavy renovations feel governed by real-world UK constraints:
 
-1. **Wall-clock, not game-clock.** `completionDate = Date.now() + duration * 60 * 1000` treats `duration` (a "days" number) as **wall-clock minutes**. At 1× game speed (180s = 1 month), 45 "days" = 45 wall-clock minutes ≈ **15 in-game months**.
-2. **`gameSpeed` ignored.** Even at 2× / 4× speed, the renovation completion target stays anchored to wall-clock time, so the rest of the game advances faster while renovations don't.
-3. **Dialog times are also too short for realism.** Per the user, even the headline numbers (e.g. 45d for a loft conversion) should be roughly doubled to better reflect real UK renovation timelines.
+1. **Planning permission gate** for major works (extensions, conversions) — fee, wait, and a probabilistic decision based on real planning rules.
+2. **Ceiling-price diminishing returns** — a postcode/area cap on what the market will pay, so over-developing a £60k terrace stops yielding 1:1 value uplift.
 
-## Fix
+---
 
-### 1. Double the dialog durations (realism pass) — `src/components/ui/renovation-dialog.tsx`
+## 1. Planning Permission
 
-Update the `duration` field in `RENOVATION_OPTIONS` to ~2× current values (rounded to clean numbers):
+### Which renovations require it?
 
-| Renovation | Old | New |
-|---|---|---|
-| Basic Repairs | 7 | 14 |
-| Full Redecoration | 14 | 28 |
-| Kitchen Upgrade | 21 | 42 |
-| Bathroom Renovation | 18 | 35 |
-| Central Heating | 10 | 21 |
-| Double Glazing | 12 | 21 |
-| Loft Conversion | 45 | 90 |
-| Single-Story Extension | 60 | 120 |
-| Conservatory | 30 | 60 |
-| Convert to HMO (4-bed) | 60 | 120 |
-| Convert to HMO (6-bed) | 90 | 180 |
-| Convert to Flats (2 units) | 120 | 240 |
-| Commercial → Residential | 90 | 180 |
+Mapped to real UK Permitted Development (PD) / full-application rules:
 
-These are now realistic UK timelines (e.g. a loft conversion ≈ 3 months, an extension ≈ 4 months, a flat conversion ≈ 8 months).
+| Renovation | PP needed? | Base approval % | Notes |
+|---|---|---|---|
+| Basic Repairs, Redecoration, Kitchen, Bathroom, Central Heating, Double Glazing | **No** | — | Internal works / PD |
+| Loft Conversion | **Yes (often)** | 80% | Usually PD but front dormers / large volumes need PP — model as needing it |
+| Single-Story (Rear) Extension | **Yes** | 70% | PD limits often exceeded in this size class |
+| Conservatory | **Maybe** | 90% | Usually PD; soft gate at very high approval |
+| Convert to HMO (4-bed) | **Yes** | 65% | Article 4 / sui generis common in many areas |
+| Convert to HMO (6-bed) | **Yes** | 50% | Sui generis — full application always |
+| Convert to Flats (2 units) | **Yes** | 55% | Material change of use |
+| Commercial → Residential | **Yes** | 75% | Class MA prior approval, mostly granted |
 
-### 2. Make actual completion match the dialog — `src/stores/gameStore.ts` (`startRenovation`)
+Approval % is then **modified** by:
+- **Property type / area conservatism**: luxury / Nunthorpe area = stricter (-10%); standard residential neutral; commercial → residential = follow base.
+- **Property value vs. neighbourhood ceiling**: over-developing a £60k terrace into 6-bed HMO is more likely to be refused (-10% if `value > 0.7 × ceiling`).
+- **Player's previous track record** (light touch): each prior approval +1%, each refusal −2%, capped ±10%.
 
-Switch from wall-clock to **in-game months** so the displayed duration is what the player actually waits, and so `gameSpeed` correctly speeds renovations up.
+### Mechanics
 
-- Add a new field `completionMonth: number` to the `Renovation` type (`src/types/game.ts`), mirroring the conveyancing pattern.
-- In `startRenovation`, compute:
-  ```ts
-  const monthsToComplete = Math.max(1, Math.round(renovationType.duration / 30));
-  const completionMonth = prev.monthsPlayed + monthsToComplete;
-  ```
-- Keep `completionDate` for backward-compat with old saves but stop using it as the source of truth — derive a fallback only when `completionMonth` is missing.
+- **Fee**: `£250 (householder)` for extensions/loft/conservatory, `£500 (full)` for HMOs and flats, `£0 (prior approval class MA)` for commercial→residential. Charged immediately on submission, **non-refundable**.
+- **Wait time**: 2 in-game months (≈ statutory 8-week determination period). HMO-6 and flat conversion: 3 months (major application).
+- **Outcome**: rolled at submission time and stored. Player sees "Planning: Pending (X mo)" on the property card and renovation tracker.
+- **On approval** → renovation auto-starts (cost debited then; ROI clock from approval month).
+- **On refusal** → fee is lost; toast explains the reason ("over-development for area", "loss of family housing stock", etc.). Player can resubmit after a 6-month cooldown.
 
-### 3. Use `completionMonth` for completion + progress
+### New types (`src/types/game.ts`)
 
-- `processMonthEnd` (around line 1243): replace `currentTime >= r.completionDate` with `monthsPlayed >= r.completionMonth`. Active list uses the inverse.
-- `src/components/ui/renovation-tracker.tsx`: compute progress and remaining time from in-game months:
-  ```ts
-  const startMonth = r.startMonth ?? (r.completionMonth - monthsToComplete);
-  const total = Math.max(1, r.completionMonth - startMonth);
-  const elapsed = Math.max(0, Math.min(total, monthsPlayed - startMonth));
-  const monthsRemaining = Math.max(0, r.completionMonth - monthsPlayed);
-  const progress = (elapsed / total) * 100;
-  ```
-  Add `startMonth` to the `Renovation` type and set it in `startRenovation`. Pass `monthsPlayed` from `useGameState` into the tracker.
+```ts
+export type PlanningStatus = 'pending' | 'approved' | 'refused';
 
-### 4. Save migration
+export interface PlanningApplication {
+  id: string;
+  propertyId: string;
+  renovationTypeId: string;
+  submittedMonth: number;
+  decisionMonth: number;        // submittedMonth + waitMonths
+  status: PlanningStatus;
+  feePaid: number;              // pennies
+  approvalProb: number;         // rolled probability for transparency
+  refusalReason?: string;
+}
 
-In `migrateState` / `sanitizeRenovation` (around line 182):
-- For legacy renovations with no `completionMonth`/`startMonth`, derive them from the wall-clock fields by mapping `(completionDate - now)` to in-game months at the current `gameSpeed`, with a sensible floor of 1 month.
+// On RenovationType (renovation-dialog.tsx):
+requiresPlanning?: boolean;
+planningWaitMonths?: number;     // default 2
+planningFee?: number;            // pounds, default 250
+baseApprovalProb?: number;       // 0-1
+```
 
-### 5. Dialog progress badge
+Add `planningApplications: PlanningApplication[]` to `GameState` + bump `SAVE_VERSION` to `9` with a migration that defaults the array to `[]`.
 
-The "In Progress" placeholder in `renovation-dialog.tsx` currently hard-codes `50%`. Pipe `monthsPlayed` and the renovation record through so the dialog mirrors the tracker's real progress.
+### Store changes (`src/stores/gameStore.ts`)
 
-## Files Modified
+- New action: `submitPlanningApplication(propertyId, renovationType)` — debits fee, creates the application, rolls outcome immediately but reveals it only at `decisionMonth`.
+- `processMonthEnd` (in monthly tick): for each pending application where `monthsPlayed >= decisionMonth`, surface the result via toast and:
+  - **approved** → call `startRenovation` directly (which debits the build cost + starts the work timer); remove the application.
+  - **refused** → mark refused, keep visible 1 month, drop afterward; lock retry for 6 months via existing `propertyLocks` reason `'planning_cooldown'`.
+- Update `startRenovation` so it can be called either directly (no PP needed) **or** after a `PlanningApplication` is approved. Add a new entry-point gate:
+  - If renovation requires planning AND no approved application exists for `(propertyId, renovationTypeId)`, route to `submitPlanningApplication` instead of starting work immediately.
 
-- `src/types/game.ts` — add `completionMonth`, `startMonth` to `Renovation`.
-- `src/stores/gameStore.ts` — `startRenovation`, `processMonthEnd` completion check, `sanitizeRenovation` migration.
-- `src/components/ui/renovation-dialog.tsx` — doubled `duration` values; real progress display.
-- `src/components/ui/renovation-tracker.tsx` — game-month based progress.
-- `src/hooks/useGameState.ts` — expose `monthsPlayed` to tracker if not already.
+### UI changes
 
-## Memory
+- **`src/components/ui/renovation-dialog.tsx`** — When `requiresPlanning`, the cost card shows a new "Requires Planning" badge with `~X% approval, £Y fee, ~2 mo wait`. The "Start Renovation" CTA renames to **"Submit Planning Application (£Y)"** for those entries; subsequent flow handled by store.
+- **`src/components/ui/renovation-tracker.tsx`** — Add a top section "Planning Applications" listing pending PPs with `(monthsPlayed - submittedMonth) / waitMonths` progress and a chip showing approval %.
+- **Property card**: small "📋 Planning pending" pill when an application exists for that property.
 
-- Update `mem://game-mechanics/property-management/renovation-and-depreciation` to note durations are in-game days (≈30/month), tied to `monthsPlayed` and respect `gameSpeed`.
+---
+
+## 2. Ceiling Prices (Postcode Saturation)
+
+Real-world: spending £50k on a TS1 terrace doesn't return 1.5×. Buyers cap out at the local price ceiling regardless of finish.
+
+### Data model — neighbourhood ceilings
+
+Add `NEIGHBORHOOD_CEILINGS` to `src/lib/engine/constants.ts`, calibrated for Middlesbrough realism (£):
+
+```ts
+export const NEIGHBORHOOD_CEILINGS: Record<string, { residential: number; luxury: number; commercial: number }> = {
+  'Linthorpe':            { residential: 200_000, luxury: 320_000, commercial: 280_000 },
+  'Acklam':               { residential: 220_000, luxury: 380_000, commercial: 260_000 },
+  'Marton':               { residential: 280_000, luxury: 450_000, commercial: 300_000 },
+  'Nunthorpe':            { residential: 380_000, luxury: 700_000, commercial: 350_000 },
+  'Middlesbrough Centre': { residential: 180_000, luxury: 600_000, commercial: 800_000 },
+  'Hemlington':           { residential: 200_000, luxury: 350_000, commercial: 220_000 },
+  'North Ormesby':        { residential: 110_000, luxury: 160_000, commercial: 180_000 },
+  'Pallister Park':       { residential: 130_000, luxury: 200_000, commercial: 200_000 },
+  'Port Clarence':        { residential: 95_000,  luxury: 140_000, commercial: 220_000 },
+  'South Bank':           { residential: 110_000, luxury: 160_000, commercial: 380_000 },
+  'Captain Cook Square':  { residential: 220_000, luxury: 400_000, commercial: 600_000 },
+};
+const DEFAULT_CEILING = { residential: 180_000, luxury: 350_000, commercial: 300_000 };
+
+export function getCeilingPrice(p: { neighborhood: string; type: 'residential' | 'commercial' | 'luxury' }): number {
+  const entry = NEIGHBORHOOD_CEILINGS[p.neighborhood] ?? DEFAULT_CEILING;
+  return entry[p.type] ?? DEFAULT_CEILING[p.type];
+}
+```
+
+These values are stored in **pounds** for readability; convert to pennies at the call site.
+
+### Diminishing-returns formula (`src/lib/engine/renovation.ts`)
+
+New helper:
+
+```ts
+/** Shrinks the renovation value uplift as current value approaches the area ceiling. */
+export function applyCeilingDiminishingReturns(
+  rawUplift: number,        // pounds
+  currentValue: number,     // pounds
+  ceilingPrice: number,     // pounds
+): { uplift: number; diminishingFactor: number } {
+  if (ceilingPrice <= 0) return { uplift: rawUplift, diminishingFactor: 1 };
+  // 0 below 60% of ceiling, smoothly tapers to 0.1× at/above ceiling.
+  const ratio = Math.min(1, currentValue / ceilingPrice);
+  // Below 60% ratio → full 1.0 multiplier. From 0.6 to 1.0 ratio → linear taper to 0.1.
+  let factor: number;
+  if (ratio <= 0.6) factor = 1.0;
+  else factor = Math.max(0.1, 1.0 - ((ratio - 0.6) / 0.4) * 0.9);
+  return { uplift: Math.round(rawUplift * factor), diminishingFactor: factor };
+}
+```
+
+This produces the curve the user described (`1.0 → 0.1` near ceiling) and applies the user's example formula:
+
+```
+New Value = Current Value + (Renovation Uplift × Multiplier × DiminishingFactor)
+```
+
+where the existing `getRenovationScaleMultiplier` is the size/value scaling already in place.
+
+### Where it's applied
+
+- **Dialog preview** (`renovation-dialog.tsx`): when computing `valueUp` for display, call `applyCeilingDiminishingReturns` so players **see** the cap before committing. Show a small footer chip when factor < 0.7: `"⚠ Approaching area ceiling — uplift reduced to 40%"`.
+- **Store completion** (`processMonthEnd` renovation completion branch in `gameStore.ts`, lines 1284-1295): apply the diminishing factor to `actualValueGain` (and a softer 0.5× of the same factor to `actualRentGain`, since rent ceilings exist too but are less brutal).
+- **Rent uplift**: scale by `0.5 + 0.5 × diminishingFactor` so rent caps gracefully — landlords can still squeeze a bit more rent even when capital uplift flattens.
+
+### Invariants
+
+- Diminishing returns apply **after** the existing probabilistic ROI roll (60/25/10/5), so a "major issues" outcome still zeroes everything.
+- Cost is **never** reduced — players still pay the full scaled cost, which is the strategic friction the user wants.
+- The dialog's value-range chip (`£low–£high`) is recomputed against the diminished number so expectations match reality.
+
+---
+
+## Memory updates
+
+- New: `mem://game-mechanics/property-management/planning-permission` — describes which renovations require it, fees, wait, approval probability inputs, 6-month refusal cooldown.
+- New: `mem://game-mechanics/property-management/ceiling-prices` — describes the postcode ceiling map, 0.6→1.0 ratio taper to 0.1× factor, applies to value & half-strength to rent.
+- Update `mem://game-mechanics/property-management/renovation-and-depreciation` with a one-liner pointer to the two new files.
+
+---
+
+## Files changed
+
+- `src/types/game.ts` — `PlanningApplication`, `PlanningStatus`; add field on `GameState`; bump `SAVE_VERSION` to 9.
+- `src/lib/engine/constants.ts` — `NEIGHBORHOOD_CEILINGS`, `getCeilingPrice`, `'planning_cooldown'` on `PropertyLock` reason union.
+- `src/lib/engine/renovation.ts` — `applyCeilingDiminishingReturns`.
+- `src/components/ui/renovation-dialog.tsx` — flag PP-requiring entries, planning badge + fee/wait/% display, ceiling preview, CTA copy switch.
+- `src/components/ui/renovation-tracker.tsx` — Planning Applications panel.
+- `src/components/ui/property-card.tsx` — pending-PP pill.
+- `src/stores/gameStore.ts` — `submitPlanningApplication`, monthly resolve loop, route `startRenovation` through PP gate, apply ceiling factor on completion, save migration v8→v9.
+- `src/hooks/useGameState.ts` — expose `submitPlanningApplication`, `planningApplications`.
+
+## Open questions / defaults assumed
+
+- I'm assuming player wants pending PPs to be visible per-property only (not a global Bank/Planning tab). Easy to add a tab later if desired.
+- Refusal cooldown defaults to 6 months; if too punishing we can drop to 3.
+- Ceiling map is calibrated for current Middlesbrough levels; we can tune any neighbourhood if the curve feels off in playtest.

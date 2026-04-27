@@ -61,3 +61,25 @@ export function scaleRenovationValue(baseValue: number, inputs: RenovationScaleI
   const mult = getRenovationScaleMultiplier(inputs);
   return Math.round(baseValue * mult / 100) * 100; // round to nearest £100
 }
+
+/**
+ * Shrinks a renovation's value uplift as the current value approaches the
+ * postcode/area ceiling. Buyers cap out — putting £50k of finishes into a
+ * back-to-back terrace doesn't return 1:1 once the area's ceiling is in sight.
+ *
+ *   ratio ≤ 0.6 → factor 1.0 (full uplift)
+ *   ratio  1.0 → factor 0.1 (90% diminishing)
+ *   linear taper between
+ */
+export function applyCeilingDiminishingReturns(
+  rawUplift: number,
+  currentValue: number,
+  ceilingPrice: number,
+): { uplift: number; diminishingFactor: number } {
+  if (ceilingPrice <= 0) return { uplift: rawUplift, diminishingFactor: 1 };
+  const ratio = Math.min(1, currentValue / ceilingPrice);
+  let factor: number;
+  if (ratio <= 0.6) factor = 1.0;
+  else factor = Math.max(0.1, 1.0 - ((ratio - 0.6) / 0.4) * 0.9);
+  return { uplift: Math.round(rawUplift * factor), diminishingFactor: factor };
+}

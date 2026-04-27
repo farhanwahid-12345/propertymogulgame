@@ -131,8 +131,30 @@ export interface PendingEviction {
 
 export interface PropertyLock {
   propertyId: string;
-  reason: 'sale_lock' | 'relet_lock' | 'appeal_cooldown';
+  reason: 'sale_lock' | 'relet_lock' | 'appeal_cooldown' | 'planning_cooldown';
   untilMonth: number;
+}
+
+export type PlanningStatus = 'pending' | 'approved' | 'refused';
+
+export interface PlanningApplication {
+  id: string;
+  propertyId: string;
+  renovationTypeId: string;
+  /** Snapshot of the (already-scaled) renovation cost in pennies — used to
+   *  start the renovation on approval without re-scaling. */
+  renovationCostPennies: number;
+  renovationName: string;
+  submittedMonth: number;
+  decisionMonth: number;
+  status: PlanningStatus;
+  feePaid: number;          // pennies
+  approvalProb: number;     // 0..1, rolled at submission for transparency
+  approved: boolean;        // pre-rolled at submission, revealed on decisionMonth
+  refusalReason?: string;
+  /** monthsPlayed when the player saw the decision toast — used to hide the
+   *  refused entry from the tracker after 1 month. */
+  acknowledgedMonth?: number;
 }
 
 /** Player-raised dispute over a withheld portion of a tenant's deposit (TDS adjudication). */
@@ -289,7 +311,9 @@ export interface GameState {
   propertyLocks: PropertyLock[];
   // Player-raised TDS deposit disputes
   depositDisputes: DepositDispute[];
+  // Planning applications — gates major renovations behind PP approval
+  planningApplications: PlanningApplication[];
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;

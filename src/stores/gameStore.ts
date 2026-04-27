@@ -5,7 +5,7 @@ import type {
   PropertyListing, PropertyOffer, Renovation,
   PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
-  DepositDispute,
+  DepositDispute, PlanningApplication,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
@@ -15,6 +15,7 @@ import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
   MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS,
+  getCeilingPrice,
 } from '@/lib/engine/constants';
 import {
   calculateStampDuty, calculateDTI, fluctuateProviderRates, getInitialProviderRates,
@@ -31,7 +32,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from '@/lib/engine/renovation';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -303,6 +304,9 @@ interface GameActions {
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
+  // Planning permission
+  submitPlanningApplication: (propertyId: string, renovationType: RenovationType) => void;
+  acknowledgePlanningDecision: (applicationId: string) => void;
   // Mortgages
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
@@ -372,6 +376,7 @@ function createInitialState(): GameState {
     pendingEvictions: [],
     propertyLocks: [],
     depositDisputes: [],
+    planningApplications: [],
   };
 }
 
@@ -498,6 +503,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 8;
   }
 
+  // v8 → v9: add planningApplications slice
+  if (persisted._version < 9) {
+    if (!Array.isArray(persisted.planningApplications)) persisted.planningApplications = [];
+    persisted._version = 9;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -513,6 +524,7 @@ function migrateState(persisted: any): GameState {
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
+    'planningApplications',
   ];
 
   arrayKeys.forEach((key) => {
@@ -1281,8 +1293,17 @@ export const useGameStore = create<GameState & GameActions>()(
             else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
             else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
 
-            const actualValueGain = Math.round(toPennies(renovation.type.valueIncrease) * valueMult);
-            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult);
+            const propRecord = updatedProperties[idx];
+            const valuePounds = fromPennies(propRecord.value);
+            const ceilingPounds = getCeilingPrice({ neighborhood: propRecord.neighborhood, type: propRecord.type });
+            // Apply postcode ceiling: value uplift tapers from full → 0.1× as
+            // current value approaches the area cap. Rent caps more gracefully.
+            const { uplift: cappedValuePounds, diminishingFactor } = applyCeilingDiminishingReturns(
+              renovation.type.valueIncrease, valuePounds, ceilingPounds,
+            );
+            const rentFactor = 0.5 + 0.5 * diminishingFactor;
+            const actualValueGain = Math.round(toPennies(cappedValuePounds) * valueMult);
+            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult * rentFactor);
 
             const subtypeUpdate = (renovation.type as any).resultingSubtype
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
@@ -2269,6 +2290,24 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── RENOVATIONS ──────────────────────
       startRenovation: (propertyId, renovationType) => {
         const prev = get();
+
+        // Renovations needing planning permission must be applied for first —
+        // route the call to the planning-application flow instead of starting
+        // work immediately. The store's monthly tick will auto-start the
+        // renovation when (and if) the LPA approves.
+        if (renovationType.requiresPlanning) {
+          // Already approved? Skip the gate and start immediately.
+          const approved = (prev.planningApplications || []).find(
+            a => a.propertyId === propertyId &&
+              a.renovationTypeId === renovationType.id &&
+              a.status === 'approved',
+          );
+          if (!approved) {
+            (get() as any).submitPlanningApplication(propertyId, renovationType);
+            return;
+          }
+        }
+
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         // Scale headline cost & uplifts by property size/value so renovating a
         // luxury 2,500 sqft house costs more (and pays more) than a tiny terrace.
@@ -2292,23 +2331,138 @@ export const useGameStore = create<GameState & GameActions>()(
           valueIncrease: scaledValue,
         };
         // Convert "days" duration into in-game months (~30 days/month).
-        // This makes actual completion match the dialog's headline number AND
-        // makes renovations honour gameSpeed (they're tied to monthsPlayed).
         const monthsToComplete = Math.max(1, Math.round(renovationType.duration / 30));
         const startMonth = prev.monthsPlayed;
         const completionMonth = startMonth + monthsToComplete;
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
           type: scaledRenovationType, startDate: Date.now(),
-          // Wall-clock fallback kept for backward-compat; not used for completion any more.
           completionDate: Date.now() + (monthsToComplete * 180 * 1000),
           startMonth,
           completionMonth,
         };
         const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
         showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
-        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, renovations: [...prev.renovations, renovation] });
+        // Consume the matching planning approval (if any) so the player can't reuse it.
+        const consumedPlanning = renovationType.requiresPlanning
+          ? (prev.planningApplications || []).filter(
+              a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
+            )
+          : prev.planningApplications;
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          renovations: [...prev.renovations, renovation],
+          planningApplications: consumedPlanning,
+        });
       },
+
+      // ─── PLANNING PERMISSION ──────────────
+      submitPlanningApplication: (propertyId, renovationType) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
+
+        // Block if a previous refusal is still in cooldown
+        const cooldown = (prev.propertyLocks || []).find(
+          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+        );
+        if (cooldown) {
+          showToast(
+            "Planning Cooldown",
+            `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`,
+            "destructive",
+          );
+          return;
+        }
+
+        // Block duplicate pending applications for the same renovation
+        if ((prev.planningApplications || []).some(
+          a => a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'pending',
+        )) {
+          showToast("Already Submitted", "An application is already pending for this work.", "destructive");
+          return;
+        }
+
+        const feePounds = renovationType.planningFee ?? 250;
+        const feePennies = toPennies(feePounds);
+        const debited = feePennies > 0 ? debit(prev, feePennies) : { cash: prev.cash, overdraftUsed: prev.overdraftUsed, usedOverdraft: 0 };
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${feePounds.toLocaleString()} for planning fee.`, "destructive");
+          return;
+        }
+
+        // Compute approval probability with modifiers
+        const baseProb = renovationType.baseApprovalProb ?? 0.7;
+        const ceilingPounds = getCeilingPrice({ neighborhood: property.neighborhood, type: property.type });
+        const valuePounds = fromPennies(property.value);
+        let prob = baseProb;
+        // Over-development penalty
+        if (valuePounds > 0.7 * ceilingPounds) prob -= 0.10;
+        // Conservative areas / luxury type stricter on conversions/extensions
+        if ((property.type === 'luxury' || property.neighborhood === 'Nunthorpe' || property.neighborhood === 'Marton')
+            && (renovationType.category === 'conversion' || renovationType.category === 'extension')) {
+          prob -= 0.10;
+        }
+        // Track-record adjustment (capped ±10%)
+        const history = prev.planningApplications || [];
+        const approvals = history.filter(a => a.status === 'approved').length;
+        const refusals = history.filter(a => a.status === 'refused').length;
+        const trackAdj = Math.max(-0.10, Math.min(0.10, approvals * 0.01 - refusals * 0.02));
+        prob = Math.max(0.05, Math.min(0.95, prob + trackAdj));
+
+        // Roll the outcome NOW, reveal at decisionMonth
+        const approved = Math.random() < prob;
+        const refusalReasons = [
+          'Over-development for the area — would harm street character.',
+          'Loss of family housing stock conflicts with the Local Plan.',
+          'Insufficient parking provision for proposed unit count.',
+          'Daylight/sunlight impact on neighbouring properties.',
+          'Inadequate amenity space for proposed occupancy.',
+        ];
+        const refusalReason = approved ? undefined : refusalReasons[Math.floor(Math.random() * refusalReasons.length)];
+
+        const waitMonths = Math.max(1, renovationType.planningWaitMonths ?? 2);
+        const application: PlanningApplication = {
+          id: `pp_${propertyId}_${renovationType.id}_${Date.now()}`,
+          propertyId,
+          renovationTypeId: renovationType.id,
+          renovationCostPennies: toPennies(scaleRenovationCost(renovationType.cost, {
+            internalSqft: property.internalSqft,
+            propertyValue: valuePounds,
+          })),
+          renovationName: renovationType.name,
+          submittedMonth: prev.monthsPlayed,
+          decisionMonth: prev.monthsPlayed + waitMonths,
+          status: 'pending',
+          feePaid: feePennies,
+          approvalProb: prob,
+          approved,
+          refusalReason,
+        };
+
+        showToast(
+          "Planning Submitted 📋",
+          `${renovationType.name} on ${property.name} — decision in ${waitMonths} mo. Fee £${feePounds.toLocaleString()} paid.`,
+        );
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          planningApplications: [...history, application],
+        });
+      },
+
+      acknowledgePlanningDecision: (applicationId) => {
+        const prev = get();
+        const app = (prev.planningApplications || []).find(a => a.id === applicationId);
+        if (!app) return;
+        // Drop refused/approved acknowledged entries; keep pending untouched
+        if (app.status === 'pending') return;
+        set({ planningApplications: prev.planningApplications.filter(a => a.id !== applicationId) });
+      },
+
+
 
       upgradeCondition: (propertyId, targetCondition) => {
         const prev = get();
