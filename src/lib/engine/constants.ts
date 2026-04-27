@@ -66,3 +66,29 @@ export const AVAILABLE_PROPERTIES: Property[] = [
 ];
 
 export const NEIGHBORHOODS = ["Linthorpe", "Acklam", "Marton", "Nunthorpe", "Middlesbrough Centre", "Hemlington", "South Bank", "Pallister Park", "North Ormesby", "Port Clarence"];
+
+/**
+ * Realistic per-postcode price ceilings (pounds, by property type).
+ * Buyers in TS3 won't pay TS7 prices regardless of finish — over-developing
+ * a £60k terrace stops yielding 1:1 value uplift past these thresholds.
+ */
+export const NEIGHBORHOOD_CEILINGS: Record<string, { residential: number; luxury: number; commercial: number }> = {
+  'Linthorpe':            { residential: 200_000, luxury: 320_000, commercial: 280_000 },
+  'Acklam':               { residential: 220_000, luxury: 380_000, commercial: 260_000 },
+  'Marton':               { residential: 280_000, luxury: 450_000, commercial: 300_000 },
+  'Nunthorpe':            { residential: 380_000, luxury: 700_000, commercial: 350_000 },
+  'Middlesbrough Centre': { residential: 180_000, luxury: 600_000, commercial: 800_000 },
+  'Hemlington':           { residential: 200_000, luxury: 350_000, commercial: 220_000 },
+  'North Ormesby':        { residential: 110_000, luxury: 160_000, commercial: 180_000 },
+  'Pallister Park':       { residential: 130_000, luxury: 200_000, commercial: 200_000 },
+  'Port Clarence':        { residential: 95_000,  luxury: 140_000, commercial: 220_000 },
+  'South Bank':           { residential: 110_000, luxury: 160_000, commercial: 380_000 },
+  'Captain Cook Square':  { residential: 220_000, luxury: 400_000, commercial: 600_000 },
+};
+
+const DEFAULT_CEILING = { residential: 180_000, luxury: 350_000, commercial: 300_000 };
+
+export function getCeilingPrice(p: { neighborhood: string; type: 'residential' | 'commercial' | 'luxury' }): number {
+  const entry = NEIGHBORHOOD_CEILINGS[p.neighborhood] ?? DEFAULT_CEILING;
+  return entry[p.type] ?? DEFAULT_CEILING[p.type];
+}
