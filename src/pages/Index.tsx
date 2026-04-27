@@ -359,6 +359,14 @@ const Index = () => {
                 const arrearsCount = (gameState.tenantEvents || []).filter(
                   (e: any) => e.propertyId === property.id && e.type === 'default'
                 ).length;
+                const propertyApps = ((gameState as any).planningApplications || []).filter(
+                  (a: any) => a.propertyId === property.id
+                );
+                const inPlanningCooldown = (gameState.propertyLocks || []).some(
+                  (l: any) => l.propertyId === property.id
+                    && l.reason === 'planning_cooldown'
+                    && l.untilMonth > gameState.monthsPlayed
+                );
                 return (
                   <PropertyCard
                     key={property.id}
@@ -384,6 +392,8 @@ const Index = () => {
                     pendingEviction={pendingEv ? { ground: pendingEv.ground, effectiveMonth: pendingEv.effectiveMonth, servedMonth: pendingEv.servedMonth } : undefined}
                     rentArrearsCount={arrearsCount}
                     applyRentIncrease={gameState.applyRentIncrease}
+                    planningApplications={propertyApps}
+                    inPlanningCooldown={inPlanningCooldown}
                   />
                 );
               })}
