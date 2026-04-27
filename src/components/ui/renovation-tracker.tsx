@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Hammer } from "lucide-react";
-import type { Renovation } from "@/types/game";
+import { Hammer, FileText } from "lucide-react";
+import type { Renovation, PlanningApplication } from "@/types/game";
 import type { Property } from "@/components/ui/property-card";
 
 interface RenovationTrackerProps {
@@ -9,10 +9,15 @@ interface RenovationTrackerProps {
   ownedProperties: Property[];
   /** Current in-game month — used for game-time progress. */
   monthsPlayed: number;
+  /** Pending/decided planning applications (decisions auto-clear after a month). */
+  planningApplications?: PlanningApplication[];
 }
 
-export function RenovationTracker({ renovations, ownedProperties, monthsPlayed }: RenovationTrackerProps) {
-  if (!renovations || renovations.length === 0) return null;
+export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, planningApplications = [] }: RenovationTrackerProps) {
+  const visibleApplications = planningApplications.filter(
+    a => a.status === 'pending' || (a.status === 'refused' && monthsPlayed - a.decisionMonth < 2),
+  );
+  if ((!renovations || renovations.length === 0) && visibleApplications.length === 0) return null;
 
   const now = Date.now();
 
