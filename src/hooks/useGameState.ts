@@ -324,6 +324,14 @@ export function useGameState() {
     store.dismissTenantConcern(concernId);
   }, [store.dismissTenantConcern]);
 
+  const submitPlanningApplication = useCallback((propertyId: string, renovationType: any) => {
+    (store as any).submitPlanningApplication(propertyId, renovationType);
+  }, [(store as any).submitPlanningApplication]);
+
+  const acknowledgePlanningDecision = useCallback((applicationId: string) => {
+    (store as any).acknowledgePlanningDecision(applicationId);
+  }, [(store as any).acknowledgePlanningDecision]);
+
   // ── Return same shape as old hook ───────────────────────
   return {
     // State values (pounds)
