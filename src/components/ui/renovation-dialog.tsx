@@ -445,7 +445,7 @@ export function RenovationDialog({
                         <p className="text-sm text-muted-foreground">{renovation.description}</p>
 
                         {completed && (
-                          <div className="text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 rounded px-2 py-1">
+                          <div className="text-xs text-success border border-success/30 bg-success/5 rounded px-2 py-1">
                             ✅ Already completed on this property
                           </div>
                         )}
@@ -453,6 +453,39 @@ export function RenovationDialog({
                         {ineligible && !completed && (
                           <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
                             ⚠️ {ineligible}
+                          </div>
+                        )}
+
+                        {/* Planning state banners */}
+                        {planningPending && application && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            📋 Planning application pending — decision in {Math.max(0, application.decisionMonth - monthsPlayed)} mo
+                          </div>
+                        )}
+                        {planningApproved && (
+                          <div className="text-xs text-success border border-success/30 bg-success/5 rounded px-2 py-1">
+                            ✅ Planning approved — start work to consume approval
+                          </div>
+                        )}
+                        {blockedByCooldown && (
+                          <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
+                            ⛔ Recent refusal — 6-mo cooldown before resubmission
+                          </div>
+                        )}
+                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (
+                          <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1">
+                            <FileText className="h-3 w-3 inline mr-1" />
+                            Submitting will charge a £{(renovation.planningFee ?? 250).toLocaleString()} non-refundable fee. Decision in ~{renovation.planningWaitMonths ?? 2} mo. Base approval ~{Math.round((renovation.baseApprovalProb ?? 0.7) * 100)}%.
+                          </div>
+                        )}
+
+                        {/* Ceiling-price warning */}
+                        {ceilingPrice > 0 && diminishingFactor < 0.95 && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            <AlertTriangle className="h-3 w-3 inline mr-1" />
+                            {atCeiling
+                              ? `At area ceiling (£${ceilingPrice.toLocaleString()}). Value uplift reduced ~${Math.round((1 - diminishingFactor) * 100)}%.`
+                              : `Approaching area ceiling. Uplift trimmed ~${Math.round((1 - diminishingFactor) * 100)}%.`}
                           </div>
                         )}
 
