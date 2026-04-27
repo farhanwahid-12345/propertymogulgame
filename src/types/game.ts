@@ -311,7 +311,9 @@ export interface GameState {
   propertyLocks: PropertyLock[];
   // Player-raised TDS deposit disputes
   depositDisputes: DepositDispute[];
+  // Planning applications — gates major renovations behind PP approval
+  planningApplications: PlanningApplication[];
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
