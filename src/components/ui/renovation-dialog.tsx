@@ -289,6 +289,10 @@ export function RenovationDialog({
   internalSqft,
   plotSqft,
   currentSubtype,
+  neighborhood,
+  planningApplications = [],
+  monthsPlayed = 0,
+  inPlanningCooldown = false,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -298,6 +302,18 @@ export function RenovationDialog({
   const scaledCost = (r: RenovationType) => scaleRenovationCost(r.cost, scaleInputs);
   const scaledRent = (r: RenovationType) => scaleRenovationRent(r.rentIncrease, scaleInputs);
   const scaledValue = (r: RenovationType) => scaleRenovationValue(r.valueIncrease, scaleInputs);
+
+  // Ceiling-price awareness — applies to extensions/conversions
+  const ceilingPrice = neighborhood && propertyType
+    ? getCeilingPrice({ neighborhood, type: propertyType })
+    : 0;
+  const ceilingRatio = ceilingPrice > 0 ? propertyValue / ceilingPrice : 0;
+  const nearCeiling = ceilingRatio >= 0.7;
+  const atCeiling = ceilingRatio >= 0.95;
+
+  /** Lookup helpers for planning state per renovation */
+  const findApplication = (renoId: string) =>
+    planningApplications.find(a => a.renovationTypeId === renoId);
 
   const handleRenovate = () => {
     if (selectedRenovation) {
