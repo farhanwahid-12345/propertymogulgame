@@ -30,6 +30,14 @@ export interface RenovationType {
   resultingSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** Heavy works that disturb living conditions — blocked while a tenant is in residence. */
   requiresVacant?: boolean;
+  /** Major works that need a Local Planning Authority decision before starting. */
+  requiresPlanning?: boolean;
+  /** In-game months between submission and decision (default 2). */
+  planningWaitMonths?: number;
+  /** Application fee (pounds). 0 = waived (e.g. Class MA prior approval). */
+  planningFee?: number;
+  /** Base approval probability before modifiers (0..1). */
+  baseApprovalProb?: number;
 }
 
 interface RenovationDialogProps {
