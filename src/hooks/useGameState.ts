@@ -371,6 +371,7 @@ export function useGameState() {
     taxRecords: Array.isArray(store.taxRecords) ? store.taxRecords : [],
     totalTaxPaid: fromPennies(store.totalTaxPaid),
     tenantConcerns: store.tenantConcerns || [],
+    planningApplications: Array.isArray((store as any).planningApplications) ? (store as any).planningApplications : [],
 
     // Derived values
     netWorth: netWorth - totalDebt,
