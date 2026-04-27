@@ -57,6 +57,14 @@ interface RenovationDialogProps {
   currentSubtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** True if a tenant is currently in residence — blocks `requiresVacant` renovations. */
   hasTenant?: boolean;
+  /** Neighborhood — drives ceiling-price warnings on extensions/conversions. */
+  neighborhood?: string;
+  /** Pending/approved planning applications for this property. */
+  planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** Current in-game month — for displaying "decision in N mo" countdowns. */
+  monthsPlayed?: number;
+  /** True if this property is in a planning_cooldown lock (recent refusal). */
+  inPlanningCooldown?: boolean;
 }
 
 const RENOVATION_OPTIONS: RenovationType[] = [
