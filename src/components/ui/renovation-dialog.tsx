@@ -308,7 +308,6 @@ export function RenovationDialog({
     ? getCeilingPrice({ neighborhood, type: propertyType })
     : 0;
   const ceilingRatio = ceilingPrice > 0 ? propertyValue / ceilingPrice : 0;
-  const nearCeiling = ceilingRatio >= 0.7;
   const atCeiling = ceilingRatio >= 0.95;
 
   /** Lookup helpers for planning state per renovation */
