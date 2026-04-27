@@ -433,5 +433,7 @@ export function useGameState() {
     setEntityType,
     resolveTenantConcern,
     dismissTenantConcern,
+    submitPlanningApplication,
+    acknowledgePlanningDecision,
   };
 }
