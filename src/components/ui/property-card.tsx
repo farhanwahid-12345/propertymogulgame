@@ -82,6 +82,10 @@ interface PropertyCardProps {
   currentMarketRate?: number;
   baseMarketRate?: number;
   providerRates?: Record<string, number>;
+  /** Pending/approved planning applications scoped to THIS property. */
+  planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** True if this property has an active planning_cooldown lock. */
+  inPlanningCooldown?: boolean;
 }
 
 const PropertyTypeIcon = {
