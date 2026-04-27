@@ -1293,8 +1293,17 @@ export const useGameStore = create<GameState & GameActions>()(
             else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
             else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
 
-            const actualValueGain = Math.round(toPennies(renovation.type.valueIncrease) * valueMult);
-            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult);
+            const propRecord = updatedProperties[idx];
+            const valuePounds = fromPennies(propRecord.value);
+            const ceilingPounds = getCeilingPrice({ neighborhood: propRecord.neighborhood, type: propRecord.type });
+            // Apply postcode ceiling: value uplift tapers from full → 0.1× as
+            // current value approaches the area cap. Rent caps more gracefully.
+            const { uplift: cappedValuePounds, diminishingFactor } = applyCeilingDiminishingReturns(
+              renovation.type.valueIncrease, valuePounds, ceilingPounds,
+            );
+            const rentFactor = 0.5 + 0.5 * diminishingFactor;
+            const actualValueGain = Math.round(toPennies(cappedValuePounds) * valueMult);
+            const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult * rentFactor);
 
             const subtypeUpdate = (renovation.type as any).resultingSubtype
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
