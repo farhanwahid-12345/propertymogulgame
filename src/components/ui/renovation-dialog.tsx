@@ -379,17 +379,29 @@ export function RenovationDialog({
                   const inProgress = isInProgress(renovation);
                   const completed = isCompleted(renovation);
                   const ineligible = ineligibilityReason(renovation);
-                  const blocked = !!ineligible || inProgress || completed;
+
+                  // Planning state for this renovation
+                  const application = renovation.requiresPlanning ? findApplication(renovation.id) : undefined;
+                  const planningPending = application?.status === 'pending';
+                  const planningApproved = application?.status === 'approved';
+                  const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
+                  const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
 
                   // Scaled cost/uplifts for THIS property's size & value
                   const cost = scaledCost(renovation);
                   const rentUp = scaledRent(renovation);
                   const valueUp = scaledValue(renovation);
 
+                  // Ceiling diminishing — preview the actual uplift the player will get
+                  const { uplift: cappedValueUp, diminishingFactor } = ceilingPrice > 0
+                    ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
+                    : { uplift: valueUp, diminishingFactor: 1 };
+                  const ceilingTrimmed = diminishingFactor < 0.95;
+
                   // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
-                  const valueLow = Math.round(valueUp * 0.3);
-                  const valueHigh = valueUp;
-                  const valueTypical = Math.round(valueUp * 0.85);
+                  const valueLow = Math.round(cappedValueUp * 0.3);
+                  const valueHigh = cappedValueUp;
+                  const valueTypical = Math.round(cappedValueUp * 0.85);
 
                   return (
                     <Card
@@ -404,20 +416,28 @@ export function RenovationDialog({
                       onClick={() => affordable && !blocked && setSelectedRenovation(renovation)}
                     >
                       <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-5 w-5" />
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon className="h-5 w-5 shrink-0" />
                             <CardTitle className="text-base">{renovation.name}</CardTitle>
                           </div>
-                          {completed ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                              ✅ Completed
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              {renovation.duration}d
-                            </Badge>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            {completed ? (
+                              <Badge className="bg-success/20 text-success border-success/30 text-xs">
+                                ✅ Completed
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                {renovation.duration}d
+                              </Badge>
+                            )}
+                            {renovation.requiresPlanning && !completed && (
+                              <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-300 bg-amber-400/5">
+                                <FileText className="h-3 w-3 mr-1" />
+                                Planning required
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
 
