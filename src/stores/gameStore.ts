@@ -499,6 +499,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 8;
   }
 
+  // v8 → v9: add planningApplications slice
+  if (persisted._version < 9) {
+    if (!Array.isArray(persisted.planningApplications)) persisted.planningApplications = [];
+    persisted._version = 9;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -514,6 +520,7 @@ function migrateState(persisted: any): GameState {
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
+    'planningApplications',
   ];
 
   arrayKeys.forEach((key) => {
