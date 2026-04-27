@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Hammer, Paintbrush, Home, Plus, Wrench, Zap } from "lucide-react";
+import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue } from "@/lib/engine/renovation";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from "@/lib/engine/renovation";
+import { getCeilingPrice } from "@/lib/engine/constants";
 
 export interface RenovationType {
   id: string;
