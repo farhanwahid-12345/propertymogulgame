@@ -14,6 +14,7 @@ import { ListedProperties } from "@/components/ui/listed-properties";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
+import { ActivityFeed } from "@/components/ui/activity-feed";
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { useGameState } from "@/hooks/useGameState";
@@ -278,6 +279,18 @@ const Index = () => {
             onSnooze={gameState.dismissTenantConcern}
           />
         )}
+
+        {/* Activity / history feed */}
+        <ActivityFeed
+          monthsPlayed={gameState.monthsPlayed}
+          tenantHistory={(gameState as any).tenantHistory || []}
+          tenantEvents={gameState.tenantEvents}
+          economicEvents={gameState.economicEvents}
+          renovations={gameState.renovations || []}
+          conveyancing={gameState.conveyancing || []}
+          taxRecords={gameState.taxRecords || []}
+          ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
+        />
 
         {/* Listed Properties */}
         <ListedProperties 

@@ -32,7 +32,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -377,6 +377,7 @@ function createInitialState(): GameState {
     propertyLocks: [],
     depositDisputes: [],
     planningApplications: [],
+    tenantHistory: [],
   };
 }
 
@@ -509,6 +510,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 9;
   }
 
+  // v9 → v10: add tenantHistory slice
+  if (persisted._version < 10) {
+    if (!Array.isArray(persisted.tenantHistory)) persisted.tenantHistory = [];
+    persisted._version = 10;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -524,7 +531,7 @@ function migrateState(persisted: any): GameState {
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
-    'planningApplications',
+    'planningApplications', 'tenantHistory',
   ];
 
   arrayKeys.forEach((key) => {
@@ -845,7 +852,20 @@ export const useGameStore = create<GameState & GameActions>()(
           if (property.condition === 'dilapidated') {
             delta -= 15; reasons.push({ reason: 'Dilapidated condition', delta: -15 });
           } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
-            delta -= 5; reasons.push({ reason: 'Premium tenant in standard property', delta: -5 });
+            const hasPlanningCooldown = (prev.propertyLocks || []).some(
+              l => l.propertyId === property.id && l.reason === 'planning_cooldown' && newMonthNumber < l.untilMonth,
+            );
+            const eligible = canUpgradeToPremium({
+              condition: property.condition,
+              completedRenovationIds: property.completedRenovationIds,
+              hasPlanningCooldown,
+            });
+            if (eligible) {
+              delta -= 5;
+              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -5 });
+            } else {
+              reasons.push({ reason: 'Premium tenant accepts current standard', delta: 0 });
+            }
           } else if (property.condition === 'premium') {
             delta += 3; reasons.push({ reason: 'Premium condition', delta: +3 });
           }
@@ -872,12 +892,22 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // Early-exit: <25 satisfaction → 8% chance tenant leaves (void period)
         const earlyExitVoids: VoidPeriod[] = [];
+        const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           if (t.satisfaction < 25 && Math.random() < 0.08) {
             const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
             earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
             const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
             showToast("Tenant Moved Out 😞", `${t.tenant.name}${property ? ` left ${property.name}` : ''} due to low satisfaction.`, "destructive");
+            newTenantHistory.push({
+              id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              propertyId: t.propertyId,
+              propertyName: property?.name || t.propertyId,
+              tenantName: t.tenant.name,
+              reason: 'low_satisfaction',
+              month: newMonthNumber,
+              detail: `Satisfaction ${Math.round(t.satisfaction)}/100`,
+            });
             return false;
           }
           return true;
@@ -1014,6 +1044,15 @@ export const useGameStore = create<GameState & GameActions>()(
           newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
           const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
           newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+          newTenantHistory.push({
+            id: `dep_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+            propertyId: ev.propertyId,
+            propertyName: property?.name || ev.propertyId,
+            tenantName: tenantRec.tenant.name,
+            reason: 'eviction_completed',
+            month: newMonthNumber,
+            detail: ev.ground.replace(/_/g, ' '),
+          });
 
           // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
           if (ev.ground === 'landlord_sale') {
@@ -1299,7 +1338,8 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
-        }));
+          tenantHistory: newTenantHistory.slice(-100),
+        } as any));
       },
 
       processMarketUpdate: () => {
@@ -1345,6 +1385,15 @@ export const useGameStore = create<GameState & GameActions>()(
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
               : {};
 
+            // Improvement-tier renovations on a standard property bump condition → premium.
+            // Only on a successful roll (valueMult > 0) so botched works don't reward.
+            const conditionUpdate =
+              valueMult > 0 &&
+              propRecord.condition === 'standard' &&
+              isConditionUpgradeRenovation(renovation.type.id)
+                ? { condition: 'premium' as Property['condition'] }
+                : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
@@ -1357,6 +1406,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 renovation.type.id,
               ],
               ...subtypeUpdate,
+              ...conditionUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
             const actualValuePounds = fromPennies(actualValueGain);

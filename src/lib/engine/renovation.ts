@@ -83,3 +83,37 @@ export function applyCeilingDiminishingReturns(
   else factor = Math.max(0.1, 1.0 - ((ratio - 0.6) / 0.4) * 0.9);
   return { uplift: Math.round(rawUplift * factor), diminishingFactor: factor };
 }
+
+/**
+ * Returns true when the property can realistically be upgraded to "premium"
+ * condition via an in-game improvement renovation. Used by the satisfaction
+ * tick to decide whether to penalise a premium tenant in a standard property.
+ *
+ * Eligibility:
+ *   - Property currently in `standard` condition
+ *   - At least one improvement-tier renovation is still un-done
+ *     (kitchen_upgrade / bathroom_renovation / central_heating / double_glazing)
+ *   - No active `planning_cooldown` lock (refused major works recently)
+ */
+const PREMIUM_UPGRADE_RENOS = [
+  'kitchen_upgrade',
+  'bathroom_renovation',
+  'central_heating',
+  'double_glazing',
+];
+
+export function canUpgradeToPremium(args: {
+  condition?: string;
+  completedRenovationIds?: string[];
+  hasPlanningCooldown?: boolean;
+}): boolean {
+  if (args.condition !== 'standard') return false;
+  if (args.hasPlanningCooldown) return false;
+  const done = new Set(args.completedRenovationIds || []);
+  return PREMIUM_UPGRADE_RENOS.some(id => !done.has(id));
+}
+
+/** Renovation type IDs that, when completed on a standard property, lift it to premium. */
+export function isConditionUpgradeRenovation(renovationTypeId: string): boolean {
+  return PREMIUM_UPGRADE_RENOS.includes(renovationTypeId);
+}
