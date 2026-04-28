@@ -762,9 +762,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const totalExpenses = mortgagePayments + councilTax;
         const netIncome = monthlyIncome - totalExpenses;
 
-        // Update mortgage balances
+        // Update mortgage balances + capture this month's actual interest portion
+        // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
+        let monthlyMortgageInterest = 0;
         const updatedMortgages = newMortgages.map(mortgage => {
           const interest = Math.round(mortgage.remainingBalance * (mortgage.interestRate / 12));
+          monthlyMortgageInterest += interest;
           let newBalance = mortgage.remainingBalance;
           if (mortgage.mortgageType === 'repayment') {
             const principal = mortgage.monthlyPayment - interest;
