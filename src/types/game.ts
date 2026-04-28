@@ -295,7 +295,13 @@ export interface GameState {
   /** Wall-clock-to-game-time multiplier. 1 = normal, 2 = 2x, 0.5 = half. */
   gameSpeed: number;
   lastYearlyGrowth: number;
-  yearlyNetProfit: number; // pennies
+  yearlyNetProfit: number; // pennies — running net cashflow (legacy / level signal)
+  /** Pennies — actual gross rent received in the current tax year (resets at April tax point). */
+  yearlyGrossRent: number;
+  /** Pennies — mortgage interest paid in the current tax year. */
+  yearlyMortgageInterest: number;
+  /** Pennies — deductible operating expenses paid in the current tax year (council tax, repairs). */
+  yearlyDeductibleExpenses: number;
   lastCorporationTaxMonth: number;
   lastGlobalDamageMonth: number;
   nextEconomicEventMonth: number;
@@ -335,4 +341,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
