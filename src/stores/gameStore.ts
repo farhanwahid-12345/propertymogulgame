@@ -1184,36 +1184,65 @@ export const useGameStore = create<GameState & GameActions>()(
         // Fluctuate provider rates
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
-        // ── Taxation (April = month 3 in 0-indexed) ──
+        // ── Taxation (UK tax year ends 5 April → use month 3 in 0-indexed) ──
+        // Accumulate THIS month's gross rent, mortgage interest, and deductible
+        // expenses into the running yearly totals. Tax is then calculated against
+        // the actual annual figures (not pre-deducted "net" income, which used to
+        // cause a double-deduction bug that under-taxed both entity types).
         const accumulatedProfit = prev.yearlyNetProfit + netIncome;
+        const accumulatedGrossRent = (prev.yearlyGrossRent || 0) + monthlyIncome;
+        const accumulatedMortgageInterest = (prev.yearlyMortgageInterest || 0) + monthlyMortgageInterest;
+        const accumulatedDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + councilTax;
+
         const currentMonth = newMonthNumber % 12;
         const isApril = currentMonth === 3;
         const lastTaxYear = Math.floor(prev.lastCorporationTaxMonth / 12);
         const currentTaxYear = Math.floor(newMonthNumber / 12);
         let taxPaid = 0;
         let finalYearlyProfit = accumulatedProfit;
+        let finalYearlyGrossRent = accumulatedGrossRent;
+        let finalYearlyMortgageInterest = accumulatedMortgageInterest;
+        let finalYearlyDeductibleExpenses = accumulatedDeductibleExpenses;
         let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
         let newTaxRecords = [...prev.taxRecords];
         let newTotalTaxPaid = prev.totalTaxPaid;
 
-        if (isApril && currentTaxYear > lastTaxYear && accumulatedProfit > 0) {
-          const annualProfit = accumulatedProfit;
-          const annualMortgageInterest = finalMortgages.reduce((s, m) => s + Math.round(m.remainingBalance * m.interestRate), 0);
-          const annualExpenses = councilTax * 12; // Simplified annual expenses
-
+        if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
           if (prev.entityType === 'sole_trader') {
-            const { effectiveTax, section24Credit } = calculateIncomeTax(annualProfit, annualMortgageInterest, annualExpenses);
+            // Sole trader: rental income MINUS deductible expenses (NOT mortgage
+            // interest — Section 24 turns interest into a 20% tax credit only).
+            const { effectiveTax, section24Credit, tax } = calculateIncomeTax(
+              accumulatedGrossRent,
+              accumulatedMortgageInterest,
+              accumulatedDeductibleExpenses,
+            );
             taxPaid = effectiveTax;
-            showToast("📋 Income Tax Due!", `Paid £${fromPennies(taxPaid).toLocaleString()} income tax (Section 24 credit: £${fromPennies(section24Credit).toLocaleString()})`);
-            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Annual income tax with §24 credit` });
+            showToast(
+              "📋 Income Tax Due!",
+              `Annual income tax: £${fromPennies(taxPaid).toLocaleString()} (gross tax £${fromPennies(tax).toLocaleString()} − §24 credit £${fromPennies(section24Credit).toLocaleString()})`,
+            );
+            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Annual income tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           } else {
-            taxPaid = calculateCorporationTax(annualProfit, annualMortgageInterest, annualExpenses);
-            showToast("📋 Corporation Tax Due!", `Paid £${fromPennies(taxPaid).toLocaleString()} corporation tax`);
-            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Annual corporation tax` });
+            // LTD: mortgage interest IS deductible — pass it through so it isn't
+            // double-counted (cash already reflects mortgage *payments*, not just interest).
+            taxPaid = calculateCorporationTax(
+              accumulatedGrossRent,
+              accumulatedMortgageInterest,
+              accumulatedDeductibleExpenses,
+            );
+            showToast(
+              "📋 Corporation Tax Due!",
+              `Annual corporation tax: £${fromPennies(taxPaid).toLocaleString()} on profit £${fromPennies(Math.max(0, accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses)).toLocaleString()}`,
+            );
+            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Annual corporation tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           }
 
           newTotalTaxPaid += taxPaid;
+          // Reset all yearly accumulators
           finalYearlyProfit = 0;
+          finalYearlyGrossRent = 0;
+          finalYearlyMortgageInterest = 0;
+          finalYearlyDeductibleExpenses = 0;
           lastCorpTaxMonth = newMonthNumber;
         }
 
