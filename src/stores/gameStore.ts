@@ -1044,6 +1044,15 @@ export const useGameStore = create<GameState & GameActions>()(
           newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
           const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
           newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+          newTenantHistory.push({
+            id: `dep_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+            propertyId: ev.propertyId,
+            propertyName: property?.name || ev.propertyId,
+            tenantName: tenantRec.tenant.name,
+            reason: 'eviction_completed',
+            month: newMonthNumber,
+            detail: ev.ground.replace(/_/g, ' '),
+          });
 
           // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
           if (ev.ground === 'landlord_sale') {
