@@ -892,12 +892,22 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // Early-exit: <25 satisfaction → 8% chance tenant leaves (void period)
         const earlyExitVoids: VoidPeriod[] = [];
+        const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           if (t.satisfaction < 25 && Math.random() < 0.08) {
             const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
             earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
             const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
             showToast("Tenant Moved Out 😞", `${t.tenant.name}${property ? ` left ${property.name}` : ''} due to low satisfaction.`, "destructive");
+            newTenantHistory.push({
+              id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              propertyId: t.propertyId,
+              propertyName: property?.name || t.propertyId,
+              tenantName: t.tenant.name,
+              reason: 'low_satisfaction',
+              month: newMonthNumber,
+              detail: `Satisfaction ${Math.round(t.satisfaction)}/100`,
+            });
             return false;
           }
           return true;
