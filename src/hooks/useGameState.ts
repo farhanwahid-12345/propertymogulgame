@@ -109,7 +109,10 @@ export function useGameState() {
   const inflightBuyCapital = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
-  const netWorth = cash + inflightBuyCapital + ownedProperties.reduce((sum, p) => sum + p.value, 0);
+  // Net worth = cash + in-flight buying escrow + Σ property value − Σ mortgage debt − overdraft drawn.
+  // overdraftUsed is real borrowed money that must be repaid; including it stops
+  // net worth from being inflated by short-term overdraft taps.
+  const netWorth = cash + inflightBuyCapital + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
   const totalMonthlyIncome = ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
   const mortgageExpenses = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
   const councilTaxExpenses = ownedProperties.reduce((sum, p) => {
