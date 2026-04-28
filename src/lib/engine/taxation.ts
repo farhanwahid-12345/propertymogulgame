@@ -64,16 +64,17 @@ export function calculateCorporationTax(
   const taxableProfit = Math.max(0, annualRentalIncome - annualMortgageInterest - annualExpenses);
 
   if (taxableProfit <= 5_000_000) {
-    // Small profits rate: 19%
+    // Small profits rate: 19% (≤ £50k)
     return Math.floor(taxableProfit * 0.19);
   } else if (taxableProfit >= 25_000_000) {
-    // Main rate: 25%
+    // Main rate: 25% (≥ £250k)
     return Math.floor(taxableProfit * 0.25);
   } else {
-    // Marginal relief between £50k-£250k
-    const mainTax = Math.floor(taxableProfit * 0.25);
-    const marginalRelief = Math.floor((25_000_000 - taxableProfit) * (1 / 400) * taxableProfit / 25_000_000);
-    return mainTax - marginalRelief;
+    // Marginal relief between £50k and £250k (2023/24 onward).
+    //   MR = (Upper − Profit) × (3/200)
+    //   Tax = Profit × 25% − MR
+    const marginalRelief = Math.floor((25_000_000 - taxableProfit) * 3 / 200);
+    return Math.max(0, Math.floor(taxableProfit * 0.25) - marginalRelief);
   }
 }
 
