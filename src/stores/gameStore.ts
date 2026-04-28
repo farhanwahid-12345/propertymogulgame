@@ -1384,6 +1384,15 @@ export const useGameStore = create<GameState & GameActions>()(
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
               : {};
 
+            // Improvement-tier renovations on a standard property bump condition → premium.
+            // Only on a successful roll (valueMult > 0) so botched works don't reward.
+            const conditionUpdate =
+              valueMult > 0 &&
+              propRecord.condition === 'standard' &&
+              isConditionUpgradeRenovation(renovation.type.id)
+                ? { condition: 'premium' as Property['condition'] }
+                : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
@@ -1396,6 +1405,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 renovation.type.id,
               ],
               ...subtypeUpdate,
+              ...conditionUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
             const actualValuePounds = fromPennies(actualValueGain);
