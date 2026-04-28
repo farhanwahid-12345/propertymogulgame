@@ -365,6 +365,9 @@ function createInitialState(): GameState {
     gameSpeed: 1,
     lastYearlyGrowth: 0,
     yearlyNetProfit: 0,
+    yearlyGrossRent: 0,
+    yearlyMortgageInterest: 0,
+    yearlyDeductibleExpenses: 0,
     lastCorporationTaxMonth: 0,
     lastGlobalDamageMonth: 0,
     nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
@@ -514,6 +517,14 @@ function migrateState(persisted: any): GameState {
   if (persisted._version < 10) {
     if (!Array.isArray(persisted.tenantHistory)) persisted.tenantHistory = [];
     persisted._version = 10;
+  }
+
+  // v10 → v11: add per-year tax accumulators
+  if (persisted._version < 11) {
+    if (typeof persisted.yearlyGrossRent !== 'number') persisted.yearlyGrossRent = 0;
+    if (typeof persisted.yearlyMortgageInterest !== 'number') persisted.yearlyMortgageInterest = 0;
+    if (typeof persisted.yearlyDeductibleExpenses !== 'number') persisted.yearlyDeductibleExpenses = 0;
+    persisted._version = 11;
   }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
