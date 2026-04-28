@@ -1338,7 +1338,8 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
-        }));
+          tenantHistory: newTenantHistory.slice(-100),
+        } as any));
       },
 
       processMarketUpdate: () => {
