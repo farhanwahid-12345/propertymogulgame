@@ -377,6 +377,7 @@ function createInitialState(): GameState {
     propertyLocks: [],
     depositDisputes: [],
     planningApplications: [],
+    tenantHistory: [],
   };
 }
 
@@ -509,6 +510,12 @@ function migrateState(persisted: any): GameState {
     persisted._version = 9;
   }
 
+  // v9 → v10: add tenantHistory slice
+  if (persisted._version < 10) {
+    if (!Array.isArray(persisted.tenantHistory)) persisted.tenantHistory = [];
+    persisted._version = 10;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -524,7 +531,7 @@ function migrateState(persisted: any): GameState {
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
-    'planningApplications',
+    'planningApplications', 'tenantHistory',
   ];
 
   arrayKeys.forEach((key) => {
