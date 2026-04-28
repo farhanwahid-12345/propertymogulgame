@@ -32,7 +32,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -852,7 +852,20 @@ export const useGameStore = create<GameState & GameActions>()(
           if (property.condition === 'dilapidated') {
             delta -= 15; reasons.push({ reason: 'Dilapidated condition', delta: -15 });
           } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
-            delta -= 5; reasons.push({ reason: 'Premium tenant in standard property', delta: -5 });
+            const hasPlanningCooldown = (prev.propertyLocks || []).some(
+              l => l.propertyId === property.id && l.reason === 'planning_cooldown' && newMonthNumber < l.untilMonth,
+            );
+            const eligible = canUpgradeToPremium({
+              condition: property.condition,
+              completedRenovationIds: property.completedRenovationIds,
+              hasPlanningCooldown,
+            });
+            if (eligible) {
+              delta -= 5;
+              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -5 });
+            } else {
+              reasons.push({ reason: 'Premium tenant accepts current standard', delta: 0 });
+            }
           } else if (property.condition === 'premium') {
             delta += 3; reasons.push({ reason: 'Premium condition', delta: +3 });
           }
