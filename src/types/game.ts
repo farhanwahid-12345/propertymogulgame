@@ -313,7 +313,26 @@ export interface GameState {
   depositDisputes: DepositDispute[];
   // Planning applications — gates major renovations behind PP approval
   planningApplications: PlanningApplication[];
+  // Tenant departure log — surfaced in Activity feed and on property cards
+  tenantHistory: TenantDeparture[];
+}
+
+/** A single tenant-departure event for the persistent activity log. */
+export type TenantDepartureReason =
+  | 'eviction_completed'
+  | 'low_satisfaction'
+  | 'end_of_tenancy';
+
+export interface TenantDeparture {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  reason: TenantDepartureReason;
+  month: number;
+  /** Optional human-readable detail (e.g. eviction ground). */
+  detail?: string;
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
