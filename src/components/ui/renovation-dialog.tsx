@@ -526,13 +526,37 @@ export function RenovationDialog({
                             Outcomes vary: typical ≈ £{valueTypical.toLocaleString()}, 5% chance of net loss.
                           </div>
 
-                          <div className="pt-2 border-t">
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>ROI (Annual, expected):</span>
-                              <span>
-                                {((rentUp * 12 * 0.85 / Math.max(1, cost)) * 100).toFixed(1)}%
-                              </span>
-                            </div>
+                          <div className="pt-2 border-t space-y-1">
+                            {(() => {
+                              const incomeAnnual = rentUp * 12 * 0.85;
+                              const incomeRoi = (incomeAnnual / Math.max(1, cost)) * 100;
+                              const capitalExpected = cappedValueUp * 0.85;
+                              const capitalRoi = (capitalExpected / Math.max(1, cost)) * 100;
+                              const paybackMonths = Math.max(1, Math.round(cost / Math.max(1, rentUp * 0.85)));
+                              const reduced = ceilingPrice > 0 && diminishingFactor < 0.95;
+                              const severe = ceilingPrice > 0 && diminishingFactor < 0.3;
+                              const colourClass = severe ? "text-danger" : reduced ? "text-amber-300" : "text-muted-foreground";
+                              const reductionPct = Math.round((1 - diminishingFactor) * 100);
+                              return (
+                                <>
+                                  <div className={cn("flex justify-between text-xs", colourClass)}>
+                                    <span>Income ROI / yr:</span>
+                                    <span>{incomeRoi.toFixed(1)}%</span>
+                                  </div>
+                                  <div className={cn("flex justify-between text-xs", colourClass)}>
+                                    <span>Capital uplift (expected):</span>
+                                    <span>
+                                      {capitalRoi.toFixed(1)}%
+                                      {reduced && <span className="ml-1 opacity-80">(−{reductionPct}% ceiling)</span>}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                                    <span>Payback (rent only):</span>
+                                    <span>~{paybackMonths} mo</span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </CardContent>
