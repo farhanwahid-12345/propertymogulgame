@@ -1055,8 +1055,8 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Pending evictions: tick down notice periods, end tenancies, refund deposits, add locks ──
         let activePendingEvictions: PendingEviction[] = [];
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
-        let evictionDepositRefund = 0;
-        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || [])];
+        let evictionDepositRefund = walkoutDepositRefund;
+        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || []), ...walkoutDisputes];
         prev.pendingEvictions.forEach(ev => {
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);
