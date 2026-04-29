@@ -2489,7 +2489,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const costPennies = toPennies(scaledCostPounds);
         const debited = debit(prev, costPennies);
         if (!debited) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()} (even with overdraft).`, "destructive"); return; }
-        if (prev.renovations.some(r => r.propertyId === propertyId)) { showToast("Renovation in Progress", "Already renovating!", "destructive"); return; }
+        if (prev.renovations.some(r => r.propertyId === propertyId && r.type.id === renovationType.id)) { showToast("Already In Progress", `${renovationType.name} is already underway on this property.`, "destructive"); return; }
 
         // Persist scaled values onto the renovation record so completion uses the same numbers
         const scaledRenovationType = {
