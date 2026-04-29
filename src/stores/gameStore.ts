@@ -904,27 +904,62 @@ export const useGameStore = create<GameState & GameActions>()(
           return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
         });
 
-        // Early-exit: <25 satisfaction → 8% chance tenant leaves (void period)
+        // Early-exit:
+        //   • satisfaction == 0 → guaranteed walkout
+        //   • satisfaction 1-24 → 8% chance walkout
+        // Both paths refund deposit (with damage retention if property is poor/dilapidated)
+        // and raise a TDS dispute if anything is withheld — same flow as eviction completion.
         const earlyExitVoids: VoidPeriod[] = [];
         const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
+        let walkoutDepositRefund = 0;
+        const walkoutDisputes: DepositDispute[] = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
-          if (t.satisfaction < 25 && Math.random() < 0.08) {
-            const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
-            earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
-            const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
-            showToast("Tenant Moved Out 😞", `${t.tenant.name}${property ? ` left ${property.name}` : ''} due to low satisfaction.`, "destructive");
-            newTenantHistory.push({
-              id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+          const guaranteedExit = t.satisfaction <= 0;
+          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 25 && Math.random() < 0.08;
+          if (!guaranteedExit && !probabilisticExit) return true;
+
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+          earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
+
+          // Deposit deduction mirrors eviction-completion logic (lines ~1035)
+          const heldAmount = t.depositHeld || 0;
+          const cond = property?.condition;
+          const withholdPct = cond === 'dilapidated' ? 0.5 : 0;
+          const withheld = Math.floor(heldAmount * withholdPct);
+          const refund = heldAmount - withheld;
+          walkoutDepositRefund += refund;
+
+          if (withheld > 0) {
+            walkoutDisputes.push({
+              id: `dispute_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
               propertyId: t.propertyId,
               propertyName: property?.name || t.propertyId,
               tenantName: t.tenant.name,
-              reason: 'low_satisfaction',
-              month: newMonthNumber,
-              detail: `Satisfaction ${Math.round(t.satisfaction)}/100`,
+              withheldAmount: withheld,
+              refundedAmount: refund,
+              raisedMonth: newMonthNumber,
+              status: 'open',
             });
-            return false;
           }
-          return true;
+
+          const title = guaranteedExit ? "Tenant Walked Out 🚪" : "Tenant Moved Out 😞";
+          const reasonLine = guaranteedExit ? "Satisfaction hit zero." : "Low satisfaction.";
+          const depositLine = withheld > 0
+            ? ` Deposit refunded £${fromPennies(refund).toLocaleString()} (£${fromPennies(withheld).toLocaleString()} withheld — pending TDS).`
+            : ` Deposit refunded in full (£${fromPennies(refund).toLocaleString()}).`;
+          showToast(title, `${t.tenant.name}${property ? ` left ${property.name}` : ''}. ${reasonLine}${depositLine}`, "destructive");
+
+          newTenantHistory.push({
+            id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+            propertyId: t.propertyId,
+            propertyName: property?.name || t.propertyId,
+            tenantName: t.tenant.name,
+            reason: 'low_satisfaction',
+            month: newMonthNumber,
+            detail: `Satisfaction ${Math.round(t.satisfaction)}/100${withheld > 0 ? ` — £${fromPennies(withheld).toLocaleString()} withheld` : ''}`,
+          });
+          return false;
         });
         newTenants = satisfactionAdjustedTenants;
         newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
@@ -1020,8 +1055,8 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Pending evictions: tick down notice periods, end tenancies, refund deposits, add locks ──
         let activePendingEvictions: PendingEviction[] = [];
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
-        let evictionDepositRefund = 0;
-        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || [])];
+        let evictionDepositRefund = walkoutDepositRefund;
+        let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || []), ...walkoutDisputes];
         prev.pendingEvictions.forEach(ev => {
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);

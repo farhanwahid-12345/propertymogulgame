@@ -1,79 +1,58 @@
 ## Goals
 
-Address three player-facing tenant feedback issues from the screenshot:
+Two interrelated polish items from the player feedback screenshot:
 
-1. **Premium-tenant-in-standard-property satisfaction loss is opaque.** Players see satisfaction tank with no actionable hint. Either guide them to renovate to premium, or stop punishing them when an upgrade isn't realistic.
-2. **No history view of game actions/events.** Recent tenant events are summarised in stats, but there's no scrollable activity log of what's happened (sales, mortgages, evictions, renovations, concerns, macro events).
-3. **No clear notification when a tenant leaves.** A toast fires for low-satisfaction early exits, but other exit paths (eviction completion, end-of-tenancy walk-outs) are silent or easy to miss, and there's no persistent record.
+1. **Tenant satisfaction = 0 ⇒ guaranteed walkout, with optional deposit deduction.** Today the early-exit path only fires probabilistically when satisfaction < 25 (8% per month) and silently refunds the full deposit. Players expect a hard exit at 0 and the same right to withhold from the deposit they have at landlord-initiated eviction (especially when the property is damaged/dilapidated).
+2. **Renovation dialog ROI is misleading near the area ceiling.** The "ROI (Annual, expected)" figure is computed only from rent uplift and ignores the capital value uplift entirely. It also doesn't reflect the ceiling-diminishing factor already shown in the warning banner, so a property at the area cap still advertises a healthy ROI.
 
 ---
 
 ## Plan
 
-### 1. Premium-tenant satisfaction guidance
+### 1. Walkout-on-zero + deposit deduction
 
-**In `src/stores/gameStore.ts` (~line 847):** when a premium tenant is in a standard-condition property, only apply the −5 penalty if the property is *eligible* for a premium renovation (i.e. there exists at least one uncompleted renovation that would raise condition to premium, AND no `planning_cooldown` lock).
+In `src/stores/gameStore.ts` (~line 907, the early-exit filter):
 
-- If upgrade-eligible → keep −5, but change reason text to `"Premium tenant wants premium finish — renovate to fix"` so the property card tooltip explains it.
-- If not upgrade-eligible (already at ceiling, planning refused recently, or no premium renovation available) → drop the penalty entirely. Reason text: `"Premium tenant accepts current standard"` with delta 0 (so it's visible but harmless).
+- **Hard walkout at sat ≤ 0**: every tenant whose satisfaction has hit 0 leaves at month-end (100%, not 8%). Keep the existing probabilistic 8%-at-<25 path for the soft-exit case, but cap it at sat between 1 and 24 so the two paths don't overlap.
+- **Deposit deduction on walkout**: mirror the eviction-completion logic (lines ~1035-1055):
+  - Compute `heldAmount = tenantRec.depositHeld`.
+  - If property `condition === 'dilapidated'` → withhold 50%; if `condition === 'poor'` → withhold 25%; else refund 100%.
+  - Push the refund into the same `evictionDepositRefund` accumulator so the cash inflow ledger picks it up.
+  - When anything is withheld, push a new entry into `depositDisputes` with `status: 'open'` so the player goes through the same TDS adjudication flow they already know from evictions.
+- **TenantHistory entry**: keep existing departure log entry; add `detail` noting whether deposit was withheld and how much.
+- **Toast wording**: "Tenant Walked Out — {name} left {property}. Deposit refunded: £X (£Y withheld pending TDS)" so the player immediately sees the financial outcome.
 
-**In `src/components/ui/property-card.tsx`:** when the active satisfaction reason is the premium-tenant penalty AND the property is upgrade-eligible, show a small "Renovate to premium" hint button under the satisfaction bar that opens the existing renovation dialog filtered to premium-tier options.
+### 2. Renovation ROI reflects ceiling + capital uplift
 
-### 2. Activity / history feed
+In `src/components/ui/renovation-dialog.tsx` (~line 529-536):
 
-Add a new `ActivityFeed` component (`src/components/ui/activity-feed.tsx`) that aggregates and timestamps:
+- Compute a more honest expected ROI:
+  - **Annual income return**: `rentUp × 12 × 0.85` (unchanged — keeps the 15% void/management haircut).
+  - **One-shot capital return**: `cappedValueUp × 0.85` (matches the `valueTypical` figure already shown above and uses the *post-ceiling* uplift, not the raw `valueUp`).
+  - **Combined annualised**: rent return alone is recurring; capital uplift is one-shot. Display two figures so the player can read intent:
+    - "Income ROI/yr: X%" — `(rentUp × 12 × 0.85) / cost × 100`
+    - "Capital uplift: Y%" — `(cappedValueUp × 0.85) / cost × 100`
+    - "Payback period: ~N months" — `cost / max(1, rentUp × 0.85)`
+- When `diminishingFactor < 0.95`, render the income/capital lines in amber and append a small "(reduced by ~Z% — area ceiling)" hint so it's visually consistent with the existing warning banner.
+- When `diminishingFactor < 0.3` (very near cap), render in danger red — the renovation is unlikely to pay back through capital and the player should reconsider.
 
-- Tenant events (`tenantEvents`: defaults, damages, early exits)
-- Macro events (`economicEvents`)
-- Tenant moved out / moved in (new entries — see §3)
-- Eviction completions (from `pendingEvictions` once `effectiveMonth` passes)
-- Renovation completions (from `renovations` once `completionMonth` passes)
-- Conveyancing completions (purchases & sales)
-- Tax payments (`taxRecords`)
-
-Implementation notes:
-- Pure derived view — read existing arrays from `gameState`, no new persisted state for already-tracked items. Sort by month desc, cap at 50 entries, with category filter chips (All / Tenants / Property / Finance / Market).
-- Render in the dashboard as a new collapsible "Activity" tile next to the existing stats, OR as a new tab in the bottom panel — confirm with placement consistent with current dashboard layout (we'll add it as a new tab in the existing tabs row to follow the dashboard pattern).
-
-### 3. Tenant-left notifications + log
-
-Currently only the low-satisfaction early-exit path emits a toast. Add:
-
-- **Toast on every tenant departure**, including:
-  - Eviction completion (in `tickMonth`, when `pendingEvictions` resolve and the tenant record is removed) — toast: "Tenant Evicted — {name} has left {property}".
-  - End-of-tenancy walk-out (if the satisfaction tick removes them for any reason) — already covered, keep it.
-  - Notice served (tenant *will* leave) — toast: "Eviction Notice Served — {name} leaves in N months".
-- **Persistent tenant-departure log entry** added to a new `tenantHistory` slice in state (lightweight: `{ propertyId, propertyName, tenantName, reason, month }`), surfaced inside the Activity Feed and pinned at the top of the property card's tenant section ("Last tenant: {name} left {N} months ago — {reason}").
-
-This guarantees the player can never miss a departure even if a toast was dismissed.
+No engine logic changes — `applyCeilingDiminishingReturns` already returns the correct `cappedValueUp`; we just need to feed it into the displayed ROI string instead of ignoring it.
 
 ---
 
 ## Technical details
 
-- **Types (`src/types/game.ts`):** add `TenantDeparture` interface and `tenantHistory: TenantDeparture[]` field to `GameState`. Bump `SAVE_VERSION` to `10` and add a migration default (`tenantHistory: []`) in the persist rehydrate step.
-- **Store (`src/stores/gameStore.ts`):**
-  - In the early-exit filter (line ~875), push a `TenantDeparture` entry alongside the existing toast.
-  - Add the same push when a `pendingEviction` resolves and the tenant is removed.
-  - Refactor the premium-tenant penalty branch (line ~847) to check eligibility via a new helper `canUpgradeToPremium(property, completedRenovationIds, propertyLocks, monthsPlayed)` exposed from `src/lib/engine/renovation.ts`.
-- **Hook (`src/hooks/useGameState.ts`):** expose `tenantHistory`.
-- **UI:**
-  - `src/components/ui/activity-feed.tsx` — new component, glass card, follows existing tracker styling (`renovation-tracker`, `tenant-concerns-feed`).
-  - `src/pages/Index.tsx` — mount the feed as a new tab in the dashboard tab strip.
-  - `src/components/ui/property-card.tsx` — add the "Renovate to premium" inline hint when applicable; show "Last tenant left {N} months ago" line in the vacant-property state.
+- **Files modified**:
+  - `src/stores/gameStore.ts` — split the early-exit branch into hard (sat ≤ 0) and probabilistic (1–24) paths; reuse the eviction deposit-withholding block (extract into a small inline helper to avoid duplication); push to `depositDisputes` and `tenantHistory`; refundamount goes through `evictionDepositRefund`.
+  - `src/components/ui/renovation-dialog.tsx` — replace the single "ROI (Annual, expected)" line (lines 529–536) with three lines (Income ROI/yr, Capital uplift %, Payback months) and conditional colour based on `diminishingFactor`.
+- **No state/schema changes**, no `SAVE_VERSION` bump, no new persisted fields. `tenantHistory` and `depositDisputes` already exist (added in v10/v8).
+- **No new dependencies, no backend/RPC changes.**
 
 ---
 
 ## Files to modify
 
-- `src/types/game.ts` — add `TenantDeparture`, bump `SAVE_VERSION`.
-- `src/stores/gameStore.ts` — premium-tenant eligibility check, eviction-completion toast, departure log writes, rehydration default.
-- `src/hooks/useGameState.ts` — expose `tenantHistory`.
-- `src/lib/engine/renovation.ts` — `canUpgradeToPremium` helper.
-- `src/components/ui/activity-feed.tsx` — **new** component.
-- `src/components/ui/property-card.tsx` — premium-renovate hint + last-tenant line.
-- `src/pages/Index.tsx` — mount Activity tab.
-- `mem://ui/layout/activity-feed.md` — **new** memory documenting the feed.
-- `mem://game-mechanics/property-management/tenant-satisfaction.md` — update note about premium-tenant eligibility gating.
-
-No new dependencies. No backend changes.
+- `src/stores/gameStore.ts`
+- `src/components/ui/renovation-dialog.tsx`
+- `mem://game-mechanics/property-management/tenant-satisfaction.md` — update note: sat=0 ⇒ guaranteed walkout, deposit withholding mirrors eviction.
+- `mem://game-mechanics/property-management/deposit-handling.md` — add the satisfaction-walkout deduction path.
