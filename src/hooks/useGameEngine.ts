@@ -18,30 +18,61 @@ import { useGameStore } from "@/stores/gameStore";
  * Falls back to setInterval if Worker is unavailable.
  */
 export function useGameEngine() {
-  const lastMonthProcessed = useRef(-1);
   const accumulatedSec = useRef(0);
   const marketAccumSec = useRef(0);
   const counterAccumSec = useRef(0);
+  const processingMonth = useRef(false);
 
   useEffect(() => {
-    const handleTick = (deltaMs: number) => {
-      // Scale wall-clock delta by user-selected game speed multiplier.
-      const speed = useGameStore.getState().gameSpeed || 1;
-      const scaledMs = deltaMs * speed;
-      accumulatedSec.current += scaledMs / 1000;
-      marketAccumSec.current += scaledMs / 1000;
-      counterAccumSec.current += scaledMs / 1000;
+    /** Hard cap on backlog: prevents huge synchronous catch-up after the
+     *  tab returns from background (or after a long sleep). At 4× speed,
+     *  60s of accumulator = 12 months of synchronous month-end processing,
+     *  which freezes the UI. Cap at 30s so we recover quickly without
+     *  blocking the main thread for seconds. */
+    const MAX_ACCUMULATOR_SEC = 30;
 
-      // Whole-second clock ticks (catch up multiple seconds if needed)
+    const handleTick = (deltaMs: number) => {
+      // Reentrancy guard — if a previous handleTick is still running its
+      // synchronous catch-up loop, just buffer the delta and bail.
+      const speed = useGameStore.getState().gameSpeed || 1;
+      const scaledSec = (deltaMs * speed) / 1000;
+      accumulatedSec.current = Math.min(MAX_ACCUMULATOR_SEC, accumulatedSec.current + scaledSec);
+      marketAccumSec.current = Math.min(MAX_ACCUMULATOR_SEC, marketAccumSec.current + scaledSec);
+      counterAccumSec.current = Math.min(MAX_ACCUMULATOR_SEC, counterAccumSec.current + scaledSec);
+
+      if (processingMonth.current) return;
+
+      // Whole-second clock ticks (catch up multiple seconds if needed).
+      // Always read fresh state inside the loop so timer + monthsPlayed
+      // reflect the previous iteration's effects (e.g. month-end reset
+      // timeUntilNextMonth back to MONTH_DURATION_SECONDS).
       while (accumulatedSec.current >= 1) {
         accumulatedSec.current -= 1;
-        const { clockTick, timeUntilNextMonth, monthsPlayed, isBankrupt } = useGameStore.getState();
-        clockTick();
+        const stateBefore = useGameStore.getState();
+        if (stateBefore.isBankrupt) {
+          accumulatedSec.current = 0;
+          break;
+        }
+        stateBefore.clockTick();
 
-        if (timeUntilNextMonth <= 1 && lastMonthProcessed.current !== monthsPlayed && !isBankrupt) {
-          lastMonthProcessed.current = monthsPlayed;
-          useGameStore.getState().processMonthEnd();
-          useGameStore.getState().replenishMarket();
+        // Re-read AFTER clockTick so we see the decremented value.
+        const stateAfter = useGameStore.getState();
+        if (stateAfter.timeUntilNextMonth <= 0) {
+          processingMonth.current = true;
+          try {
+            useGameStore.getState().processMonthEnd();
+            useGameStore.getState().replenishMarket();
+          } finally {
+            processingMonth.current = false;
+          }
+          // After a heavy month-end, drain remaining backlog more gently:
+          // bail out of the catch-up loop and let the next worker tick
+          // continue. Prevents multi-month synchronous freezes.
+          if (accumulatedSec.current >= 5) {
+            // Cap remaining so we don't immediately reprocess.
+            accumulatedSec.current = Math.min(accumulatedSec.current, 2);
+            break;
+          }
         }
       }
 
