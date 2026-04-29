@@ -925,7 +925,7 @@ export const useGameStore = create<GameState & GameActions>()(
           // Deposit deduction mirrors eviction-completion logic (lines ~1035)
           const heldAmount = t.depositHeld || 0;
           const cond = property?.condition;
-          const withholdPct = cond === 'dilapidated' ? 0.5 : cond === 'poor' ? 0.25 : 0;
+          const withholdPct = cond === 'dilapidated' ? 0.5 : 0;
           const withheld = Math.floor(heldAmount * withholdPct);
           const refund = heldAmount - withheld;
           walkoutDepositRefund += refund;
