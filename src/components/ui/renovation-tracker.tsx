@@ -9,27 +9,51 @@ interface RenovationTrackerProps {
   ownedProperties: Property[];
   /** Current in-game month — used for game-time progress. */
   monthsPlayed: number;
-  /** Pending/decided planning applications (decisions auto-clear after a month). */
+  /** Pending/decided planning applications. Refused entries are no longer surfaced here — see renovation dialog. */
   planningApplications?: PlanningApplication[];
+  /** When true, render only the body (no outer glass card). */
+  bare?: boolean;
+  /** When true, hide planning applications (caller handles them in their own tab). */
+  hidePlanning?: boolean;
 }
 
-export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, planningApplications = [] }: RenovationTrackerProps) {
-  const visibleApplications = planningApplications.filter(
-    a => a.status === 'pending' || (a.status === 'refused' && monthsPlayed - a.decisionMonth < 2),
-  );
-  if ((!renovations || renovations.length === 0) && visibleApplications.length === 0) return null;
+export function RenovationTracker({
+  renovations,
+  ownedProperties,
+  monthsPlayed,
+  planningApplications = [],
+  bare = false,
+  hidePlanning = false,
+}: RenovationTrackerProps) {
+  // Only pending planning applications show up; refused entries live inside the renovation dialog cooldown banner.
+  const visibleApplications = hidePlanning
+    ? []
+    : planningApplications.filter(a => a.status === 'pending');
+
+  if ((!renovations || renovations.length === 0) && visibleApplications.length === 0) {
+    if (bare) {
+      return (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          No active renovations.
+        </p>
+      );
+    }
+    return null;
+  }
 
   const now = Date.now();
 
-  return (
-    <div className="glass p-5 animate-fade-in space-y-5">
+  const inner = (
+    <div className="space-y-5">
       {renovations.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Hammer className="h-5 w-5 text-orange-400" />
-            <h2 className="text-xl font-bold text-foreground">Active Renovations</h2>
-            <Badge variant="secondary" className="text-xs">{renovations.length}</Badge>
-          </div>
+          {!bare && (
+            <div className="flex items-center gap-2 mb-4">
+              <Hammer className="h-5 w-5 text-orange-400" />
+              <h2 className="text-xl font-bold text-foreground">Active Renovations</h2>
+              <Badge variant="secondary" className="text-xs">{renovations.length}</Badge>
+            </div>
+          )}
 
           <div className="space-y-3">
             {renovations.map((r) => {
@@ -38,7 +62,6 @@ export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, 
 
               const property = ownedProperties.find((p) => p.id === r.propertyId);
 
-              // Prefer in-game-month timing; fall back to wall-clock for legacy records.
               let progress: number;
               let monthsRemaining: number;
               if (typeof r.completionMonth === 'number' && typeof r.startMonth === 'number') {
@@ -110,8 +133,6 @@ export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, 
               const elapsed = Math.max(0, Math.min(total, monthsPlayed - app.submittedMonth));
               const progress = (elapsed / total) * 100;
               const monthsRemaining = Math.max(0, app.decisionMonth - monthsPlayed);
-              const isPending = app.status === 'pending';
-              const isRefused = app.status === 'refused';
 
               return (
                 <div key={app.id} className="glass p-3 space-y-2">
@@ -125,37 +146,22 @@ export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, 
                         {app.renovationName}
                       </Badge>
                     </div>
-                    {isRefused && (
-                      <Badge className="bg-danger/20 text-danger border-danger/30 text-[10px]">
-                        Refused — 6mo cooldown
-                      </Badge>
-                    )}
-                    {isPending && (
-                      <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-300">
-                        Pending LPA decision
-                      </Badge>
-                    )}
+                    <Badge variant="outline" className="text-[10px] border-amber-400/30 text-amber-300">
+                      Pending LPA decision
+                    </Badge>
                   </div>
 
-                  {isPending && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>
-                          {monthsRemaining === 0
-                            ? "Decision imminent"
-                            : `Decision in ~${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
-                        </span>
-                        <span>{Math.round(progress)}%</span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {monthsRemaining === 0
+                          ? "Decision imminent"
+                          : `Decision in ~${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
+                      </span>
+                      <span>{Math.round(progress)}%</span>
                     </div>
-                  )}
-
-                  {isRefused && app.refusalReason && (
-                    <div className="text-xs text-danger border border-danger/30 bg-danger/5 rounded px-2 py-1">
-                      {app.refusalReason}
-                    </div>
-                  )}
+                    <Progress value={progress} className="h-2" />
+                  </div>
                 </div>
               );
             })}
@@ -164,4 +170,8 @@ export function RenovationTracker({ renovations, ownedProperties, monthsPlayed, 
       )}
     </div>
   );
+
+  if (bare) return inner;
+
+  return <div className="glass p-5 animate-fade-in">{inner}</div>;
 }
