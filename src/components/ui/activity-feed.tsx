@@ -29,12 +29,14 @@ type Category = "all" | "tenants" | "property" | "finance" | "market";
 interface ActivityFeedProps {
   monthsPlayed: number;
   tenantHistory?: TenantDeparture[];
-  tenantEvents?: Array<TenantEvent & { amount: number }>; // amount may already be pounds via wrapper
+  tenantEvents?: Array<TenantEvent & { amount: number }>;
   economicEvents?: MacroEconomicEvent[];
   renovations?: Renovation[];
   conveyancing?: Conveyancing[];
   taxRecords?: TaxRecord[];
   ownedProperties?: Array<{ id: string; name: string }>;
+  /** When true, render only the body (no outer Card / heading). */
+  bare?: boolean;
 }
 
 interface FeedItem {
