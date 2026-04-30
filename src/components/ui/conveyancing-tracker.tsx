@@ -95,8 +95,20 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false }
               </div>
             </div>
           );
-        })}
+      })}
+    </div>
+  );
+
+  if (bare) return body;
+
+  return (
+    <div className="glass p-5 animate-fade-in">
+      <div className="flex items-center gap-2 mb-4">
+        <Hourglass className="h-5 w-5 text-yellow-400" />
+        <h2 className="text-xl font-bold text-foreground">Conveyancing in Progress</h2>
+        <Badge variant="secondary" className="text-xs">{conveyancing.length}</Badge>
       </div>
+      {body}
     </div>
   );
 }
