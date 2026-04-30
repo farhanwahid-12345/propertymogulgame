@@ -224,42 +224,6 @@ export function GameStats({
         </div>
       </div>
 
-      {/* DTI Ratio Bar */}
-      {totalMonthlyExpenses > 0 && (
-        <div className="glass p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">📊 Debt-to-Income (DTI)</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[250px]">
-                    <p className="text-xs">DTI measures how much of your rental income goes to debt payments. Above 80% puts you at high risk if interest rates rise — one rate hike could make you cash-flow negative.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <span className={cn("text-sm font-bold", dtiColor)}>
-              {Math.round(dtiRatio)}%
-            </span>
-          </div>
-          <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-            <div 
-              className={cn("h-full rounded-full transition-all duration-500", dtiBarColor)}
-              style={{ width: `${Math.min(100, dtiRatio)}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-            <span>0%</span>
-            <span className="text-success">Safe</span>
-            <span className="text-yellow-400">50%</span>
-            <span className="text-yellow-400">Caution</span>
-            <span className="text-danger">80%+</span>
-          </div>
-        </div>
-      )}
 
       {/* Collapsible Market & Events */}
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
