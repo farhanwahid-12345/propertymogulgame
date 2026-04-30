@@ -13,6 +13,8 @@ interface Props {
   monthsPlayed: number;
   onResolve: (concernId: string) => void;
   onSnooze: (concernId: string) => void;
+  /** When true, render only the body (no outer Card / heading). */
+  bare?: boolean;
 }
 
 const CATEGORY_ICON = {
@@ -38,13 +40,13 @@ export function TenantConcernsFeed({
   monthsPlayed,
   onResolve,
   onSnooze,
+  bare = false,
 }: Props) {
   const ownedIds = new Set(ownedProperties.map(p => p.id));
-  // Hide resolved concerns AND orphans (concerns for properties no longer owned).
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
 
-  return (
+  const body = (
     <Card className="glass border-0">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
