@@ -113,7 +113,19 @@ export function useGameState() {
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps.
   const netWorth = cash + inflightBuyCapital + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
-  const totalMonthlyIncome = ownedProperties.reduce((sum, p) => sum + p.monthlyIncome, 0);
+  const nowTs = Date.now();
+  const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
+  const conveyancingPropertyIds = new Set(
+    conveyancingRaw.filter((c: any) => c.status === 'buying').map((c: any) => c.propertyId)
+  );
+  const totalMonthlyIncome = ownedProperties.reduce((sum, p) => {
+    if (conveyancingPropertyIds.has(p.id)) return sum;
+    const hasTenant = tenantsRaw.some(t => t.propertyId === p.id);
+    const isInVoid = voidPeriodsRaw.some((vp: any) =>
+      vp.propertyId === p.id && nowTs >= vp.startDate && nowTs <= vp.endDate
+    );
+    return sum + (hasTenant && !isInVoid ? p.monthlyIncome : 0);
+  }, 0);
   const mortgageExpenses = mortgages.reduce((sum, m) => sum + m.monthlyPayment, 0);
   const councilTaxExpenses = ownedProperties.reduce((sum, p) => {
     const hasTenant = tenantsRaw.some(t => t.propertyId === p.id);
