@@ -66,6 +66,7 @@ export function ActivityFeed({
   conveyancing = [],
   taxRecords = [],
   ownedProperties = [],
+  bare = false,
 }: ActivityFeedProps) {
   const [filter, setFilter] = useState<Category>("all");
 
