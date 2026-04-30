@@ -8,20 +8,24 @@ import { cn } from "@/lib/utils";
 interface ConveyancingTrackerProps {
   conveyancing: Conveyancing[];
   monthsPlayed: number;
+  /** When true, render only the body (no outer glass card / heading). */
+  bare?: boolean;
 }
 
-export function ConveyancingTracker({ conveyancing, monthsPlayed }: ConveyancingTrackerProps) {
-  if (!conveyancing || conveyancing.length === 0) return null;
+export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false }: ConveyancingTrackerProps) {
+  if (!conveyancing || conveyancing.length === 0) {
+    if (bare) {
+      return (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          No active conveyancing — buy or sell a property to get started.
+        </p>
+      );
+    }
+    return null;
+  }
 
-  return (
-    <div className="glass p-5 animate-fade-in">
-      <div className="flex items-center gap-2 mb-4">
-        <Hourglass className="h-5 w-5 text-yellow-400" />
-        <h2 className="text-xl font-bold text-foreground">Conveyancing in Progress</h2>
-        <Badge variant="secondary" className="text-xs">{conveyancing.length}</Badge>
-      </div>
-
-      <div className="space-y-3">
+  const body = (
+    <div className="space-y-3">
         {conveyancing.map((c) => {
           const totalMonths = Math.max(1, c.completionMonth - c.startMonth);
           const elapsed = Math.max(0, Math.min(totalMonths, monthsPlayed - c.startMonth));
