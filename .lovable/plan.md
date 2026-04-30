@@ -1,58 +1,51 @@
-## Goals
+## Goal
 
-Two interrelated polish items from the player feedback screenshot:
+Reduce vertical clutter on the main page by merging the four standalone panels (Conveyancing, Planning Applications, Tenant Concerns, Activity) into a single compact tabbed component, shrink the DTI bar into an inline pill, and stop surfacing refused planning applications outside the renovation flow.
 
-1. **Tenant satisfaction = 0 ⇒ guaranteed walkout, with optional deposit deduction.** Today the early-exit path only fires probabilistically when satisfaction < 25 (8% per month) and silently refunds the full deposit. Players expect a hard exit at 0 and the same right to withhold from the deposit they have at landlord-initiated eviction (especially when the property is damaged/dilapidated).
-2. **Renovation dialog ROI is misleading near the area ceiling.** The "ROI (Annual, expected)" figure is computed only from rent uplift and ignores the capital value uplift entirely. It also doesn't reflect the ceiling-diminishing factor already shown in the warning banner, so a property at the area cap still advertises a healthy ROI.
+## Changes
 
----
+### 1. New `OperationsCenter` component
+Create `src/components/ui/operations-center.tsx`. Single glass card with:
 
-## Plan
+- A header showing "Operations" plus a total count badge.
+- A horizontal tab strip (using existing `Tabs`) with these tabs, each showing a count badge:
+  - **Conveyancing** — current `ConveyancingTracker` body
+  - **Planning** — pending-only planning applications (refused entries excluded — see #4)
+  - **Renovations** — current `RenovationTracker` "Active Renovations" body
+  - **Concerns** — current `TenantConcernsFeed` body
+  - **Activity** — current `ActivityFeed` body (existing internal category filter is preserved)
+- Tabs with zero items render a muted empty state. If everything is empty, the whole card collapses to a single thin "All quiet" line so it doesn't waste space.
+- Default active tab = first non-empty tab in the order above; falls back to Activity.
+- Body uses a fixed max height (`max-h-[360px]`) with internal scroll so the card never grows taller than the activity feed used to be.
 
-### 1. Walkout-on-zero + deposit deduction
+### 2. Wire it into `src/pages/Index.tsx`
+Replace the current sequence of `<ConveyancingTracker>`, `<RenovationTracker>`, `<TenantConcernsFeed>`, `<ActivityFeed>` (lines ~238–293) with a single `<OperationsCenter>` that receives all the props those components currently take. `EvictionTimelineFeed` and `DepositDisputesFeed` stay outside the center — they are action-required dialogs, not feeds.
 
-In `src/stores/gameStore.ts` (~line 907, the early-exit filter):
+### 3. Shrink the DTI display
+In `src/components/ui/game-stats.tsx` (lines ~209–244):
 
-- **Hard walkout at sat ≤ 0**: every tenant whose satisfaction has hit 0 leaves at month-end (100%, not 8%). Keep the existing probabilistic 8%-at-<25 path for the soft-exit case, but cap it at sat between 1 and 24 so the two paths don't overlap.
-- **Deposit deduction on walkout**: mirror the eviction-completion logic (lines ~1035-1055):
-  - Compute `heldAmount = tenantRec.depositHeld`.
-  - If property `condition === 'dilapidated'` → withhold 50%; if `condition === 'poor'` → withhold 25%; else refund 100%.
-  - Push the refund into the same `evictionDepositRefund` accumulator so the cash inflow ledger picks it up.
-  - When anything is withheld, push a new entry into `depositDisputes` with `status: 'open'` so the player goes through the same TDS adjudication flow they already know from evictions.
-- **TenantHistory entry**: keep existing departure log entry; add `detail` noting whether deposit was withheld and how much.
-- **Toast wording**: "Tenant Walked Out — {name} left {property}. Deposit refunded: £X (£Y withheld pending TDS)" so the player immediately sees the financial outcome.
+- Remove the standalone full-width DTI card.
+- Replace it with an inline pill rendered next to the existing LTV pill in the header row (around line 180). Format: `DTI 42%` with the same colour rules (success / yellow / danger).
+- Move the explanatory tooltip onto the pill (Info icon next to the value).
+- Drop the 0%–80% scale labels entirely; the colour conveys the risk band.
 
-### 2. Renovation ROI reflects ceiling + capital uplift
+### 4. Hide refused planning applications from the main UI
+In `src/components/ui/renovation-tracker.tsx`:
 
-In `src/components/ui/renovation-dialog.tsx` (~line 529-536):
+- Change `visibleApplications` filter to `a.status === 'pending'` only (drop the 2-month refused window).
+- Refused applications continue to exist in state and are surfaced inside the renovation sub-menu (the existing `RenovationDialog` already reads `planningApplications` and shows the cooldown there).
 
-- Compute a more honest expected ROI:
-  - **Annual income return**: `rentUp × 12 × 0.85` (unchanged — keeps the 15% void/management haircut).
-  - **One-shot capital return**: `cappedValueUp × 0.85` (matches the `valueTypical` figure already shown above and uses the *post-ceiling* uplift, not the raw `valueUp`).
-  - **Combined annualised**: rent return alone is recurring; capital uplift is one-shot. Display two figures so the player can read intent:
-    - "Income ROI/yr: X%" — `(rentUp × 12 × 0.85) / cost × 100`
-    - "Capital uplift: Y%" — `(cappedValueUp × 0.85) / cost × 100`
-    - "Payback period: ~N months" — `cost / max(1, rentUp × 0.85)`
-- When `diminishingFactor < 0.95`, render the income/capital lines in amber and append a small "(reduced by ~Z% — area ceiling)" hint so it's visually consistent with the existing warning banner.
-- When `diminishingFactor < 0.3` (very near cap), render in danger red — the renovation is unlikely to pay back through capital and the player should reconsider.
+Verify: read `src/components/ui/renovation-dialog.tsx` during implementation to confirm the refused state is shown when the user opens a renovation; if not, add a small "Refused — Xmo cooldown remaining" line inside that dialog so the player still sees why an option is blocked.
 
-No engine logic changes — `applyCeilingDiminishingReturns` already returns the correct `cappedValueUp`; we just need to feed it into the displayed ROI string instead of ignoring it.
+## Files touched
 
----
+- **new**: `src/components/ui/operations-center.tsx`
+- **edit**: `src/pages/Index.tsx` — swap four panels for one
+- **edit**: `src/components/ui/game-stats.tsx` — DTI to inline pill
+- **edit**: `src/components/ui/renovation-tracker.tsx` — drop refused-app window
+- **edit**: `src/components/ui/renovation-dialog.tsx` — ensure refusal cooldown visible inside the renovation flow (only if not already)
 
-## Technical details
+## Out of scope
 
-- **Files modified**:
-  - `src/stores/gameStore.ts` — split the early-exit branch into hard (sat ≤ 0) and probabilistic (1–24) paths; reuse the eviction deposit-withholding block (extract into a small inline helper to avoid duplication); push to `depositDisputes` and `tenantHistory`; refundamount goes through `evictionDepositRefund`.
-  - `src/components/ui/renovation-dialog.tsx` — replace the single "ROI (Annual, expected)" line (lines 529–536) with three lines (Income ROI/yr, Capital uplift %, Payback months) and conditional colour based on `diminishingFactor`.
-- **No state/schema changes**, no `SAVE_VERSION` bump, no new persisted fields. `tenantHistory` and `depositDisputes` already exist (added in v10/v8).
-- **No new dependencies, no backend/RPC changes.**
-
----
-
-## Files to modify
-
-- `src/stores/gameStore.ts`
-- `src/components/ui/renovation-dialog.tsx`
-- `mem://game-mechanics/property-management/tenant-satisfaction.md` — update note: sat=0 ⇒ guaranteed walkout, deposit withholding mirrors eviction.
-- `mem://game-mechanics/property-management/deposit-handling.md` — add the satisfaction-walkout deduction path.
+- No changes to game logic, store, or types.
+- `ConveyancingTracker`, `RenovationTracker`, `TenantConcernsFeed`, `ActivityFeed` remain as components — `OperationsCenter` composes them so we don't duplicate markup. Their outer "glass card" wrappers will be removed via a `bare` prop (or by rendering their inner content) so we don't get nested cards inside the tabs.

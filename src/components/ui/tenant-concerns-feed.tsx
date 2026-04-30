@@ -13,6 +13,8 @@ interface Props {
   monthsPlayed: number;
   onResolve: (concernId: string) => void;
   onSnooze: (concernId: string) => void;
+  /** When true, render only the body (no outer Card / heading). */
+  bare?: boolean;
 }
 
 const CATEGORY_ICON = {
@@ -38,11 +40,83 @@ export function TenantConcernsFeed({
   monthsPlayed,
   onResolve,
   onSnooze,
+  bare = false,
 }: Props) {
   const ownedIds = new Set(ownedProperties.map(p => p.id));
-  // Hide resolved concerns AND orphans (concerns for properties no longer owned).
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
+
+  const body = (
+    <div className="space-y-2">
+      {active.length === 0 ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+          <Smile className="h-4 w-4 text-emerald-400" />
+          No concerns — tenants are happy 😊
+        </div>
+      ) : (
+        active.map(c => {
+          const Icon = CATEGORY_ICON[c.category] || Wrench;
+          const monthsOpen = Math.max(0, monthsPlayed - (c.raisedMonth || 0));
+          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+          const graceRemaining = Math.max(0, grace - monthsOpen);
+          const isDecaying = monthsOpen > grace;
+          const cost = fromPennies(c.resolveCost || 0);
+          const canAfford = playerCash >= (c.resolveCost || 0);
+          return (
+            <div
+              key={c.id}
+              className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/40"
+            >
+              <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${c.source === 'damage' ? 'text-red-400' : 'text-amber-400'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium truncate">{propName(c.propertyId)}</span>
+                  {c.source === 'damage' ? (
+                    <Badge variant="destructive" className="text-[10px]">🔧 Damage</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {CATEGORY_LABEL[c.category] || "Maintenance"}
+                    </Badge>
+                  )}
+                  {isDecaying ? (
+                    <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
+                      ⚠ Decaying · -{c.satisfactionPenaltyIfIgnored || 0}/mo
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300">
+                      ⏳ Resolve in {graceRemaining}mo
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{c.description || "Tenant concern"}</p>
+              </div>
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-7 text-xs"
+                  disabled={!canAfford}
+                  onClick={() => onResolve(c.id)}
+                >
+                  Resolve £{cost.toLocaleString()}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-muted-foreground"
+                  onClick={() => onSnooze(c.id)}
+                >
+                  Snooze
+                </Button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
+  if (bare) return body;
 
   return (
     <Card className="glass border-0">
@@ -56,75 +130,7 @@ export function TenantConcernsFeed({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {active.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-            <Smile className="h-4 w-4 text-emerald-400" />
-            No concerns — tenants are happy 😊
-          </div>
-        ) : (
-          active.map(c => {
-            const Icon = CATEGORY_ICON[c.category] || Wrench;
-            const monthsOpen = Math.max(0, monthsPlayed - (c.raisedMonth || 0));
-            const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
-            const graceRemaining = Math.max(0, grace - monthsOpen);
-            const isDecaying = monthsOpen > grace;
-            const cost = fromPennies(c.resolveCost || 0);
-            const canAfford = playerCash >= (c.resolveCost || 0);
-            return (
-              <div
-                key={c.id}
-                className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/40"
-              >
-                <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${c.source === 'damage' ? 'text-red-400' : 'text-amber-400'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium truncate">{propName(c.propertyId)}</span>
-                    {c.source === 'damage' ? (
-                      <Badge variant="destructive" className="text-[10px]">
-                        🔧 Damage
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] capitalize">
-                        {CATEGORY_LABEL[c.category] || "Maintenance"}
-                      </Badge>
-                    )}
-                    {isDecaying ? (
-                      <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
-                        ⚠ Decaying · -{c.satisfactionPenaltyIfIgnored || 0}/mo
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300">
-                        ⏳ Resolve in {graceRemaining}mo
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{c.description || "Tenant concern"}</p>
-                </div>
-                <div className="flex flex-col gap-1.5 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="h-7 text-xs"
-                    disabled={!canAfford}
-                    onClick={() => onResolve(c.id)}
-                  >
-                    Resolve £{cost.toLocaleString()}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs text-muted-foreground"
-                    onClick={() => onSnooze(c.id)}
-                  >
-                    Snooze
-                  </Button>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </CardContent>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

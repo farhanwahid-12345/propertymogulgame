@@ -73,7 +73,7 @@ export function GameStats({
     ? (totalMonthlyExpenses / totalMonthlyIncome) * 100 
     : (totalMonthlyExpenses > 0 ? 100 : 0);
   const dtiColor = dtiRatio <= 50 ? "text-success" : dtiRatio <= 79 ? "text-yellow-400" : "text-danger";
-  const dtiBarColor = dtiRatio <= 50 ? "bg-success" : dtiRatio <= 79 ? "bg-yellow-400" : "bg-red-500";
+  
 
   const getCreditScoreColor = (score: number) => {
     if (score >= 750) return "text-success";
@@ -173,7 +173,7 @@ export function GameStats({
             <div className="text-xl font-bold text-foreground">
               {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">
                 Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
               </span>
@@ -186,6 +186,24 @@ export function GameStats({
                 )}>
                   LTV: {portfolioLTV.toFixed(0)}%
                 </span>
+              )}
+              {totalMonthlyExpenses > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-xs font-semibold inline-flex items-center gap-1 cursor-help",
+                        dtiColor
+                      )}>
+                        DTI: {Math.round(dtiRatio)}%
+                        <Info className="h-3 w-3 opacity-70" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[250px]">
+                      <p className="text-xs">DTI is the share of your rental income that goes to debt payments. Above 80% puts you at high risk if interest rates rise.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               <CreditImprovementGuide
                 creditScore={creditScore}
@@ -206,42 +224,6 @@ export function GameStats({
         </div>
       </div>
 
-      {/* DTI Ratio Bar */}
-      {totalMonthlyExpenses > 0 && (
-        <div className="glass p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">📊 Debt-to-Income (DTI)</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[250px]">
-                    <p className="text-xs">DTI measures how much of your rental income goes to debt payments. Above 80% puts you at high risk if interest rates rise — one rate hike could make you cash-flow negative.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <span className={cn("text-sm font-bold", dtiColor)}>
-              {Math.round(dtiRatio)}%
-            </span>
-          </div>
-          <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-            <div 
-              className={cn("h-full rounded-full transition-all duration-500", dtiBarColor)}
-              style={{ width: `${Math.min(100, dtiRatio)}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-            <span>0%</span>
-            <span className="text-success">Safe</span>
-            <span className="text-yellow-400">50%</span>
-            <span className="text-yellow-400">Caution</span>
-            <span className="text-danger">80%+</span>
-          </div>
-        </div>
-      )}
 
       {/* Collapsible Market & Events */}
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
