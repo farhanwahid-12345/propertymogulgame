@@ -73,7 +73,7 @@ export function GameStats({
     ? (totalMonthlyExpenses / totalMonthlyIncome) * 100 
     : (totalMonthlyExpenses > 0 ? 100 : 0);
   const dtiColor = dtiRatio <= 50 ? "text-success" : dtiRatio <= 79 ? "text-yellow-400" : "text-danger";
-  const dtiBarColor = dtiRatio <= 50 ? "bg-success" : dtiRatio <= 79 ? "bg-yellow-400" : "bg-red-500";
+  
 
   const getCreditScoreColor = (score: number) => {
     if (score >= 750) return "text-success";
