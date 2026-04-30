@@ -11,10 +11,7 @@ import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { ListedProperties } from "@/components/ui/listed-properties";
-import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
-import { RenovationTracker } from "@/components/ui/renovation-tracker";
-import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
-import { ActivityFeed } from "@/components/ui/activity-feed";
+import { OperationsCenter } from "@/components/ui/operations-center";
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { useGameState } from "@/hooks/useGameState";
@@ -235,21 +232,7 @@ const Index = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Conveyancing tracker */}
-        <ConveyancingTracker
-          conveyancing={gameState.conveyancing || []}
-          monthsPlayed={gameState.monthsPlayed}
-        />
-
-        {/* Renovation tracker */}
-        <RenovationTracker
-          renovations={gameState.renovations || []}
-          ownedProperties={gameState.ownedProperties}
-          monthsPlayed={gameState.monthsPlayed}
-          planningApplications={(gameState as any).planningApplications || []}
-        />
-
-        {/* Eviction timeline */}
+        {/* Eviction timeline (action-required) */}
         <EvictionTimelineFeed
           pendingEvictions={gameState.pendingEvictions || []}
           ownedProperties={gameState.ownedProperties}
@@ -258,38 +241,29 @@ const Index = () => {
           onAppealEviction={gameState.appealEviction}
         />
 
-        {/* Deposit disputes */}
+        {/* Deposit disputes (action-required) */}
         <DepositDisputesFeed
           disputes={gameState.depositDisputes || []}
           onDispute={gameState.disputeDeposit}
           onDismiss={gameState.dismissDispute}
         />
 
-        {/* Tenant concerns feed */}
-        {gameState.ownedProperties.length > 0 && (
-          <TenantConcernsFeed
-            concerns={(gameState.tenantConcerns || []).map((c: any) => ({
-              ...c,
-              // store keeps pennies — feed expects pennies for the cost too (uses fromPennies internally)
-            }))}
-            ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
-            playerCash={gameState.cash * 100} // pounds → pennies for comparison
-            monthsPlayed={gameState.monthsPlayed}
-            onResolve={gameState.resolveTenantConcern}
-            onSnooze={gameState.dismissTenantConcern}
-          />
-        )}
-
-        {/* Activity / history feed */}
-        <ActivityFeed
+        {/* Operations Center — combines conveyancing, planning, renovations, concerns, activity */}
+        <OperationsCenter
           monthsPlayed={gameState.monthsPlayed}
+          conveyancing={gameState.conveyancing || []}
+          renovations={gameState.renovations || []}
+          planningApplications={(gameState as any).planningApplications || []}
+          tenantConcerns={(gameState.tenantConcerns || []) as any}
+          ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
+          ownedPropertiesFull={gameState.ownedProperties}
+          playerCash={gameState.cash * 100}
+          onResolveConcern={gameState.resolveTenantConcern}
+          onSnoozeConcern={gameState.dismissTenantConcern}
           tenantHistory={(gameState as any).tenantHistory || []}
           tenantEvents={gameState.tenantEvents}
           economicEvents={gameState.economicEvents}
-          renovations={gameState.renovations || []}
-          conveyancing={gameState.conveyancing || []}
           taxRecords={gameState.taxRecords || []}
-          ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
         />
 
         {/* Listed Properties */}
