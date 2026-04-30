@@ -173,7 +173,7 @@ export function GameStats({
             <div className="text-xl font-bold text-foreground">
               {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">
                 Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
               </span>
@@ -186,6 +186,24 @@ export function GameStats({
                 )}>
                   LTV: {portfolioLTV.toFixed(0)}%
                 </span>
+              )}
+              {totalMonthlyExpenses > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-xs font-semibold inline-flex items-center gap-1 cursor-help",
+                        dtiColor
+                      )}>
+                        DTI: {Math.round(dtiRatio)}%
+                        <Info className="h-3 w-3 opacity-70" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[250px]">
+                      <p className="text-xs">DTI is the share of your rental income that goes to debt payments. Above 80% puts you at high risk if interest rates rise.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               <CreditImprovementGuide
                 creditScore={creditScore}
