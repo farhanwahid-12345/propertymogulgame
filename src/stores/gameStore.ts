@@ -1201,11 +1201,16 @@ export const useGameStore = create<GameState & GameActions>()(
           };
         });
 
-        // Annual rent uplift (kept on its own yearly schedule)
+        // Annual rent uplift — only vacant properties get auto-increase.
+        // Sitting tenants keep their agreed rent (use Section 13 to raise).
         let newLastYearlyGrowth = prev.lastYearlyGrowth;
         if (newMonthNumber > 0 && newMonthNumber % 12 === 0 && newMonthNumber !== prev.lastYearlyGrowth) {
           const rentIncreaseRate = 0.03;
+          let vacantCount = 0;
           updatedOwnedProperties = updatedOwnedProperties.map(property => {
+            const hasTenant = newTenants.some(t => t.propertyId === property.id);
+            if (hasTenant) return property; // sitting tenant — rent locked
+            vacantCount++;
             const newBaseRent = Math.floor((property.baseRent || property.monthlyIncome) * (1 + rentIncreaseRate));
             return {
               ...property,
@@ -1215,7 +1220,9 @@ export const useGameStore = create<GameState & GameActions>()(
             };
           });
           newLastYearlyGrowth = newMonthNumber;
-          showToast("Annual Rent Uplift!", `Rents increased by 3% across your portfolio.`);
+          if (vacantCount > 0) {
+            showToast("Market Rent Uplift", `Market rents rose 3% on ${vacantCount} vacant propert${vacantCount === 1 ? 'y' : 'ies'}.`);
+          }
         }
 
         // Fluctuate provider rates
