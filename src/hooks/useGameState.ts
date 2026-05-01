@@ -105,14 +105,19 @@ export function useGameState() {
 
   // Cash held in escrow on in-flight buys still belongs to the player —
   // include it so net worth doesn't dip during conveyancing.
-  const conveyancingRaw = Array.isArray(store.conveyancing) ? store.conveyancing : [];
+   const conveyancingRaw = Array.isArray(store.conveyancing) ? store.conveyancing : [];
   const inflightBuyCapital = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
-  // Net worth = cash + in-flight buying escrow + Σ property value − Σ mortgage debt − overdraft drawn.
+  // Active renovations represent capital already spent that will convert to
+  // property value on completion — treat as work-in-progress asset so net
+  // worth doesn't artificially dip while renovations are underway.
+  const renovationsRaw = Array.isArray(store.renovations) ? store.renovations : [];
+  const renovationWIP = renovationsRaw.reduce((sum: number, r: any) => sum + (r.type?.cost || 0), 0);
+  // Net worth = cash + in-flight buying escrow + renovation WIP + Σ property value − Σ mortgage debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps.
-  const netWorth = cash + inflightBuyCapital + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
+  const netWorth = cash + inflightBuyCapital + renovationWIP + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
   const nowTs = Date.now();
   const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
   const conveyancingPropertyIds = new Set(
