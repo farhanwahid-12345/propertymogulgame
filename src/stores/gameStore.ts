@@ -1359,20 +1359,30 @@ export const useGameStore = create<GameState & GameActions>()(
                 const valueCap = Math.round(purchaseBasis * 2.5);
                 const raw = Math.floor(p.value * 1.04);
                 const newValue = Math.min(clampSwing(p.value, raw), valueCap);
+                const hasTenant = newTenants.some(t => t.propertyId === p.id);
                 return {
                   ...p, value: newValue,
                   marketValue: Math.floor((p.marketValue || p.value) * 1.04),
-                  monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
-                  baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                  // Only raise rent on vacant properties — sitting tenants keep agreed rent
+                  ...(hasTenant ? {} : {
+                    monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
+                    baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                  }),
                 };
               });
             } else if (chosen.type === 'recession') {
               eventRateAdjust = 0.01;
-              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
-                marketValue: Math.floor((p.marketValue || p.value) * 0.95),
-                monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
-                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
+              updatedOwnedProperties = updatedOwnedProperties.map(p => {
+                const hasTenant = newTenants.some(t => t.propertyId === p.id);
+                return {
+                  ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
+                  marketValue: Math.floor((p.marketValue || p.value) * 0.95),
+                  // Only adjust rent on vacant properties — sitting tenants keep agreed rent
+                  ...(hasTenant ? {} : {
+                    monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
+                    baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
+                  }),
+                };
               }));
             } else if (chosen.type === 'mild_correction') {
               updatedOwnedProperties = updatedOwnedProperties.map(p => ({
