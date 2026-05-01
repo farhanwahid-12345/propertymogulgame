@@ -1265,7 +1265,7 @@ export const useGameStore = create<GameState & GameActions>()(
               "📋 Income Tax Due!",
               `Annual income tax: £${fromPennies(taxPaid).toLocaleString()} (gross tax £${fromPennies(tax).toLocaleString()} − §24 credit £${fromPennies(section24Credit).toLocaleString()})`,
             );
-            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Annual income tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
+            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Year ${currentTaxYear} income tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           } else {
             // LTD: mortgage interest IS deductible — pass it through so it isn't
             // double-counted (cash already reflects mortgage *payments*, not just interest).
@@ -1278,7 +1278,7 @@ export const useGameStore = create<GameState & GameActions>()(
               "📋 Corporation Tax Due!",
               `Annual corporation tax: £${fromPennies(taxPaid).toLocaleString()} on profit £${fromPennies(Math.max(0, accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses)).toLocaleString()}`,
             );
-            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Annual corporation tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
+            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Year ${currentTaxYear} corporation tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           }
 
           newTotalTaxPaid += taxPaid;
