@@ -153,6 +153,7 @@ function sanitizeTenantRecord(record: any, monthsPlayed: number): PropertyTenant
     satisfaction: asNumber(record?.satisfaction, 80),
     lastSatisfactionUpdate: asNumber(record?.lastSatisfactionUpdate, monthsPlayed),
     satisfactionReasons: Array.isArray(record?.satisfactionReasons) ? record.satisfactionReasons : [],
+    moveInMonth: typeof record?.moveInMonth === 'number' ? record.moveInMonth : 0,
     depositHeld: asNumber(record?.depositHeld, 0),
     evictionNoticeMonth: typeof record?.evictionNoticeMonth === 'number' ? record.evictionNoticeMonth : undefined,
     evictionGround: ['rent_arrears', 'landlord_sale', 'landlord_move_in', 'antisocial_behaviour'].includes(record?.evictionGround)
@@ -888,9 +889,10 @@ export const useGameStore = create<GameState & GameActions>()(
             delta -= 10; reasons.push({ reason: 'Unrepaired damage', delta: -10 });
           }
 
-          // Recent rent hike (within last 3 months)
-          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed) {
-            delta -= 8; reasons.push({ reason: 'Recent rent increase', delta: -8 });
+          // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
+          const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
+          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+            delta -= 4; reasons.push({ reason: 'Recent rent increase', delta: -4 });
           }
 
           // Drift back toward 70 baseline if no negative pressure
@@ -1200,11 +1202,16 @@ export const useGameStore = create<GameState & GameActions>()(
           };
         });
 
-        // Annual rent uplift (kept on its own yearly schedule)
+        // Annual rent uplift — only vacant properties get auto-increase.
+        // Sitting tenants keep their agreed rent (use Section 13 to raise).
         let newLastYearlyGrowth = prev.lastYearlyGrowth;
         if (newMonthNumber > 0 && newMonthNumber % 12 === 0 && newMonthNumber !== prev.lastYearlyGrowth) {
           const rentIncreaseRate = 0.03;
+          let vacantCount = 0;
           updatedOwnedProperties = updatedOwnedProperties.map(property => {
+            const hasTenant = newTenants.some(t => t.propertyId === property.id);
+            if (hasTenant) return property; // sitting tenant — rent locked
+            vacantCount++;
             const newBaseRent = Math.floor((property.baseRent || property.monthlyIncome) * (1 + rentIncreaseRate));
             return {
               ...property,
@@ -1214,7 +1221,9 @@ export const useGameStore = create<GameState & GameActions>()(
             };
           });
           newLastYearlyGrowth = newMonthNumber;
-          showToast("Annual Rent Uplift!", `Rents increased by 3% across your portfolio.`);
+          if (vacantCount > 0) {
+            showToast("Market Rent Uplift", `Market rents rose 3% on ${vacantCount} vacant propert${vacantCount === 1 ? 'y' : 'ies'}.`);
+          }
         }
 
         // Fluctuate provider rates
@@ -1257,7 +1266,7 @@ export const useGameStore = create<GameState & GameActions>()(
               "📋 Income Tax Due!",
               `Annual income tax: £${fromPennies(taxPaid).toLocaleString()} (gross tax £${fromPennies(tax).toLocaleString()} − §24 credit £${fromPennies(section24Credit).toLocaleString()})`,
             );
-            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Annual income tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
+            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Year ${currentTaxYear} income tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           } else {
             // LTD: mortgage interest IS deductible — pass it through so it isn't
             // double-counted (cash already reflects mortgage *payments*, not just interest).
@@ -1270,7 +1279,7 @@ export const useGameStore = create<GameState & GameActions>()(
               "📋 Corporation Tax Due!",
               `Annual corporation tax: £${fromPennies(taxPaid).toLocaleString()} on profit £${fromPennies(Math.max(0, accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses)).toLocaleString()}`,
             );
-            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Annual corporation tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
+            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Year ${currentTaxYear} corporation tax (rent £${fromPennies(accumulatedGrossRent).toLocaleString()})` });
           }
 
           newTotalTaxPaid += taxPaid;
@@ -1351,21 +1360,31 @@ export const useGameStore = create<GameState & GameActions>()(
                 const valueCap = Math.round(purchaseBasis * 2.5);
                 const raw = Math.floor(p.value * 1.04);
                 const newValue = Math.min(clampSwing(p.value, raw), valueCap);
+                const hasTenant = newTenants.some(t => t.propertyId === p.id);
                 return {
                   ...p, value: newValue,
                   marketValue: Math.floor((p.marketValue || p.value) * 1.04),
-                  monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
-                  baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                  // Only raise rent on vacant properties — sitting tenants keep agreed rent
+                  ...(hasTenant ? {} : {
+                    monthlyIncome: Math.floor(p.monthlyIncome * 1.02),
+                    baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 1.02),
+                  }),
                 };
               });
             } else if (chosen.type === 'recession') {
               eventRateAdjust = 0.01;
-              updatedOwnedProperties = updatedOwnedProperties.map(p => ({
-                ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
-                marketValue: Math.floor((p.marketValue || p.value) * 0.95),
-                monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
-                baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
-              }));
+              updatedOwnedProperties = updatedOwnedProperties.map(p => {
+                const hasTenant = newTenants.some(t => t.propertyId === p.id);
+                return {
+                  ...p, value: clampSwing(p.value, Math.floor(p.value * 0.95)),
+                  marketValue: Math.floor((p.marketValue || p.value) * 0.95),
+                  // Only adjust rent on vacant properties — sitting tenants keep agreed rent
+                  ...(hasTenant ? {} : {
+                    monthlyIncome: Math.floor(p.monthlyIncome * 0.98),
+                    baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
+                  }),
+                };
+              });
             } else if (chosen.type === 'mild_correction') {
               updatedOwnedProperties = updatedOwnedProperties.map(p => ({
                 ...p, value: clampSwing(p.value, Math.floor(p.value * 0.98)),
@@ -2146,6 +2165,7 @@ export const useGameStore = create<GameState & GameActions>()(
           satisfaction: 80,
           lastSatisfactionUpdate: prev.monthsPlayed,
           satisfactionReasons: [],
+          moveInMonth: prev.monthsPlayed,
           depositHeld: requiredDeposit,
         };
         const updatedTenants = existingIdx >= 0
