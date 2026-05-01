@@ -888,9 +888,10 @@ export const useGameStore = create<GameState & GameActions>()(
             delta -= 10; reasons.push({ reason: 'Unrepaired damage', delta: -10 });
           }
 
-          // Recent rent hike (within last 3 months)
-          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed) {
-            delta -= 8; reasons.push({ reason: 'Recent rent increase', delta: -8 });
+          // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
+          const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
+          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+            delta -= 4; reasons.push({ reason: 'Recent rent increase', delta: -4 });
           }
 
           // Drift back toward 70 baseline if no negative pressure
@@ -2146,6 +2147,7 @@ export const useGameStore = create<GameState & GameActions>()(
           satisfaction: 80,
           lastSatisfactionUpdate: prev.monthsPlayed,
           satisfactionReasons: [],
+          moveInMonth: prev.monthsPlayed,
           depositHeld: requiredDeposit,
         };
         const updatedTenants = existingIdx >= 0

@@ -114,6 +114,8 @@ export interface PropertyTenant {
   lastSatisfactionUpdate: number;
   /** Reasons array for the last satisfaction adjustment, surfaced in tooltips. */
   satisfactionReasons?: Array<{ reason: string; delta: number }>;
+  /** monthsPlayed when the tenant moved in. Used to avoid penalising new tenants for pre-existing rent increases. */
+  moveInMonth?: number;
   /** Deposit held under TDS (pennies). 5 weeks of rent on tenancy start. 0 for grandfathered tenants. */
   depositHeld: number;
   /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
