@@ -1383,7 +1383,7 @@ export const useGameStore = create<GameState & GameActions>()(
                     baseRent: Math.floor((p.baseRent || p.monthlyIncome) * 0.98),
                   }),
                 };
-              }));
+              });
             } else if (chosen.type === 'mild_correction') {
               updatedOwnedProperties = updatedOwnedProperties.map(p => ({
                 ...p, value: clampSwing(p.value, Math.floor(p.value * 0.98)),
