@@ -1173,7 +1173,7 @@ export const useGameStore = create<GameState & GameActions>()(
           return total + p.value - (m?.remainingBalance || 0);
         }, 0);
         // Active renovations are capital already spent — include as WIP asset
-        const renovationWIP = activeRenovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
+        const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
         // Subtract drawn overdraft so leveling-up doesn't ignore borrowed money.
         const netWorth = newCashBeforeTax + propertyEquity + renovationWIP - prev.overdraftUsed;
         let newLevel = prev.level;
