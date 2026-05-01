@@ -1,51 +1,50 @@
-## Goal
-
-Reduce vertical clutter on the main page by merging the four standalone panels (Conveyancing, Planning Applications, Tenant Concerns, Activity) into a single compact tabbed component, shrink the DTI bar into an inline pill, and stop surfacing refused planning applications outside the renovation flow.
 
 ## Changes
 
-### 1. New `OperationsCenter` component
-Create `src/components/ui/operations-center.tsx`. Single glass card with:
+### 1. Fix tenant satisfaction: stop penalising new move-ins for "recent rent increase"
 
-- A header showing "Operations" plus a total count badge.
-- A horizontal tab strip (using existing `Tabs`) with these tabs, each showing a count badge:
-  - **Conveyancing** — current `ConveyancingTracker` body
-  - **Planning** — pending-only planning applications (refused entries excluded — see #4)
-  - **Renovations** — current `RenovationTracker` "Active Renovations" body
-  - **Concerns** — current `TenantConcernsFeed` body
-  - **Activity** — current `ActivityFeed` body (existing internal category filter is preserved)
-- Tabs with zero items render a muted empty state. If everything is empty, the whole card collapses to a single thin "All quiet" line so it doesn't waste space.
-- Default active tab = first non-empty tab in the order above; falls back to Activity.
-- Body uses a fixed max height (`max-h-[360px]`) with internal scroll so the card never grows taller than the activity feed used to be.
+**Problem:** When a tenant moves in, `lastRentIncrease` may have been set recently (from the annual uplift or a Section 13 on the previous tenant). The new tenant then gets hit with the -8 "Recent rent increase" satisfaction penalty even though they agreed to that rent when they moved in.
 
-### 2. Wire it into `src/pages/Index.tsx`
-Replace the current sequence of `<ConveyancingTracker>`, `<RenovationTracker>`, `<TenantConcernsFeed>`, `<ActivityFeed>` (lines ~238–293) with a single `<OperationsCenter>` that receives all the props those components currently take. `EvictionTimelineFeed` and `DepositDisputesFeed` stay outside the center — they are action-required dialogs, not feeds.
+**Fix** (in `src/stores/gameStore.ts`, satisfaction loop ~line 892):
+- Add a guard: only apply the "recent rent increase" penalty if the tenant's `moveInMonth` is **before** the `lastRentIncrease` date. If the tenant moved in at or after the last increase, they accepted that rent voluntarily — no penalty.
+- Store a `moveInMonth` field on each tenant record (set to `monthsPlayed` in `selectTenant`).
 
-### 3. Shrink the DTI display
-In `src/components/ui/game-stats.tsx` (lines ~209–244):
+Also reduce the penalty from -8 to -4 per month (3 months duration), making it less punishing overall.
 
-- Remove the standalone full-width DTI card.
-- Replace it with an inline pill rendered next to the existing LTV pill in the header row (around line 180). Format: `DTI 42%` with the same colour rules (success / yellow / danger).
-- Move the explanatory tooltip onto the pill (Info icon next to the value).
-- Drop the 0%–80% scale labels entirely; the colour conveys the risk band.
+### 2. Stop automatic rent increases on player-owned properties
 
-### 4. Hide refused planning applications from the main UI
-In `src/components/ui/renovation-tracker.tsx`:
+**Problem:** Lines 1203-1218 apply a blanket 3% annual rent uplift to all owned properties, including those with sitting tenants. Per the user's rules, rent on occupied properties should only go up via Section 13 or tenant turnover.
 
-- Change `visibleApplications` filter to `a.status === 'pending'` only (drop the 2-month refused window).
-- Refused applications continue to exist in state and are surfaced inside the renovation sub-menu (the existing `RenovationDialog` already reads `planningApplications` and shows the cooldown there).
+**Fix:**
+- The annual rent uplift loop should only increase `baseRent` / `monthlyIncome` on **vacant** properties (no tenant and not in void). This keeps the market reference rising so new tenants get current rates, but sitting tenants keep their agreed rent.
+- Similarly for macro events (tech_boom +2%, recession -2% at lines 1357/1366): these should only adjust `baseRent`/`monthlyIncome` on vacant properties. For occupied properties, only `marketValue` and `value` change — rent stays locked until tenant turns over or Section 13 is served.
 
-Verify: read `src/components/ui/renovation-dialog.tsx` during implementation to confirm the refused state is shown when the user opens a renovation; if not, add a small "Refused — Xmo cooldown remaining" line inside that dialog so the player still sees why an option is blocked.
+### 3. Verify taxation is not double-applied
 
-## Files touched
+**Finding:** Tax logic looks correct — it fires once per game-year in April (line 1246 checks `currentTaxYear > lastTaxYear`). The yearly accumulators reset after each tax event. There is no double-taxation bug.
 
-- **new**: `src/components/ui/operations-center.tsx`
-- **edit**: `src/pages/Index.tsx` — swap four panels for one
-- **edit**: `src/components/ui/game-stats.tsx` — DTI to inline pill
-- **edit**: `src/components/ui/renovation-tracker.tsx` — drop refused-app window
-- **edit**: `src/components/ui/renovation-dialog.tsx` — ensure refusal cooldown visible inside the renovation flow (only if not already)
+However, the activity feed shows two separate "Annual income tax" entries for different rent amounts in the screenshot. This is likely because two tax years passed (the game ran for 24+ months). No code change needed here, but I will add the tax year number to each tax record description so the player can distinguish them (e.g., "Year 2 income tax").
 
-## Out of scope
+### Files to modify
 
-- No changes to game logic, store, or types.
-- `ConveyancingTracker`, `RenovationTracker`, `TenantConcernsFeed`, `ActivityFeed` remain as components — `OperationsCenter` composes them so we don't duplicate markup. Their outer "glass card" wrappers will be removed via a `bare` prop (or by rendering their inner content) so we don't get nested cards inside the tabs.
+- `src/stores/gameStore.ts` — all three changes above
+- `src/types/game.ts` — add `moveInMonth` to `PropertyTenant` type
+
+### Technical details
+
+**moveInMonth field:**
+```
+// In PropertyTenant type
+moveInMonth?: number;
+```
+
+Set in `selectTenant` action and tenant hydration. Existing tenants without it default to 0 (will never trigger the guard, so they behave as before — safe fallback).
+
+**Annual uplift guard:**
+```
+// Only uplift vacant properties
+const hasTenant = newTenants.some(t => t.propertyId === property.id);
+if (hasTenant) return property; // sitting tenant — rent locked
+```
+
+**Macro event guard:** Same pattern — skip `monthlyIncome`/`baseRent` changes for properties with a sitting tenant.
