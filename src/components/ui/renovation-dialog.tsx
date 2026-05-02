@@ -157,7 +157,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.80,
+    baseApprovalProb: 0.85,
   },
   {
     id: "rear_extension",
@@ -175,7 +175,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.70,
+    baseApprovalProb: 0.80,
   },
   {
     id: "conservatory",
@@ -193,7 +193,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.90,
+    baseApprovalProb: 0.92,
   },
   {
     id: "convert_hmo_4",
@@ -212,7 +212,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 500,
-    baseApprovalProb: 0.65,
+    baseApprovalProb: 0.82,
   },
   {
     id: "convert_hmo_6",
@@ -231,7 +231,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 3,
     planningFee: 500,
-    baseApprovalProb: 0.50,
+    baseApprovalProb: 0.60,
   },
   {
     id: "convert_flats",
@@ -249,7 +249,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 3,
     planningFee: 500,
-    baseApprovalProb: 0.55,
+    baseApprovalProb: 0.65,
   },
   {
     id: "convert_commercial_to_residential",
@@ -266,7 +266,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 0,
-    baseApprovalProb: 0.75,
+    baseApprovalProb: 0.82,
   },
 ];
 
