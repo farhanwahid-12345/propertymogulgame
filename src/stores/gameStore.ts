@@ -2582,24 +2582,20 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Compute approval probability with modifiers
-        const baseProb = renovationType.baseApprovalProb ?? 0.7;
-        const ceilingPounds = getCeilingPrice({ neighborhood: property.neighborhood, type: property.type });
-        const valuePounds = fromPennies(property.value);
-        let prob = baseProb;
-        // Over-development penalty
-        if (valuePounds > 0.7 * ceilingPounds) prob -= 0.10;
-        // Conservative areas / luxury type stricter on conversions/extensions
-        if ((property.type === 'luxury' || property.neighborhood === 'Nunthorpe' || property.neighborhood === 'Marton')
-            && (renovationType.category === 'conversion' || renovationType.category === 'extension')) {
-          prob -= 0.10;
-        }
-        // Track-record adjustment (capped ±10%)
+        // Compute approval probability via shared helper (matches dialog UI exactly)
         const history = prev.planningApplications || [];
-        const approvals = history.filter(a => a.status === 'approved').length;
-        const refusals = history.filter(a => a.status === 'refused').length;
-        const trackAdj = Math.max(-0.10, Math.min(0.10, approvals * 0.01 - refusals * 0.02));
-        prob = Math.max(0.05, Math.min(0.95, prob + trackAdj));
+        const approvalsCount = history.filter(a => a.status === 'approved').length;
+        const refusalsCount = history.filter(a => a.status === 'refused').length;
+        const valuePounds = fromPennies(property.value);
+        const { prob } = computePlanningApprovalProbability({
+          baseProb: renovationType.baseApprovalProb,
+          propertyValuePounds: valuePounds,
+          neighborhood: property.neighborhood,
+          propertyType: property.type,
+          renovationCategory: renovationType.category,
+          approvalsCount,
+          refusalsCount,
+        });
 
         // Roll the outcome NOW, reveal at decisionMonth
         const approved = Math.random() < prob;
