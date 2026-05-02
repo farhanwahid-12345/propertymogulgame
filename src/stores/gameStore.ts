@@ -1498,12 +1498,22 @@ export const useGameStore = create<GameState & GameActions>()(
                 ? { condition: 'premium' as Property['condition'] }
                 : {};
 
+            // Renters' Rights Bill: a renovation does NOT auto-raise rent
+            // for a sitting tenant. baseRent is updated (so the next tenant /
+            // Section 13 review uses the new market rent), but monthlyIncome
+            // only bumps when the property is vacant.
+            const propertyOccupied = prev.tenants.some(t => t.propertyId === propRecord.id);
+            const newBaseRent = (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain;
+            const newMonthlyIncome = propertyOccupied
+              ? updatedProperties[idx].monthlyIncome
+              : updatedProperties[idx].monthlyIncome + actualRentGain;
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
               marketValue: (updatedProperties[idx].marketValue || updatedProperties[idx].value) + actualValueGain,
-              monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
-              baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
+              monthlyIncome: newMonthlyIncome,
+              baseRent: newBaseRent,
               monthsSinceLastRenovation: 0,
               completedRenovationIds: [
                 ...(updatedProperties[idx].completedRenovationIds || []),
@@ -1514,11 +1524,14 @@ export const useGameStore = create<GameState & GameActions>()(
             };
             const expectedValue = renovation.type.valueIncrease;
             const actualValuePounds = fromPennies(actualValueGain);
+            const rentNote = propertyOccupied && actualRentGain > 0
+              ? ` Sitting tenant on existing rent — serve Section 13 to raise to £${fromPennies(newBaseRent).toLocaleString()}/mo.`
+              : '';
             showToast(
               `Renovation Complete (${outcomeNote})!`,
-              valueMult === 1
+              (valueMult === 1
                 ? `${renovation.type.name} on ${updatedProperties[idx].name} delivered the full +£${expectedValue.toLocaleString()} uplift.`
-                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`,
+                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
           }
