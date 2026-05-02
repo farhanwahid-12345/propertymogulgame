@@ -61,6 +61,8 @@ interface RenovationDialogProps {
   neighborhood?: string;
   /** Pending/approved planning applications for this property. */
   planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** Full planning application history across the player's portfolio — used to compute the live track-record adjustment. */
+  planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
   /** Current in-game month — for displaying "decision in N mo" countdowns. */
   monthsPlayed?: number;
   /** True if this property is in a planning_cooldown lock (recent refusal). */
