@@ -293,6 +293,7 @@ export function RenovationDialog({
   currentSubtype,
   neighborhood,
   planningApplications = [],
+  planningHistory = [],
   monthsPlayed = 0,
   inPlanningCooldown = false,
 }: RenovationDialogProps) {
