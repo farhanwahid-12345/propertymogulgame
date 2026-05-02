@@ -542,6 +542,7 @@ export const PropertyCard = memo(function PropertyCard({
                       currentSubtype={property.subtype}
                       neighborhood={property.neighborhood}
                       planningApplications={planningApplications}
+                      planningHistory={planningHistory}
                       monthsPlayed={monthsPlayed}
                       inPlanningCooldown={inPlanningCooldown}
                     />
