@@ -33,6 +33,7 @@ import {
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
+import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
