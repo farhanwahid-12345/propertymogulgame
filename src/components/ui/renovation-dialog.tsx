@@ -396,10 +396,10 @@ export function RenovationDialog({
                     ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
                     : { uplift: valueUp, diminishingFactor: 1 };
 
-                  // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
+                  // Range reflects realistic outcome distribution (5% write-off → 60% on-spec)
                   const valueLow = Math.round(cappedValueUp * 0.3);
                   const valueHigh = cappedValueUp;
-                  const valueTypical = Math.round(cappedValueUp * 0.85);
+                  const expectedValueUp = Math.round(cappedValueUp * RENOVATION_EXPECTED_MULTIPLIER);
 
                   return (
                     <Card
