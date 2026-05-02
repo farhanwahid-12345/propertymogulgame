@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from "@/lib/engine/renovation";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
 import { getCeilingPrice } from "@/lib/engine/constants";
 
 export interface RenovationType {
@@ -396,10 +396,10 @@ export function RenovationDialog({
                     ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
                     : { uplift: valueUp, diminishingFactor: 1 };
 
-                  // Expected ranges based on ROI variability roll (60% full, 25% × 0.7, 10% × 0.3, 5% × 0)
+                  // Range reflects realistic outcome distribution (5% write-off → 60% on-spec)
                   const valueLow = Math.round(cappedValueUp * 0.3);
                   const valueHigh = cappedValueUp;
-                  const valueTypical = Math.round(cappedValueUp * 0.85);
+                  const expectedValueUp = Math.round(cappedValueUp * RENOVATION_EXPECTED_MULTIPLIER);
 
                   return (
                     <Card
@@ -523,36 +523,53 @@ export function RenovationDialog({
                           </div>
 
                           <div className="text-[10px] text-muted-foreground italic">
-                            Outcomes vary: typical ≈ £{valueTypical.toLocaleString()}, 5% chance of net loss.
+                            Outcomes vary: expected ≈ £{expectedValueUp.toLocaleString()}, 5% chance of total write-off.
                           </div>
 
                           <div className="pt-2 border-t space-y-1">
                             {(() => {
-                              const incomeAnnual = rentUp * 12 * 0.85;
+                              // Mirror engine completion: rent uplift also tapers with ceiling
+                              const rentFactor = 0.5 + 0.5 * diminishingFactor;
+                              const expectedRent = rentUp * RENOVATION_EXPECTED_MULTIPLIER * rentFactor;
+                              const incomeAnnual = expectedRent * 12 * 0.85; // 85% occupancy
                               const incomeRoi = (incomeAnnual / Math.max(1, cost)) * 100;
-                              const capitalExpected = cappedValueUp * 0.85;
-                              const capitalRoi = (capitalExpected / Math.max(1, cost)) * 100;
-                              const paybackMonths = Math.max(1, Math.round(cost / Math.max(1, rentUp * 0.85)));
+                              // NET capital ROI — subtracts cost so loss-making renos go red/negative
+                              const capitalRoiNet = ((expectedValueUp - cost) / Math.max(1, cost)) * 100;
+                              // 5-year combined: capital + 60mo rent (net of voids) − cost
+                              const combined5yr = ((expectedValueUp + expectedRent * 60 * 0.85 - cost) / Math.max(1, cost)) * 100;
+                              const paybackMonths = expectedRent > 0
+                                ? Math.max(1, Math.round(cost / (expectedRent * 0.85)))
+                                : Infinity;
+                              const capitalColour =
+                                capitalRoiNet >= 0 ? "text-success" :
+                                capitalRoiNet >= -10 ? "text-amber-300" :
+                                "text-danger";
+                              const combinedColour =
+                                combined5yr >= 20 ? "text-success" :
+                                combined5yr >= 0 ? "text-amber-300" :
+                                "text-danger";
                               const reduced = ceilingPrice > 0 && diminishingFactor < 0.95;
-                              const severe = ceilingPrice > 0 && diminishingFactor < 0.3;
-                              const colourClass = severe ? "text-danger" : reduced ? "text-amber-300" : "text-muted-foreground";
                               const reductionPct = Math.round((1 - diminishingFactor) * 100);
                               return (
                                 <>
-                                  <div className={cn("flex justify-between text-xs", colourClass)}>
+                                  <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>Income ROI / yr:</span>
                                     <span>{incomeRoi.toFixed(1)}%</span>
                                   </div>
-                                  <div className={cn("flex justify-between text-xs", colourClass)}>
-                                    <span>Capital uplift (expected):</span>
+                                  <div className={cn("flex justify-between text-xs font-semibold", capitalColour)}>
+                                    <span>Capital ROI (net):</span>
                                     <span>
-                                      {capitalRoi.toFixed(1)}%
-                                      {reduced && <span className="ml-1 opacity-80">(−{reductionPct}% ceiling)</span>}
+                                      {capitalRoiNet >= 0 ? "+" : ""}{capitalRoiNet.toFixed(1)}%
+                                      {reduced && <span className="ml-1 opacity-80 font-normal">(−{reductionPct}% ceiling)</span>}
                                     </span>
+                                  </div>
+                                  <div className={cn("flex justify-between text-xs", combinedColour)}>
+                                    <span>5-yr total ROI:</span>
+                                    <span>{combined5yr >= 0 ? "+" : ""}{combined5yr.toFixed(1)}%</span>
                                   </div>
                                   <div className="flex justify-between text-[10px] text-muted-foreground">
                                     <span>Payback (rent only):</span>
-                                    <span>~{paybackMonths} mo</span>
+                                    <span>{Number.isFinite(paybackMonths) ? `~${paybackMonths} mo` : "—"}</span>
                                   </div>
                                 </>
                               );

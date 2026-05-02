@@ -64,11 +64,11 @@ export function scaleRenovationValue(baseValue: number, inputs: RenovationScaleI
 
 /**
  * Shrinks a renovation's value uplift as the current value approaches the
- * postcode/area ceiling. Buyers cap out — putting £50k of finishes into a
- * back-to-back terrace doesn't return 1:1 once the area's ceiling is in sight.
+ * postcode/area ceiling. Tempered curve — buyers still pay something for
+ * a quality finish even at ceiling.
  *
- *   ratio ≤ 0.6 → factor 1.0 (full uplift)
- *   ratio  1.0 → factor 0.1 (90% diminishing)
+ *   ratio ≤ 0.75 → factor 1.0 (full uplift)
+ *   ratio  1.0  → factor 0.35 (floor)
  *   linear taper between
  */
 export function applyCeilingDiminishingReturns(
@@ -79,10 +79,19 @@ export function applyCeilingDiminishingReturns(
   if (ceilingPrice <= 0) return { uplift: rawUplift, diminishingFactor: 1 };
   const ratio = Math.min(1, currentValue / ceilingPrice);
   let factor: number;
-  if (ratio <= 0.6) factor = 1.0;
-  else factor = Math.max(0.1, 1.0 - ((ratio - 0.6) / 0.4) * 0.9);
+  if (ratio <= 0.75) factor = 1.0;
+  else factor = Math.max(0.35, 1.0 - ((ratio - 0.75) / 0.25) * 0.65);
   return { uplift: Math.round(rawUplift * factor), diminishingFactor: factor };
 }
+
+/**
+ * Probability-weighted expected outcome multiplier for a renovation.
+ * Mirrors the engine's completion roll in `gameStore.ts`:
+ *   60% × 1.0 + 25% × 0.7 + 10% × 0.3 + 5% × 0 = 0.805
+ * Exported so the dialog preview reports the same expected value the engine
+ * delivers on average.
+ */
+export const RENOVATION_EXPECTED_MULTIPLIER = 0.805;
 
 /**
  * Returns true when the property can realistically be upgraded to "premium"
