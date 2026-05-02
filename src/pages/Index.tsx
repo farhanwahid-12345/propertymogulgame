@@ -380,6 +380,7 @@ const Index = () => {
                     rentArrearsCount={arrearsCount}
                     applyRentIncrease={gameState.applyRentIncrease}
                     planningApplications={propertyApps}
+                    planningHistory={(gameState as any).planningApplications || []}
                     inPlanningCooldown={inPlanningCooldown}
                   />
                 );

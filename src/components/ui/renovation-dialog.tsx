@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
+import { computePlanningApprovalProbability } from "@/lib/engine/planning";
 import { getCeilingPrice } from "@/lib/engine/constants";
 
 export interface RenovationType {
@@ -61,6 +62,8 @@ interface RenovationDialogProps {
   neighborhood?: string;
   /** Pending/approved planning applications for this property. */
   planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** Full planning application history across the player's portfolio — used to compute the live track-record adjustment. */
+  planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
   /** Current in-game month — for displaying "decision in N mo" countdowns. */
   monthsPlayed?: number;
   /** True if this property is in a planning_cooldown lock (recent refusal). */
@@ -157,7 +160,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.80,
+    baseApprovalProb: 0.85,
   },
   {
     id: "rear_extension",
@@ -175,7 +178,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.70,
+    baseApprovalProb: 0.80,
   },
   {
     id: "conservatory",
@@ -193,7 +196,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.90,
+    baseApprovalProb: 0.92,
   },
   {
     id: "convert_hmo_4",
@@ -212,7 +215,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 500,
-    baseApprovalProb: 0.65,
+    baseApprovalProb: 0.82,
   },
   {
     id: "convert_hmo_6",
@@ -231,7 +234,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 3,
     planningFee: 500,
-    baseApprovalProb: 0.50,
+    baseApprovalProb: 0.60,
   },
   {
     id: "convert_flats",
@@ -249,7 +252,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 3,
     planningFee: 500,
-    baseApprovalProb: 0.55,
+    baseApprovalProb: 0.65,
   },
   {
     id: "convert_commercial_to_residential",
@@ -266,7 +269,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 0,
-    baseApprovalProb: 0.75,
+    baseApprovalProb: 0.82,
   },
 ];
 
@@ -291,6 +294,7 @@ export function RenovationDialog({
   currentSubtype,
   neighborhood,
   planningApplications = [],
+  planningHistory = [],
   monthsPlayed = 0,
   inPlanningCooldown = false,
 }: RenovationDialogProps) {
@@ -470,12 +474,50 @@ export function RenovationDialog({
                             ⛔ Recent refusal — 6-mo cooldown before resubmission
                           </div>
                         )}
-                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (
-                          <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1">
-                            <FileText className="h-3 w-3 inline mr-1" />
-                            Submitting will charge a £{(renovation.planningFee ?? 250).toLocaleString()} non-refundable fee. Decision in ~{renovation.planningWaitMonths ?? 2} mo. Base approval ~{Math.round((renovation.baseApprovalProb ?? 0.7) * 100)}%.
-                          </div>
-                        )}
+                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (() => {
+                          // Live approval odds — matches the engine's roll exactly
+                          const approvalsCount = planningHistory.filter(a => a.status === 'approved').length;
+                          const refusalsCount = planningHistory.filter(a => a.status === 'refused').length;
+                          const { prob, base, modifiers } = computePlanningApprovalProbability({
+                            baseProb: renovation.baseApprovalProb,
+                            propertyValuePounds: propertyValue,
+                            neighborhood: neighborhood ?? '',
+                            propertyType: propertyType ?? 'residential',
+                            renovationCategory: renovation.category,
+                            approvalsCount,
+                            refusalsCount,
+                          });
+                          const pct = Math.round(prob * 100);
+                          const probColour = pct >= 75 ? 'text-success' : pct >= 50 ? 'text-amber-300' : 'text-danger';
+                          return (
+                            <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  Planning approval likelihood:
+                                </span>
+                                <span className={cn("font-semibold", probColour)}>{pct}%</span>
+                              </div>
+                              <div className="text-[10px] opacity-80 space-y-0.5">
+                                <div className="flex justify-between">
+                                  <span>Base ({renovation.category}):</span>
+                                  <span>{Math.round(base * 100)}%</span>
+                                </div>
+                                {modifiers.map((m, i) => (
+                                  <div key={i} className="flex justify-between">
+                                    <span>{m.label}:</span>
+                                    <span className={m.delta >= 0 ? 'text-success' : 'text-danger'}>
+                                      {m.delta >= 0 ? '+' : ''}{Math.round(m.delta * 100)}%
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="text-[10px] opacity-70">
+                                Fee £{(renovation.planningFee ?? 250).toLocaleString()} · decision in ~{renovation.planningWaitMonths ?? 2} mo
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Ceiling-price warning */}
                         {ceilingPrice > 0 && diminishingFactor < 0.95 && !completed && (

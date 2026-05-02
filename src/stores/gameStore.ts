@@ -33,6 +33,7 @@ import {
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
+import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
 function showToast(title: string, description: string, variant?: 'destructive') {
@@ -1497,12 +1498,22 @@ export const useGameStore = create<GameState & GameActions>()(
                 ? { condition: 'premium' as Property['condition'] }
                 : {};
 
+            // Renters' Rights Bill: a renovation does NOT auto-raise rent
+            // for a sitting tenant. baseRent is updated (so the next tenant /
+            // Section 13 review uses the new market rent), but monthlyIncome
+            // only bumps when the property is vacant.
+            const propertyOccupied = prev.tenants.some(t => t.propertyId === propRecord.id);
+            const newBaseRent = (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain;
+            const newMonthlyIncome = propertyOccupied
+              ? updatedProperties[idx].monthlyIncome
+              : updatedProperties[idx].monthlyIncome + actualRentGain;
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
               marketValue: (updatedProperties[idx].marketValue || updatedProperties[idx].value) + actualValueGain,
-              monthlyIncome: updatedProperties[idx].monthlyIncome + actualRentGain,
-              baseRent: (updatedProperties[idx].baseRent || updatedProperties[idx].monthlyIncome) + actualRentGain,
+              monthlyIncome: newMonthlyIncome,
+              baseRent: newBaseRent,
               monthsSinceLastRenovation: 0,
               completedRenovationIds: [
                 ...(updatedProperties[idx].completedRenovationIds || []),
@@ -1513,11 +1524,14 @@ export const useGameStore = create<GameState & GameActions>()(
             };
             const expectedValue = renovation.type.valueIncrease;
             const actualValuePounds = fromPennies(actualValueGain);
+            const rentNote = propertyOccupied && actualRentGain > 0
+              ? ` Sitting tenant on existing rent — serve Section 13 to raise to £${fromPennies(newBaseRent).toLocaleString()}/mo.`
+              : '';
             showToast(
               `Renovation Complete (${outcomeNote})!`,
-              valueMult === 1
+              (valueMult === 1
                 ? `${renovation.type.name} on ${updatedProperties[idx].name} delivered the full +£${expectedValue.toLocaleString()} uplift.`
-                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`,
+                : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
           }
@@ -2582,24 +2596,20 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
-        // Compute approval probability with modifiers
-        const baseProb = renovationType.baseApprovalProb ?? 0.7;
-        const ceilingPounds = getCeilingPrice({ neighborhood: property.neighborhood, type: property.type });
-        const valuePounds = fromPennies(property.value);
-        let prob = baseProb;
-        // Over-development penalty
-        if (valuePounds > 0.7 * ceilingPounds) prob -= 0.10;
-        // Conservative areas / luxury type stricter on conversions/extensions
-        if ((property.type === 'luxury' || property.neighborhood === 'Nunthorpe' || property.neighborhood === 'Marton')
-            && (renovationType.category === 'conversion' || renovationType.category === 'extension')) {
-          prob -= 0.10;
-        }
-        // Track-record adjustment (capped ±10%)
+        // Compute approval probability via shared helper (matches dialog UI exactly)
         const history = prev.planningApplications || [];
-        const approvals = history.filter(a => a.status === 'approved').length;
-        const refusals = history.filter(a => a.status === 'refused').length;
-        const trackAdj = Math.max(-0.10, Math.min(0.10, approvals * 0.01 - refusals * 0.02));
-        prob = Math.max(0.05, Math.min(0.95, prob + trackAdj));
+        const approvalsCount = history.filter(a => a.status === 'approved').length;
+        const refusalsCount = history.filter(a => a.status === 'refused').length;
+        const valuePounds = fromPennies(property.value);
+        const { prob } = computePlanningApprovalProbability({
+          baseProb: renovationType.baseApprovalProb,
+          propertyValuePounds: valuePounds,
+          neighborhood: property.neighborhood,
+          propertyType: property.type,
+          renovationCategory: renovationType.category,
+          approvalsCount,
+          refusalsCount,
+        });
 
         // Roll the outcome NOW, reveal at decisionMonth
         const approved = Math.random() < prob;

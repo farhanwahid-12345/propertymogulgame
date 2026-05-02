@@ -83,6 +83,8 @@ interface PropertyCardProps {
   providerRates?: Record<string, number>;
   /** Pending/approved planning applications scoped to THIS property. */
   planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
+  /** Full planning history across portfolio — used to show live track-record adjustment. */
+  planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
   /** True if this property has an active planning_cooldown lock. */
   inPlanningCooldown?: boolean;
 }
@@ -126,6 +128,7 @@ export const PropertyCard = memo(function PropertyCard({
   baseMarketRate = 0.05,
   providerRates = {},
   planningApplications = [],
+  planningHistory = [],
   inPlanningCooldown = false,
   evictTenant,
   cancelEviction,
@@ -539,6 +542,7 @@ export const PropertyCard = memo(function PropertyCard({
                       currentSubtype={property.subtype}
                       neighborhood={property.neighborhood}
                       planningApplications={planningApplications}
+                      planningHistory={planningHistory}
                       monthsPlayed={monthsPlayed}
                       inPlanningCooldown={inPlanningCooldown}
                     />
