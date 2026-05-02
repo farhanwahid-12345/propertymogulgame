@@ -474,12 +474,50 @@ export function RenovationDialog({
                             ⛔ Recent refusal — 6-mo cooldown before resubmission
                           </div>
                         )}
-                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (
-                          <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1">
-                            <FileText className="h-3 w-3 inline mr-1" />
-                            Submitting will charge a £{(renovation.planningFee ?? 250).toLocaleString()} non-refundable fee. Decision in ~{renovation.planningWaitMonths ?? 2} mo. Base approval ~{Math.round((renovation.baseApprovalProb ?? 0.7) * 100)}%.
-                          </div>
-                        )}
+                        {!completed && !planningPending && !planningApproved && !blockedByCooldown && renovation.requiresPlanning && (() => {
+                          // Live approval odds — matches the engine's roll exactly
+                          const approvalsCount = planningHistory.filter(a => a.status === 'approved').length;
+                          const refusalsCount = planningHistory.filter(a => a.status === 'refused').length;
+                          const { prob, base, modifiers } = computePlanningApprovalProbability({
+                            baseProb: renovation.baseApprovalProb,
+                            propertyValuePounds: propertyValue,
+                            neighborhood: neighborhood ?? '',
+                            propertyType: propertyType ?? 'residential',
+                            renovationCategory: renovation.category,
+                            approvalsCount,
+                            refusalsCount,
+                          });
+                          const pct = Math.round(prob * 100);
+                          const probColour = pct >= 75 ? 'text-success' : pct >= 50 ? 'text-amber-300' : 'text-danger';
+                          return (
+                            <div className="text-[11px] text-muted-foreground border border-border/40 rounded px-2 py-1 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="flex items-center gap-1">
+                                  <FileText className="h-3 w-3" />
+                                  Planning approval likelihood:
+                                </span>
+                                <span className={cn("font-semibold", probColour)}>{pct}%</span>
+                              </div>
+                              <div className="text-[10px] opacity-80 space-y-0.5">
+                                <div className="flex justify-between">
+                                  <span>Base ({renovation.category}):</span>
+                                  <span>{Math.round(base * 100)}%</span>
+                                </div>
+                                {modifiers.map((m, i) => (
+                                  <div key={i} className="flex justify-between">
+                                    <span>{m.label}:</span>
+                                    <span className={m.delta >= 0 ? 'text-success' : 'text-danger'}>
+                                      {m.delta >= 0 ? '+' : ''}{Math.round(m.delta * 100)}%
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="text-[10px] opacity-70">
+                                Fee £{(renovation.planningFee ?? 250).toLocaleString()} · decision in ~{renovation.planningWaitMonths ?? 2} mo
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Ceiling-price warning */}
                         {ceilingPrice > 0 && diminishingFactor < 0.95 && !completed && (
