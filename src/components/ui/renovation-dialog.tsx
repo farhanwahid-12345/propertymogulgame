@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns } from "@/lib/engine/renovation";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
 import { getCeilingPrice } from "@/lib/engine/constants";
 
 export interface RenovationType {
