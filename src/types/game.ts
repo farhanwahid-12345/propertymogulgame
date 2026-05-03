@@ -60,6 +60,8 @@ export interface Property {
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** IDs of renovation types completed on this property (one-shot per type). */
   completedRenovationIds?: string[];
+  /** Cumulative renovation spend on this property (pennies). */
+  totalRenovationSpendPennies?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
@@ -129,6 +131,12 @@ export interface PendingEviction {
   ground: EvictionGround;
   servedMonth: number;
   effectiveMonth: number;
+  /** True if the tenant has filed (or will file) a tribunal appeal. */
+  appealFiled?: boolean;
+  /** Month the tribunal will rule on the tenant's appeal. */
+  appealResolveMonth?: number;
+  /** True after the appeal has been resolved (upheld/overturned). */
+  appealResolved?: boolean;
 }
 
 export interface PropertyLock {
