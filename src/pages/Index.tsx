@@ -238,7 +238,7 @@ const Index = () => {
           ownedProperties={gameState.ownedProperties}
           tenants={gameState.tenants}
           monthsPlayed={gameState.monthsPlayed}
-          onAppealEviction={gameState.appealEviction}
+          
         />
 
         {/* Deposit disputes (action-required) */}

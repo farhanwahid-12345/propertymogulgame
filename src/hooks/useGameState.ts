@@ -209,9 +209,6 @@ export function useGameState() {
     store.cancelEviction(propertyId);
   }, [store.cancelEviction]);
 
-  const appealEviction = useCallback((propertyId: string) => {
-    store.appealEviction(propertyId);
-  }, [store.appealEviction]);
 
   const disputeDeposit = useCallback((disputeId: string) => {
     store.disputeDeposit(disputeId);
@@ -423,7 +420,7 @@ export function useGameState() {
     applyRentIncrease,
     evictTenant,
     cancelEviction,
-    appealEviction,
+    
     disputeDeposit,
     dismissDispute,
     startRenovation,
