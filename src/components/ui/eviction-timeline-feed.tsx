@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Gavel, Home, UserMinus, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Gavel, Home, UserMinus, AlertTriangle, ShieldAlert, Scale } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
-import { EvictionAppealDialog } from "@/components/ui/eviction-appeal-dialog";
 import type { PendingEviction, Property, PropertyTenant, EvictionGround } from "@/types/game";
 
 interface Props {
@@ -11,7 +10,6 @@ interface Props {
   ownedProperties: Pick<Property, 'id' | 'name' | 'condition'>[];
   tenants: PropertyTenant[];
   monthsPlayed: number;
-  onAppealEviction?: (propertyId: string) => void;
 }
 
 const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; tone: string }> = {
@@ -33,7 +31,6 @@ export function EvictionTimelineFeed({
   ownedProperties,
   tenants,
   monthsPlayed,
-  onAppealEviction,
 }: Props) {
   if (!pendingEvictions || pendingEvictions.length === 0) return null;
 
@@ -124,15 +121,14 @@ export function EvictionTimelineFeed({
                 <Progress value={progressPct} className="h-1.5" />
               </div>
 
-              {onAppealEviction && monthsRemaining > 0 && (
-                <div className="flex justify-end pt-1">
-                  <EvictionAppealDialog
-                    propertyId={ev.propertyId}
-                    propertyName={property?.name || ev.propertyId}
-                    tenantName={ev.tenantName}
-                    ground={ev.ground}
-                    onAppeal={onAppealEviction}
-                  />
+              {ev.appealFiled && !ev.appealResolved && (
+                <div className="flex items-center gap-1.5 text-[10px] text-amber-300">
+                  <Scale className="h-3 w-3" />
+                  Tenant has filed a tribunal appeal — ruling{' '}
+                  {ev.appealResolveMonth !== undefined
+                    ? `month ${ev.appealResolveMonth}`
+                    : 'next month'}
+                  .
                 </div>
               )}
             </div>

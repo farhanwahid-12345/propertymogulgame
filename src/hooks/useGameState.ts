@@ -41,6 +41,7 @@ function propertyToPounds(p: any): Property {
     mortgageRemaining: p.mortgageRemaining != null ? fromPennies(p.mortgageRemaining) : undefined,
     marketValue: p.marketValue != null ? fromPennies(p.marketValue) : undefined,
     baseRent: p.baseRent != null ? fromPennies(p.baseRent) : undefined,
+    totalRenovationSpendPennies: p.totalRenovationSpendPennies || 0,
     internalSqft,
     plotSqft,
   };
@@ -208,9 +209,6 @@ export function useGameState() {
     store.cancelEviction(propertyId);
   }, [store.cancelEviction]);
 
-  const appealEviction = useCallback((propertyId: string) => {
-    store.appealEviction(propertyId);
-  }, [store.appealEviction]);
 
   const disputeDeposit = useCallback((disputeId: string) => {
     store.disputeDeposit(disputeId);
@@ -422,7 +420,7 @@ export function useGameState() {
     applyRentIncrease,
     evictTenant,
     cancelEviction,
-    appealEviction,
+    
     disputeDeposit,
     dismissDispute,
     startRenovation,

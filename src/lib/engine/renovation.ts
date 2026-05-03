@@ -126,3 +126,12 @@ export function canUpgradeToPremium(args: {
 export function isConditionUpgradeRenovation(renovationTypeId: string): boolean {
   return PREMIUM_UPGRADE_RENOS.includes(renovationTypeId);
 }
+
+/**
+ * True when every premium-tier upgrade renovation has been completed.
+ * A fully-upgraded property won't degrade premium → standard from neglect alone.
+ */
+export function isFullyUpgraded(completedRenovationIds?: string[]): boolean {
+  const done = new Set(completedRenovationIds || []);
+  return PREMIUM_UPGRADE_RENOS.every(id => done.has(id));
+}

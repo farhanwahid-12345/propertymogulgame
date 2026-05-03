@@ -12,6 +12,7 @@ import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { OperationsCenter } from "@/components/ui/operations-center";
+import { ActivityTicker } from "@/components/ui/activity-ticker";
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { useGameState } from "@/hooks/useGameState";
@@ -103,6 +104,18 @@ const Index = () => {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-5">
+        {/* Activity ticker — slim horizontal feed */}
+        <ActivityTicker
+          monthsPlayed={gameState.monthsPlayed}
+          tenantHistory={(gameState as any).tenantHistory}
+          tenantEvents={gameState.tenantEvents}
+          economicEvents={gameState.economicEvents}
+          renovations={gameState.renovations || []}
+          conveyancing={gameState.conveyancing || []}
+          taxRecords={(gameState as any).taxRecords}
+          ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
+        />
+
         {/* Game Stats */}
         <GameStats
           cash={gameState.cash}
@@ -238,7 +251,7 @@ const Index = () => {
           ownedProperties={gameState.ownedProperties}
           tenants={gameState.tenants}
           monthsPlayed={gameState.monthsPlayed}
-          onAppealEviction={gameState.appealEviction}
+          
         />
 
         {/* Deposit disputes (action-required) */}

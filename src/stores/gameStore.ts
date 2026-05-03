@@ -32,7 +32,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -300,7 +300,7 @@ interface GameActions {
   applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number) => void;
   evictTenant: (propertyId: string, ground: EvictionGround) => void;
   cancelEviction: (propertyId: string) => void;
-  appealEviction: (propertyId: string) => void;
+  // appealEviction removed — appeals are now tenant-driven & resolved by tick
   disputeDeposit: (disputeId: string) => void;
   dismissDispute: (disputeId: string) => void;
   // Renovations
@@ -834,9 +834,16 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (newMonthsSince >= depMonths) {
             if (p.condition === 'premium') {
-              newCondition = 'standard';
-              resetMonths = 0;
-              showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
+              // Fully-upgraded properties don't degrade from neglect alone —
+              // every premium-tier renovation has been done, so just reset the
+              // counter to half a window so they cycle slowly without falling.
+              if (isFullyUpgraded(p.completedRenovationIds)) {
+                resetMonths = Math.floor(depMonths / 2);
+              } else {
+                newCondition = 'standard';
+                resetMonths = 0;
+                showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
+              }
             } else if (p.condition === 'standard') {
               newCondition = 'dilapidated';
               resetMonths = 0;
@@ -1060,7 +1067,36 @@ export const useGameStore = create<GameState & GameActions>()(
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
         let evictionDepositRefund = walkoutDepositRefund;
         let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || []), ...walkoutDisputes];
-        prev.pendingEvictions.forEach(ev => {
+        prev.pendingEvictions.forEach(rawEv => {
+          let ev = rawEv;
+          // ── Tenant-filed appeal resolves this month? ──
+          if (ev.appealFiled && !ev.appealResolved && ev.appealResolveMonth !== undefined && newMonthNumber >= ev.appealResolveMonth) {
+            const upheld = Math.random() < 0.60;
+            if (upheld) {
+              showToast(
+                "Tribunal Ruling: Upheld",
+                `${ev.tenantName} appealed your notice on ${ev.propertyId} — the tribunal upheld it. Notice stands.`,
+              );
+              ev = { ...ev, appealResolved: true };
+            } else {
+              // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
+              const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
+              if (cooldownGrounds.includes(ev.ground)) {
+                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6 });
+              }
+              newTenants = newTenants.map(t =>
+                t.propertyId === ev.propertyId
+                  ? { ...t, satisfaction: Math.min(100, (t.satisfaction || 0) + 15), evictionNoticeMonth: undefined, evictionGround: undefined }
+                  : t,
+              );
+              showToast(
+                "Tribunal Ruling: Overturned",
+                `${ev.tenantName} won their appeal. Notice removed; tenant stays.${cooldownGrounds.includes(ev.ground) ? ' 6-month cooldown applied to landlord-grounds.' : ''}`,
+              );
+              return; // drop this eviction entirely
+            }
+          }
+
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);
             return;
@@ -2136,6 +2172,16 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
+        // sale_lock — must list/sell after serving landlord-sale grounds
+        const saleLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'sale_lock' && prev.monthsPlayed < l.untilMonth);
+        if (saleLock) {
+          showToast(
+            "Sale Lock Active",
+            `You served a sale-grounds notice — list this property for sale before re-letting (unlocks month ${saleLock.untilMonth}).`,
+            "destructive",
+          );
+          return;
+        }
         // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
         // valid eviction notice and wait out the notice period before re-letting.
         if (prev.tenants.some(t => t.propertyId === propertyId)) {
@@ -2266,6 +2312,21 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Eviction Already Served", "Notice already in effect. Cancel it first.", "destructive"); return;
         }
 
+        // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
+        if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
+          const appealCd = (prev.propertyLocks || []).find(
+            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth,
+          );
+          if (appealCd) {
+            showToast(
+              "Tribunal Cooldown",
+              `Cannot re-serve a landlord-grounds notice until month ${appealCd.untilMonth} (${appealCd.untilMonth - prev.monthsPlayed} mo).`,
+              "destructive",
+            );
+            return;
+          }
+        }
+
         // Validate ground
         const recentDefaults = prev.tenantEvents.filter(e => e.propertyId === propertyId && e.type === 'default').length;
         const concerns = prev.tenantConcerns.filter(c => c.propertyId === propertyId && !c.resolvedMonth);
@@ -2301,6 +2362,17 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
         }
 
+        // ── Tenant-driven appeal roll ──
+        // Base probability by ground; adjusted by satisfaction & profile.
+        let appealChance =
+          ground === 'landlord_sale' || ground === 'landlord_move_in' ? 0.35 :
+          ground === 'antisocial_behaviour' ? 0.10 :
+          0.05;
+        if ((tenant.satisfaction ?? 50) >= 60) appealChance += 0.15;
+        if (tenant.tenant.profile === 'risky') appealChance -= 0.10;
+        appealChance = Math.max(0, Math.min(0.85, appealChance));
+        const willAppeal = Math.random() < appealChance;
+
         const effectiveMonth = prev.monthsPlayed + noticeMonths;
         const updatedTenants = prev.tenants.map(t =>
           t.propertyId === propertyId ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground } : t
@@ -2311,8 +2383,11 @@ export const useGameStore = create<GameState & GameActions>()(
           ground,
           servedMonth: prev.monthsPlayed,
           effectiveMonth,
+          appealFiled: willAppeal,
+          appealResolveMonth: willAppeal ? prev.monthsPlayed + 1 : undefined,
         };
-        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.`);
+        const appealNote = willAppeal ? ' Tenant has filed a tribunal appeal — ruling next month.' : '';
+        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.${appealNote}`);
         set({
           tenants: updatedTenants,
           pendingEvictions: [...prev.pendingEvictions, newEviction],
@@ -2331,75 +2406,9 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      // ─── RENTERS' RIGHTS — APPEALS & DISPUTES ──────────────
-      // Tenant-side appeal of a served eviction notice. £400 tribunal fee.
-      // 60% upheld (notice stands), 40% overturned (notice removed, tenant
-      // satisfaction bumped, 6-month re-attempt cooldown for landlord-grounds).
-      appealEviction: (propertyId) => {
-        const prev = get();
-        const eviction = prev.pendingEvictions.find(e => e.propertyId === propertyId);
-        if (!eviction) {
-          showToast("No Notice", "There is no eviction notice on this property to appeal.", "destructive");
-          return;
-        }
-        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
-        if (!tenant) {
-          showToast("No Tenant", "Cannot appeal — the tenant has already vacated.", "destructive");
-          return;
-        }
-
-        const FEE = toPennies(400);
-        const debited = debit(prev, FEE);
-        if (!debited) {
-          showToast("Insufficient Funds", "You can't afford the £400 tribunal fee, even with overdraft.", "destructive");
-          return;
-        }
-        if (debited.usedOverdraft > 0) {
-          showToast("Overdraft Used", `Tribunal fee of £400 drawn from overdraft.`);
-        }
-
-        const upheld = Math.random() < 0.60;
-        if (upheld) {
-          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed });
-          showToast(
-            "Tribunal Ruling: Upheld",
-            `The tribunal upheld your eviction notice on ${eviction.tenantName}. The notice stands.`,
-          );
-          return;
-        }
-
-        // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
-        const newPendingEvictions = prev.pendingEvictions.filter(e => e.propertyId !== propertyId);
-        const newTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId
-            ? {
-                ...t,
-                satisfaction: Math.min(100, (t.satisfaction || 0) + 15),
-                evictionNoticeMonth: undefined,
-                evictionGround: undefined,
-              }
-            : t,
-        );
-        const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
-        const newPropertyLocks = cooldownGrounds.includes(eviction.ground)
-          ? [
-              ...prev.propertyLocks,
-              { propertyId, reason: 'appeal_cooldown' as const, untilMonth: prev.monthsPlayed + 6 },
-            ]
-          : prev.propertyLocks;
-
-        set({
-          cash: debited.cash,
-          overdraftUsed: debited.overdraftUsed,
-          pendingEvictions: newPendingEvictions,
-          tenants: newTenants,
-          propertyLocks: newPropertyLocks,
-        });
-        showToast(
-          "Tribunal Ruling: Overturned",
-          `The tribunal sided with ${eviction.tenantName}. Notice removed; tenant satisfaction restored.${cooldownGrounds.includes(eviction.ground) ? ' 6-month re-attempt cooldown applied.' : ''}`,
-        );
-      },
+      // Tenant-side appeals are now resolved automatically by the monthly tick
+      // when `pendingEviction.appealResolveMonth` is reached — the player no
+      // longer initiates them.
 
       // Player raises a TDS adjudication on a withheld deposit.
       // 35% landlord wins (no further refund) | 50% partial settle (half withheld back)
@@ -2553,11 +2562,18 @@ export const useGameStore = create<GameState & GameActions>()(
               a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
             )
           : prev.planningApplications;
+        // Track cumulative renovation spend on the property record
+        const updatedOwned = prev.ownedProperties.map(p =>
+          p.id === propertyId
+            ? { ...p, totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies }
+            : p,
+        );
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           renovations: [...prev.renovations, renovation],
           planningApplications: consumedPlanning,
+          ownedProperties: updatedOwned,
         });
       },
 
@@ -3118,7 +3134,7 @@ export const useGameStore = create<GameState & GameActions>()(
           listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
           reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction,
-          appealEviction, disputeDeposit, dismissDispute,
+          disputeDeposit, dismissDispute,
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
