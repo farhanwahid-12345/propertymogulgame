@@ -32,7 +32,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -834,9 +834,16 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (newMonthsSince >= depMonths) {
             if (p.condition === 'premium') {
-              newCondition = 'standard';
-              resetMonths = 0;
-              showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
+              // Fully-upgraded properties don't degrade from neglect alone —
+              // every premium-tier renovation has been done, so just reset the
+              // counter to half a window so they cycle slowly without falling.
+              if (isFullyUpgraded(p.completedRenovationIds)) {
+                resetMonths = Math.floor(depMonths / 2);
+              } else {
+                newCondition = 'standard';
+                resetMonths = 0;
+                showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
+              }
             } else if (p.condition === 'standard') {
               newCondition = 'dilapidated';
               resetMonths = 0;
