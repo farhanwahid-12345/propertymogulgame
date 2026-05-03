@@ -2628,11 +2628,18 @@ export const useGameStore = create<GameState & GameActions>()(
               a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
             )
           : prev.planningApplications;
+        // Track cumulative renovation spend on the property record
+        const updatedOwned = prev.ownedProperties.map(p =>
+          p.id === propertyId
+            ? { ...p, totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies }
+            : p,
+        );
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           renovations: [...prev.renovations, renovation],
           planningApplications: consumedPlanning,
+          ownedProperties: updatedOwned,
         });
       },
 
