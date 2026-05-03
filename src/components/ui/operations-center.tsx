@@ -1,11 +1,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Hourglass, FileText, Hammer, Wrench, History, Sparkles } from "lucide-react";
+import { Hourglass, FileText, Hammer, Wrench, Sparkles } from "lucide-react";
 import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
 import { RenovationTracker } from "@/components/ui/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
-import { ActivityFeed } from "@/components/ui/activity-feed";
 import type {
   Conveyancing,
   Renovation,
@@ -35,7 +34,7 @@ interface OperationsCenterProps {
   taxRecords?: TaxRecord[];
 }
 
-type TabKey = "conveyancing" | "planning" | "renovations" | "concerns" | "activity";
+type TabKey = "conveyancing" | "planning" | "renovations" | "concerns";
 
 export function OperationsCenter(props: OperationsCenterProps) {
   const {
@@ -62,30 +61,22 @@ export function OperationsCenter(props: OperationsCenterProps) {
     const plan = planningApplications.filter(a => a.status === 'pending').length;
     const reno = renovations.length;
     const concerns = tenantConcerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId)).length;
-    const activity =
-      tenantHistory.length +
-      tenantEvents.length +
-      economicEvents.length +
-      renovations.filter((r: any) => typeof r.completionMonth === 'number' && monthsPlayed >= r.completionMonth).length +
-      taxRecords.length;
-    return { conv, plan, reno, concerns, activity };
-  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, tenantHistory, tenantEvents, economicEvents, taxRecords, monthsPlayed]);
+    return { conv, plan, reno, concerns };
+  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds]);
 
   const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns;
   const allEmpty =
     counts.conv === 0 &&
     counts.plan === 0 &&
     counts.reno === 0 &&
-    counts.concerns === 0 &&
-    counts.activity === 0;
+    counts.concerns === 0;
 
   // Default tab → first non-empty
   const defaultTab: TabKey = useMemo(() => {
     if (counts.concerns > 0) return "concerns";
     if (counts.conv > 0) return "conveyancing";
     if (counts.plan > 0) return "planning";
-    if (counts.reno > 0) return "renovations";
-    return "activity";
+    return "renovations";
   }, [counts]);
 
   const [tab, setTab] = useState<TabKey>(defaultTab);
@@ -114,7 +105,6 @@ export function OperationsCenter(props: OperationsCenterProps) {
     { key: "planning", label: "Planning", icon: FileText, count: counts.plan },
     { key: "renovations", label: "Renovations", icon: Hammer, count: counts.reno },
     { key: "concerns", label: "Concerns", icon: Wrench, count: counts.concerns },
-    { key: "activity", label: "Activity", icon: History, count: counts.activity },
   ];
 
   return (
@@ -130,7 +120,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-        <TabsList className="grid w-full grid-cols-5 bg-white/[0.06] border-0 mb-3">
+        <TabsList className="grid w-full grid-cols-4 bg-white/[0.06] border-0 mb-3">
           {tabDef.map(t => {
             const Icon = t.icon;
             return (
@@ -191,20 +181,6 @@ export function OperationsCenter(props: OperationsCenterProps) {
               monthsPlayed={monthsPlayed}
               onResolve={onResolveConcern}
               onSnooze={onSnoozeConcern}
-              bare
-            />
-          </TabsContent>
-
-          <TabsContent value="activity" className="mt-0">
-            <ActivityFeed
-              monthsPlayed={monthsPlayed}
-              tenantHistory={tenantHistory}
-              tenantEvents={tenantEvents}
-              economicEvents={economicEvents}
-              renovations={renovations}
-              conveyancing={conveyancing}
-              taxRecords={taxRecords}
-              ownedProperties={ownedProperties}
               bare
             />
           </TabsContent>
