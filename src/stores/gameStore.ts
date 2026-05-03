@@ -2302,6 +2302,21 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Eviction Already Served", "Notice already in effect. Cancel it first.", "destructive"); return;
         }
 
+        // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
+        if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
+          const appealCd = (prev.propertyLocks || []).find(
+            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth,
+          );
+          if (appealCd) {
+            showToast(
+              "Tribunal Cooldown",
+              `Cannot re-serve a landlord-grounds notice until month ${appealCd.untilMonth} (${appealCd.untilMonth - prev.monthsPlayed} mo).`,
+              "destructive",
+            );
+            return;
+          }
+        }
+
         // Validate ground
         const recentDefaults = prev.tenantEvents.filter(e => e.propertyId === propertyId && e.type === 'default').length;
         const concerns = prev.tenantConcerns.filter(c => c.propertyId === propertyId && !c.resolvedMonth);
@@ -2337,6 +2352,17 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
         }
 
+        // ── Tenant-driven appeal roll ──
+        // Base probability by ground; adjusted by satisfaction & profile.
+        let appealChance =
+          ground === 'landlord_sale' || ground === 'landlord_move_in' ? 0.35 :
+          ground === 'antisocial_behaviour' ? 0.10 :
+          0.05;
+        if ((tenant.satisfaction ?? 50) >= 60) appealChance += 0.15;
+        if (tenant.tenant.profile === 'risky') appealChance -= 0.10;
+        appealChance = Math.max(0, Math.min(0.85, appealChance));
+        const willAppeal = Math.random() < appealChance;
+
         const effectiveMonth = prev.monthsPlayed + noticeMonths;
         const updatedTenants = prev.tenants.map(t =>
           t.propertyId === propertyId ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground } : t
@@ -2347,8 +2373,11 @@ export const useGameStore = create<GameState & GameActions>()(
           ground,
           servedMonth: prev.monthsPlayed,
           effectiveMonth,
+          appealFiled: willAppeal,
+          appealResolveMonth: willAppeal ? prev.monthsPlayed + 1 : undefined,
         };
-        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.`);
+        const appealNote = willAppeal ? ' Tenant has filed a tribunal appeal — ruling next month.' : '';
+        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.${appealNote}`);
         set({
           tenants: updatedTenants,
           pendingEvictions: [...prev.pendingEvictions, newEviction],
