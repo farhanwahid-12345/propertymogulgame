@@ -1,69 +1,95 @@
-## Renovation uplift % accuracy + ceiling tempering
+## Property card + activity + eviction polish
 
-Two related problems on the renovation dialog:
+Four related fixes from the screenshots.
 
-1. **Capital uplift % is misleading.** The screenshot HMO shows Cost £21,050, Value range £2,790–£9,300, Capital uplift (expected) **+37.6%**. That's mathematically `(£9,300 × 0.85) ÷ £21,050`, i.e. it treats the value uplift as pure return and ignores that £21,050 of cash was spent. With expected uplift well below cost, the true ROI is *negative* — but the UI shows green `+37.6%`. User wants a number that goes negative when the renovation is expected to lose money.
-2. **Ceiling prices bite too hard.** The diminishing-returns curve starts trimming at 60% of ceiling and reaches 90% reduction at the cap. Combined with conservative ceiling values (e.g. Linthorpe residential £200k), even modest properties hit the taper early, making most renovations look like losses. User wants ceilings tempered down somewhat (i.e. less restrictive).
+---
 
-### Changes
+### 1. Stop premium → standard degradation when all upgrade renos are done
 
-#### 1. `src/components/ui/renovation-dialog.tsx` — fix uplift maths
+**Symptom:** Properties in standard condition with every improvement already completed still anger premium tenants and still degrade further. Player has no recourse.
 
-Replace the per-card ROI block (lines ~529-560) so the displayed numbers describe the same probability-weighted distribution used by the engine and report **net** ROI:
+**Fix in `src/stores/gameStore.ts` depreciation block (lines ~828-855):**
+- Before degrading `premium → standard`, check `canUpgradeToPremium`-style eligibility in reverse: if the property has all four improvement-tier renos in `completedRenovationIds` (`kitchen_upgrade`, `bathroom_renovation`, `central_heating`, `double_glazing`), keep `condition = 'premium'` and just reset `monthsSinceLastRenovation` to a partial value (e.g. half the depreciation window) so it cycles slowly without ever falling. Skip the toast.
+- This makes a fully-upgraded property "permanently premium" — it can still take damage from concerns/dilapidation pathways, but neglect alone won't drop it.
 
-- Use the true expected multiplier from the outcome roll: `expectedMult = 0.6×1.0 + 0.25×0.7 + 0.10×0.3 + 0.05×0 = 0.805` (single shared constant).
-- `expectedValueUplift = cappedValueUp * expectedMult` (expected gross capital gain).
-- `expectedRentUplift  = rentUp * expectedMult * (0.5 + 0.5 × diminishingFactor)` to mirror the rent factor applied at completion in `gameStore.ts` line 1483.
-- **Capital ROI (net)** = `(expectedValueUplift − cost) / cost × 100` — can go negative.
-- **Income ROI / yr (net of voids)** = `(expectedRentUplift × 12 × 0.85) / cost × 100`.
-- **Combined 5-yr ROI** (new, optional helper line) = `(expectedValueUplift + expectedRentUplift × 60 × 0.85 − cost) / cost × 100` — gives a clearer "is this worth doing" signal.
-- **Payback** = `cost / max(1, expectedRentUplift × 0.85)`.
-- Colour: green when capital ROI > 0, amber when between -10% and 0%, red when < -10%. Replaces the current ceiling-based colouring (we already show the ceiling banner separately).
-- Update the small italic line under the range to match the same expected mult: `"Outcomes vary: expected ≈ £{round(expectedValueUplift)}, 5% chance of total write-off."`.
-- Also align `valueLow` / `valueHigh` so the range reflects the full distribution: keep `valueHigh = cappedValueUp` (60% case), set `valueLow = round(cappedValueUp × 0.3)` for the underwhelming case (already matches), and add a tooltip on `Value + (range)` explaining the 5% write-off tail.
+**Helper:** add `isFullyUpgraded(completedRenovationIds)` to `src/lib/engine/renovation.ts` next to `canUpgradeToPremium` so both call sites share the predicate. The satisfaction branch at line 870-884 already handles "no premium upgrade available → no penalty" — leave it as-is.
 
-Result for the screenshot example: Cost £21,050, expected gain ≈ £9,300 × 0.805 ≈ £7,486, **Capital ROI ≈ −64%** (red) — exactly the negative signal the user expects.
+---
 
-#### 2. `src/lib/engine/renovation.ts` — temper the diminishing curve
+### 2. Break Profit/Loss into Purchase + Renovation spend on the property card
 
-Soften `applyCeilingDiminishingReturns` so renovations remain viable closer to ceiling:
+**Track renovation spend per property.**
+- Add `totalRenovationSpendPennies?: number` to `Property` in `src/types/game.ts` and the migration in `gameStore.ts` (default 0).
+- In `startRenovation` (line 2495), increment `property.totalRenovationSpendPennies += costPennies` on the property record being charged. Persist alongside the existing `set({ ... })`. (Renovations are non-refundable so we don't need to roll it back on outcome rolls.)
 
-- Move the inflection from `ratio ≤ 0.6 → factor 1.0` up to `ratio ≤ 0.75 → factor 1.0`.
-- Cap the floor at `0.35` (was `0.10`) so even at-ceiling properties keep ~35% of the uplift instead of being almost worthless.
-- Linear taper between 0.75 and 1.0 from 1.0 → 0.35.
+**Render the breakdown in `src/components/ui/property-card.tsx` (lines 287-303):**
+Replace the single Profit/Loss row with a small block:
 
-#### 3. `src/lib/engine/constants.ts` — temper `NEIGHBORHOOD_CEILINGS`
+```text
+Purchase Price:    £52,300
+Renovation Spend:  £18,400
+Total Invested:    £70,700
+Market Value:      £130,146
+Equity vs Market:  +£59,446 (+84.1%)   ← red/green
+                   * 23.4% above market
+```
 
-Raise residential and luxury ceilings ~15-25% to better reflect achievable Middlesbrough finished-product prices and stop choking renovation ROI in mid-tier areas:
+- Compute `totalCost = property.price + renovationSpendPounds`.
+- `equityVsMarket = marketValueToUse - totalCost`.
+- "above/below market" % = `(marketValueToUse - totalCost) / totalCost * 100` (replaces the existing `profitPercent`).
+- Hide the Renovation Spend / Total Invested rows when spend is £0 to keep cards compact for un-renovated stock.
 
-- Linthorpe res 200k → 260k, lux 320k → 400k
-- Acklam res 220k → 280k, lux 380k → 460k
-- Marton res 280k → 340k
-- Nunthorpe res 380k → 450k, lux 700k → 850k
-- Middlesbrough Centre res 180k → 230k
-- Hemlington res 200k → 240k
-- Pallister Park res 130k → 165k
-- North Ormesby res 110k → 140k
-- South Bank res 110k → 140k
-- Port Clarence res 95k → 120k
-- Captain Cook Square res 220k → 280k
-- Bump `DEFAULT_CEILING` residential 180k → 230k, luxury 350k → 430k.
+---
 
-Commercial ceilings left as-is (already comfortably above current commercial stock).
+### 3. Move the Activity feed off the Operations tab strip into a slim top ticker
 
-#### 4. Memory updates
+**Symptom:** Activity tab eats horizontal space inside Operations and rarely has anything actionable.
 
-Update `mem://game-mechanics/property-management/ceiling-prices` to record the softer curve (`≤0.75` flat, `0.35` floor) and the tempered ceiling values, so future plans don't regress these numbers.
+- Remove the `activity` tab from `src/components/ui/operations-center.tsx` (drop the entry on line 117, the `TabsContent` block on lines 198-210, and the `count.activity` from `allEmpty`/`defaultTab` logic). `TabsList` becomes `grid-cols-4`.
+- New component `src/components/ui/activity-ticker.tsx`: a horizontal, single-line marquee using the same data feeds (`tenantHistory`, `tenantEvents`, `economicEvents`, `renovations`, `conveyancing`, `taxRecords`). Shows only the latest ~8 events as `· {month} {short label}` separated by middots; CSS-only auto-scroll (paused on hover). Glass-pill styling, ~36 px tall.
+- Mount it at the top of the dashboard in `src/pages/Index.tsx` directly above the hero block. Pass through the same props the operations centre already receives.
+- A "View all" button on the ticker opens a Sheet/Drawer with the full `ActivityFeed` for users who want detail — keeps the existing component reachable without giving it a permanent tab.
+
+---
+
+### 4. Eviction appeals: tenant-initiated only, and enforce cooldowns
+
+Two bugs: the player can voluntarily pay £400 to appeal their own eviction (nonsense), and the `appeal_cooldown` lock is recorded but never checked when serving a fresh notice.
+
+**`src/components/ui/eviction-timeline-feed.tsx`:** remove the `EvictionAppealDialog` trigger entirely (lines 127-135) and drop `onAppealEviction` from the props/Index wiring. The dialog file can stay (re-used for the auto flow below) but is no longer invoked by the player.
+
+**`src/stores/gameStore.ts` — make appeals tenant-driven:**
+- When a notice is served via `evictTenant` (lines 2261-2320), roll a one-shot `tenantWillAppeal` chance based on tenant profile + satisfaction + ground:
+  - `landlord_sale` / `landlord_move_in`: base 35%
+  - `rent_arrears`: base 5%
+  - `antisocial_behaviour`: base 10%
+  - +15% if tenant satisfaction ≥ 60, −10% if profile is `risky`.
+- Persist the decision on the `PendingEviction` record (`appealFiled: boolean`, `appealResolveMonth: number` ≈ servedMonth + 1).
+- In the monthly tick (around line 1063 where evictions are processed), when `appealResolveMonth` arrives:
+  - Charge the tribunal fee to the **tenant** (no cost to player), then run the existing 60/40 upheld/overturned roll using the same outcome paths already in `appealEviction` (lines 2361-2401). Refactor that body into a private helper `resolveEvictionAppeal(state, eviction)` so both the manual and automatic paths share it; delete the public `appealEviction` action and its store-interface entry.
+  - Show a toast: "Tenant filed a tribunal appeal — ruling: upheld/overturned".
+
+**Enforce the cooldowns in `evictTenant` (line 2261):** before validating the ground, look up `propertyLocks` for this property:
+- `appeal_cooldown` → block any `landlord_sale` or `landlord_move_in` notice until `untilMonth`. Toast: "Tribunal cooldown active until month X".
+- `sale_lock` → block re-letting (already exists conceptually) **and** add a check in `selectTenant` (line 2125) mirroring the existing `relet_lock` block, so a player who served `landlord_sale` actually has to sell before getting new tenants. Toast: "You served a sale-grounds notice — list this property for sale before re-letting (unlocks month X)."
+
+This also fixes the "I can get more tenants after evicting" report — currently only `relet_lock` (move-in ground) is enforced; `sale_lock` is recorded but ignored.
+
+---
 
 ### Files modified
 
-- `src/components/ui/renovation-dialog.tsx` — net-ROI maths, alignment with displayed range, colour thresholds, tooltip.
-- `src/lib/engine/renovation.ts` — softer `applyCeilingDiminishingReturns` (engine + dialog both consume this, so completion outcomes match the new preview).
-- `src/lib/engine/constants.ts` — raised neighborhood ceilings + default ceiling.
-- `mem://game-mechanics/property-management/ceiling-prices` — refreshed.
+- `src/lib/engine/renovation.ts` — add `isFullyUpgraded`.
+- `src/stores/gameStore.ts` — depreciation guard, renovation spend tracking, automatic tenant appeals + cooldown enforcement, drop `appealEviction` action.
+- `src/types/game.ts` — `Property.totalRenovationSpendPennies`, `PendingEviction.appealFiled` / `appealResolveMonth`.
+- `src/components/ui/property-card.tsx` — new profit/loss breakdown.
+- `src/components/ui/operations-center.tsx` — drop Activity tab.
+- `src/components/ui/activity-ticker.tsx` — new horizontal ticker.
+- `src/pages/Index.tsx` — mount ticker, drop `onAppealEviction` prop wiring.
+- `src/components/ui/eviction-timeline-feed.tsx` — remove appeal trigger.
 
 ### Out of scope
 
-- Changing the underlying outcome distribution (60/25/10/5 split stays).
-- Changing per-renovation base costs/uplifts in `RENOVATION_OPTIONS`.
-- Reworking how completion toasts report value gains.
+- Reworking the deposit-dispute / TDS flow.
+- Changing tenant appeal probabilities beyond the table above (tunable later).
+- Persisting historical renovation spend onto pre-existing save games beyond the `?? 0` migration default.
