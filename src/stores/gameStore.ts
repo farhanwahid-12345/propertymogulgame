@@ -2172,6 +2172,16 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
+        // sale_lock — must list/sell after serving landlord-sale grounds
+        const saleLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'sale_lock' && prev.monthsPlayed < l.untilMonth);
+        if (saleLock) {
+          showToast(
+            "Sale Lock Active",
+            `You served a sale-grounds notice — list this property for sale before re-letting (unlocks month ${saleLock.untilMonth}).`,
+            "destructive",
+          );
+          return;
+        }
         // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
         // valid eviction notice and wait out the notice period before re-letting.
         if (prev.tenants.some(t => t.propertyId === propertyId)) {
