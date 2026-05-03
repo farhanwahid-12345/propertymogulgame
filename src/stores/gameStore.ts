@@ -2406,75 +2406,9 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      // ─── RENTERS' RIGHTS — APPEALS & DISPUTES ──────────────
-      // Tenant-side appeal of a served eviction notice. £400 tribunal fee.
-      // 60% upheld (notice stands), 40% overturned (notice removed, tenant
-      // satisfaction bumped, 6-month re-attempt cooldown for landlord-grounds).
-      appealEviction: (propertyId) => {
-        const prev = get();
-        const eviction = prev.pendingEvictions.find(e => e.propertyId === propertyId);
-        if (!eviction) {
-          showToast("No Notice", "There is no eviction notice on this property to appeal.", "destructive");
-          return;
-        }
-        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
-        if (!tenant) {
-          showToast("No Tenant", "Cannot appeal — the tenant has already vacated.", "destructive");
-          return;
-        }
-
-        const FEE = toPennies(400);
-        const debited = debit(prev, FEE);
-        if (!debited) {
-          showToast("Insufficient Funds", "You can't afford the £400 tribunal fee, even with overdraft.", "destructive");
-          return;
-        }
-        if (debited.usedOverdraft > 0) {
-          showToast("Overdraft Used", `Tribunal fee of £400 drawn from overdraft.`);
-        }
-
-        const upheld = Math.random() < 0.60;
-        if (upheld) {
-          set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed });
-          showToast(
-            "Tribunal Ruling: Upheld",
-            `The tribunal upheld your eviction notice on ${eviction.tenantName}. The notice stands.`,
-          );
-          return;
-        }
-
-        // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
-        const newPendingEvictions = prev.pendingEvictions.filter(e => e.propertyId !== propertyId);
-        const newTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId
-            ? {
-                ...t,
-                satisfaction: Math.min(100, (t.satisfaction || 0) + 15),
-                evictionNoticeMonth: undefined,
-                evictionGround: undefined,
-              }
-            : t,
-        );
-        const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
-        const newPropertyLocks = cooldownGrounds.includes(eviction.ground)
-          ? [
-              ...prev.propertyLocks,
-              { propertyId, reason: 'appeal_cooldown' as const, untilMonth: prev.monthsPlayed + 6 },
-            ]
-          : prev.propertyLocks;
-
-        set({
-          cash: debited.cash,
-          overdraftUsed: debited.overdraftUsed,
-          pendingEvictions: newPendingEvictions,
-          tenants: newTenants,
-          propertyLocks: newPropertyLocks,
-        });
-        showToast(
-          "Tribunal Ruling: Overturned",
-          `The tribunal sided with ${eviction.tenantName}. Notice removed; tenant satisfaction restored.${cooldownGrounds.includes(eviction.ground) ? ' 6-month re-attempt cooldown applied.' : ''}`,
-        );
-      },
+      // Tenant-side appeals are now resolved automatically by the monthly tick
+      // when `pendingEviction.appealResolveMonth` is reached — the player no
+      // longer initiates them.
 
       // Player raises a TDS adjudication on a withheld deposit.
       // 35% landlord wins (no further refund) | 50% partial settle (half withheld back)
