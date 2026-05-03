@@ -41,6 +41,7 @@ function propertyToPounds(p: any): Property {
     mortgageRemaining: p.mortgageRemaining != null ? fromPennies(p.mortgageRemaining) : undefined,
     marketValue: p.marketValue != null ? fromPennies(p.marketValue) : undefined,
     baseRent: p.baseRent != null ? fromPennies(p.baseRent) : undefined,
+    totalRenovationSpendPennies: p.totalRenovationSpendPennies || 0,
     internalSqft,
     plotSqft,
   };
