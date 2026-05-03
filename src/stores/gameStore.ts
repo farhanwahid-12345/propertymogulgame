@@ -1067,7 +1067,36 @@ export const useGameStore = create<GameState & GameActions>()(
         let newPropertyLocks: PropertyLock[] = [...prev.propertyLocks];
         let evictionDepositRefund = walkoutDepositRefund;
         let newDepositDisputes: DepositDispute[] = [...(prev.depositDisputes || []), ...walkoutDisputes];
-        prev.pendingEvictions.forEach(ev => {
+        prev.pendingEvictions.forEach(rawEv => {
+          let ev = rawEv;
+          // ── Tenant-filed appeal resolves this month? ──
+          if (ev.appealFiled && !ev.appealResolved && ev.appealResolveMonth !== undefined && newMonthNumber >= ev.appealResolveMonth) {
+            const upheld = Math.random() < 0.60;
+            if (upheld) {
+              showToast(
+                "Tribunal Ruling: Upheld",
+                `${ev.tenantName} appealed your notice on ${ev.propertyId} — the tribunal upheld it. Notice stands.`,
+              );
+              ev = { ...ev, appealResolved: true };
+            } else {
+              // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
+              const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
+              if (cooldownGrounds.includes(ev.ground)) {
+                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6 });
+              }
+              newTenants = newTenants.map(t =>
+                t.propertyId === ev.propertyId
+                  ? { ...t, satisfaction: Math.min(100, (t.satisfaction || 0) + 15), evictionNoticeMonth: undefined, evictionGround: undefined }
+                  : t,
+              );
+              showToast(
+                "Tribunal Ruling: Overturned",
+                `${ev.tenantName} won their appeal. Notice removed; tenant stays.${cooldownGrounds.includes(ev.ground) ? ' 6-month cooldown applied to landlord-grounds.' : ''}`,
+              );
+              return; // drop this eviction entirely
+            }
+          }
+
           if (newMonthNumber < ev.effectiveMonth) {
             activePendingEvictions.push(ev);
             return;
