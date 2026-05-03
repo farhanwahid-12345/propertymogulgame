@@ -38,6 +38,7 @@ export interface Property {
   plotSqft?: number;
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   completedRenovationIds?: string[];
+  totalRenovationSpendPennies?: number;
 }
 
 interface PropertyCardProps {
@@ -151,10 +152,12 @@ export const PropertyCard = memo(function PropertyCard({
   const canAffordCash = playerCash >= property.price;
   const canAffordMortgage = playerCash >= cashRequired;
   
-  // Calculate profit/loss based on true market value if available (for below-market purchases)
+  // Cost basis: purchase price + cumulative renovation spend
+  const renovationSpendPounds = Math.round((property.totalRenovationSpendPennies || 0) / 100);
+  const totalInvested = property.price + renovationSpendPounds;
   const marketValueToUse = property.marketValue || property.value;
-  const profitLoss = marketValueToUse - property.price;
-  const profitPercent = ((profitLoss / property.price) * 100).toFixed(1);
+  const equityVsMarket = marketValueToUse - totalInvested;
+  const equityPct = totalInvested > 0 ? ((equityVsMarket / totalInvested) * 100).toFixed(1) : "0.0";
 
   // Calculate monthly costs for owned properties
   const propertyMortgage = mortgages.find(m => m.propertyId === property.id);
@@ -277,23 +280,42 @@ export const PropertyCard = memo(function PropertyCard({
           
           {property.owned && (
             <>
+              {renovationSpendPounds > 0 && (
+                <>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Renovation Spend:</span>
+                    <span className="font-medium text-amber-300">
+                      £{renovationSpendPounds.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Total Invested:</span>
+                    <span className="font-medium">
+                      £{totalInvested.toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Market Value:</span>
                 <span className="font-bold">
                   £{marketValueToUse.toLocaleString()}
                 </span>
               </div>
-              
+
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Profit/Loss:</span>
+                <span className="text-sm font-medium">
+                  {renovationSpendPounds > 0 ? 'Equity vs Market:' : 'Profit/Loss:'}
+                </span>
                 <span className={cn(
                   "font-bold",
-                  profitLoss >= 0 ? "text-success" : "text-danger"
+                  equityVsMarket >= 0 ? "text-success" : "text-danger"
                 )}>
-                  {profitLoss >= 0 ? "+" : ""}£{profitLoss.toLocaleString()} ({profitPercent}%)
+                  {equityVsMarket >= 0 ? "+" : ""}£{equityVsMarket.toLocaleString()} ({equityPct}%)
                 </span>
               </div>
-              
+
               {property.marketValue && property.marketValue > property.price && (
                 <div className="text-xs text-muted-foreground italic">
                   * Purchased £{(property.marketValue - property.price).toLocaleString()} below market
