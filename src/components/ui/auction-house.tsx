@@ -770,7 +770,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                 <h4 className="font-semibold">Your Auction Listings</h4>
                 <div className="space-y-3">
                   {listings.map((listing, index) => (
-                    <Card key={index}>
+                    <Card
+                      key={index}
+                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => setWatchingIndex(index)}
+                    >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
                           <div>
@@ -785,10 +789,14 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             <p className="font-semibold text-green-400">
                               £{Math.floor(listing.highestBid).toLocaleString()}
                             </p>
-                            <p className="text-sm text-muted-foreground">Current bid</p>
+                            <p className="text-sm text-muted-foreground">
+                              {listing.settled ? 'Final price' : 'Current bid'}
+                            </p>
                             <Badge variant="outline" className="mt-1">
                               <Clock className="h-3 w-3 mr-1" />
-                              {Math.max(0, listing.auctionMonth - monthsPlayed)} month(s)
+                              {listing.settled
+                                ? 'Sold'
+                                : `${Math.max(0, listing.auctionMonth - monthsPlayed)} month(s)`}
                             </Badge>
                           </div>
                         </div>
@@ -797,6 +805,26 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                   ))}
                 </div>
               </div>
+            )}
+
+            {watchingIndex !== null && listings[watchingIndex] && (
+              <SellerAuctionWatcher
+                listing={listings[watchingIndex]}
+                monthsPlayed={monthsPlayed}
+                onClose={() => setWatchingIndex(null)}
+                onWithdraw={() => {
+                  const idx = watchingIndex;
+                  setListings(prev => prev.filter((_, i) => i !== idx));
+                  setWatchingIndex(null);
+                  toast({ title: "Listing Withdrawn", description: "Your auction listing has been removed." });
+                }}
+                onBid={(bid) => {
+                  const idx = watchingIndex;
+                  setListings(prev => prev.map((l, i) => i === idx
+                    ? { ...l, highestBid: bid.amount, bidderCount: l.bidderCount + 1, bidHistory: [bid, ...l.bidHistory].slice(0, 30) }
+                    : l));
+                }}
+              />
             )}
           </TabsContent>
         </Tabs>
