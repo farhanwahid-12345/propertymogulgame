@@ -318,7 +318,8 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       listMonth: monthsPlayed,
       auctionMonth: monthsPlayed + 1, // Sells next in-game month
       highestBid: reserve * 0.8,
-      bidderCount: Math.floor(Math.random() * 3) + 1
+      bidderCount: Math.floor(Math.random() * 3) + 1,
+      bidHistory: [],
     };
 
     setListings(prev => [...prev, newListing]);
