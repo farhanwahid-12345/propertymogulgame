@@ -4,6 +4,21 @@ import { toPennies } from "@/lib/formatCurrency";
 import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
 import { getPropertyValueRangeForLevel } from "./financials";
 
+/** Map a property value (pennies) to a plausible gross rental yield %.
+ *  Cheaper stock yields more; prime stock yields less. ±1.5% jitter, clamped [2.5, 14]. */
+export function yieldForValue(valuePennies: number): number {
+  const v = valuePennies / 100; // pounds
+  let centre: number;
+  if (v <= 75_000) centre = 11;
+  else if (v <= 150_000) centre = 9;
+  else if (v <= 300_000) centre = 7.5;
+  else if (v <= 600_000) centre = 6;
+  else if (v <= 1_200_000) centre = 5;
+  else centre = 4;
+  const jittered = centre + (Math.random() - 0.5) * 3; // ±1.5
+  return Math.max(2.5, Math.min(14, jittered));
+}
+
 export function generateRandomProperty(level: number): Property {
   const id = `gen_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
   const types: Property['type'][] = ['residential', 'commercial', 'luxury'];
@@ -16,7 +31,7 @@ export function generateRandomProperty(level: number): Property {
   const price = Math.floor(basePrice / 100_000) * 100_000;
   const value = price;
 
-  const averageYield = 6 + Math.random() * 9;
+  const averageYield = yieldForValue(value);
   const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
 
   const neighborhood = NEIGHBORHOODS[Math.floor(Math.random() * NEIGHBORHOODS.length)];

@@ -12,6 +12,12 @@ import { Property } from "@/components/ui/property-card";
 import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+interface SellerBid {
+  bidder: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface AuctionListing {
   property: Property;
   reservePrice: number;
@@ -20,6 +26,9 @@ interface AuctionListing {
   auctionMonth: number; // monthsPlayed when auction completes
   highestBid: number;
   bidderCount: number;
+  bidHistory: SellerBid[];
+  finalSalePrice?: number;
+  settled?: boolean;
 }
 
 interface LiveAuction {
@@ -55,6 +64,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [reservePrice, setReservePrice] = useState("");
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
+  const [watchingIndex, setWatchingIndex] = useState<number | null>(null);
   
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
@@ -224,57 +234,38 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   // Monthly auction cycle for property listings - uses monthsPlayed
   useEffect(() => {
     setListings(prev => {
-      const completed: AuctionListing[] = [];
-      const active: AuctionListing[] = [];
+      const next: AuctionListing[] = [];
       
       prev.forEach(listing => {
+        if (listing.settled) {
+          next.push(listing);
+          return;
+        }
         if (monthsPlayed >= listing.auctionMonth) {
-          completed.push(listing);
-        } else {
-          // Simulate bidding activity
-          if (Math.random() > 0.5) {
-            const bidIncrease = listing.property.value * (0.01 + Math.random() * 0.05);
-            active.push({
-              ...listing,
-              highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
-              bidderCount: listing.bidderCount + 1
+          // Settle
+          const marketValue = listing.property.value;
+          const roll = Math.random();
+          let finalPrice: number;
+          if (roll < 0.70) finalPrice = marketValue * (0.90 + Math.random() * 0.15);
+          else if (roll < 0.85) finalPrice = marketValue * (0.80 + Math.random() * 0.10);
+          else finalPrice = marketValue * (1.05 + Math.random() * 0.10);
+          finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
+          
+          setTimeout(() => {
+            onAuctionSale(listing.property.id, finalPrice);
+            toast({
+              title: "Auction Complete! 🔨",
+              description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
             });
-          } else {
-            active.push(listing);
-          }
-        }
-      });
-      
-      // Process completed auctions
-      completed.forEach(listing => {
-        // Generate final price using market-value-anchored 70/15/15 distribution
-        const marketValue = listing.property.value;
-        const roll = Math.random();
-        let finalPrice: number;
-        
-        if (roll < 0.70) {
-          // 70%: near market value (90-105%)
-          finalPrice = marketValue * (0.90 + Math.random() * 0.15);
-        } else if (roll < 0.85) {
-          // 15%: below market (80-90%)
-          finalPrice = marketValue * (0.80 + Math.random() * 0.10);
+          }, 500);
+          
+          next.push({ ...listing, settled: true, finalSalePrice: finalPrice, highestBid: finalPrice });
         } else {
-          // 15%: above market (105-115%)
-          finalPrice = marketValue * (1.05 + Math.random() * 0.10);
+          next.push(listing);
         }
-        
-        finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
-        
-        setTimeout(() => {
-          onAuctionSale(listing.property.id, finalPrice);
-          toast({
-            title: "Auction Complete! 🔨",
-            description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
-          });
-        }, 500);
       });
       
-      return active;
+      return next;
     });
   }, [monthsPlayed]);
 
@@ -309,7 +300,8 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
       listMonth: monthsPlayed,
       auctionMonth: monthsPlayed + 1, // Sells next in-game month
       highestBid: reserve * 0.8,
-      bidderCount: Math.floor(Math.random() * 3) + 1
+      bidderCount: Math.floor(Math.random() * 3) + 1,
+      bidHistory: [],
     };
 
     setListings(prev => [...prev, newListing]);
@@ -779,7 +771,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                 <h4 className="font-semibold">Your Auction Listings</h4>
                 <div className="space-y-3">
                   {listings.map((listing, index) => (
-                    <Card key={index}>
+                    <Card
+                      key={index}
+                      className="cursor-pointer hover:bg-accent/30 transition-colors"
+                      onClick={() => setWatchingIndex(index)}
+                    >
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
                           <div>
@@ -794,10 +790,14 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             <p className="font-semibold text-green-400">
                               £{Math.floor(listing.highestBid).toLocaleString()}
                             </p>
-                            <p className="text-sm text-muted-foreground">Current bid</p>
+                            <p className="text-sm text-muted-foreground">
+                              {listing.settled ? 'Final price' : 'Current bid'}
+                            </p>
                             <Badge variant="outline" className="mt-1">
                               <Clock className="h-3 w-3 mr-1" />
-                              {Math.max(0, listing.auctionMonth - monthsPlayed)} month(s)
+                              {listing.settled
+                                ? 'Sold'
+                                : `${Math.max(0, listing.auctionMonth - monthsPlayed)} month(s)`}
                             </Badge>
                           </div>
                         </div>
@@ -807,8 +807,132 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                 </div>
               </div>
             )}
+
+            {watchingIndex !== null && listings[watchingIndex] && (
+              <SellerAuctionWatcher
+                listing={listings[watchingIndex]}
+                monthsPlayed={monthsPlayed}
+                onClose={() => setWatchingIndex(null)}
+                onWithdraw={() => {
+                  const idx = watchingIndex;
+                  setListings(prev => prev.filter((_, i) => i !== idx));
+                  setWatchingIndex(null);
+                  toast({ title: "Listing Withdrawn", description: "Your auction listing has been removed." });
+                }}
+                onBid={(bid) => {
+                  const idx = watchingIndex;
+                  setListings(prev => prev.map((l, i) => i === idx
+                    ? { ...l, highestBid: bid.amount, bidderCount: l.bidderCount + 1, bidHistory: [bid, ...l.bidHistory].slice(0, 30) }
+                    : l));
+                }}
+              />
+            )}
           </TabsContent>
         </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const SELLER_BIDDER_NAMES = [
+  "Michael J.", "Sarah T.", "Property Investor Ltd", "James W.",
+  "Emma R.", "David L.", "Trinity Homes", "North East Holdings",
+  "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
+];
+
+interface SellerAuctionWatcherProps {
+  listing: AuctionListing;
+  monthsPlayed: number;
+  onClose: () => void;
+  onWithdraw: () => void;
+  onBid: (bid: SellerBid) => void;
+}
+
+function SellerAuctionWatcher({ listing, monthsPlayed, onClose, onWithdraw, onBid }: SellerAuctionWatcherProps) {
+  const [auctioneerLine, setAuctioneerLine] = useState<string>(
+    `Lot opens — opening bid £${Math.floor(listing.highestBid).toLocaleString()}`
+  );
+
+  useEffect(() => {
+    if (listing.settled) return;
+    const interval = setInterval(() => {
+      if (Math.random() > 0.4) {
+        const bumpPct = 0.005 + Math.random() * 0.025;
+        const bumpAmount = Math.max(500, Math.floor(listing.property.value * bumpPct));
+        const newBid = Math.max(listing.reservePrice, listing.highestBid + bumpAmount);
+        const bidder = SELLER_BIDDER_NAMES[Math.floor(Math.random() * SELLER_BIDDER_NAMES.length)];
+        onBid({ bidder, amount: newBid, timestamp: Date.now() });
+        setAuctioneerLine(`Going once at £${newBid.toLocaleString()} — ${bidder}`);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [listing.settled, listing.highestBid, listing.reservePrice, listing.property.value, onBid]);
+
+  const monthsLeft = Math.max(0, listing.auctionMonth - monthsPlayed);
+  const reserveMet = listing.highestBid >= listing.reservePrice;
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Gavel className="h-5 w-5" />
+            {listing.property.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center bg-card/40 rounded-xl p-4 border border-border/50">
+            <div>
+              <p className="text-xs text-muted-foreground">Reserve / Guide</p>
+              <p className="text-sm">£{listing.reservePrice.toLocaleString()} / £{listing.guidePrice.toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">{listing.settled ? 'Sold for' : 'Current bid'}</p>
+              <p className="text-2xl font-bold text-green-400">£{Math.floor(listing.highestBid).toLocaleString()}</p>
+              <p className={`text-xs ${reserveMet ? 'text-green-400' : 'text-amber-400'}`}>
+                {reserveMet ? 'Reserve met' : 'Reserve not met'}
+              </p>
+            </div>
+          </div>
+
+          {!listing.settled && (
+            <div className="text-center text-sm italic text-muted-foreground p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+              {auctioneerLine}
+            </div>
+          )}
+
+          {listing.settled && (
+            <div className="text-center p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+              <p className="text-lg font-semibold">SOLD — £{Math.floor(listing.finalSalePrice ?? listing.highestBid).toLocaleString()}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Bid activity ({listing.bidderCount} bidders) · {monthsLeft} month(s) until hammer
+            </p>
+            <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-border/40 p-2 bg-background/40">
+              {listing.bidHistory.length === 0 && (
+                <p className="text-xs text-muted-foreground p-2">Waiting for bids…</p>
+              )}
+              {listing.bidHistory.map((bid, i) => (
+                <div key={i} className="flex justify-between text-sm py-1 px-2 hover:bg-accent/20 rounded">
+                  <span>· {bid.bidder}</span>
+                  <span className="font-medium text-green-400">£{bid.amount.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-2">
+            {!listing.settled ? (
+              <Button variant="destructive" onClick={onWithdraw}>Withdraw Listing</Button>
+            ) : (
+              <span />
+            )}
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
