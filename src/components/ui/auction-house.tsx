@@ -233,57 +233,38 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   // Monthly auction cycle for property listings - uses monthsPlayed
   useEffect(() => {
     setListings(prev => {
-      const completed: AuctionListing[] = [];
-      const active: AuctionListing[] = [];
+      const next: AuctionListing[] = [];
       
       prev.forEach(listing => {
+        if (listing.settled) {
+          next.push(listing);
+          return;
+        }
         if (monthsPlayed >= listing.auctionMonth) {
-          completed.push(listing);
-        } else {
-          // Simulate bidding activity
-          if (Math.random() > 0.5) {
-            const bidIncrease = listing.property.value * (0.01 + Math.random() * 0.05);
-            active.push({
-              ...listing,
-              highestBid: Math.max(listing.highestBid + bidIncrease, listing.reservePrice),
-              bidderCount: listing.bidderCount + 1
+          // Settle
+          const marketValue = listing.property.value;
+          const roll = Math.random();
+          let finalPrice: number;
+          if (roll < 0.70) finalPrice = marketValue * (0.90 + Math.random() * 0.15);
+          else if (roll < 0.85) finalPrice = marketValue * (0.80 + Math.random() * 0.10);
+          else finalPrice = marketValue * (1.05 + Math.random() * 0.10);
+          finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
+          
+          setTimeout(() => {
+            onAuctionSale(listing.property.id, finalPrice);
+            toast({
+              title: "Auction Complete! 🔨",
+              description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
             });
-          } else {
-            active.push(listing);
-          }
-        }
-      });
-      
-      // Process completed auctions
-      completed.forEach(listing => {
-        // Generate final price using market-value-anchored 70/15/15 distribution
-        const marketValue = listing.property.value;
-        const roll = Math.random();
-        let finalPrice: number;
-        
-        if (roll < 0.70) {
-          // 70%: near market value (90-105%)
-          finalPrice = marketValue * (0.90 + Math.random() * 0.15);
-        } else if (roll < 0.85) {
-          // 15%: below market (80-90%)
-          finalPrice = marketValue * (0.80 + Math.random() * 0.10);
+          }, 500);
+          
+          next.push({ ...listing, settled: true, finalSalePrice: finalPrice, highestBid: finalPrice });
         } else {
-          // 15%: above market (105-115%)
-          finalPrice = marketValue * (1.05 + Math.random() * 0.10);
+          next.push(listing);
         }
-        
-        finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
-        
-        setTimeout(() => {
-          onAuctionSale(listing.property.id, finalPrice);
-          toast({
-            title: "Auction Complete! 🔨",
-            description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
-          });
-        }, 500);
       });
       
-      return active;
+      return next;
     });
   }, [monthsPlayed]);
 
