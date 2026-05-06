@@ -16,7 +16,7 @@ export function generateRandomProperty(level: number): Property {
   const price = Math.floor(basePrice / 100_000) * 100_000;
   const value = price;
 
-  const averageYield = 6 + Math.random() * 9;
+  const averageYield = yieldForValue(value);
   const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
 
   const neighborhood = NEIGHBORHOODS[Math.floor(Math.random() * NEIGHBORHOODS.length)];
