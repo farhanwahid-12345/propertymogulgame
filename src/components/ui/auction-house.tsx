@@ -64,6 +64,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [reservePrice, setReservePrice] = useState("");
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
+  const [watchingIndex, setWatchingIndex] = useState<number | null>(null);
   
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
