@@ -833,3 +833,107 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     </Dialog>
   );
 }
+
+const SELLER_BIDDER_NAMES = [
+  "Michael J.", "Sarah T.", "Property Investor Ltd", "James W.",
+  "Emma R.", "David L.", "Trinity Homes", "North East Holdings",
+  "Liverpool Capital", "Manchester Properties", "Yorkshire Estates"
+];
+
+interface SellerAuctionWatcherProps {
+  listing: AuctionListing;
+  monthsPlayed: number;
+  onClose: () => void;
+  onWithdraw: () => void;
+  onBid: (bid: SellerBid) => void;
+}
+
+function SellerAuctionWatcher({ listing, monthsPlayed, onClose, onWithdraw, onBid }: SellerAuctionWatcherProps) {
+  const [auctioneerLine, setAuctioneerLine] = useState<string>(
+    `Lot opens — opening bid £${Math.floor(listing.highestBid).toLocaleString()}`
+  );
+
+  useEffect(() => {
+    if (listing.settled) return;
+    const interval = setInterval(() => {
+      if (Math.random() > 0.4) {
+        const bumpPct = 0.005 + Math.random() * 0.025;
+        const bumpAmount = Math.max(500, Math.floor(listing.property.value * bumpPct));
+        const newBid = Math.max(listing.reservePrice, listing.highestBid + bumpAmount);
+        const bidder = SELLER_BIDDER_NAMES[Math.floor(Math.random() * SELLER_BIDDER_NAMES.length)];
+        onBid({ bidder, amount: newBid, timestamp: Date.now() });
+        setAuctioneerLine(`Going once at £${newBid.toLocaleString()} — ${bidder}`);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [listing.settled, listing.highestBid, listing.reservePrice, listing.property.value, onBid]);
+
+  const monthsLeft = Math.max(0, listing.auctionMonth - monthsPlayed);
+  const reserveMet = listing.highestBid >= listing.reservePrice;
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Gavel className="h-5 w-5" />
+            {listing.property.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center bg-card/40 rounded-xl p-4 border border-border/50">
+            <div>
+              <p className="text-xs text-muted-foreground">Reserve / Guide</p>
+              <p className="text-sm">£{listing.reservePrice.toLocaleString()} / £{listing.guidePrice.toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">{listing.settled ? 'Sold for' : 'Current bid'}</p>
+              <p className="text-2xl font-bold text-green-400">£{Math.floor(listing.highestBid).toLocaleString()}</p>
+              <p className={`text-xs ${reserveMet ? 'text-green-400' : 'text-amber-400'}`}>
+                {reserveMet ? 'Reserve met' : 'Reserve not met'}
+              </p>
+            </div>
+          </div>
+
+          {!listing.settled && (
+            <div className="text-center text-sm italic text-muted-foreground p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+              {auctioneerLine}
+            </div>
+          )}
+
+          {listing.settled && (
+            <div className="text-center p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+              <p className="text-lg font-semibold">SOLD — £{Math.floor(listing.finalSalePrice ?? listing.highestBid).toLocaleString()}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Bid activity ({listing.bidderCount} bidders) · {monthsLeft} month(s) until hammer
+            </p>
+            <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-border/40 p-2 bg-background/40">
+              {listing.bidHistory.length === 0 && (
+                <p className="text-xs text-muted-foreground p-2">Waiting for bids…</p>
+              )}
+              {listing.bidHistory.map((bid, i) => (
+                <div key={i} className="flex justify-between text-sm py-1 px-2 hover:bg-accent/20 rounded">
+                  <span>· {bid.bidder}</span>
+                  <span className="font-medium text-green-400">£{bid.amount.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-2">
+            {!listing.settled ? (
+              <Button variant="destructive" onClick={onWithdraw}>Withdraw Listing</Button>
+            ) : (
+              <span />
+            )}
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
