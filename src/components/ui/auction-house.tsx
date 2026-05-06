@@ -12,6 +12,12 @@ import { Property } from "@/components/ui/property-card";
 import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+interface SellerBid {
+  bidder: string;
+  amount: number;
+  timestamp: number;
+}
+
 interface AuctionListing {
   property: Property;
   reservePrice: number;
@@ -20,6 +26,9 @@ interface AuctionListing {
   auctionMonth: number; // monthsPlayed when auction completes
   highestBid: number;
   bidderCount: number;
+  bidHistory: SellerBid[];
+  finalSalePrice?: number;
+  settled?: boolean;
 }
 
 interface LiveAuction {
