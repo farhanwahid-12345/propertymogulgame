@@ -105,7 +105,7 @@ const Index = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 space-y-5">
+      <div className="container mx-auto px-4 py-6 space-y-5 pb-24 md:pb-6">
         {/* Activity ticker — slim horizontal feed */}
         <ActivityTicker
           monthsPlayed={gameState.monthsPlayed}
@@ -140,7 +140,7 @@ const Index = () => {
         />
 
         {/* Tabs + Action Tiles */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 glass border-0 bg-white/[0.06]">
             <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-xl">
               🏪 Market
