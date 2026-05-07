@@ -346,8 +346,14 @@ const Index = () => {
               <div className="glass p-3 text-center">
                 <div className="text-xs text-muted-foreground">Avg Yield</div>
                 <div className="text-lg font-bold text-[hsl(var(--stat-credit))]">{avgYield}%</div>
-              </div>
-            </div>
+      </div>
+
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
+      />
+    </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
               {/* Conveyancing-buying properties (pending) */}
