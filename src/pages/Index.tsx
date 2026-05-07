@@ -427,6 +427,12 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
+      />
     </div>
   );
 };
