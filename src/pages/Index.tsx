@@ -247,47 +247,69 @@ const Index = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Eviction timeline (action-required) */}
-        <EvictionTimelineFeed
-          pendingEvictions={gameState.pendingEvictions || []}
-          ownedProperties={gameState.ownedProperties}
-          tenants={gameState.tenants}
-          monthsPlayed={gameState.monthsPlayed}
-          
-        />
+        {/* Alerts: evictions + disputes */}
+        <CollapsibleSection
+          id="section-alerts"
+          title="⚠️ Action Required"
+          badge={
+            ((gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)) > 0 ? (
+              <Badge variant="destructive" className="text-[10px]">
+                {(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
+              </Badge>
+            ) : null
+          }
+          defaultOpenMobile={true}
+        >
+          <EvictionTimelineFeed
+            pendingEvictions={gameState.pendingEvictions || []}
+            ownedProperties={gameState.ownedProperties}
+            tenants={gameState.tenants}
+            monthsPlayed={gameState.monthsPlayed}
+          />
+          <DepositDisputesFeed
+            disputes={gameState.depositDisputes || []}
+            onDispute={gameState.disputeDeposit}
+            onDismiss={gameState.dismissDispute}
+          />
+        </CollapsibleSection>
 
-        {/* Deposit disputes (action-required) */}
-        <DepositDisputesFeed
-          disputes={gameState.depositDisputes || []}
-          onDispute={gameState.disputeDeposit}
-          onDismiss={gameState.dismissDispute}
-        />
-
-        {/* Operations Center — combines conveyancing, planning, renovations, concerns, activity */}
-        <OperationsCenter
-          monthsPlayed={gameState.monthsPlayed}
-          conveyancing={gameState.conveyancing || []}
-          renovations={gameState.renovations || []}
-          planningApplications={(gameState as any).planningApplications || []}
-          tenantConcerns={(gameState.tenantConcerns || []) as any}
-          ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
-          ownedPropertiesFull={gameState.ownedProperties}
-          playerCash={gameState.cash * 100}
-          onResolveConcern={gameState.resolveTenantConcern}
-          onSnoozeConcern={gameState.dismissTenantConcern}
-          tenantHistory={(gameState as any).tenantHistory || []}
-          tenantEvents={gameState.tenantEvents}
-          economicEvents={gameState.economicEvents}
-          taxRecords={gameState.taxRecords || []}
-        />
+        {/* Operations Center */}
+        <CollapsibleSection id="section-ops" title="🔨 Operations" defaultOpenMobile={false}>
+          <OperationsCenter
+            monthsPlayed={gameState.monthsPlayed}
+            conveyancing={gameState.conveyancing || []}
+            renovations={gameState.renovations || []}
+            planningApplications={(gameState as any).planningApplications || []}
+            tenantConcerns={(gameState.tenantConcerns || []) as any}
+            ownedProperties={gameState.ownedProperties.map(p => ({ id: p.id, name: p.name }))}
+            ownedPropertiesFull={gameState.ownedProperties}
+            playerCash={gameState.cash * 100}
+            onResolveConcern={gameState.resolveTenantConcern}
+            onSnoozeConcern={gameState.dismissTenantConcern}
+            tenantHistory={(gameState as any).tenantHistory || []}
+            tenantEvents={gameState.tenantEvents}
+            economicEvents={gameState.economicEvents}
+            taxRecords={gameState.taxRecords || []}
+          />
+        </CollapsibleSection>
 
         {/* Listed Properties */}
-        <ListedProperties 
-          propertyListings={gameState.propertyListings}
-          ownedProperties={gameState.ownedProperties}
-          onAcceptOffer={(property, offer) => gameState.handleEstateAgentSale(property.id, offer)}
-          onSetAutoAcceptThreshold={gameState.setAutoAcceptThreshold}
-        />
+        <CollapsibleSection
+          title="📃 Listed Properties"
+          badge={
+            gameState.propertyListings?.length ? (
+              <Badge variant="secondary" className="text-[10px]">{gameState.propertyListings.length}</Badge>
+            ) : null
+          }
+          defaultOpenMobile={false}
+        >
+          <ListedProperties
+            propertyListings={gameState.propertyListings}
+            ownedProperties={gameState.ownedProperties}
+            onAcceptOffer={(property, offer) => gameState.handleEstateAgentSale(property.id, offer)}
+            onSetAutoAcceptThreshold={gameState.setAutoAcceptThreshold}
+          />
+        </CollapsibleSection>
 
         {/* Player Portfolio */}
         {(gameState.ownedProperties.length > 0 || conveyancingBuyProperties.length > 0) && (
