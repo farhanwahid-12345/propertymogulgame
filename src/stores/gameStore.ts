@@ -348,6 +348,7 @@ function createInitialState(): GameState {
     overdraftLimit: 0,
     overdraftUsed: 0,
     entityType: 'sole_trader',
+    entityChosen: false,
     ownedProperties: [],
     estateAgentProperties: shuffled.slice(5),
     auctionProperties: shuffled.slice(0, 5),
