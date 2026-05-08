@@ -246,6 +246,16 @@ const Index = () => {
                 netWorth={gameState.netWorth}
               />
             </div>
+            <div className="mt-4">
+              <TaxBreakdown
+                entityType={gameState.entityType}
+                yearlyGrossRent={(gameState as any).yearlyGrossRentPennies || 0}
+                yearlyMortgageInterest={(gameState as any).yearlyMortgageInterestPennies || 0}
+                yearlyDeductibleExpenses={(gameState as any).yearlyDeductibleExpensesPennies || 0}
+                taxRecords={gameState.taxRecords || []}
+                totalTaxPaidPennies={(gameState as any).totalTaxPaidPennies || 0}
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
