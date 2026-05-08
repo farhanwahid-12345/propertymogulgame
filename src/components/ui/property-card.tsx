@@ -14,6 +14,7 @@ import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTria
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { getMarketRentPounds } from "@/lib/engine/market";
 
 export interface Property {
   id: string;
