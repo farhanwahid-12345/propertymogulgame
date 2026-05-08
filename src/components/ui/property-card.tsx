@@ -521,9 +521,11 @@ export const PropertyCard = memo(function PropertyCard({
                           propertyName={property.name}
                           currentRent={property.monthlyIncome}
                           marketRent={
-                            property.value > 0
-                              ? Math.round((property.value * ((property.yield ?? 7) / 100)) / 12)
-                              : property.monthlyIncome
+                            getMarketRentPounds({
+                              value: property.value,
+                              yield: property.yield,
+                              condition: property.condition as any,
+                            }) || property.monthlyIncome
                           }
                           monthsSinceLastIncrease={
                             property.lastRentIncrease !== undefined
