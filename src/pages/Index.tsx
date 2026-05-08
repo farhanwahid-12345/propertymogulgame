@@ -17,6 +17,8 @@ import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
+import { EntityOnboardingDialog } from "@/components/ui/entity-onboarding-dialog";
+import { TaxBreakdown } from "@/components/ui/tax-breakdown";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
