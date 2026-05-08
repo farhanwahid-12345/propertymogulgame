@@ -990,9 +990,21 @@ export const useGameStore = create<GameState & GameActions>()(
           existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
         });
 
+        // Properties currently in conveyancing (selling or buying) shouldn't
+        // surface new tenant concerns — the player can't act on them and the
+        // feed filters them out, which produced phantom toast notifications.
+        const inConveyancingIds = new Set(
+          (prev.conveyancing || [])
+            .filter((c: any) => c.status === 'selling' || c.status === 'buying')
+            .map((c: any) => c.propertyId)
+        );
+        const ownedIdsForConcerns = new Set(updatedOwnedProperties.map(p => p.id));
+
         newTenants.forEach(t => {
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
           if (!property) return;
+          if (!ownedIdsForConcerns.has(t.propertyId)) return;
+          if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
           let chance = 0.06;
