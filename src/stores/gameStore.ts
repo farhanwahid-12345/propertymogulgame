@@ -3133,7 +3133,7 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 5,
+      version: 12,
       migrate: (persisted: any, _version: number) => {
         // Always run migrateState — idempotent and repairs any stale field shape
         return migrateState(persisted);
