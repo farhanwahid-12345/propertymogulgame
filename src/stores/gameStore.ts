@@ -1035,8 +1035,13 @@ export const useGameStore = create<GameState & GameActions>()(
           existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
         });
 
-        if (newConcerns.length > 0) {
-          showToast("New Tenant Concern 🛠️", `${newConcerns.length} new concern${newConcerns.length > 1 ? 's' : ''} raised — check the feed.`);
+        // Only toast for concerns that will actually appear in the feed
+        // (owned, unresolved, not in conveyancing).
+        const visibleNew = newConcerns.filter(c =>
+          ownedIdsForConcerns.has(c.propertyId) && !inConveyancingIds.has(c.propertyId)
+        );
+        if (visibleNew.length > 0) {
+          showToast("New Tenant Concern 🛠️", `${visibleNew.length} new concern${visibleNew.length > 1 ? 's' : ''} raised — check the feed.`);
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
