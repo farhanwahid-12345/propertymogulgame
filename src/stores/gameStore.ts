@@ -629,10 +629,10 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Insufficient Funds", "Need £1,000 (even with overdraft) to incorporate.", "destructive");
             return;
           }
-          set({ entityType: type, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+          set({ entityType: type, entityChosen: true, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
           showToast("Incorporated! 🏢", `You are now trading as a Limited Company. Mortgage interest is fully tax-deductible.${debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft.)` : ''}`);
         } else {
-          set({ entityType: type });
+          set({ entityType: type, entityChosen: true });
         }
       },
 
