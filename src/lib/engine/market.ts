@@ -91,3 +91,32 @@ export function deriveSqft(p: { type: 'residential' | 'commercial' | 'luxury'; v
   const internal = Math.round(500 + (valuePounds / 150));
   return { internalSqft: Math.min(1800, Math.max(500, internal)), plotSqft: Math.round(1500 + (valuePounds / 50)) };
 }
+
+/**
+ * Fair monthly market rent in POUNDS for a property, accounting for condition
+ * (renovations push effective rent up). Blends the property's stored yield
+ * (preserves traits/location) with a condition-anchored yield, then scales by
+ * a quality multiplier reflecting refurb premium.
+ *
+ * Inputs read in pounds (UI side); callers in pennies should divide first.
+ */
+export function getMarketRentPounds(p: {
+  value: number; // pounds
+  yield?: number; // %
+  condition?: 'premium' | 'standard' | 'dilapidated';
+}): number {
+  if (!p.value || p.value <= 0) return 0;
+  const conditionYield =
+    p.condition === 'dilapidated' ? 0.085 :
+    p.condition === 'premium'     ? 0.065 :
+                                    0.075;
+  const ownYield = (typeof p.yield === 'number' ? p.yield : 7) / 100;
+  // Blend: keep some of the property's individuality, anchor to condition norms
+  const blended = ownYield * 0.4 + conditionYield * 0.6;
+  // Quality premium: refurbished stock commands more than yield alone implies
+  const qualityMult =
+    p.condition === 'premium'     ? 1.12 :
+    p.condition === 'dilapidated' ? 0.92 :
+                                    1.0;
+  return Math.round((p.value * blended * qualityMult) / 12);
+}

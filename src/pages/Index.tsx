@@ -17,6 +17,8 @@ import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
+import { EntityOnboardingDialog } from "@/components/ui/entity-onboarding-dialog";
+import { TaxBreakdown } from "@/components/ui/tax-breakdown";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { RotateCcw } from "lucide-react";
@@ -244,6 +246,16 @@ const Index = () => {
                 netWorth={gameState.netWorth}
               />
             </div>
+            <div className="mt-4">
+              <TaxBreakdown
+                entityType={gameState.entityType}
+                yearlyGrossRent={(gameState as any).yearlyGrossRentPennies || 0}
+                yearlyMortgageInterest={(gameState as any).yearlyMortgageInterestPennies || 0}
+                yearlyDeductibleExpenses={(gameState as any).yearlyDeductibleExpensesPennies || 0}
+                taxRecords={gameState.taxRecords || []}
+                totalTaxPaidPennies={(gameState as any).totalTaxPaidPennies || 0}
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -432,6 +444,11 @@ const Index = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
+      />
+
+      <EntityOnboardingDialog
+        open={!(gameState as any).entityChosen}
+        onChoose={gameState.setEntityType}
       />
     </div>
   );

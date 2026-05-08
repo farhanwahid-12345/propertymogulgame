@@ -282,6 +282,8 @@ export interface GameState {
   overdraftLimit: number; // pennies
   overdraftUsed: number; // pennies
   entityType: EntityType;
+  /** Has the player explicitly chosen sole_trader vs ltd at game start? */
+  entityChosen?: boolean;
   // Properties
   ownedProperties: Property[];
   estateAgentProperties: Property[];

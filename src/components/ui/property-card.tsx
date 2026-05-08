@@ -14,6 +14,7 @@ import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTria
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { getMarketRentPounds } from "@/lib/engine/market";
 
 export interface Property {
   id: string;
@@ -521,9 +522,11 @@ export const PropertyCard = memo(function PropertyCard({
                           propertyName={property.name}
                           currentRent={property.monthlyIncome}
                           marketRent={
-                            property.value > 0
-                              ? Math.round((property.value * ((property.yield ?? 7) / 100)) / 12)
-                              : property.monthlyIncome
+                            getMarketRentPounds({
+                              value: property.value,
+                              yield: property.yield,
+                              condition: property.condition as any,
+                            }) || property.monthlyIncome
                           }
                           monthsSinceLastIncrease={
                             property.lastRentIncrease !== undefined

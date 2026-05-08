@@ -11,11 +11,22 @@ const HIGHER_RATE_LIMIT = 12_514_000; // £125,140
  * Section 24: mortgage interest is NOT deductible — only a 20% tax credit.
  * Input: annual figures in pennies.
  */
+export interface IncomeTaxBreakdown {
+  tax: number;
+  section24Credit: number;
+  effectiveTax: number;
+  personalAllowance: number;
+  basicBandTax: number;
+  higherBandTax: number;
+  additionalBandTax: number;
+  taxableIncome: number;
+}
+
 export function calculateIncomeTax(
   annualRentalIncome: number,
   annualMortgageInterest: number,
   annualExpenses: number, // council tax, repairs, etc.
-): { tax: number; section24Credit: number; effectiveTax: number } {
+): IncomeTaxBreakdown {
   // Sole trader: expenses (excl mortgage interest) are deductible
   const taxableIncome = Math.max(0, annualRentalIncome - annualExpenses);
 
@@ -23,31 +34,41 @@ export function calculateIncomeTax(
   let remaining = taxableIncome;
 
   // Personal allowance (tapers above £100k but we'll simplify)
-  const personalAllowance = taxableIncome > 10_000_000 
+  const personalAllowance = taxableIncome > 10_000_000
     ? Math.max(0, PERSONAL_ALLOWANCE - Math.floor((taxableIncome - 10_000_000) / 2))
     : PERSONAL_ALLOWANCE;
   remaining = Math.max(0, remaining - personalAllowance);
 
   // Basic rate: 20%
   const basicBand = Math.min(remaining, BASIC_RATE_LIMIT - personalAllowance);
-  tax += Math.floor(basicBand * 0.20);
+  const basicBandTax = Math.floor(basicBand * 0.20);
+  tax += basicBandTax;
   remaining -= basicBand;
 
   // Higher rate: 40%
   const higherBand = Math.min(remaining, HIGHER_RATE_LIMIT - BASIC_RATE_LIMIT);
-  tax += Math.floor(higherBand * 0.40);
+  const higherBandTax = Math.floor(higherBand * 0.40);
+  tax += higherBandTax;
   remaining -= higherBand;
 
   // Additional rate: 45%
-  if (remaining > 0) {
-    tax += Math.floor(remaining * 0.45);
-  }
+  const additionalBandTax = remaining > 0 ? Math.floor(remaining * 0.45) : 0;
+  tax += additionalBandTax;
 
   // Section 24: 20% tax credit on mortgage interest
   const section24Credit = Math.floor(annualMortgageInterest * 0.20);
   const effectiveTax = Math.max(0, tax - section24Credit);
 
-  return { tax, section24Credit, effectiveTax };
+  return {
+    tax,
+    section24Credit,
+    effectiveTax,
+    personalAllowance,
+    basicBandTax,
+    higherBandTax,
+    additionalBandTax,
+    taxableIncome,
+  };
 }
 
 /**

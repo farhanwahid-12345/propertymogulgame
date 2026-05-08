@@ -338,7 +338,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 5,
+    _version: 12,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -348,6 +348,7 @@ function createInitialState(): GameState {
     overdraftLimit: 0,
     overdraftUsed: 0,
     entityType: 'sole_trader',
+    entityChosen: false,
     ownedProperties: [],
     estateAgentProperties: shuffled.slice(5),
     auctionProperties: shuffled.slice(0, 5),
@@ -529,6 +530,14 @@ function migrateState(persisted: any): GameState {
     persisted._version = 11;
   }
 
+  // v11 → v12: add entityChosen flag (existing saves are grandfathered as chosen)
+  if (persisted._version < 12) {
+    if (typeof persisted.entityChosen !== 'boolean') {
+      persisted.entityChosen = true;
+    }
+    persisted._version = 12;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
@@ -620,10 +629,10 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Insufficient Funds", "Need £1,000 (even with overdraft) to incorporate.", "destructive");
             return;
           }
-          set({ entityType: type, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+          set({ entityType: type, entityChosen: true, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
           showToast("Incorporated! 🏢", `You are now trading as a Limited Company. Mortgage interest is fully tax-deductible.${debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft.)` : ''}`);
         } else {
-          set({ entityType: type });
+          set({ entityType: type, entityChosen: true });
         }
       },
 
@@ -990,9 +999,21 @@ export const useGameStore = create<GameState & GameActions>()(
           existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
         });
 
+        // Properties currently in conveyancing (selling or buying) shouldn't
+        // surface new tenant concerns — the player can't act on them and the
+        // feed filters them out, which produced phantom toast notifications.
+        const inConveyancingIds = new Set(
+          (prev.conveyancing || [])
+            .filter((c: any) => c.status === 'selling' || c.status === 'buying')
+            .map((c: any) => c.propertyId)
+        );
+        const ownedIdsForConcerns = new Set(updatedOwnedProperties.map(p => p.id));
+
         newTenants.forEach(t => {
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
           if (!property) return;
+          if (!ownedIdsForConcerns.has(t.propertyId)) return;
+          if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
           let chance = 0.06;
@@ -1023,8 +1044,13 @@ export const useGameStore = create<GameState & GameActions>()(
           existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
         });
 
-        if (newConcerns.length > 0) {
-          showToast("New Tenant Concern 🛠️", `${newConcerns.length} new concern${newConcerns.length > 1 ? 's' : ''} raised — check the feed.`);
+        // Only toast for concerns that will actually appear in the feed
+        // (owned, unresolved, not in conveyancing).
+        const visibleNew = newConcerns.filter(c =>
+          ownedIdsForConcerns.has(c.propertyId) && !inConveyancingIds.has(c.propertyId)
+        );
+        if (visibleNew.length > 0) {
+          showToast("New Tenant Concern 🛠️", `${visibleNew.length} new concern${visibleNew.length > 1 ? 's' : ''} raised — check the feed.`);
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
@@ -3107,7 +3133,7 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 5,
+      version: 12,
       migrate: (persisted: any, _version: number) => {
         // Always run migrateState — idempotent and repairs any stale field shape
         return migrateState(persisted);
