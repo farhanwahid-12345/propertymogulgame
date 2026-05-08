@@ -530,6 +530,14 @@ function migrateState(persisted: any): GameState {
     persisted._version = 11;
   }
 
+  // v11 → v12: add entityChosen flag (existing saves are grandfathered as chosen)
+  if (persisted._version < 12) {
+    if (typeof persisted.entityChosen !== 'boolean') {
+      persisted.entityChosen = true;
+    }
+    persisted._version = 12;
+  }
+
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
     persisted.tenantConcerns = [];
