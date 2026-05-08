@@ -445,6 +445,11 @@ const Index = () => {
         onTabChange={setActiveTab}
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
       />
+
+      <EntityOnboardingDialog
+        open={!(gameState as any).entityChosen}
+        onChoose={gameState.setEntityType}
+      />
     </div>
   );
 };
