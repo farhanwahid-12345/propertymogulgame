@@ -938,7 +938,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const walkoutDisputes: DepositDispute[] = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
-          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 25 && Math.random() < 0.08;
+          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && Math.random() < 0.05;
           if (!guaranteedExit && !probabilisticExit) return true;
 
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
