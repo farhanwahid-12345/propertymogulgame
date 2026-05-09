@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Building2, Calculator, TrendingDown, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment, calculateMortgageEligibility, findMaxEligibleLoan } from "@/lib/mortgageEligibility";
 import { cn } from "@/lib/utils";
 
 interface MortgageManagementProps {
@@ -308,8 +308,31 @@ export function MortgageManagement({
                           </div>
                         )}
                         {eligibility && !eligibility.eligible && eligibility.reason && (
-                          <div className="col-span-2 p-2 rounded border border-red-500/40 bg-red-500/10 text-xs text-red-400">
-                            {eligibility.reason}
+                          <div className="col-span-2 p-2 rounded border border-red-500/40 bg-red-500/10 text-xs text-red-400 space-y-1">
+                            <div>{eligibility.reason}</div>
+                            {selectedProperty && singleProviderData && (() => {
+                              const maxEligible = findMaxEligibleLoan({
+                                creditScore,
+                                propertyValue: selectedProperty.value,
+                                propertyMonthlyRent: selectedProperty.monthlyIncome,
+                                providerBaseRate: singleProviderData.baseRate,
+                                providerMinCreditScore: singleProviderData.minCreditScore,
+                                providerMaxLTV: singleProviderData.maxLTV,
+                                providerId: singleProviderData.id,
+                                termYears: singleTermYears,
+                                mortgageType: singleMortgageType,
+                                existingMonthlyMortgagePayments,
+                                totalRentalIncome,
+                                ownedPropertyCount: ownedProperties.length,
+                              });
+                              return maxEligible > 0 ? (
+                                <div className="text-foreground/80">
+                                  Up to <strong>£{maxEligible.toLocaleString()}</strong> would be approved with this lender.
+                                </div>
+                              ) : (
+                                <div className="text-foreground/70">No loan amount qualifies — try another lender.</div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -323,7 +346,7 @@ export function MortgageManagement({
                   disabled={!singleProvider || singleLoanAmount[0] <= 0 || !icrPasses || (eligibility ? !eligibility.eligible : false)}
                 >
                   <TrendingDown className="h-4 w-4 mr-2" />
-                  Refinance Property
+                  {eligibility && !eligibility.eligible ? 'Mortgage would be rejected' : 'Refinance Property'}
                 </Button>
               </div>
             )}
