@@ -1043,7 +1043,7 @@ export const useGameStore = create<GameState & GameActions>()(
             description: desc,
             raisedMonth: newMonthNumber,
             resolveCost: cost,
-            satisfactionPenaltyIfIgnored: Math.round(tpl.penalty * penaltyMod),
+            satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
           });
           existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
         });
@@ -1074,8 +1074,8 @@ export const useGameStore = create<GameState & GameActions>()(
             return { ...c, resolvedMonth: newMonthNumber };
           }
           // Grace period before satisfaction starts decaying:
-          // urgent (safety/noise) and damage-sourced → 1 month; everything else → 2 months
-          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+          // urgent (safety/noise) and damage-sourced → 2 months; everything else → 3 months
+          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 2 : 3;
           const monthsOpen = newMonthNumber - c.raisedMonth;
           if (monthsOpen > grace) {
             satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
