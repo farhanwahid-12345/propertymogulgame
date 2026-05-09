@@ -2055,9 +2055,33 @@ export const useGameStore = create<GameState & GameActions>()(
         set(s => ({ propertyListings: [...s.propertyListings, listing] }));
       },
 
-      cancelPropertyListing: (propertyId) => set(s => ({
-        propertyListings: s.propertyListings.filter(l => l.propertyId !== propertyId)
-      })),
+      cancelPropertyListing: (propertyId) => set(s => {
+        const listing = s.propertyListings.find(l => l.propertyId === propertyId);
+        if (!listing) return {} as any;
+        const property = s.ownedProperties.find(p => p.id === propertyId);
+        // Detect a buyer in active conveyancing for this property (chain in progress)
+        const inChain = (s.conveyancing || []).some((c: any) => c.propertyId === propertyId && c.status === 'selling');
+        const feePennies = inChain ? toPennies(1500) : toPennies(750);
+        if (s.cash < feePennies) {
+          showToast(
+            "Cannot Withdraw",
+            `You need £${fromPennies(feePennies).toLocaleString()} to cover solicitor + agent fees${inChain ? ' (chain collapse)' : ''}.`,
+            "destructive",
+          );
+          return {} as any;
+        }
+        showToast(
+          inChain ? "Chain Collapsed" : "Listing Withdrawn",
+          `${property?.name ?? 'Property'} pulled from sale. Fee £${fromPennies(feePennies).toLocaleString()} paid.`,
+          inChain ? "destructive" : undefined,
+        );
+        return {
+          cash: s.cash - feePennies,
+          propertyListings: s.propertyListings.filter(l => l.propertyId !== propertyId),
+          // Drop any in-flight selling conveyancing for this property
+          conveyancing: (s.conveyancing || []).filter((c: any) => !(c.propertyId === propertyId && c.status === 'selling')),
+        };
+      }),
 
       updatePropertyListingPrice: (propertyId, newPrice) => {
         set(s => ({
