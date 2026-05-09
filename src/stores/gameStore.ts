@@ -882,7 +882,7 @@ export const useGameStore = create<GameState & GameActions>()(
           let delta = 0;
 
           if (property.condition === 'dilapidated') {
-            delta -= 15; reasons.push({ reason: 'Dilapidated condition', delta: -15 });
+            delta -= 8; reasons.push({ reason: 'Dilapidated condition', delta: -8 });
           } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
             const hasPlanningCooldown = (prev.propertyLocks || []).some(
               l => l.propertyId === property.id && l.reason === 'planning_cooldown' && newMonthNumber < l.untilMonth,
@@ -893,8 +893,8 @@ export const useGameStore = create<GameState & GameActions>()(
               hasPlanningCooldown,
             });
             if (eligible) {
-              delta -= 5;
-              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -5 });
+              delta -= 3;
+              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -3 });
             } else {
               reasons.push({ reason: 'Premium tenant accepts current standard', delta: 0 });
             }
@@ -903,21 +903,25 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           if (recentDamageIds.has(t.propertyId)) {
-            delta -= 10; reasons.push({ reason: 'Unrepaired damage', delta: -10 });
+            delta -= 5; reasons.push({ reason: 'Unrepaired damage', delta: -5 });
           }
 
           // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
           const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
-          if (property.lastRentIncrease !== undefined && newMonthNumber - property.lastRentIncrease <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
-            delta -= 4; reasons.push({ reason: 'Recent rent increase', delta: -4 });
+          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+            delta -= 2; reasons.push({ reason: 'Recent rent increase', delta: -2 });
           }
 
-          // Drift back toward 70 baseline if no negative pressure
-          if (reasons.length === 0) {
-            const drift = t.satisfaction < 70 ? 2 : t.satisfaction > 70 ? -1 : 0;
+          // Happiness drift: gentle pull toward ~75 baseline whenever no acute pressure
+          const hasNegativePressure = delta < 0;
+          if (!hasNegativePressure) {
+            const drift = t.satisfaction < 75 ? 2 : t.satisfaction > 85 ? -1 : 1;
             delta += drift;
-            if (drift !== 0) reasons.push({ reason: 'Stable conditions', delta: drift });
+            reasons.push({ reason: 'Stable conditions', delta: drift });
           }
+
+          // Cap monthly net drop at -4 to prevent rapid satisfaction collapse
+          if (delta < -4) delta = -4;
 
           const newSatisfaction = Math.max(0, Math.min(100, t.satisfaction + delta));
           return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
@@ -934,7 +938,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const walkoutDisputes: DepositDispute[] = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
-          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 25 && Math.random() < 0.08;
+          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && Math.random() < 0.05;
           if (!guaranteedExit && !probabilisticExit) return true;
 
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
@@ -1039,7 +1043,7 @@ export const useGameStore = create<GameState & GameActions>()(
             description: desc,
             raisedMonth: newMonthNumber,
             resolveCost: cost,
-            satisfactionPenaltyIfIgnored: Math.round(tpl.penalty * penaltyMod),
+            satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
           });
           existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
         });
@@ -1070,8 +1074,8 @@ export const useGameStore = create<GameState & GameActions>()(
             return { ...c, resolvedMonth: newMonthNumber };
           }
           // Grace period before satisfaction starts decaying:
-          // urgent (safety/noise) and damage-sourced → 1 month; everything else → 2 months
-          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 1 : 2;
+          // urgent (safety/noise) and damage-sourced → 2 months; everything else → 3 months
+          const grace = (c.category === 'safety' || c.category === 'noise' || c.source === 'damage') ? 2 : 3;
           const monthsOpen = newMonthNumber - c.raisedMonth;
           if (monthsOpen > grace) {
             satPenaltyByProp.set(c.propertyId, (satPenaltyByProp.get(c.propertyId) || 0) + c.satisfactionPenaltyIfIgnored);
@@ -2051,9 +2055,33 @@ export const useGameStore = create<GameState & GameActions>()(
         set(s => ({ propertyListings: [...s.propertyListings, listing] }));
       },
 
-      cancelPropertyListing: (propertyId) => set(s => ({
-        propertyListings: s.propertyListings.filter(l => l.propertyId !== propertyId)
-      })),
+      cancelPropertyListing: (propertyId) => set(s => {
+        const listing = s.propertyListings.find(l => l.propertyId === propertyId);
+        if (!listing) return {} as any;
+        const property = s.ownedProperties.find(p => p.id === propertyId);
+        // Detect a buyer in active conveyancing for this property (chain in progress)
+        const inChain = (s.conveyancing || []).some((c: any) => c.propertyId === propertyId && c.status === 'selling');
+        const feePennies = inChain ? toPennies(1500) : toPennies(750);
+        if (s.cash < feePennies) {
+          showToast(
+            "Cannot Withdraw",
+            `You need £${fromPennies(feePennies).toLocaleString()} to cover solicitor + agent fees${inChain ? ' (chain collapse)' : ''}.`,
+            "destructive",
+          );
+          return {} as any;
+        }
+        showToast(
+          inChain ? "Chain Collapsed" : "Listing Withdrawn",
+          `${property?.name ?? 'Property'} pulled from sale. Fee £${fromPennies(feePennies).toLocaleString()} paid.`,
+          inChain ? "destructive" : undefined,
+        );
+        return {
+          cash: s.cash - feePennies,
+          propertyListings: s.propertyListings.filter(l => l.propertyId !== propertyId),
+          // Drop any in-flight selling conveyancing for this property
+          conveyancing: (s.conveyancing || []).filter((c: any) => !(c.propertyId === propertyId && c.status === 'selling')),
+        };
+      }),
 
       updatePropertyListingPrice: (propertyId, newPrice) => {
         set(s => ({

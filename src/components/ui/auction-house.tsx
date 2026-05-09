@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { simulateAuctionSale } from "@/lib/engine/auction";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -242,24 +243,34 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           return;
         }
         if (monthsPlayed >= listing.auctionMonth) {
-          // Settle
-          const marketValue = listing.property.value;
-          const roll = Math.random();
-          let finalPrice: number;
-          if (roll < 0.70) finalPrice = marketValue * (0.90 + Math.random() * 0.15);
-          else if (roll < 0.85) finalPrice = marketValue * (0.80 + Math.random() * 0.10);
-          else finalPrice = marketValue * (1.05 + Math.random() * 0.10);
-          finalPrice = Math.max(listing.reservePrice, Math.floor(finalPrice));
-          
-          setTimeout(() => {
-            onAuctionSale(listing.property.id, finalPrice);
-            toast({
-              title: "Auction Complete! 🔨",
-              description: `${listing.property.name} sold for £${finalPrice.toLocaleString()}`,
-            });
-          }, 500);
-          
-          next.push({ ...listing, settled: true, finalSalePrice: finalPrice, highestBid: finalPrice });
+          // Settle via realistic bidder-pool simulation
+          const result = simulateAuctionSale({
+            fairValue: listing.property.value,
+            reservePrice: listing.reservePrice,
+            guidePrice: listing.guidePrice,
+          });
+
+          if (result.sold) {
+            const finalPrice = result.hammerPrice;
+            setTimeout(() => {
+              onAuctionSale(listing.property.id, finalPrice);
+              toast({
+                title: "Auction Complete! 🔨",
+                description: `${listing.property.name} sold for £${finalPrice.toLocaleString()} (${result.bidderCount} bidders).`,
+              });
+            }, 500);
+            next.push({ ...listing, settled: true, finalSalePrice: finalPrice, highestBid: finalPrice });
+          } else {
+            setTimeout(() => {
+              toast({
+                title: "Reserve Not Met 🚫",
+                description: `${listing.property.name} did not sell — top bidder offered £${result.topValuation.toLocaleString()} vs £${listing.reservePrice.toLocaleString()} reserve. £400 auction fee charged.`,
+                variant: "destructive",
+              });
+            }, 500);
+            // Mark settled so it stops cycling; property remains owned (no sale callback fired)
+            next.push({ ...listing, settled: true, finalSalePrice: 0, highestBid: result.topValuation });
+          }
         } else {
           next.push(listing);
         }

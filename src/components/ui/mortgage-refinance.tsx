@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/ui/property-card";
 import { Building2, Calculator, TrendingDown, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { calculateMortgageEligibility, findMaxEligibleLoan } from "@/lib/mortgageEligibility";
 import { cn } from "@/lib/utils";
 
 interface MortgageRefinanceProps {
@@ -277,7 +277,32 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                     {!eligibility.eligible && (
                       <div className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive flex items-start gap-2">
                         <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span>{eligibility.reason}</span>
+                        <div className="space-y-1">
+                          <div>{eligibility.reason}</div>
+                          {selectedProperty && selectedProviderData && (() => {
+                            const maxEligible = findMaxEligibleLoan({
+                              creditScore,
+                              propertyValue: selectedProperty.value,
+                              propertyMonthlyRent: selectedProperty.monthlyIncome,
+                              providerBaseRate: selectedProviderData.baseRate,
+                              providerMinCreditScore: selectedProviderData.minCreditScore,
+                              providerMaxLTV: selectedProviderData.maxLTV,
+                              providerId: selectedProviderData.id,
+                              termYears,
+                              mortgageType,
+                              existingMonthlyMortgagePayments,
+                              totalRentalIncome,
+                              ownedPropertyCount: ownedProperties.length,
+                            });
+                            return maxEligible > 0 ? (
+                              <div className="text-foreground/80">
+                                Up to <strong>£{maxEligible.toLocaleString()}</strong> would be approved with this lender.
+                              </div>
+                            ) : (
+                              <div className="text-foreground/70">No loan amount qualifies with this lender — try another.</div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -290,7 +315,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                 disabled={!selectedProvider || loanAmount[0] <= 0 || (eligibility ? !eligibility.eligible : false)}
               >
                 <TrendingDown className="h-4 w-4 mr-2" />
-                Refinance Property
+                {eligibility && !eligibility.eligible ? 'Mortgage would be rejected' : 'Refinance Property'}
               </Button>
             </div>
           )}

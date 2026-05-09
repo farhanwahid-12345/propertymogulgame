@@ -394,7 +394,13 @@ export function RenovationDialog({
                   const planningPending = application?.status === 'pending';
                   const planningApproved = application?.status === 'approved';
                   const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
+                  // Planning-gated renovations only need the planning fee to begin the process,
+                  // so we let the user select & submit even if they can't yet afford the build.
+                  const needsPlanningStep = renovation.requiresPlanning && !planningApproved && !planningPending;
+                  const planningFeeForCard = renovation.planningFee ?? 250;
+                  const canSubmitPlanning = needsPlanningStep && playerCash >= planningFeeForCard;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
+                  const selectable = !blocked && (canSubmitPlanning || (planningApproved && affordable) || (!renovation.requiresPlanning && affordable));
 
                   // Scaled cost/uplifts for THIS property's size & value
                   const cost = scaledCost(renovation);
@@ -417,11 +423,11 @@ export function RenovationDialog({
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
                         isSelected && "ring-2 ring-primary",
-                        !affordable && !completed && "opacity-60",
+                        !selectable && !completed && "opacity-60",
                         blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
-                      onClick={() => affordable && !blocked && setSelectedRenovation(renovation)}
+                      onClick={() => selectable && setSelectedRenovation(renovation)}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">

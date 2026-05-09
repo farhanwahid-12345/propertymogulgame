@@ -5,7 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PropertyOffers } from "@/components/ui/property-offers";
 import { useState } from "react";
-import { Clock, TrendingUp, Target, X } from "lucide-react";
+import { Clock, TrendingUp, Target, X, Ban } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Property {
   id: string;
@@ -45,9 +56,10 @@ interface ListedPropertiesProps {
   ownedProperties: Property[];
   onAcceptOffer: (property: Property, offer: any) => void;
   onSetAutoAcceptThreshold: (propertyId: string, threshold: number | undefined) => void;
+  onWithdrawListing?: (propertyId: string) => void;
 }
 
-export function ListedProperties({ propertyListings, ownedProperties, onAcceptOffer, onSetAutoAcceptThreshold }: ListedPropertiesProps) {
+export function ListedProperties({ propertyListings, ownedProperties, onAcceptOffer, onSetAutoAcceptThreshold, onWithdrawListing }: ListedPropertiesProps) {
   const [selectedProperty, setSelectedProperty] = useState<{ property: Property; listing: PropertyListing } | null>(null);
   const [editingThreshold, setEditingThreshold] = useState<string | null>(null);
   const [thresholdValue, setThresholdValue] = useState<string>("");
@@ -184,6 +196,31 @@ export function ListedProperties({ propertyListings, ownedProperties, onAcceptOf
                           >
                             View {offerCount} Offer{offerCount > 1 ? 's' : ''}
                           </Button>
+                        )}
+                        {onWithdrawListing && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="outline" className="w-full">
+                                <Ban className="h-3 w-3 mr-1" />
+                                Withdraw
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Withdraw {property.name} from sale?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Cancels the listing and drops all pending offers. Solicitor + estate-agent fees of <strong>£750</strong> apply
+                                  (or <strong>£1,500</strong> if a buyer is already in conveyancing — counts as a chain collapse).
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Keep listed</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => onWithdrawListing(listing.propertyId)}>
+                                  Withdraw
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </div>
