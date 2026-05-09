@@ -192,3 +192,27 @@ export function calculateMortgageEligibility(
 
   return result;
 }
+
+/**
+ * Binary search for the largest loan amount that would still pass eligibility.
+ * Returns 0 if even £0 fails (e.g. credit score too low for provider).
+ * Bypasses random rejection to give a deterministic ceiling.
+ */
+export function findMaxEligibleLoan(
+  base: Omit<MortgageEligibilityRequest, 'loanAmount'>,
+): number {
+  const skipRandom = { ...base, providerId: `__det__${base.providerId}` };
+  const test = (amount: number): boolean => {
+    const r = calculateMortgageEligibility({ ...skipRandom, loanAmount: amount } as any);
+    return r.eligible;
+  };
+  let lo = 0;
+  let hi = Math.floor(base.propertyValue * 0.95);
+  if (!test(0)) return 0;
+  while (hi - lo > 500) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (test(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
