@@ -5,7 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PropertyOffers } from "@/components/ui/property-offers";
 import { useState } from "react";
-import { Clock, TrendingUp, Target, X } from "lucide-react";
+import { Clock, TrendingUp, Target, X, Ban } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Property {
   id: string;
@@ -45,9 +56,10 @@ interface ListedPropertiesProps {
   ownedProperties: Property[];
   onAcceptOffer: (property: Property, offer: any) => void;
   onSetAutoAcceptThreshold: (propertyId: string, threshold: number | undefined) => void;
+  onWithdrawListing?: (propertyId: string) => void;
 }
 
-export function ListedProperties({ propertyListings, ownedProperties, onAcceptOffer, onSetAutoAcceptThreshold }: ListedPropertiesProps) {
+export function ListedProperties({ propertyListings, ownedProperties, onAcceptOffer, onSetAutoAcceptThreshold, onWithdrawListing }: ListedPropertiesProps) {
   const [selectedProperty, setSelectedProperty] = useState<{ property: Property; listing: PropertyListing } | null>(null);
   const [editingThreshold, setEditingThreshold] = useState<string | null>(null);
   const [thresholdValue, setThresholdValue] = useState<string>("");
