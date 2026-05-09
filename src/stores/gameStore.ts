@@ -908,7 +908,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
           // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
           const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
-          if (property.lastRecentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
             delta -= 2; reasons.push({ reason: 'Recent rent increase', delta: -2 });
           }
 
@@ -917,7 +917,7 @@ export const useGameStore = create<GameState & GameActions>()(
           if (!hasNegativePressure) {
             const drift = t.satisfaction < 75 ? 2 : t.satisfaction > 85 ? -1 : 1;
             delta += drift;
-            if (drift !== 0) reasons.push({ reason: 'Stable conditions', delta: drift });
+            reasons.push({ reason: 'Stable conditions', delta: drift });
           }
 
           // Cap monthly net drop at -4 to prevent rapid satisfaction collapse
