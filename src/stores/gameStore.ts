@@ -1476,6 +1476,43 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
+        // ── Loans amortisation (personal/business/bridging) ──
+        const prevLoans: import('@/types/game').Loan[] = (prev as any).loans || [];
+        let loanCashDelta = 0;
+        const updatedLoans: import('@/types/game').Loan[] = [];
+        prevLoans.forEach(l => {
+          const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
+          loanCashDelta -= l.monthlyPayment;
+          if (l.kind === 'bridging') {
+            const monthsElapsed = newMonthNumber - l.startMonth;
+            if (monthsElapsed >= l.termMonths) {
+              loanCashDelta -= l.remainingBalance;
+              showToast("Bridging Loan Due 🏦", `Repaid £${fromPennies(l.remainingBalance).toLocaleString()} bullet on bridging loan.`);
+              return;
+            }
+            updatedLoans.push(l);
+          } else {
+            const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
+            const newBal = Math.max(0, l.remainingBalance - principalPaid);
+            if (newBal <= 0) {
+              showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
+              return;
+            }
+            updatedLoans.push({ ...l, remainingBalance: newBal });
+          }
+        });
+        if (loanCashDelta < 0) {
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
+          if (debited) {
+            finalCash = debited.cash;
+            finalOverdraftUsed = debited.overdraftUsed;
+          } else {
+            finalCash += loanCashDelta;
+            creditAdj -= 5;
+            showToast("Loan Payment Missed", "Insufficient funds for loan payment — credit score affected.", "destructive");
+          }
+        }
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
