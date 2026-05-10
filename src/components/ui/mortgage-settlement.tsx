@@ -23,6 +23,7 @@ interface Mortgage {
   monthlyPayment: number;
   interestRate: number;
   providerId: string;
+  startDate: number;
 }
 
 interface MortgageSettlementProps {
@@ -51,7 +52,12 @@ export function MortgageSettlement({
   const selectedMortgageProperty = ownedProperties.find(p => p.id === selectedMortgage);
 
   const paymentAmount = partialAmount ? parseFloat(partialAmount) : 0;
-  const canMakePayment = selectedMortgageDetails && paymentAmount > 0 && paymentAmount <= cash && paymentAmount <= selectedMortgageDetails.remainingBalance;
+  // ERC: 2% within first 5 years (60 months @ 180s/month)
+  const ERC_WINDOW_MS = 60 * 180 * 1000;
+  const ercApplies = !!selectedMortgageDetails && (Date.now() - selectedMortgageDetails.startDate) < ERC_WINDOW_MS;
+  const ercAmount = ercApplies ? Math.round(paymentAmount * 0.02) : 0;
+  const totalDue = paymentAmount + ercAmount;
+  const canMakePayment = !!selectedMortgageDetails && paymentAmount > 0 && totalDue <= cash && paymentAmount <= selectedMortgageDetails.remainingBalance;
 
   const handlePayment = () => {
     if (selectedMortgage && canMakePayment) {
