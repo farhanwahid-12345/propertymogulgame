@@ -3003,7 +3003,70 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
-      // ─── OVERDRAFT / CASH ─────────────────
+      // ─── LOANS (personal / business / bridging) ─────────────────
+      applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => {
+        const prev = get();
+        const product = (LOAN_PRODUCTS as any)[kind];
+        if (!product) { showToast("Loan Failed", "Unknown product.", "destructive"); return; }
+        if (prev.creditScore < product.minCreditScore) {
+          showToast("Loan Rejected", `Credit score ${prev.creditScore} below minimum ${product.minCreditScore}.`, "destructive"); return;
+        }
+        if (kind === 'business') {
+          if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
+          if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
+        }
+        if (kind !== 'bridging' && (amount > product.maxAmountPennies)) {
+          showToast("Loan Too Large", `Max £${fromPennies(product.maxAmountPennies).toLocaleString()} for ${kind} loans.`, "destructive"); return;
+        }
+        if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
+          showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
+        }
+        let collateralId: string | undefined;
+        if (kind === 'bridging') {
+          const collateral = prev.ownedProperties.find(p => p.id === collateralPropertyId);
+          if (!collateral) { showToast("Loan Rejected", "Bridging loan needs a collateral property.", "destructive"); return; }
+          const existingDebt = prev.mortgages.filter(m => m.propertyId === collateral.id).reduce((s, m) => s + m.remainingBalance, 0);
+          const maxBorrow = Math.floor(collateral.value * product.maxLTV) - existingDebt;
+          if (amount > maxBorrow) {
+            showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, maxBorrow)).toLocaleString()} on this property (70% LTV).`, "destructive"); return;
+          }
+          collateralId = collateral.id;
+        }
+        const rate = Math.max(0.02, prev.currentMarketRate + product.rateSpread);
+        // Repayment monthly payment formula (annuity); bridging is interest-only
+        const monthlyRate = rate / 12;
+        const monthlyPayment = kind === 'bridging'
+          ? Math.round(amount * monthlyRate)
+          : Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+        const loan: import('@/types/game').Loan = {
+          id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+          kind, principal: amount, remainingBalance: amount,
+          monthlyPayment, interestRate: rate, termMonths,
+          startMonth: prev.monthsPlayed, collateralPropertyId: collateralId,
+        };
+        const credited = credit(prev, amount);
+        set({
+          cash: credited.cash, overdraftUsed: credited.overdraftUsed,
+          loans: [...((prev as any).loans || []), loan],
+        } as any);
+        showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
+      },
+
+      settleLoan: (loanId: string) => {
+        const prev = get();
+        const loan = ((prev as any).loans || []).find((l: any) => l.id === loanId);
+        if (!loan) { showToast("Settle Failed", "Loan not found.", "destructive"); return; }
+        const debited = debit(prev, loan.remainingBalance);
+        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(loan.remainingBalance).toLocaleString()}.`, "destructive"); return; }
+        set({
+          cash: debited.cash, overdraftUsed: debited.overdraftUsed,
+          loans: ((prev as any).loans || []).filter((l: any) => l.id !== loanId),
+          creditScore: Math.min(850, prev.creditScore + 3),
+        } as any);
+        showToast("Loan Settled ✓", `Repaid £${fromPennies(loan.remainingBalance).toLocaleString()} early.`);
+      },
+
+
       handleApplyOverdraft: (requestedLimit) => set({ overdraftLimit: requestedLimit }),
       setCash: (newCash) => set({ cash: newCash }),
       setOverdraftUsed: (used) => set({ overdraftUsed: used }),
