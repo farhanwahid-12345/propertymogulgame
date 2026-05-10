@@ -13,6 +13,16 @@ export const SOLICITOR_FEES = toPennies(600);
 export const ESTATE_AGENT_RATE = 0.015;
 export const AUCTION_SELLER_FEE = 0.05;
 export const MONTH_DURATION_SECONDS = 180;
+/** Early Repayment Charge: % of remaining/partial balance if mortgage is settled within ERC window. */
+export const ERC_PERCENT = 0.02;
+/** ERC applies if the mortgage is less than this many in-game months old. */
+export const ERC_WINDOW_MONTHS = 60;
+/** Loan products — limits & rate spreads above current market rate. */
+export const LOAN_PRODUCTS = {
+  personal:  { maxAmountPennies: toPennies(25_000),  minTermMonths: 12, maxTermMonths: 60, rateSpread: 0.04,  minCreditScore: 600 },
+  business:  { maxAmountPennies: toPennies(150_000), minTermMonths: 12, maxTermMonths: 84, rateSpread: 0.025, minCreditScore: 580 },
+  bridging:  { maxLTV: 0.70,                          minTermMonths: 1,  maxTermMonths: 12, rateSpread: 0.06,  minCreditScore: 550 },
+} as const;
 
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   { id: "hsbc", name: "HSBC", baseRate: 0.035, maxLTV: 0.75, minCreditScore: 740, description: "Premier bank with the best rates but strictest criteria" },

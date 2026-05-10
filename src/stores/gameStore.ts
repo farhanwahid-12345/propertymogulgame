@@ -15,6 +15,7 @@ import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
   MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS,
+  ERC_PERCENT, ERC_WINDOW_MONTHS, LOAN_PRODUCTS,
   getCeilingPrice,
 } from '@/lib/engine/constants';
 import {
@@ -314,6 +315,9 @@ interface GameActions {
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  // Loans
+  applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => void;
+  settleLoan: (loanId: string) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
   setCash: (newCash: number) => void;
@@ -384,6 +388,7 @@ function createInitialState(): GameState {
     depositDisputes: [],
     planningApplications: [],
     tenantHistory: [],
+    loans: [],
   };
 }
 
@@ -553,7 +558,7 @@ function migrateState(persisted: any): GameState {
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
-    'planningApplications', 'tenantHistory',
+    'planningApplications', 'tenantHistory', 'loans',
   ];
 
   arrayKeys.forEach((key) => {
@@ -1376,8 +1381,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
         const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
-        const finalCash = Math.max(0, credited.cash);
-        const finalOverdraftUsed = credited.overdraftUsed;
+        let finalCash = Math.max(0, credited.cash);
+        let finalOverdraftUsed = credited.overdraftUsed;
 
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
@@ -1474,6 +1479,43 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
+        // ── Loans amortisation (personal/business/bridging) ──
+        const prevLoans: import('@/types/game').Loan[] = (prev as any).loans || [];
+        let loanCashDelta = 0;
+        const updatedLoans: import('@/types/game').Loan[] = [];
+        prevLoans.forEach(l => {
+          const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
+          loanCashDelta -= l.monthlyPayment;
+          if (l.kind === 'bridging') {
+            const monthsElapsed = newMonthNumber - l.startMonth;
+            if (monthsElapsed >= l.termMonths) {
+              loanCashDelta -= l.remainingBalance;
+              showToast("Bridging Loan Due 🏦", `Repaid £${fromPennies(l.remainingBalance).toLocaleString()} bullet on bridging loan.`);
+              return;
+            }
+            updatedLoans.push(l);
+          } else {
+            const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
+            const newBal = Math.max(0, l.remainingBalance - principalPaid);
+            if (newBal <= 0) {
+              showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
+              return;
+            }
+            updatedLoans.push({ ...l, remainingBalance: newBal });
+          }
+        });
+        if (loanCashDelta < 0) {
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
+          if (debited) {
+            finalCash = debited.cash;
+            finalOverdraftUsed = debited.overdraftUsed;
+          } else {
+            finalCash += loanCashDelta;
+            creditAdj -= 5;
+            showToast("Loan Payment Missed", "Insufficient funds for loan payment — credit score affected.", "destructive");
+          }
+        }
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
@@ -1509,6 +1551,7 @@ export const useGameStore = create<GameState & GameActions>()(
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
           tenantHistory: newTenantHistory.slice(-100),
+          loans: updatedLoans,
         } as any));
       },
 
@@ -2775,33 +2818,45 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
         if (!mortgage) { showToast("Settlement Failed", "Mortgage not found!", "destructive"); return; }
 
+        // Compute Early Repayment Charge (2% of amount being settled if within ERC window).
+        const monthsHeld = Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
+        const ercApplies = monthsHeld < ERC_WINDOW_MONTHS;
+
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
-            const debited = debit(prev, partialAmount);
-            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const erc = ercApplies ? Math.round(partialAmount * ERC_PERCENT) : 0;
+            const totalDue = partialAmount + erc;
+            const debited = debit(prev, totalDue);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(totalDue).toLocaleString()} (incl. ERC) — even with overdraft.`, "destructive"); return; }
             const newBal = mortgage.remainingBalance - partialAmount;
             const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+            const ercNote = erc > 0 ? ` ERC: £${fromPennies(erc).toLocaleString()}.` : '';
             if (newBal <= 0) {
-              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}${odNote}`);
+              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}.${ercNote}${odNote}`);
               set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
             } else {
-              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}${odNote}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
+              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}.${ercNote}${odNote} Remaining: £${fromPennies(newBal).toLocaleString()}`);
               set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
             }
           } else {
-            const debited = debit(prev, mortgage.remainingBalance);
-            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const erc = ercApplies ? Math.round(mortgage.remainingBalance * ERC_PERCENT) : 0;
+            const totalDue = mortgage.remainingBalance + erc;
+            const debited = debit(prev, totalDue);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(totalDue).toLocaleString()} (incl. ERC) — even with overdraft.`, "destructive"); return; }
             const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
-            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}${odNote}`);
+            const ercNote = erc > 0 ? ` ERC: £${fromPennies(erc).toLocaleString()}.` : '';
+            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}.${ercNote}${odNote}`);
             set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
           }
         } else {
           const settleProp = prev.ownedProperties.find(p => p.id === settlementPropertyId);
           if (!settleProp) { showToast("Settlement Failed", "Property not found!", "destructive"); return; }
           if (settleProp.value < mortgage.remainingBalance) { showToast("Insufficient Value", "Property value too low!", "destructive"); return; }
-          const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE);
+          const erc = ercApplies ? Math.round(mortgage.remainingBalance * ERC_PERCENT) : 0;
+          const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE) - erc;
           const credited = credit(prev, cashFromSale);
-          showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}`);
+          const ercNote = erc > 0 ? ` (ERC £${fromPennies(erc).toLocaleString()} deducted)` : '';
+          showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}${ercNote}`);
           set({
             cash: credited.cash,
             overdraftUsed: credited.overdraftUsed,
@@ -2951,7 +3006,70 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
-      // ─── OVERDRAFT / CASH ─────────────────
+      // ─── LOANS (personal / business / bridging) ─────────────────
+      applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => {
+        const prev = get();
+        const product = (LOAN_PRODUCTS as any)[kind];
+        if (!product) { showToast("Loan Failed", "Unknown product.", "destructive"); return; }
+        if (prev.creditScore < product.minCreditScore) {
+          showToast("Loan Rejected", `Credit score ${prev.creditScore} below minimum ${product.minCreditScore}.`, "destructive"); return;
+        }
+        if (kind === 'business') {
+          if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
+          if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
+        }
+        if (kind !== 'bridging' && (amount > product.maxAmountPennies)) {
+          showToast("Loan Too Large", `Max £${fromPennies(product.maxAmountPennies).toLocaleString()} for ${kind} loans.`, "destructive"); return;
+        }
+        if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
+          showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
+        }
+        let collateralId: string | undefined;
+        if (kind === 'bridging') {
+          const collateral = prev.ownedProperties.find(p => p.id === collateralPropertyId);
+          if (!collateral) { showToast("Loan Rejected", "Bridging loan needs a collateral property.", "destructive"); return; }
+          const existingDebt = prev.mortgages.filter(m => m.propertyId === collateral.id).reduce((s, m) => s + m.remainingBalance, 0);
+          const maxBorrow = Math.floor(collateral.value * product.maxLTV) - existingDebt;
+          if (amount > maxBorrow) {
+            showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, maxBorrow)).toLocaleString()} on this property (70% LTV).`, "destructive"); return;
+          }
+          collateralId = collateral.id;
+        }
+        const rate = Math.max(0.02, prev.currentMarketRate + product.rateSpread);
+        // Repayment monthly payment formula (annuity); bridging is interest-only
+        const monthlyRate = rate / 12;
+        const monthlyPayment = kind === 'bridging'
+          ? Math.round(amount * monthlyRate)
+          : Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+        const loan: import('@/types/game').Loan = {
+          id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+          kind, principal: amount, remainingBalance: amount,
+          monthlyPayment, interestRate: rate, termMonths,
+          startMonth: prev.monthsPlayed, collateralPropertyId: collateralId,
+        };
+        const credited = credit(prev, amount);
+        set({
+          cash: credited.cash, overdraftUsed: credited.overdraftUsed,
+          loans: [...((prev as any).loans || []), loan],
+        } as any);
+        showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
+      },
+
+      settleLoan: (loanId: string) => {
+        const prev = get();
+        const loan = ((prev as any).loans || []).find((l: any) => l.id === loanId);
+        if (!loan) { showToast("Settle Failed", "Loan not found.", "destructive"); return; }
+        const debited = debit(prev, loan.remainingBalance);
+        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(loan.remainingBalance).toLocaleString()}.`, "destructive"); return; }
+        set({
+          cash: debited.cash, overdraftUsed: debited.overdraftUsed,
+          loans: ((prev as any).loans || []).filter((l: any) => l.id !== loanId),
+          creditScore: Math.min(850, prev.creditScore + 3),
+        } as any);
+        showToast("Loan Settled ✓", `Repaid £${fromPennies(loan.remainingBalance).toLocaleString()} early.`);
+      },
+
+
       handleApplyOverdraft: (requestedLimit) => set({ overdraftLimit: requestedLimit }),
       setCash: (newCash) => set({ cash: newCash }),
       setOverdraftUsed: (used) => set({ overdraftUsed: used }),
@@ -3193,6 +3311,7 @@ export const useGameStore = create<GameState & GameActions>()(
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
           resolveTenantConcern, dismissTenantConcern,
+          applyForLoan, settleLoan,
           ...data } = state;
         return data;
       },

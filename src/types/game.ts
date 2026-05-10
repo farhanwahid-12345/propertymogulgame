@@ -89,6 +89,21 @@ export interface MortgageProvider {
   description: string;
 }
 
+export type LoanKind = 'personal' | 'business' | 'bridging';
+
+export interface Loan {
+  id: string;
+  kind: LoanKind;
+  principal: number;        // pennies
+  remainingBalance: number; // pennies
+  monthlyPayment: number;   // pennies (interest-only for bridging)
+  interestRate: number;     // annual decimal
+  termMonths: number;
+  startMonth: number;       // monthsPlayed snapshot
+  /** Bridging only — secured against this property. */
+  collateralPropertyId?: string;
+}
+
 export interface Mortgage {
   id: string;
   propertyId: string;
@@ -333,6 +348,8 @@ export interface GameState {
   planningApplications: PlanningApplication[];
   // Tenant departure log — surfaced in Activity feed and on property cards
   tenantHistory: TenantDeparture[];
+  // Personal / business / bridging loans
+  loans: Loan[];
 }
 
 /** A single tenant-departure event for the persistent activity log. */
@@ -353,4 +370,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;

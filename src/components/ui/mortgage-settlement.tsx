@@ -23,6 +23,7 @@ interface Mortgage {
   monthlyPayment: number;
   interestRate: number;
   providerId: string;
+  startDate: number;
 }
 
 interface MortgageSettlementProps {
@@ -51,7 +52,12 @@ export function MortgageSettlement({
   const selectedMortgageProperty = ownedProperties.find(p => p.id === selectedMortgage);
 
   const paymentAmount = partialAmount ? parseFloat(partialAmount) : 0;
-  const canMakePayment = selectedMortgageDetails && paymentAmount > 0 && paymentAmount <= cash && paymentAmount <= selectedMortgageDetails.remainingBalance;
+  // ERC: 2% within first 5 years (60 months @ 180s/month)
+  const ERC_WINDOW_MS = 60 * 180 * 1000;
+  const ercApplies = !!selectedMortgageDetails && (Date.now() - selectedMortgageDetails.startDate) < ERC_WINDOW_MS;
+  const ercAmount = ercApplies ? Math.round(paymentAmount * 0.02) : 0;
+  const totalDue = paymentAmount + ercAmount;
+  const canMakePayment = !!selectedMortgageDetails && paymentAmount > 0 && totalDue <= cash && paymentAmount <= selectedMortgageDetails.remainingBalance;
 
   const handlePayment = () => {
     if (selectedMortgage && canMakePayment) {
@@ -196,13 +202,19 @@ export function MortgageSettlement({
                         </span>
                       </div>
                     </div>
-                    
+
+                    {ercApplies && paymentAmount > 0 && (
+                      <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
+                        <strong>Early Repayment Charge:</strong> £{ercAmount.toLocaleString()} (2%) applies — mortgage less than 5 years old. Total cash needed: £{totalDue.toLocaleString()}.
+                      </div>
+                    )}
+
                     {canMakePayment ? (
                       <div className="pt-2 border-t">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Cash after payment:</span>
                           <span className="font-semibold text-success">
-                            £{(cash - paymentAmount).toLocaleString()}
+                            £{(cash - totalDue).toLocaleString()}
                           </span>
                         </div>
                         {(selectedMortgageDetails?.remainingBalance || 0) - paymentAmount <= 0 && (
