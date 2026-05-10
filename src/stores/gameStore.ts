@@ -1378,8 +1378,8 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
         const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
-        const finalCash = Math.max(0, credited.cash);
-        const finalOverdraftUsed = credited.overdraftUsed;
+        let finalCash = Math.max(0, credited.cash);
+        let finalOverdraftUsed = credited.overdraftUsed;
 
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
