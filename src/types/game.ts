@@ -348,6 +348,8 @@ export interface GameState {
   planningApplications: PlanningApplication[];
   // Tenant departure log — surfaced in Activity feed and on property cards
   tenantHistory: TenantDeparture[];
+  // Personal / business / bridging loans
+  loans: Loan[];
 }
 
 /** A single tenant-departure event for the persistent activity log. */
@@ -368,4 +370,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
