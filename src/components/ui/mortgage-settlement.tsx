@@ -202,13 +202,19 @@ export function MortgageSettlement({
                         </span>
                       </div>
                     </div>
-                    
+
+                    {ercApplies && paymentAmount > 0 && (
+                      <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
+                        <strong>Early Repayment Charge:</strong> £{ercAmount.toLocaleString()} (2%) applies — mortgage less than 5 years old. Total cash needed: £{totalDue.toLocaleString()}.
+                      </div>
+                    )}
+
                     {canMakePayment ? (
                       <div className="pt-2 border-t">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Cash after payment:</span>
                           <span className="font-semibold text-success">
-                            £{(cash - paymentAmount).toLocaleString()}
+                            £{(cash - totalDue).toLocaleString()}
                           </span>
                         </div>
                         {(selectedMortgageDetails?.remainingBalance || 0) - paymentAmount <= 0 && (
