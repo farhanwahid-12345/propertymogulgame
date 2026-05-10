@@ -3311,6 +3311,7 @@ export const useGameStore = create<GameState & GameActions>()(
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
           resolveTenantConcern, dismissTenantConcern,
+          applyForLoan, settleLoan,
           ...data } = state;
         return data;
       },
