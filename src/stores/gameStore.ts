@@ -315,6 +315,9 @@ interface GameActions {
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  // Loans
+  applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => void;
+  settleLoan: (loanId: string) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
   setCash: (newCash: number) => void;
