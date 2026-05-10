@@ -385,6 +385,7 @@ function createInitialState(): GameState {
     depositDisputes: [],
     planningApplications: [],
     tenantHistory: [],
+    loans: [],
   };
 }
 
