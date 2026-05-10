@@ -1548,6 +1548,7 @@ export const useGameStore = create<GameState & GameActions>()(
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
           tenantHistory: newTenantHistory.slice(-100),
+          loans: updatedLoans,
         } as any));
       },
 
