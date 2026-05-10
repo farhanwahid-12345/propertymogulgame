@@ -12,6 +12,7 @@ import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
 import { ListedProperties } from "@/components/ui/listed-properties";
 import { OperationsCenter } from "@/components/ui/operations-center";
+import { LoansPanel } from "@/components/ui/loans-panel";
 import { ActivityTicker } from "@/components/ui/activity-ticker";
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
@@ -245,6 +246,9 @@ const Index = () => {
                 totalMortgagePayments={gameState.totalMonthlyExpenses}
                 netWorth={gameState.netWorth}
               />
+            </div>
+            <div className="mt-4">
+              <LoansPanel />
             </div>
             <div className="mt-4">
               <TaxBreakdown
