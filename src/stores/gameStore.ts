@@ -2775,33 +2775,45 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
         if (!mortgage) { showToast("Settlement Failed", "Mortgage not found!", "destructive"); return; }
 
+        // Compute Early Repayment Charge (2% of amount being settled if within ERC window).
+        const monthsHeld = Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
+        const ercApplies = monthsHeld < ERC_WINDOW_MONTHS;
+
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
-            const debited = debit(prev, partialAmount);
-            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(partialAmount).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const erc = ercApplies ? Math.round(partialAmount * ERC_PERCENT) : 0;
+            const totalDue = partialAmount + erc;
+            const debited = debit(prev, totalDue);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(totalDue).toLocaleString()} (incl. ERC) — even with overdraft.`, "destructive"); return; }
             const newBal = mortgage.remainingBalance - partialAmount;
             const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
+            const ercNote = erc > 0 ? ` ERC: £${fromPennies(erc).toLocaleString()}.` : '';
             if (newBal <= 0) {
-              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}${odNote}`);
+              showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}.${ercNote}${odNote}`);
               set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
             } else {
-              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}${odNote}. Remaining: £${fromPennies(newBal).toLocaleString()}`);
+              showToast("Partial Payment", `Paid £${fromPennies(partialAmount).toLocaleString()}.${ercNote}${odNote} Remaining: £${fromPennies(newBal).toLocaleString()}`);
               set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.map(m => m.propertyId === mortgagePropertyId ? { ...m, remainingBalance: newBal } : m) });
             }
           } else {
-            const debited = debit(prev, mortgage.remainingBalance);
-            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(mortgage.remainingBalance).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+            const erc = ercApplies ? Math.round(mortgage.remainingBalance * ERC_PERCENT) : 0;
+            const totalDue = mortgage.remainingBalance + erc;
+            const debited = debit(prev, totalDue);
+            if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(totalDue).toLocaleString()} (incl. ERC) — even with overdraft.`, "destructive"); return; }
             const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
-            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}${odNote}`);
+            const ercNote = erc > 0 ? ` ERC: £${fromPennies(erc).toLocaleString()}.` : '';
+            showToast("Mortgage Paid Off!", `Paid £${fromPennies(mortgage.remainingBalance).toLocaleString()}.${ercNote}${odNote}`);
             set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter(m => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
           }
         } else {
           const settleProp = prev.ownedProperties.find(p => p.id === settlementPropertyId);
           if (!settleProp) { showToast("Settlement Failed", "Property not found!", "destructive"); return; }
           if (settleProp.value < mortgage.remainingBalance) { showToast("Insufficient Value", "Property value too low!", "destructive"); return; }
-          const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE);
+          const erc = ercApplies ? Math.round(mortgage.remainingBalance * ERC_PERCENT) : 0;
+          const cashFromSale = settleProp.value - mortgage.remainingBalance - SOLICITOR_FEES - Math.round(settleProp.value * ESTATE_AGENT_RATE) - erc;
           const credited = credit(prev, cashFromSale);
-          showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}`);
+          const ercNote = erc > 0 ? ` (ERC £${fromPennies(erc).toLocaleString()} deducted)` : '';
+          showToast("Mortgage Settled!", `${settleProp.name} sold. Net: £${fromPennies(cashFromSale).toLocaleString()}${ercNote}`);
           set({
             cash: credited.cash,
             overdraftUsed: credited.overdraftUsed,
