@@ -89,6 +89,21 @@ export interface MortgageProvider {
   description: string;
 }
 
+export type LoanKind = 'personal' | 'business' | 'bridging';
+
+export interface Loan {
+  id: string;
+  kind: LoanKind;
+  principal: number;        // pennies
+  remainingBalance: number; // pennies
+  monthlyPayment: number;   // pennies (interest-only for bridging)
+  interestRate: number;     // annual decimal
+  termMonths: number;
+  startMonth: number;       // monthsPlayed snapshot
+  /** Bridging only — secured against this property. */
+  collateralPropertyId?: string;
+}
+
 export interface Mortgage {
   id: string;
   propertyId: string;
