@@ -677,9 +677,39 @@ export function RenovationDialog({
         </div>
         
         {selectedRenovation && (
-          <div className="bg-muted p-4 rounded-lg mt-4">
-            <h4 className="font-semibold mb-2">Renovation Summary</h4>
+          <div className="bg-muted p-4 rounded-lg mt-4 space-y-3">
+            <h4 className="font-semibold">Renovation Summary</h4>
+            {isConversion(selectedRenovation) && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {isFlats(selectedRenovation) ? 'Number of flats' : 'Number of rooms'}
+                  </span>
+                  <span className="font-semibold">{conversionUnits}</span>
+                </div>
+                <Slider
+                  min={minUnits(selectedRenovation)}
+                  max={maxUnits(selectedRenovation)}
+                  step={1}
+                  value={[conversionUnits]}
+                  onValueChange={(v) => setConversionUnits(v[0])}
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  Building can support {minUnits(selectedRenovation)}–{maxUnits(selectedRenovation)} {isFlats(selectedRenovation) ? 'flats' : 'rooms'} (based on {sqft.toLocaleString()} sqft).
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Cost:</span>
+                <br />
+                <span className="font-semibold">£{scaledCost(selectedRenovation).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Rent +/mo (typical):</span>
+                <br />
+                <span className="font-semibold text-success">+£{scaledRent(selectedRenovation).toLocaleString()}</span>
+              </div>
               <div>
                 <span className="text-muted-foreground">New Monthly Rent:</span>
                 <br />
