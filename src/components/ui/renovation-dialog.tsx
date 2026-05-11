@@ -278,6 +278,7 @@ export function RenovationDialog({
   onRenovate,
   activeRenovations = [],
   completedRenovationIds = [],
+  renovationCompletionMonths = {},
   propertyType,
   internalSqft,
   plotSqft,
