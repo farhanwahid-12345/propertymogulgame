@@ -1,10 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wrench, Volume2, Droplets, Plug, ShieldAlert, Smile } from "lucide-react";
+import { Wrench, Volume2, VolumeX, Droplets, Plug, ShieldAlert, Smile } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
 import type { TenantConcern } from "@/types/game";
 import type { Property } from "@/types/game";
+import { isSoundEnabled, setSoundEnabled, playConcernChime } from "@/lib/sound";
 
 interface Props {
   concerns: TenantConcern[];
@@ -45,6 +47,38 @@ export function TenantConcernsFeed({
   const ownedIds = new Set(ownedProperties.map(p => p.id));
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
+
+  // Flashing + chime when new concerns arrive
+  const seenIds = useRef<Set<string>>(new Set());
+  const [flashing, setFlashing] = useState(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
+
+  useEffect(() => {
+    const handler = (e: Event) => setSoundOn((e as CustomEvent<boolean>).detail);
+    window.addEventListener('pm:sound-toggled', handler);
+    return () => window.removeEventListener('pm:sound-toggled', handler);
+  }, []);
+
+  useEffect(() => {
+    const newIds = active.map(c => c.id).filter(id => !seenIds.current.has(id));
+    if (newIds.length > 0) {
+      // Initial mount — don't chime, just record
+      const isInitial = seenIds.current.size === 0;
+      newIds.forEach(id => seenIds.current.add(id));
+      if (!isInitial) {
+        playConcernChime();
+        setFlashing(true);
+      }
+    }
+    if (active.length === 0) setFlashing(false);
+  }, [active.map(c => c.id).join('|')]);
+
+  const stopFlashing = () => setFlashing(false);
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+  };
 
   const body = (
     <div className="space-y-2">
@@ -119,15 +153,27 @@ export function TenantConcernsFeed({
   if (bare) return body;
 
   return (
-    <Card className="glass border-0">
+    <Card
+      className={`glass border-0 ${flashing && active.length > 0 ? 'animate-pulse ring-2 ring-amber-400/60' : ''}`}
+      onMouseEnter={stopFlashing}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           🛠️ Tenant Concerns
           {active.length > 0 && (
-            <Badge variant="outline" className="text-xs border-amber-400/40 text-amber-300">
+            <Badge variant="outline" className={`text-xs border-amber-400/40 text-amber-300 ${flashing ? 'animate-pulse' : ''}`}>
               {active.length} active
             </Badge>
           )}
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="ml-auto text-muted-foreground hover:text-foreground"
+            title={soundOn ? 'Mute concern alerts' : 'Unmute concern alerts'}
+            aria-label={soundOn ? 'Mute' : 'Unmute'}
+          >
+            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent>{body}</CardContent>

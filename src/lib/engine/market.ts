@@ -9,14 +9,14 @@ import { getPropertyValueRangeForLevel } from "./financials";
 export function yieldForValue(valuePennies: number): number {
   const v = valuePennies / 100; // pounds
   let centre: number;
-  if (v <= 75_000) centre = 11;
-  else if (v <= 150_000) centre = 9;
-  else if (v <= 300_000) centre = 7.5;
-  else if (v <= 600_000) centre = 6;
-  else if (v <= 1_200_000) centre = 5;
-  else centre = 4;
+  if (v <= 75_000) centre = 13;
+  else if (v <= 150_000) centre = 11;
+  else if (v <= 300_000) centre = 9;
+  else if (v <= 600_000) centre = 7.5;
+  else if (v <= 1_200_000) centre = 6.5;
+  else centre = 5.5;
   const jittered = centre + (Math.random() - 0.5) * 3; // ±1.5
-  return Math.max(2.5, Math.min(14, jittered));
+  return Math.max(3, Math.min(16, jittered));
 }
 
 export function generateRandomProperty(level: number): Property {

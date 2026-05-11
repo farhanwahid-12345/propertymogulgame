@@ -39,6 +39,8 @@ export interface Property {
   plotSqft?: number;
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   completedRenovationIds?: string[];
+  renovationCompletionMonths?: Record<string, number>;
+  subtypeUnits?: number;
   totalRenovationSpendPennies?: number;
 }
 
@@ -561,6 +563,7 @@ export const PropertyCard = memo(function PropertyCard({
                       onRenovate={onRenovate}
                       activeRenovations={activeRenovationIds}
                       completedRenovationIds={property.completedRenovationIds}
+                      renovationCompletionMonths={property.renovationCompletionMonths}
                       propertyType={propertyType}
                       internalSqft={property.internalSqft}
                       plotSqft={property.plotSqft}

@@ -12,9 +12,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER, getConversionScaleMultiplier, CONVERSION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
 import { computePlanningApprovalProbability } from "@/lib/engine/planning";
 import { getCeilingPrice } from "@/lib/engine/constants";
+import { Slider } from "@/components/ui/slider";
 
 export interface RenovationType {
   id: string;
@@ -57,6 +58,8 @@ interface RenovationDialogProps {
   activeRenovations?: string[]; // IDs of renovations in progress
   /** IDs of renovations already completed on this property — disables one-shot re-do. */
   completedRenovationIds?: string[];
+  /** Map renovation typeId → in-game month it completed. Drives basic-repair suppression. */
+  renovationCompletionMonths?: Record<string, number>;
   /** Required for conversion / extension gating. */
   propertyType?: "residential" | "commercial" | "luxury";
   internalSqft?: number;
@@ -205,13 +208,13 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     baseApprovalProb: 0.92,
   },
   {
-    id: "convert_hmo_4",
-    name: "Convert to HMO (4-bed)",
-    cost: 18000,
+    id: "convert_hmo",
+    name: "Convert to HMO",
+    cost: 18000,           // base for 4 rooms — scaled per-unit when selected
     rentIncrease: 600,
-    valueIncrease: 8000,
+    valueIncrease: 12000,
     duration: 120,
-    description: "License & remodel into a 4-bed shared house. Higher rent, more management.",
+    description: "License & remodel into a shared house. Choose room count after selecting.",
     icon: Home,
     category: "conversion",
     allowedTypes: ["residential"],
@@ -221,39 +224,20 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 500,
-    baseApprovalProb: 0.82,
-  },
-  {
-    id: "convert_hmo_6",
-    name: "Convert to HMO (6-bed)",
-    cost: 35000,
-    rentIncrease: 1100,
-    valueIncrease: 15000,
-    duration: 180,
-    description: "Larger HMO with 6 lettable rooms.",
-    icon: Home,
-    category: "conversion",
-    allowedTypes: ["residential"],
-    minPropertyValue: 120000,
-    minInternalSqft: 1300,
-    resultingSubtype: "hmo",
-    requiresPlanning: true,
-    planningWaitMonths: 3,
-    planningFee: 500,
-    baseApprovalProb: 0.60,
+    baseApprovalProb: 0.78,
   },
   {
     id: "convert_flats",
-    name: "Convert to Flats (2 units)",
-    cost: 55000,
+    name: "Convert to Flats",
+    cost: 55000,           // base for 2 flats — scaled per-unit when selected
     rentIncrease: 900,
-    valueIncrease: 40000,
+    valueIncrease: 60000,
     duration: 240,
-    description: "Split into two self-contained flats with separate entrances.",
+    description: "Split into self-contained flats with separate entrances. Choose unit count after selecting.",
     icon: Plus,
     category: "conversion",
     allowedTypes: ["residential"],
-    minInternalSqft: 1400,
+    minInternalSqft: 1100,
     resultingSubtype: "flats",
     requiresPlanning: true,
     planningWaitMonths: 3,
@@ -294,6 +278,7 @@ export function RenovationDialog({
   onRenovate,
   activeRenovations = [],
   completedRenovationIds = [],
+  renovationCompletionMonths = {},
   propertyType,
   internalSqft,
   plotSqft,
@@ -306,12 +291,36 @@ export function RenovationDialog({
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [conversionUnits, setConversionUnits] = useState<number>(4);
+
+  // Conversion units: bounds depend on internalSqft
+  const isConversion = (r: RenovationType | null) => !!r && r.category === 'conversion';
+  const isHmo = (r: RenovationType | null) => !!r && r.id === 'convert_hmo';
+  const isFlats = (r: RenovationType | null) => !!r && r.id === 'convert_flats';
+  const sqft = internalSqft || 900;
+  const maxHmoUnits = Math.max(3, Math.min(8, Math.floor(sqft / 180)));
+  const maxFlatUnits = Math.max(2, Math.min(5, Math.floor(sqft / 550)));
+  const minUnits = (r: RenovationType | null) => isFlats(r) ? 2 : 3;
+  const maxUnits = (r: RenovationType | null) => isFlats(r) ? maxFlatUnits : isHmo(r) ? maxHmoUnits : 1;
+  const defaultUnits = (r: RenovationType | null) => isFlats(r) ? 2 : isHmo(r) ? 4 : 1;
 
   // All headline costs/rent/value uplifts are scaled to this property's profile
   const scaleInputs = { internalSqft, propertyValue };
-  const scaledCost = (r: RenovationType) => scaleRenovationCost(r.cost, scaleInputs);
-  const scaledRent = (r: RenovationType) => scaleRenovationRent(r.rentIncrease, scaleInputs);
-  const scaledValue = (r: RenovationType) => scaleRenovationValue(r.valueIncrease, scaleInputs);
+  // Conversion multiplier for given option + units. For non-conversion = 1.
+  const conversionMult = (r: RenovationType | null, units: number): number => {
+    if (!isConversion(r)) return 1;
+    const subtype = r!.id === 'convert_hmo' ? 'hmo' : r!.id === 'convert_flats' ? 'flats' : 'standard';
+    const baseDefault = getConversionScaleMultiplier({ propertyValue, subtype: subtype as any, units: defaultUnits(r) });
+    const target = getConversionScaleMultiplier({ propertyValue, subtype: subtype as any, units });
+    return baseDefault > 0 ? target / baseDefault : 1;
+  };
+  const previewUnits = (r: RenovationType | null) => {
+    if (!isConversion(r)) return 1;
+    return selectedRenovation && selectedRenovation.id === r!.id ? conversionUnits : defaultUnits(r);
+  };
+  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) / 50) * 50;
+  const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 5) * 5;
+  const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 100) * 100;
 
   // Ceiling-price awareness — applies to extensions/conversions
   const ceilingPrice = neighborhood && propertyType
@@ -325,11 +334,33 @@ export function RenovationDialog({
     planningApplications.find(a => a.renovationTypeId === renoId);
 
   const handleRenovate = () => {
-    if (selectedRenovation) {
-      onRenovate(propertyId, selectedRenovation);
-      setIsOpen(false);
-      setSelectedRenovation(null);
+    if (!selectedRenovation) return;
+    let toSubmit: RenovationType = selectedRenovation;
+    if (isConversion(selectedRenovation)) {
+      // Bake the chosen unit count into a one-shot type so the engine completes
+      // with the correct cost/rent/value and persists subtypeUnits onto the property.
+      const u = conversionUnits;
+      const cost = Math.round(scaleRenovationCost(selectedRenovation.cost, scaleInputs) * conversionMult(selectedRenovation, u) / 50) * 50;
+      const rent = Math.round(scaleRenovationRent(selectedRenovation.rentIncrease, scaleInputs) * conversionMult(selectedRenovation, u) / 5) * 5;
+      const value = Math.round(scaleRenovationValue(selectedRenovation.valueIncrease, scaleInputs) * conversionMult(selectedRenovation, u) / 100) * 100;
+      const planningFee = (selectedRenovation.planningFee ?? 500) + (u - defaultUnits(selectedRenovation)) * 100;
+      const noun = isFlats(selectedRenovation) ? 'flat' : 'bed';
+      toSubmit = {
+        ...selectedRenovation,
+        name: `${selectedRenovation.name} (${u}-${noun})`,
+        cost,
+        rentIncrease: rent,
+        valueIncrease: value,
+        planningFee: Math.max(250, planningFee),
+        // Approval likelihood drops slightly per extra unit
+        baseApprovalProb: Math.max(0.35, (selectedRenovation.baseApprovalProb ?? 0.7) - 0.05 * (u - defaultUnits(selectedRenovation))),
+        // Carry units through to the engine via a custom field on the type
+        ...( { subtypeUnits: u } as any ),
+      } as RenovationType;
     }
+    onRenovate(propertyId, toSubmit);
+    setIsOpen(false);
+    setSelectedRenovation(null);
   };
 
   const canAfford = (renovation: RenovationType) => playerCash >= scaledCost(renovation);
@@ -352,6 +383,20 @@ export function RenovationDialog({
     }
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
       return `Already converted to ${currentSubtype}`;
+    }
+    // Suppress redundant maintenance after recent redec / conversion
+    const lastRedec = renovationCompletionMonths['full_redecoration'];
+    const lastConv = renovationCompletionMonths['__lastConversion'];
+    if (r.id === 'basic_repair') {
+      if (typeof lastRedec === 'number' && (monthsPlayed - lastRedec) < 24) {
+        return `Recently redecorated — repairs not needed (${24 - (monthsPlayed - lastRedec)}mo left)`;
+      }
+      if (typeof lastConv === 'number' && (monthsPlayed - lastConv) < 12) {
+        return `Recently converted — repairs not needed (${12 - (monthsPlayed - lastConv)}mo left)`;
+      }
+    }
+    if (r.id === 'full_redecoration' && typeof lastConv === 'number' && (monthsPlayed - lastConv) < 12) {
+      return `Recently converted — redecoration not needed (${12 - (monthsPlayed - lastConv)}mo left)`;
     }
     return null;
   };
@@ -412,10 +457,13 @@ export function RenovationDialog({
                     ? applyCeilingDiminishingReturns(valueUp, propertyValue, ceilingPrice)
                     : { uplift: valueUp, diminishingFactor: 1 };
 
-                  // Range reflects realistic outcome distribution (5% write-off → 60% on-spec)
-                  const valueLow = Math.round(cappedValueUp * 0.3);
-                  const valueHigh = cappedValueUp;
-                  const expectedValueUp = Math.round(cappedValueUp * RENOVATION_EXPECTED_MULTIPLIER);
+                  // Range reflects realistic outcome distribution
+                  const expectedMult = renovation.category === 'conversion'
+                    ? CONVERSION_EXPECTED_MULTIPLIER
+                    : RENOVATION_EXPECTED_MULTIPLIER;
+                  const valueLow = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 0.5 : 0.3));
+                  const valueHigh = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 1.4 : 1.0));
+                  const expectedValueUp = Math.round(cappedValueUp * expectedMult);
 
                   return (
                     <Card
@@ -427,7 +475,13 @@ export function RenovationDialog({
                         blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
-                      onClick={() => selectable && setSelectedRenovation(renovation)}
+                      onClick={() => {
+                        if (!selectable) return;
+                        setSelectedRenovation(renovation);
+                        if (renovation.category === 'conversion') {
+                          setConversionUnits(defaultUnits(renovation));
+                        }
+                      }}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
@@ -584,7 +638,7 @@ export function RenovationDialog({
                             {(() => {
                               // Mirror engine completion: rent uplift also tapers with ceiling
                               const rentFactor = 0.5 + 0.5 * diminishingFactor;
-                              const expectedRent = rentUp * RENOVATION_EXPECTED_MULTIPLIER * rentFactor;
+                              const expectedRent = rentUp * expectedMult * rentFactor;
                               const incomeAnnual = expectedRent * 12 * 0.85; // 85% occupancy
                               const incomeRoi = (incomeAnnual / Math.max(1, cost)) * 100;
                               // NET capital ROI — subtracts cost so loss-making renos go red/negative
@@ -640,9 +694,39 @@ export function RenovationDialog({
         </div>
         
         {selectedRenovation && (
-          <div className="bg-muted p-4 rounded-lg mt-4">
-            <h4 className="font-semibold mb-2">Renovation Summary</h4>
+          <div className="bg-muted p-4 rounded-lg mt-4 space-y-3">
+            <h4 className="font-semibold">Renovation Summary</h4>
+            {isConversion(selectedRenovation) && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {isFlats(selectedRenovation) ? 'Number of flats' : 'Number of rooms'}
+                  </span>
+                  <span className="font-semibold">{conversionUnits}</span>
+                </div>
+                <Slider
+                  min={minUnits(selectedRenovation)}
+                  max={maxUnits(selectedRenovation)}
+                  step={1}
+                  value={[conversionUnits]}
+                  onValueChange={(v) => setConversionUnits(v[0])}
+                />
+                <div className="text-[11px] text-muted-foreground">
+                  Building can support {minUnits(selectedRenovation)}–{maxUnits(selectedRenovation)} {isFlats(selectedRenovation) ? 'flats' : 'rooms'} (based on {sqft.toLocaleString()} sqft).
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Cost:</span>
+                <br />
+                <span className="font-semibold">£{scaledCost(selectedRenovation).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Rent +/mo (typical):</span>
+                <br />
+                <span className="font-semibold text-success">+£{scaledRent(selectedRenovation).toLocaleString()}</span>
+              </div>
               <div>
                 <span className="text-muted-foreground">New Monthly Rent:</span>
                 <br />

@@ -1574,13 +1574,21 @@ export const useGameStore = create<GameState & GameActions>()(
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
           if (idx >= 0) {
             // ROI variability roll: realistic outcome distribution
-            //  60% — full uplift  · 25% — under-delivery (×0.7) · 10% — break-even (×0.3) · 5% — net loss (×0)
             const roll = Math.random();
             let valueMult = 1.0, rentMult = 1.0, outcomeNote = '';
-            if (roll < 0.60) { outcomeNote = 'on spec'; }
-            else if (roll < 0.85) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'under-delivered'; }
-            else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
-            else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
+            if (renovation.type.category === 'conversion') {
+              // Conversions are GDV plays — bigger upside, rarer total flops
+              if (roll < 0.50) { valueMult = 1.0; rentMult = 1.0; outcomeNote = 'on spec'; }
+              else if (roll < 0.80) { valueMult = 1.4; rentMult = 1.4; outcomeNote = 'over-delivered'; }
+              else if (roll < 0.95) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'soft demand'; }
+              else { valueMult = 0.2; rentMult = 0.2; outcomeNote = 'planning issues'; }
+            } else {
+              //  60% — full uplift  · 25% under (×0.7) · 10% break-even (×0.3) · 5% net loss
+              if (roll < 0.60) { outcomeNote = 'on spec'; }
+              else if (roll < 0.85) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'under-delivered'; }
+              else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
+              else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
+            }
 
             const propRecord = updatedProperties[idx];
             const valuePounds = fromPennies(propRecord.value);
@@ -1597,6 +1605,8 @@ export const useGameStore = create<GameState & GameActions>()(
             const subtypeUpdate = (renovation.type as any).resultingSubtype
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
               : {};
+            const subtypeUnits = (renovation.type as any).subtypeUnits as number | undefined;
+            const subtypeUnitsUpdate = subtypeUnits ? { subtypeUnits } : {};
 
             // Improvement-tier renovations on a standard property bump condition → premium.
             // Only on a successful roll (valueMult > 0) so botched works don't reward.
@@ -1628,7 +1638,13 @@ export const useGameStore = create<GameState & GameActions>()(
                 ...(updatedProperties[idx].completedRenovationIds || []),
                 renovation.type.id,
               ],
+              renovationCompletionMonths: {
+                ...(updatedProperties[idx].renovationCompletionMonths || {}),
+                [renovation.type.id]: prev.monthsPlayed,
+                ...(renovation.type.category === 'conversion' ? { __lastConversion: prev.monthsPlayed } : {}),
+              },
               ...subtypeUpdate,
+              ...subtypeUnitsUpdate,
               ...conditionUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
