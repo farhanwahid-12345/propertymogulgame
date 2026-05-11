@@ -48,6 +48,38 @@ export function TenantConcernsFeed({
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
 
+  // Flashing + chime when new concerns arrive
+  const seenIds = useRef<Set<string>>(new Set());
+  const [flashing, setFlashing] = useState(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
+
+  useEffect(() => {
+    const handler = (e: Event) => setSoundOn((e as CustomEvent<boolean>).detail);
+    window.addEventListener('pm:sound-toggled', handler);
+    return () => window.removeEventListener('pm:sound-toggled', handler);
+  }, []);
+
+  useEffect(() => {
+    const newIds = active.map(c => c.id).filter(id => !seenIds.current.has(id));
+    if (newIds.length > 0) {
+      // Initial mount — don't chime, just record
+      const isInitial = seenIds.current.size === 0;
+      newIds.forEach(id => seenIds.current.add(id));
+      if (!isInitial) {
+        playConcernChime();
+        setFlashing(true);
+      }
+    }
+    if (active.length === 0) setFlashing(false);
+  }, [active.map(c => c.id).join('|')]);
+
+  const stopFlashing = () => setFlashing(false);
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+  };
+
   const body = (
     <div className="space-y-2">
       {active.length === 0 ? (
