@@ -1638,7 +1638,13 @@ export const useGameStore = create<GameState & GameActions>()(
                 ...(updatedProperties[idx].completedRenovationIds || []),
                 renovation.type.id,
               ],
+              renovationCompletionMonths: {
+                ...(updatedProperties[idx].renovationCompletionMonths || {}),
+                [renovation.type.id]: prev.monthsPlayed,
+                ...(renovation.type.category === 'conversion' ? { __lastConversion: prev.monthsPlayed } : {}),
+              },
               ...subtypeUpdate,
+              ...subtypeUnitsUpdate,
               ...conditionUpdate,
             };
             const expectedValue = renovation.type.valueIncrease;
