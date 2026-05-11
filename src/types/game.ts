@@ -60,6 +60,10 @@ export interface Property {
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   /** IDs of renovation types completed on this property (one-shot per type). */
   completedRenovationIds?: string[];
+  /** Map of renovation typeId → in-game month it completed (for cooldown gating). */
+  renovationCompletionMonths?: Record<string, number>;
+  /** For conversions: number of HMO rooms or flat units chosen at conversion time. */
+  subtypeUnits?: number;
   /** Cumulative renovation spend on this property (pennies). */
   totalRenovationSpendPennies?: number;
 }
