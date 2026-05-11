@@ -58,6 +58,8 @@ interface RenovationDialogProps {
   activeRenovations?: string[]; // IDs of renovations in progress
   /** IDs of renovations already completed on this property — disables one-shot re-do. */
   completedRenovationIds?: string[];
+  /** Map renovation typeId → in-game month it completed. Drives basic-repair suppression. */
+  renovationCompletionMonths?: Record<string, number>;
   /** Required for conversion / extension gating. */
   propertyType?: "residential" | "commercial" | "luxury";
   internalSqft?: number;
