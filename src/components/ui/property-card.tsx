@@ -39,6 +39,8 @@ export interface Property {
   plotSqft?: number;
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   completedRenovationIds?: string[];
+  renovationCompletionMonths?: Record<string, number>;
+  subtypeUnits?: number;
   totalRenovationSpendPennies?: number;
 }
 
