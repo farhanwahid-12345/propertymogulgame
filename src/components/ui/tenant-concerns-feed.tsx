@@ -153,15 +153,27 @@ export function TenantConcernsFeed({
   if (bare) return body;
 
   return (
-    <Card className="glass border-0">
+    <Card
+      className={`glass border-0 ${flashing && active.length > 0 ? 'animate-pulse ring-2 ring-amber-400/60' : ''}`}
+      onMouseEnter={stopFlashing}
+    >
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           🛠️ Tenant Concerns
           {active.length > 0 && (
-            <Badge variant="outline" className="text-xs border-amber-400/40 text-amber-300">
+            <Badge variant="outline" className={`text-xs border-amber-400/40 text-amber-300 ${flashing ? 'animate-pulse' : ''}`}>
               {active.length} active
             </Badge>
           )}
+          <button
+            type="button"
+            onClick={toggleSound}
+            className="ml-auto text-muted-foreground hover:text-foreground"
+            title={soundOn ? 'Mute concern alerts' : 'Unmute concern alerts'}
+            aria-label={soundOn ? 'Mute' : 'Unmute'}
+          >
+            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent>{body}</CardContent>
