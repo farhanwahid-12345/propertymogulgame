@@ -561,6 +561,7 @@ export const PropertyCard = memo(function PropertyCard({
                       onRenovate={onRenovate}
                       activeRenovations={activeRenovationIds}
                       completedRenovationIds={property.completedRenovationIds}
+                      renovationCompletionMonths={property.renovationCompletionMonths}
                       propertyType={propertyType}
                       internalSqft={property.internalSqft}
                       plotSqft={property.plotSqft}
