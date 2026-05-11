@@ -94,6 +94,40 @@ export function applyCeilingDiminishingReturns(
 export const RENOVATION_EXPECTED_MULTIPLIER = 0.805;
 
 /**
+ * Conversion-only expected multiplier. Conversions (HMO / flats / change-of-use)
+ * are GDV plays — when they land they over-perform; failures are rarer.
+ *   50%×1.0 + 30%×1.4 + 15%×0.7 + 5%×0.2 ≈ 1.035
+ */
+export const CONVERSION_EXPECTED_MULTIPLIER = 1.035;
+
+/**
+ * Value-aware uplift multiplier for conversions. Bigger / more valuable
+ * buildings convert into HMOs and flats with much larger absolute uplifts —
+ * a £400k Victorian terrace into a 6-bed HMO produces several times the
+ * rent uplift of a £120k one. Combine multiplicatively with `units`.
+ */
+export function getConversionScaleMultiplier(args: {
+  propertyValue: number;          // pounds
+  subtype: 'hmo' | 'flats' | 'multi-let' | 'standard';
+  units?: number;                 // rooms (HMO) or flats (flats). Defaults sensibly.
+}): number {
+  const v = args.propertyValue || 150_000;
+  // Sub-linear scaling on value: a 4× value building gets ~2× uplift
+  const valueMult = Math.max(0.7, Math.min(3.5, Math.pow(v / 150_000, 0.55)));
+  const units = Math.max(1, args.units || (args.subtype === 'flats' ? 2 : 4));
+  // HMOs scale per room with diminishing returns; flats roughly linear
+  let unitMult: number;
+  if (args.subtype === 'hmo') {
+    unitMult = 0.55 + 0.18 * units; // 4 rooms → ~1.27, 6 → ~1.63, 8 → ~1.99
+  } else if (args.subtype === 'flats') {
+    unitMult = 0.55 + 0.4 * units;  // 2 → 1.35, 3 → 1.75, 4 → 2.15
+  } else {
+    unitMult = 1.0;
+  }
+  return Math.max(0.5, Math.min(7.0, valueMult * unitMult));
+}
+
+/**
  * Returns true when the property can realistically be upgraded to "premium"
  * condition via an in-game improvement renovation. Used by the satisfaction
  * tick to decide whether to penalise a premium tenant in a standard property.
