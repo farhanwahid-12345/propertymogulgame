@@ -455,7 +455,13 @@ export function RenovationDialog({
                         blocked && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
-                      onClick={() => selectable && setSelectedRenovation(renovation)}
+                      onClick={() => {
+                        if (!selectable) return;
+                        setSelectedRenovation(renovation);
+                        if (renovation.category === 'conversion') {
+                          setConversionUnits(defaultUnits(renovation));
+                        }
+                      }}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
