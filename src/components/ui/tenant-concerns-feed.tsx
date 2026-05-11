@@ -1,10 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wrench, Volume2, Droplets, Plug, ShieldAlert, Smile } from "lucide-react";
+import { Wrench, Volume2, VolumeX, Droplets, Plug, ShieldAlert, Smile, Volume2 as VolumeOn } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
 import type { TenantConcern } from "@/types/game";
 import type { Property } from "@/types/game";
+import { isSoundEnabled, setSoundEnabled, playConcernChime } from "@/lib/sound";
 
 interface Props {
   concerns: TenantConcern[];
