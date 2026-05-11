@@ -621,7 +621,7 @@ export function RenovationDialog({
                             {(() => {
                               // Mirror engine completion: rent uplift also tapers with ceiling
                               const rentFactor = 0.5 + 0.5 * diminishingFactor;
-                              const expectedRent = rentUp * RENOVATION_EXPECTED_MULTIPLIER * rentFactor;
+                              const expectedRent = rentUp * expectedMult * rentFactor;
                               const incomeAnnual = expectedRent * 12 * 0.85; // 85% occupancy
                               const incomeRoi = (incomeAnnual / Math.max(1, cost)) * 100;
                               // NET capital ROI — subtracts cost so loss-making renos go red/negative
