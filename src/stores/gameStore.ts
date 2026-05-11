@@ -1605,6 +1605,8 @@ export const useGameStore = create<GameState & GameActions>()(
             const subtypeUpdate = (renovation.type as any).resultingSubtype
               ? { subtype: (renovation.type as any).resultingSubtype as Property['subtype'] }
               : {};
+            const subtypeUnits = (renovation.type as any).subtypeUnits as number | undefined;
+            const subtypeUnitsUpdate = subtypeUnits ? { subtypeUnits } : {};
 
             // Improvement-tier renovations on a standard property bump condition → premium.
             // Only on a successful roll (valueMult > 0) so botched works don't reward.
