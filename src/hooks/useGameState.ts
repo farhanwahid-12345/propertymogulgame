@@ -209,6 +209,10 @@ export function useGameState() {
     store.cancelEviction(propertyId);
   }, [store.cancelEviction]);
 
+  const withdrawFromConveyancing = useCallback((conveyancingId: string) => {
+    store.withdrawFromConveyancing(conveyancingId);
+  }, [store.withdrawFromConveyancing]);
+
 
   const disputeDeposit = useCallback((disputeId: string) => {
     store.disputeDeposit(disputeId);
