@@ -90,21 +90,52 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
                 <Progress value={progress} className="h-2" />
               </div>
 
-              <div className="flex justify-between text-xs">
-                {isBuying && c.purchasePrice !== undefined && (
-                  <span className="text-muted-foreground">
-                    Price: <span className="text-foreground font-medium">£{fromPennies(c.purchasePrice).toLocaleString()}</span>
-                  </span>
-                )}
-                {!isBuying && c.salePrice !== undefined && (
-                  <span className="text-muted-foreground">
-                    Sale: <span className="text-foreground font-medium">£{fromPennies(c.salePrice).toLocaleString()}</span>
-                  </span>
-                )}
-                {isBuying && escrowPounds > 0 && (
-                  <span className="text-muted-foreground">
-                    Escrow: <span className="text-yellow-400 font-medium">£{escrowPounds.toLocaleString()}</span>
-                  </span>
+              <div className="flex justify-between items-center text-xs gap-2">
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {isBuying && c.purchasePrice !== undefined && (
+                    <span className="text-muted-foreground">
+                      Price: <span className="text-foreground font-medium">£{fromPennies(c.purchasePrice).toLocaleString()}</span>
+                    </span>
+                  )}
+                  {!isBuying && c.salePrice !== undefined && (
+                    <span className="text-muted-foreground">
+                      Sale: <span className="text-foreground font-medium">£{fromPennies(c.salePrice).toLocaleString()}</span>
+                    </span>
+                  )}
+                  {isBuying && escrowPounds > 0 && (
+                    <span className="text-muted-foreground">
+                      Escrow: <span className="text-yellow-400 font-medium">£{escrowPounds.toLocaleString()}</span>
+                    </span>
+                  )}
+                </div>
+                {!isBuying && onWithdraw && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 -my-1"
+                      >
+                        <Ban className="h-3 w-3 mr-1" />
+                        Pull out
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Pull {c.propertyName} out of sale?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This collapses the chain and triggers a <strong>£1,500</strong> solicitor + estate agent fee.
+                          The property stays in your portfolio.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep selling</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onWithdraw(c.id)}>
+                          Withdraw (£1,500)
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
             </div>
