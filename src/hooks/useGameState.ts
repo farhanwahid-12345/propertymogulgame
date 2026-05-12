@@ -429,6 +429,7 @@ export function useGameState() {
     applyRentIncrease,
     evictTenant,
     cancelEviction,
+    withdrawFromConveyancing,
     
     disputeDeposit,
     dismissDispute,
