@@ -2943,7 +2943,8 @@ export const useGameStore = create<GameState & GameActions>()(
           totalRentalIncome: fromPennies(totalRentalIncome - property.monthlyIncome),
           ownedPropertyCount: prev.ownedProperties.length,
         });
-        if (!eligibility.eligible) { showToast("Refinance Rejected", eligibility.reason || "Declined", "destructive"); return; }
+        // Inline rejection is shown by the panel; do not pop a global toast.
+        if (!eligibility.eligible) { return; }
 
         const newMortgage: Mortgage = {
           id: `${propertyId}_${Date.now()}`, propertyId, principal: newLoanAmount,
