@@ -27,6 +27,7 @@ interface OperationsCenterProps {
   playerCash: number; // pennies
   onResolveConcern: (id: string) => void;
   onSnoozeConcern: (id: string) => void;
+  onWithdrawConveyancing?: (conveyancingId: string) => void;
   // activity feed
   tenantHistory?: TenantDeparture[];
   tenantEvents?: Array<TenantEvent & { amount: number }>;
