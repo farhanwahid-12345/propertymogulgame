@@ -302,6 +302,7 @@ const Index = () => {
             playerCash={gameState.cash * 100}
             onResolveConcern={gameState.resolveTenantConcern}
             onSnoozeConcern={gameState.dismissTenantConcern}
+            onWithdrawConveyancing={gameState.withdrawFromConveyancing}
             tenantHistory={(gameState as any).tenantHistory || []}
             tenantEvents={gameState.tenantEvents}
             economicEvents={gameState.economicEvents}
