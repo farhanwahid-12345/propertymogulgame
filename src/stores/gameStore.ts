@@ -2539,6 +2539,9 @@ export const useGameStore = create<GameState & GameActions>()(
           overdraftUsed: dbg.overdraftUsed,
           conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
         });
+      },
+
+      // Tenant-side appeals are now resolved automatically by the monthly tick
       // when `pendingEviction.appealResolveMonth` is reached — the player no
       // longer initiates them.
 
