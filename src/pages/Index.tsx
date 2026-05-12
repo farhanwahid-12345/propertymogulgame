@@ -154,8 +154,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="market">
-            <div className="flex items-center justify-between mt-4 mb-3">
-              <h2 className="text-xl font-bold text-foreground">Property Market</h2>
+            <div className="flex items-center justify-end mt-4 mb-3">
               <div className="flex gap-2">
                 <EstateAgentWindow
                   ownedProperties={gameState.ownedProperties}
