@@ -1,6 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Hourglass, AlertTriangle, ShoppingCart, Tag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Hourglass, AlertTriangle, ShoppingCart, Tag, Ban } from "lucide-react";
 import type { Conveyancing } from "@/types/game";
 import { fromPennies } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
@@ -10,9 +22,11 @@ interface ConveyancingTrackerProps {
   monthsPlayed: number;
   /** When true, render only the body (no outer glass card / heading). */
   bare?: boolean;
+  /** Optional withdraw handler — only shown for selling rows. */
+  onWithdraw?: (conveyancingId: string) => void;
 }
 
-export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false }: ConveyancingTrackerProps) {
+export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, onWithdraw }: ConveyancingTrackerProps) {
   if (!conveyancing || conveyancing.length === 0) {
     if (bare) {
       return (
