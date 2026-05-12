@@ -49,6 +49,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
     playerCash,
     onResolveConcern,
     onSnoozeConcern,
+    onWithdrawConveyancing,
     tenantHistory = [],
     tenantEvents = [],
     economicEvents = [],
