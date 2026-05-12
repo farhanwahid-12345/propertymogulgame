@@ -2519,7 +2519,26 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      // Tenant-side appeals are now resolved automatically by the monthly tick
+      withdrawFromConveyancing: (conveyancingId) => {
+        const prev = get();
+        const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
+        if (!conv) { showToast("Not Found", "That transaction is no longer in progress.", "destructive"); return; }
+        if (conv.status !== 'selling') {
+          showToast("Cannot Withdraw", "Only sellers can pull out of a conveyancing chain.", "destructive");
+          return;
+        }
+        const feePennies = toPennies(1500);
+        const dbg = debit(prev, feePennies);
+        if (!dbg) {
+          showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
+          return;
+        }
+        showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+        set({
+          cash: dbg.cash,
+          overdraftUsed: dbg.overdraftUsed,
+          conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+        });
       // when `pendingEviction.appealResolveMonth` is reached — the player no
       // longer initiates them.
 
