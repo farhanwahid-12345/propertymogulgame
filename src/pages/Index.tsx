@@ -81,22 +81,22 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-city">
       {/* Compact Hero */}
       <div 
-        className="relative h-[160px] bg-cover bg-center flex items-end"
+        className="relative h-[120px] md:h-[160px] bg-cover bg-center flex items-end"
         style={{ backgroundImage: `url(${transporterBridgeHero})` }}
       >
         <div className="absolute inset-0" style={{ background: 'var(--gradient-hero)' }} />
-        <div className="relative w-full px-4 pb-3 pt-8">
+        <div className="relative w-full px-4 pb-3 pt-6 md:pt-8">
           <div className="container mx-auto">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight gradient-text">
+            <div className="flex items-end justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight gradient-text">
                   Property Tycoon 🏘️
                 </h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="hidden md:block text-sm text-muted-foreground mt-0.5">
                   Build your empire, one house at a time!
                 </p>
               </div>
-              <div className="flex-1 max-w-sm">
+              <div className="flex-1 min-w-[200px] max-w-sm">
                 <GameClock 
                   monthsPlayed={gameState.monthsPlayed}
                   timeUntilNextMonth={gameState.timeUntilNextMonth}
@@ -154,8 +154,7 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="market">
-            <div className="flex items-center justify-between mt-4 mb-3">
-              <h2 className="text-xl font-bold text-foreground">Property Market</h2>
+            <div className="flex items-center justify-end mt-4 mb-3">
               <div className="flex gap-2">
                 <EstateAgentWindow
                   ownedProperties={gameState.ownedProperties}
@@ -302,6 +301,7 @@ const Index = () => {
             playerCash={gameState.cash * 100}
             onResolveConcern={gameState.resolveTenantConcern}
             onSnoozeConcern={gameState.dismissTenantConcern}
+            onWithdrawConveyancing={gameState.withdrawFromConveyancing}
             tenantHistory={(gameState as any).tenantHistory || []}
             tenantEvents={gameState.tenantEvents}
             economicEvents={gameState.economicEvents}

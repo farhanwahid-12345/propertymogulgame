@@ -27,6 +27,7 @@ interface OperationsCenterProps {
   playerCash: number; // pennies
   onResolveConcern: (id: string) => void;
   onSnoozeConcern: (id: string) => void;
+  onWithdrawConveyancing?: (conveyancingId: string) => void;
   // activity feed
   tenantHistory?: TenantDeparture[];
   tenantEvents?: Array<TenantEvent & { amount: number }>;
@@ -48,6 +49,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
     playerCash,
     onResolveConcern,
     onSnoozeConcern,
+    onWithdrawConveyancing,
     tenantHistory = [],
     tenantEvents = [],
     economicEvents = [],
@@ -143,7 +145,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
 
         <div className="max-h-[360px] overflow-y-auto pr-1">
           <TabsContent value="conveyancing" className="mt-0">
-            <ConveyancingTracker conveyancing={conveyancing} monthsPlayed={monthsPlayed} bare />
+            <ConveyancingTracker conveyancing={conveyancing} monthsPlayed={monthsPlayed} bare onWithdraw={onWithdrawConveyancing} />
           </TabsContent>
 
           <TabsContent value="planning" className="mt-0">

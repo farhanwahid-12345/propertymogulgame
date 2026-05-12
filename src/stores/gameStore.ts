@@ -301,6 +301,7 @@ interface GameActions {
   applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number) => void;
   evictTenant: (propertyId: string, ground: EvictionGround) => void;
   cancelEviction: (propertyId: string) => void;
+  withdrawFromConveyancing: (conveyancingId: string) => void;
   // appealEviction removed — appeals are now tenant-driven & resolved by tick
   disputeDeposit: (disputeId: string) => void;
   dismissDispute: (disputeId: string) => void;
@@ -2519,6 +2520,28 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
+      withdrawFromConveyancing: (conveyancingId) => {
+        const prev = get();
+        const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
+        if (!conv) { showToast("Not Found", "That transaction is no longer in progress.", "destructive"); return; }
+        if (conv.status !== 'selling') {
+          showToast("Cannot Withdraw", "Only sellers can pull out of a conveyancing chain.", "destructive");
+          return;
+        }
+        const feePennies = toPennies(1500);
+        const dbg = debit(prev, feePennies);
+        if (!dbg) {
+          showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
+          return;
+        }
+        showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+        set({
+          cash: dbg.cash,
+          overdraftUsed: dbg.overdraftUsed,
+          conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+        });
+      },
+
       // Tenant-side appeals are now resolved automatically by the monthly tick
       // when `pendingEviction.appealResolveMonth` is reached — the player no
       // longer initiates them.
@@ -2943,7 +2966,8 @@ export const useGameStore = create<GameState & GameActions>()(
           totalRentalIncome: fromPennies(totalRentalIncome - property.monthlyIncome),
           ownedPropertyCount: prev.ownedProperties.length,
         });
-        if (!eligibility.eligible) { showToast("Refinance Rejected", eligibility.reason || "Declined", "destructive"); return; }
+        // Inline rejection is shown by the panel; do not pop a global toast.
+        if (!eligibility.eligible) { return; }
 
         const newMortgage: Mortgage = {
           id: `${propertyId}_${Date.now()}`, propertyId, principal: newLoanAmount,
@@ -3321,7 +3345,7 @@ export const useGameStore = create<GameState & GameActions>()(
           buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
           listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
-          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction,
+          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction, withdrawFromConveyancing,
           disputeDeposit, dismissDispute,
           startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,

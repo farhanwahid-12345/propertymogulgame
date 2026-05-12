@@ -1,82 +1,79 @@
-## Improvements 12–14
+# Improvements 15–17
 
-### 12. Yield rebalance + dynamic conversion ROI
+## 15. Inline mortgage/refinance rejections (no global toast)
 
-**12a. Lift yield curve across the board**
-Update `yieldForValue()` in `src/lib/engine/market.ts`:
-| Value bracket | Current centre | New centre |
-|--|--|--|
-| ≤ £75k | 11% | **13%** |
-| ≤ £150k | 9% | **11%** |
-| ≤ £300k | 7.5% | **9%** |
-| ≤ £600k | 6% | **7.5%** |
-| ≤ £1.2m | 5% | **6.5%** |
-| > £1.2m | 4% | **5.5%** |
+**Problem**: Refinance attempt fires a destructive toast that floats over the screen. The user wants the rejection reason rendered inside the panel where the application was made.
 
-Same `±1.5%` jitter, clamp raised to `[3, 16]`. Bump `monthlyIncome` on the seeded properties in `INITIAL_PROPERTIES` (`src/lib/engine/constants.ts`) by ~+20% so day-1 properties show ~13–15% yields instead of 9–10%. Cheaper stays meaningfully higher than premium — the curve just shifts up.
+**Changes**:
+- `src/components/ui/mortgage-refinance.tsx`
+  - Add local state `const [rejection, setRejection] = useState<string | null>(null)`.
+  - Wrap the existing `onRefinance(...)` call: pre-run `calculateMortgageEligibility(...)` (already imported for the inline preview). If `!eligible`, `setRejection(reason)` and `return` — do NOT call the store action (which toasts).
+  - Render an inline `<Alert variant="destructive">` directly above the action button when `rejection` is set, with title "Refinance Rejected" and the reason text. Auto-clear when the user changes provider, loan amount slider, term, or property.
+- `src/components/ui/mortgage-management.tsx` and `src/components/ui/mortgage-settlement.tsx`
+  - Same pattern for any application/settlement that surfaces a rejection toast — render inline error in the active sub-tab.
+- `src/components/ui/portfolio-mortgage.tsx`, `src/components/ui/loans-panel.tsx`
+  - Add a `lastRejection` local state and inline alert. Replace `showToast("...Denied"...)` callbacks with returned reasons, OR keep store toast but additionally pipe the result into local state via a return value. Simplest: each panel runs `calculateMortgageEligibility` itself before calling the store action and shows the alert inline; only call the store on success.
+- `src/stores/gameStore.ts`
+  - Suppress the destructive `showToast("Refinance Rejected"...)` and equivalent mortgage-rejected toasts. The store actions still guard internally (so a panel that forgets to pre-check can't break state) but they fail silently — the panel owns the UX.
+  - Successful actions keep their existing success toasts.
 
-**12b. Bigger yield uplift on conversions for larger / higher-value buildings**
-In `src/components/ui/renovation-dialog.tsx` the conversion `rentIncrease` values are flat. Replace with a value-aware scaling on top of the existing `scaleRenovationRent()` so a £400k house converted to a 6-bed HMO gains far more rent than a £120k one. New helper in `src/lib/engine/renovation.ts`:
-
-```ts
-getConversionRentMultiplier({ propertyValue, subtype, units }) // returns 1.0–2.5×
-```
-
-Applied in the renovation dialog preview and in `gameStore.completeRenovation` so booked rent matches. HMO uplift scales with `units` (rooms); flats uplift scales with `units`.
-
-**12c. Make conversion Capital ROI realistic & dynamic**
-Currently conversions in the screenshot show -64% / -41% capital ROI — they always destroy value. Adjust `valueIncrease` to scale with property value (HMO/flats add real GDV), and reroll the engine's value-uplift random multiplier (`RENOVATION_EXPECTED_MULTIPLIER` weights in `gameStore.completeRenovation`) for **conversion category only** to use:
-
-- 50% × 1.0
-- 30% × 1.4 (over-perform)
-- 15% × 0.7
-- 5% × 0.2 (planning-driven write-off)
-
-Expected ≈ 1.10× — conversions are positive on average but can still flop. Other renovation categories keep their current weighting.
-
-**12d. One-conversion-per-property cap**
-Add `hasBeenConverted: boolean` to `Property` (or derive from `subtype !== 'standard'`). In `renovation-dialog.tsx` filter all `category === 'conversion'` options out when the property already has a non-standard subtype. Show a disabled card with the message "Already converted to {HMO|Flats}".
-
-**12e. Predictions assume conversion is finished**
-ROI/value previews in the renovation dialog currently use the property's pre-conversion value. When evaluating *non-conversion* options on an already-converted property, calculations should already be correct. The fix is to ensure the renovation list itself recomputes `propertyValue` after subtype change for cost/uplift scaling. Verify in the dialog's `useMemo` block (~L316) that `currentValue` reflects post-conversion value for predictions.
-
-**12f. Selectable rooms / units on conversions**
-Replace the two HMO presets (4-bed / 6-bed) and the single Flats preset with **parametric conversions**: when the player selects "Convert to HMO" or "Convert to Flats", show a slider for `units` bounded by available `internalSqft`:
-
-- HMO: 1 room per **180 sqft**, min 3, max 8
-- Flats: 1 flat per **550 sqft**, min 2, max 5
-
-Cost, rent, value, planning approval probability, and duration all scale with chosen `units`. Stored on the property as `subtypeUnits: number`.
+**Acceptance**: Triggering a denied refinance from the Bank → Manage Mortgages tab shows the red alert inside that tab; nothing pops up over the empire view.
 
 ---
 
-### 13. Flashing notification + sound for tenant concerns
+## 16. Cleaner mobile + web UI
 
-In `src/components/ui/tenant-concerns-feed.tsx` (and the bottom-nav badge indicator):
-- When `unresolved concerns count` increases, set a `flashing` class on the badge and the operations-center button. Tailwind: `animate-pulse ring-2 ring-warning/60`.
-- Play a single short chime (one-shot per concern arrival, not looping). Use a small base64 WAV embedded in `src/lib/sound.ts`, gated by a `useRef(false)` "already played for this concern id" set so refreshing the page or navigating doesn't re-trigger.
-- Stop the flashing as soon as the player opens the Tenant Concerns feed.
-- Respect a `soundEnabled` toggle in the game store (default on); add a small speaker icon in the header to mute.
+Goal: reduce visual noise, less stacking, clearer hierarchy. Visual/layout only — no logic changes.
+
+**Mobile (`src/pages/Index.tsx`, `src/components/ui/mobile-bottom-nav.tsx`, `src/components/ui/game-stats.tsx`, `src/components/ui/game-clock.tsx`)**:
+- Hero: drop tagline ("Build your empire…") on `<sm` widths; shrink `h-[160px]` → `h-[120px]`; move the GameClock under the title instead of beside it (current side-by-side wraps awkwardly).
+- Stats grid: collapse the 2×2 quick-stats tiles into a single horizontal scroll-snap row of slimmer pills (Net Worth · Cash Flow · Portfolio · Level). Drop the redundant "Cash: £…" subline that duplicates Net Worth.
+- "Market: 3.44% | Debt: £0 | Month 0" strip: turn into a single muted ticker line without the chevron expander on mobile (move the expanded macro detail under the Bank tab).
+- Tabs: `Market | Bank` row currently sits above the ribbon already; remove the duplicate `Property Market` heading row that appears between the tab and the segmented `Estate Agent / Auction House / Reset` pill. Heading is implied by the active tab.
+- Bottom nav: keep 5 items but flatten to icons + tiny label only; drop the `+` and `1` neighbours (those are bottom OS chrome bleed in the screenshot — verify, no code change needed if so).
+- Collapsible sections: default Operations + Alerts to *closed* on mobile; default Empire to *open*. Already partially set — audit `defaultOpenMobile` flags.
+
+**Desktop (`src/pages/Index.tsx`)**:
+- Tighten container max-width to `max-w-6xl` (currently full-bleed) and add consistent `gap-6` between major sections.
+- Bank sub-tabs (`Pay Mortgage / Manage / Credit & Banking / Loans`) currently render full-width with a heavy gradient. Switch to a slim segmented control flush left, and put the inline rejection alert (item 15) in its own row above the content card so it doesn't overlap the tax breakdown.
+- Tax — current year card: shrink from 4 metric tiles to a 2-row compact summary on `<lg`; stack rate-band table below.
+- "All quiet — no operations in progress" empty state and "Your Empire 🏰 1" header should not both appear in the same horizontal band — add `mt-6` separator.
+
+**Out of scope**: redesigning glass/gradient tokens, restructuring the tab system itself.
 
 ---
 
-### 14. Skip basic repairs after redecoration / conversion
+## 17. Withdraw from in-progress conveyancing
 
-In `src/components/ui/renovation-dialog.tsx`, when filtering the available list:
-- Hide `basic_repair` if `completedRenovationIds` includes `full_redecoration` **and** the completion happened within the last 24 in-game months.
-- Hide `basic_repair` and `full_redecoration` for 12 months following completion of any `category === 'conversion'` renovation (the conversion already strips back and re-finishes the building).
-- Add a small footnote chip on the property card: "Recently redecorated — basic maintenance not required."
+**Problem**: Once a sale enters conveyancing it shows in the tracker with no way to pull out. (See screenshot 11 — "89 Borough Road" / "156 Cargo Fleet Lane" mid-conveyancing, no actions.)
 
-No changes to maintenance damage roll itself; only to what the player can re-buy.
+**Changes**:
+- `src/types/game.ts`: no schema change needed — reuse existing `cancelPropertyListing` semantics.
+- `src/stores/gameStore.ts`
+  - Add new action `withdrawFromConveyancing(conveyancingId: string)`:
+    - Find the `Conveyancing` row. Only `status === 'selling'` rows are user-cancellable (buyers pulling out of a purchase = different flow; out of scope).
+    - Charge a fixed **£1,500 chain-collapse fee** (matches the existing chain-collapse cost path).
+    - Remove the conveyancing row, restore the property to owned (it never left the portfolio in selling flow — verify in code; if it did, mark it back as owned and not listed).
+    - Push an `activity-feed` entry: "Pulled out of sale — {property} (£1,500 fee)".
+    - Show success toast `"Sale Withdrawn"`.
+  - For `status === 'buying'` rows: leave a stub returning false and show inline disabled tooltip "Buyer can't withdraw — only the seller can pull out".
+- `src/components/ui/conveyancing-tracker.tsx`
+  - Add a small `Pull out` button (red `Ban` icon, ghost variant) on the right side of each selling row. Wrap in `AlertDialog` mirroring the listed-properties withdraw confirmation (warn about £1,500 fee).
+  - Hide button on buying rows.
+  - Accept new prop `onWithdraw?: (conveyancingId: string) => void`.
+- `src/pages/Index.tsx`: pass `onWithdraw={gameState.withdrawFromConveyancing}` to the tracker.
+
+**Acceptance**: A property in "Selling — completes in 1 month" shows a red `Pull out` button. Clicking it opens a confirmation dialog stating the £1,500 fee. Confirming removes the conveyancing row, debits cash, keeps the property owned, and logs the activity.
 
 ---
 
 ## Files
 
-- **Modified**: `src/lib/engine/market.ts`, `src/lib/engine/constants.ts`, `src/lib/engine/renovation.ts`, `src/components/ui/renovation-dialog.tsx`, `src/stores/gameStore.ts`, `src/types/game.ts`, `src/components/ui/tenant-concerns-feed.tsx`, `src/components/ui/operations-center.tsx`, `src/components/ui/mobile-bottom-nav.tsx`, `src/pages/Index.tsx`
-- **New**: `src/lib/sound.ts`
+- **Modified**: `src/components/ui/mortgage-refinance.tsx`, `src/components/ui/mortgage-management.tsx`, `src/components/ui/mortgage-settlement.tsx`, `src/components/ui/portfolio-mortgage.tsx`, `src/components/ui/loans-panel.tsx`, `src/stores/gameStore.ts`, `src/components/ui/conveyancing-tracker.tsx`, `src/pages/Index.tsx`, `src/components/ui/mobile-bottom-nav.tsx`, `src/components/ui/game-stats.tsx`, `src/components/ui/game-clock.tsx`
+- **New**: none
 
 ## Out of scope
-- Re-pricing existing seed mortgages or recomputing historical tax against the new yields.
-- Rebalancing macro-event magnitudes against new yield curve.
-- Variable-rate concern chime (single sound only).
+
+- Allowing buyers to cancel in-flight purchases (different cost model).
+- Redesigning the whole tab system / theming tokens.
+- Re-pricing chain-collapse fee against macro state.
