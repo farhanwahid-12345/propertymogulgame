@@ -9,10 +9,10 @@ import { getPropertyValueRangeForLevel } from "./financials";
 export function yieldForValue(valuePennies: number): number {
   const v = valuePennies / 100; // pounds
   let centre: number;
-  if (v <= 75_000) centre = 13;
-  else if (v <= 150_000) centre = 11;
-  else if (v <= 300_000) centre = 9;
-  else if (v <= 600_000) centre = 7.5;
+  if (v <= 75_000) centre = 15;
+  else if (v <= 150_000) centre = 13;
+  else if (v <= 300_000) centre = 10.5;
+  else if (v <= 600_000) centre = 8.5;
   else if (v <= 1_200_000) centre = 6.5;
   else centre = 5.5;
   const jittered = centre + (Math.random() - 0.5) * 3; // ±1.5
