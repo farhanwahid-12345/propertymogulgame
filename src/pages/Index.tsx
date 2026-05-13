@@ -257,6 +257,8 @@ const Index = () => {
                 yearlyDeductibleExpenses={(gameState as any).yearlyDeductibleExpensesPennies || 0}
                 taxRecords={gameState.taxRecords || []}
                 totalTaxPaidPennies={(gameState as any).totalTaxPaidPennies || 0}
+                monthsPlayed={gameState.monthsPlayed}
+                lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
               />
             </div>
           </TabsContent>
