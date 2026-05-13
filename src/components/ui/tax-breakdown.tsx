@@ -12,6 +12,10 @@ interface Props {
   yearlyDeductibleExpenses: number;
   taxRecords: TaxRecord[];
   totalTaxPaidPennies: number;
+  /** Total months elapsed in-game. Used to extrapolate a full-year projection. */
+  monthsPlayed?: number;
+  /** Month index of last finalised tax bill (0 if none). */
+  lastCorporationTaxMonth?: number;
 }
 
 const fmt = (pennies: number) =>
@@ -24,10 +28,12 @@ export function TaxBreakdown({
   yearlyDeductibleExpenses,
   taxRecords,
   totalTaxPaidPennies,
+  monthsPlayed = 0,
+  lastCorporationTaxMonth = 0,
 }: Props) {
   const isLtd = entityType === 'ltd';
 
-  // Project current tax year liability using the same engine functions as the store
+  // Year-to-date tax (what the engine would actually charge if April hit now)
   const incomeBreakdown = calculateIncomeTax(
     yearlyGrossRent,
     yearlyMortgageInterest,
@@ -39,9 +45,34 @@ export function TaxBreakdown({
     yearlyDeductibleExpenses,
   );
 
+  // Months elapsed within the current tax year (1..12). The store resets
+  // accumulators in April and stores the reset month in lastCorporationTaxMonth.
+  const monthsElapsed = Math.max(
+    1,
+    Math.min(12, monthsPlayed - lastCorporationTaxMonth),
+  );
+  const scale = 12 / monthsElapsed;
+  const projGrossRent = Math.round(yearlyGrossRent * scale);
+  const projMortgageInterest = Math.round(yearlyMortgageInterest * scale);
+  const projExpenses = Math.round(yearlyDeductibleExpenses * scale);
+  const projectedIncomeTax = calculateIncomeTax(
+    projGrossRent,
+    projMortgageInterest,
+    projExpenses,
+  ).effectiveTax;
+  const projectedCorpTax = calculateCorporationTax(
+    projGrossRent,
+    projMortgageInterest,
+    projExpenses,
+  );
+
   const ytdCgt = taxRecords
     .filter(r => r.type === 'cgt')
     .reduce((s, r) => s + r.amount, 0);
+
+  const lastBill = [...taxRecords]
+    .filter(r => r.type !== 'cgt')
+    .sort((a, b) => b.month - a.month)[0];
 
   return (
     <div className="glass rounded-2xl p-4 space-y-4 animate-fade-in">
@@ -60,6 +91,9 @@ export function TaxBreakdown({
         <div className="glass p-2 rounded-lg">
           <div className="text-muted-foreground">Gross rent</div>
           <div className="font-semibold">{fmt(yearlyGrossRent)}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            {monthsElapsed} mo so far
+          </div>
         </div>
         <div className="glass p-2 rounded-lg">
           <div className="text-muted-foreground">Mortgage interest</div>
@@ -92,8 +126,12 @@ export function TaxBreakdown({
           <BandRow label="Additional rate (45%)" value={fmt(incomeBreakdown.additionalBandTax)} />
           <BandRow label="Section 24 credit (mortgage interest)" value={`− ${fmt(incomeBreakdown.section24Credit)}`} positive />
           <div className="border-t border-white/10 pt-1.5 mt-1.5 flex items-center justify-between font-semibold">
-            <span>Estimated tax this year</span>
+            <span>Year-to-date tax</span>
             <span className="text-amber-300">{fmt(incomeBreakdown.effectiveTax)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Projected at year-end (extrapolated)</span>
+            <span className="text-amber-200">{fmt(projectedIncomeTax)}</span>
           </div>
         </div>
       ) : (
@@ -103,11 +141,19 @@ export function TaxBreakdown({
           <BandRow label="Marginal relief (£50k–£250k)" value="effective 19–25%" />
           <BandRow label="Main rate (≥ £250k profit)" value="25%" />
           <div className="border-t border-white/10 pt-1.5 mt-1.5 flex items-center justify-between font-semibold">
-            <span>Estimated tax this year</span>
+            <span>Year-to-date tax</span>
             <span className="text-amber-300">{fmt(corpTax)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Projected at year-end (extrapolated)</span>
+            <span className="text-amber-200">{fmt(projectedCorpTax)}</span>
           </div>
         </div>
       )}
+
+      <p className="text-[10px] text-muted-foreground italic">
+        YTD updates each month as rent is collected — the projected figure smooths this out.
+      </p>
 
       {/* CGT (sole trader only) */}
       {!isLtd && (
@@ -127,6 +173,18 @@ export function TaxBreakdown({
           {' '}Lifetime tax paid: <strong className="text-foreground">{fmt(totalTaxPaidPennies)}</strong>.
         </span>
       </div>
+
+      {/* Last bill */}
+      {lastBill && (
+        <div className="text-[11px] flex items-start gap-2 border-t border-white/10 pt-3">
+          <Receipt className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-300" />
+          <span className="text-muted-foreground">
+            Last bill (month {lastBill.month}):{' '}
+            <strong className="text-foreground">{fmt(lastBill.amount)}</strong>
+            {lastBill.description ? <> — {lastBill.description}</> : null}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

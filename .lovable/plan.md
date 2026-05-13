@@ -1,79 +1,79 @@
-# Improvements 15–17
+# Improvements 18–20
 
-## 15. Inline mortgage/refinance rejections (no global toast)
+## 18. Stop tax notifications blocking sub-menus
 
-**Problem**: Refinance attempt fires a destructive toast that floats over the screen. The user wants the rejection reason rendered inside the panel where the application was made.
+**Problem (screenshot 6)**: The "📋 Income Tax Due!" / "📋 Corporation Tax Due!" toast pops over the Renovation dialog and other sub-menus, blocking clicks on the right-hand actions ("Completed" badges, install/upgrade buttons, etc.).
+
+**Cause**: `src/stores/gameStore.ts` (lines ~1340 and ~1353) calls `showToast(...)` for the annual tax bill. The toast renders in the top-right toast region which overlaps open dialogs.
 
 **Changes**:
-- `src/components/ui/mortgage-refinance.tsx`
-  - Add local state `const [rejection, setRejection] = useState<string | null>(null)`.
-  - Wrap the existing `onRefinance(...)` call: pre-run `calculateMortgageEligibility(...)` (already imported for the inline preview). If `!eligible`, `setRejection(reason)` and `return` — do NOT call the store action (which toasts).
-  - Render an inline `<Alert variant="destructive">` directly above the action button when `rejection` is set, with title "Refinance Rejected" and the reason text. Auto-clear when the user changes provider, loan amount slider, term, or property.
-- `src/components/ui/mortgage-management.tsx` and `src/components/ui/mortgage-settlement.tsx`
-  - Same pattern for any application/settlement that surfaces a rejection toast — render inline error in the active sub-tab.
-- `src/components/ui/portfolio-mortgage.tsx`, `src/components/ui/loans-panel.tsx`
-  - Add a `lastRejection` local state and inline alert. Replace `showToast("...Denied"...)` callbacks with returned reasons, OR keep store toast but additionally pipe the result into local state via a return value. Simplest: each panel runs `calculateMortgageEligibility` itself before calling the store action and shows the alert inline; only call the store on success.
 - `src/stores/gameStore.ts`
-  - Suppress the destructive `showToast("Refinance Rejected"...)` and equivalent mortgage-rejected toasts. The store actions still guard internally (so a panel that forgets to pre-check can't break state) but they fail silently — the panel owns the UX.
-  - Successful actions keep their existing success toasts.
+  - Remove the two `showToast("📋 Income Tax Due!", ...)` / `showToast("📋 Corporation Tax Due!", ...)` calls.
+  - In their place, push an entry into the existing **activity feed** so the user still sees the bill in the Alerts panel: `addActivityFeedEntry({ type: 'tax', title: 'Income Tax Paid', description: 'Annual income tax £X (gross £Y − §24 credit £Z)', month })` — mirror the pattern already used for macro events. Use `'corporation_tax'` description for LTD.
+  - Keep the `taxRecords.push(...)` write unchanged so the Tax tab still shows the year's record.
+- `src/components/ui/tax-breakdown.tsx`
+  - Add a small "Last bill" row under the schedule footer showing the most recent `taxRecords` entry (date + amount), so the user has an obvious place to see the bill that previously came via toast.
 
-**Acceptance**: Triggering a denied refinance from the Bank → Manage Mortgages tab shows the red alert inside that tab; nothing pops up over the empire view.
+**Acceptance**: Opening the Renovation dialog while the in-game year ticks past 5 April no longer covers the right-hand "Completed" / install controls. The bill appears in the activity feed and at the bottom of the Tax tab.
 
 ---
 
-## 16. Cleaner mobile + web UI
+## 19. Verify the in-year tax estimate
 
-Goal: reduce visual noise, less stacking, clearer hierarchy. Visual/layout only — no logic changes.
+**Problem (screenshot 7)**: The "Estimated tax this year" figure climbs by a few hundred pounds every month, which the user wants sanity-checked.
 
-**Mobile (`src/pages/Index.tsx`, `src/components/ui/mobile-bottom-nav.tsx`, `src/components/ui/game-stats.tsx`, `src/components/ui/game-clock.tsx`)**:
-- Hero: drop tagline ("Build your empire…") on `<sm` widths; shrink `h-[160px]` → `h-[120px]`; move the GameClock under the title instead of beside it (current side-by-side wraps awkwardly).
-- Stats grid: collapse the 2×2 quick-stats tiles into a single horizontal scroll-snap row of slimmer pills (Net Worth · Cash Flow · Portfolio · Level). Drop the redundant "Cash: £…" subline that duplicates Net Worth.
-- "Market: 3.44% | Debt: £0 | Month 0" strip: turn into a single muted ticker line without the chevron expander on mobile (move the expanded macro detail under the Bank tab).
-- Tabs: `Market | Bank` row currently sits above the ribbon already; remove the duplicate `Property Market` heading row that appears between the tab and the segmented `Estate Agent / Auction House / Reset` pill. Heading is implied by the active tab.
-- Bottom nav: keep 5 items but flatten to icons + tiny label only; drop the `+` and `1` neighbours (those are bottom OS chrome bleed in the screenshot — verify, no code change needed if so).
-- Collapsible sections: default Operations + Alerts to *closed* on mobile; default Empire to *open*. Already partially set — audit `defaultOpenMobile` flags.
+**Investigation summary (no code change unless verification fails)**:
+- `TaxBreakdown` calls `calculateCorporationTax(yearlyGrossRent, yearlyMortgageInterest, yearlyDeductibleExpenses)`.
+- The store accumulates those three fields **monthly** (`accumulatedGrossRent = prev.yearlyGrossRent + monthlyIncome`, etc.) and only resets them in April.
+- Therefore the displayed estimate is **year-to-date tax on year-to-date income**, not a *projected* full-year liability. Each new month adds another month of rent → tax goes up. Mathematically correct, but the *label* "Estimated tax this year" misleads — users read it as a forecast.
 
-**Desktop (`src/pages/Index.tsx`)**:
-- Tighten container max-width to `max-w-6xl` (currently full-bleed) and add consistent `gap-6` between major sections.
-- Bank sub-tabs (`Pay Mortgage / Manage / Credit & Banking / Loans`) currently render full-width with a heavy gradient. Switch to a slim segmented control flush left, and put the inline rejection alert (item 15) in its own row above the content card so it doesn't overlap the tax breakdown.
-- Tax — current year card: shrink from 4 metric tiles to a 2-row compact summary on `<lg`; stack rate-band table below.
-- "All quiet — no operations in progress" empty state and "Your Empire 🏰 1" header should not both appear in the same horizontal band — add `mt-6` separator.
+**Changes**:
+- `src/components/ui/tax-breakdown.tsx`
+  - Compute `monthsElapsedInTaxYear = ((monthsPlayed - lastTaxYearStartMonth) % 12) + 1` (pass `monthsPlayed` and `lastCorporationTaxMonth` as props from `Index.tsx`).
+  - Show **two** figures in the summary band:
+    1. `Year-to-date tax` = current calculation (rename the existing line).
+    2. `Projected full-year tax` = run `calculateIncomeTax` / `calculateCorporationTax` on `(ytdRent / monthsElapsed) * 12` and the same scaled mortgage interest + expenses. Label clearly: "Projected at year-end (extrapolated)".
+  - Add a one-line caption: "Estimate updates each month as rent is collected — projected figure smooths this out."
+- `src/pages/Index.tsx`
+  - Pass `monthsPlayed={gameState.monthsPlayed}` and `lastCorporationTaxMonth={gameState.lastCorporationTaxMonth}` to `<TaxBreakdown />`.
 
-**Out of scope**: redesigning glass/gradient tokens, restructuring the tab system itself.
+**No engine math changes** — the calculation is already correct; the UI just gets clearer labels and a projected figure.
+
+**Acceptance**: The Tax tab shows both YTD and projected tax. The user can see the YTD climb is expected behaviour and the projected number stays roughly stable month-to-month (only moving when rent roll, expenses, or interest actually change).
 
 ---
 
-## 17. Withdraw from in-progress conveyancing
+## 20. Lift yields on cheaper stock toward ~15%
 
-**Problem**: Once a sale enters conveyancing it shows in the tracker with no way to pull out. (See screenshot 11 — "89 Borough Road" / "156 Cargo Fleet Lane" mid-conveyancing, no actions.)
+**Problem (screenshot 8)**: 113 The Crescent — price £118,800, market value £119,089 — was quoted well under 10% gross yield. The user expects sub-£150k Middlesbrough stock to land closer to 15%.
+
+**Cause**: `src/lib/engine/market.ts → yieldForValue()` currently centres £75k–£150k at **11%** with ±1.5% jitter, so realistic outputs are 9.5–12.5%. Doesn't reach 15%.
 
 **Changes**:
-- `src/types/game.ts`: no schema change needed — reuse existing `cancelPropertyListing` semantics.
-- `src/stores/gameStore.ts`
-  - Add new action `withdrawFromConveyancing(conveyancingId: string)`:
-    - Find the `Conveyancing` row. Only `status === 'selling'` rows are user-cancellable (buyers pulling out of a purchase = different flow; out of scope).
-    - Charge a fixed **£1,500 chain-collapse fee** (matches the existing chain-collapse cost path).
-    - Remove the conveyancing row, restore the property to owned (it never left the portfolio in selling flow — verify in code; if it did, mark it back as owned and not listed).
-    - Push an `activity-feed` entry: "Pulled out of sale — {property} (£1,500 fee)".
-    - Show success toast `"Sale Withdrawn"`.
-  - For `status === 'buying'` rows: leave a stub returning false and show inline disabled tooltip "Buyer can't withdraw — only the seller can pull out".
-- `src/components/ui/conveyancing-tracker.tsx`
-  - Add a small `Pull out` button (red `Ban` icon, ghost variant) on the right side of each selling row. Wrap in `AlertDialog` mirroring the listed-properties withdraw confirmation (warn about £1,500 fee).
-  - Hide button on buying rows.
-  - Accept new prop `onWithdraw?: (conveyancingId: string) => void`.
-- `src/pages/Index.tsx`: pass `onWithdraw={gameState.withdrawFromConveyancing}` to the tracker.
+- `src/lib/engine/market.ts`
+  - Lift the lower brackets of `yieldForValue`:
+    - `≤ £75k`: centre **15** (was 13)
+    - `≤ £150k`: centre **13** (was 11)
+    - `≤ £300k`: centre **10.5** (was 9)
+    - `≤ £600k`: centre **8.5** (was 7.5)
+    - `≤ £1.2M`: centre 6.5 (unchanged)
+    - `> £1.2M`: centre 5.5 (unchanged)
+  - Keep ±1.5% jitter and the `[3, 16]` clamp.
+- `src/lib/engine/constants.ts`
+  - The seed properties under £150k were already boosted in improvement 14. Re-derive their `monthlyIncome` from the new centres so seeds match the curve (sub-£100k seeds nudge up another ~15%, £100k–£150k seeds nudge up ~10%).
+- No changes to `getMarketRentPounds` (refurb premium model stays). Existing owned properties keep their stored `yield` value, so this only affects newly-generated stock and seeds — which matches the user's "estate agent quoted under 10%" complaint.
 
-**Acceptance**: A property in "Selling — completes in 1 month" shows a red `Pull out` button. Clicking it opens a confirmation dialog stating the £1,500 fee. Confirming removes the conveyancing row, debits cash, keeps the property owned, and logs the activity.
+**Acceptance**: Browsing the Estate Agent for a fresh batch of sub-£150k Middlesbrough houses shows quoted yields clustering around 12–15%. A ~£120k property like 113 The Crescent now shows ~£1,300–£1,500/mo income (≈13–15% gross).
 
 ---
 
 ## Files
 
-- **Modified**: `src/components/ui/mortgage-refinance.tsx`, `src/components/ui/mortgage-management.tsx`, `src/components/ui/mortgage-settlement.tsx`, `src/components/ui/portfolio-mortgage.tsx`, `src/components/ui/loans-panel.tsx`, `src/stores/gameStore.ts`, `src/components/ui/conveyancing-tracker.tsx`, `src/pages/Index.tsx`, `src/components/ui/mobile-bottom-nav.tsx`, `src/components/ui/game-stats.tsx`, `src/components/ui/game-clock.tsx`
+- **Modified**: `src/stores/gameStore.ts`, `src/components/ui/tax-breakdown.tsx`, `src/pages/Index.tsx`, `src/lib/engine/market.ts`, `src/lib/engine/constants.ts`
 - **New**: none
 
 ## Out of scope
 
-- Allowing buyers to cancel in-flight purchases (different cost model).
-- Redesigning the whole tab system / theming tokens.
-- Re-pricing chain-collapse fee against macro state.
+- Re-pricing already-owned stock (would invalidate saved games and feels like cheating in the user's favour).
+- Reworking the toast region's z-index globally — only the tax toast was flagged.
+- Changing the UK tax-year boundary or band thresholds.
