@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
+import { FurnishingDialog } from "@/components/ui/furnishing-dialog";
 import { EvictionDialog } from "@/components/ui/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart } from "lucide-react";
@@ -585,6 +586,14 @@ export const PropertyCard = memo(function PropertyCard({
                       inPlanningCooldown={inPlanningCooldown}
                     />
                   )}
+                  <FurnishingDialog
+                    propertyId={property.id}
+                    propertyName={property.name}
+                    internalSqft={property.internalSqft}
+                    currentTier={(property as any).furnishingTier}
+                    monthsRemaining={(property as any).furnishingMonthsRemaining}
+                    hasTenant={!!currentTenant}
+                  />
                   <Button 
                     variant="destructive" 
                     size="sm"
