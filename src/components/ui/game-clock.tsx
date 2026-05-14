@@ -74,7 +74,6 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
         <span className="text-xs text-muted-foreground shrink-0">
           {Math.ceil(timeUntilNextMonth)}s
         </span>
-        <SpeedSelector compact />
       </div>
     );
   }
