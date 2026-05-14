@@ -1094,7 +1094,9 @@ export const useGameStore = create<GameState & GameActions>()(
           newTenants = newTenants.map(t => {
             const pen = satPenaltyByProp.get(t.propertyId);
             if (!pen) return t;
-            return { ...t, satisfaction: Math.max(0, t.satisfaction - pen) };
+            // Cap concern penalty at -2 per tenant per month (was uncapped)
+            const cappedPen = Math.min(pen, 2);
+            return { ...t, satisfaction: Math.max(0, t.satisfaction - cappedPen) };
           });
         }
         // Trim long-resolved
