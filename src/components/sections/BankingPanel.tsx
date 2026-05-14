@@ -4,6 +4,7 @@ import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
 import { LoansPanel } from "@/components/ui/loans-panel";
 import { TaxBreakdown } from "@/components/ui/tax-breakdown";
+import { UpcomingEvents } from "@/components/sections/UpcomingEvents";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
@@ -22,6 +23,15 @@ export function BankingPanel({ gameState, getDebtForProperty, totalPortfolioInco
 
   return (
     <>
+      <div className="mt-4">
+        <UpcomingEvents
+          monthsPlayed={gameState.monthsPlayed}
+          entityType={gameState.entityType}
+          pendingEvictions={gameState.pendingEvictions || []}
+          planningApplications={(gameState as any).planningApplications || []}
+          lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
+        />
+      </div>
       <div className="flex flex-wrap gap-2 mt-4">
         <MortgageSettlement
           ownedProperties={gameState.ownedProperties}

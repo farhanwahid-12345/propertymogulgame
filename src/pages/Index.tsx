@@ -8,7 +8,8 @@ import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
-import { EntityOnboardingDialog } from "@/components/ui/entity-onboarding-dialog";
+import { OnboardingFlow } from "@/components/ui/onboarding-flow";
+import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarket } from "@/components/sections/PropertyMarket";
 import { BankingPanel } from "@/components/sections/BankingPanel";
@@ -174,9 +175,12 @@ const Index = () => {
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
       />
 
-      <EntityOnboardingDialog
-        open={!(gameState as any).entityChosen}
-        onChoose={gameState.setEntityType}
+      <OnboardingFlow
+        open={!(gameState as any).entityChosen || !(gameState as any).onboardingCompleted}
+        onComplete={(entity) => {
+          gameState.setEntityType(entity);
+          useGameStore.setState({ onboardingCompleted: true } as any);
+        }}
       />
     </div>
   );

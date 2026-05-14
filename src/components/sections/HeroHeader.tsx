@@ -41,6 +41,7 @@ export function HeroHeader({
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
+  const reputation = useGameStore((s) => (s as any).landlordReputation ?? 50);
   const [compact, setCompact] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
@@ -95,8 +96,14 @@ export function HeroHeader({
                 Property Tycoon{compact ? "" : " 🏘️"}
               </h1>
               {!compact && (
-                <p className="hidden md:block text-sm text-muted-foreground mt-0.5">
-                  Build your empire, one house at a time!
+                <p className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
+                  <span>Build your empire, one house at a time!</span>
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-[10px] font-medium"
+                    title={`Landlord reputation: ${Math.round(reputation)}/100`}
+                  >
+                    ⭐ {Math.round(reputation)}
+                  </span>
                 </p>
               )}
             </div>
