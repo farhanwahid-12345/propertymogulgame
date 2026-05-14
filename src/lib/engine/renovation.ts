@@ -87,18 +87,15 @@ export function applyCeilingDiminishingReturns(
 /**
  * Probability-weighted expected outcome multiplier for a renovation.
  * Mirrors the engine's completion roll in `gameStore.ts`:
- *   60% × 1.0 + 25% × 0.7 + 10% × 0.3 + 5% × 0 = 0.805
- * Exported so the dialog preview reports the same expected value the engine
- * delivers on average.
+ *   70% × 1.0 + 25% × 0.85 + 4% × 0.4 + 1% × 0 ≈ 0.929
  */
-export const RENOVATION_EXPECTED_MULTIPLIER = 0.805;
+export const RENOVATION_EXPECTED_MULTIPLIER = 0.929;
 
 /**
- * Conversion-only expected multiplier. Conversions (HMO / flats / change-of-use)
- * are GDV plays — when they land they over-perform; failures are rarer.
- *   50%×1.0 + 30%×1.4 + 15%×0.7 + 5%×0.2 ≈ 1.035
+ * Conversion-only expected multiplier.
+ *   55%×1.0 + 30%×1.5 + 12%×0.8 + 3%×0.3 ≈ 1.105
  */
-export const CONVERSION_EXPECTED_MULTIPLIER = 1.035;
+export const CONVERSION_EXPECTED_MULTIPLIER = 1.105;
 
 /**
  * Value-aware uplift multiplier for conversions. Bigger / more valuable
