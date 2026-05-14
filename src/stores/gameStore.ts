@@ -3312,6 +3312,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           tenants: updatedTenants,
+          ownedProperties: updatedOwned,
           annualRepairCosts: updatedAnnual,
           damageHistory: updatedHistory,
           tenantConcerns: concerns.map(c =>
