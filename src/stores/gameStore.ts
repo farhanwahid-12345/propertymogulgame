@@ -3322,7 +3322,41 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      dismissTenantConcern: (concernId) => {
+      topUpCondition: (propertyId, pointsRequested) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) return;
+        const currentScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
+        const headroomToCap = Math.max(0, 100 - currentScore);
+        const monthlyUsed = (property.conditionLastTopUpMonth === prev.monthsPlayed)
+          ? (property.conditionTopUpPointsThisMonth ?? 0) : 0;
+        const monthlyHeadroom = Math.max(0, MAX_TOPUP_POINTS_PER_MONTH - monthlyUsed);
+        const pts = Math.max(0, Math.min(pointsRequested, headroomToCap, monthlyHeadroom));
+        if (pts <= 0) {
+          showToast("Nothing to do", "Already at the cap (100) or this month's spend limit reached.");
+          return;
+        }
+        const sqft = Math.max(400, property.internalSqft ?? 900);
+        const cost = Math.max(1, Math.round(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * sqft * pts / 100));
+        const debited = debit(prev, cost);
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} (even with overdraft) for ${pts} points of repairs.`, "destructive");
+          return;
+        }
+        const newScore = Math.min(100, currentScore + pts);
+        const newMonthlyUsed = monthlyUsed + pts;
+        const updated = prev.ownedProperties.map(p =>
+          p.id !== propertyId ? p : ({
+            ...p,
+            conditionScore: newScore,
+            condition: conditionTierFromScore(newScore),
+            conditionLastTopUpMonth: prev.monthsPlayed,
+            conditionTopUpPointsThisMonth: newMonthlyUsed,
+          })
+        );
+        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, ownedProperties: updated });
+        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).`);
+      },
         // "Snooze" — keep in feed; satisfaction will decay each month it remains unresolved
         showToast("Concern Snoozed", "It'll keep nagging until resolved.");
       },
