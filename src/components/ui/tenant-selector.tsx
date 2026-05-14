@@ -348,16 +348,19 @@ export function TenantSelector({
             const isSelected = selectedTenant?.id === tenant.id;
             const reliabilityStars = riskToStars(tenant.defaultRisk, 50);
             const careStars = riskToStars(tenant.damageRisk, 12);
+            const minCond = TENANT_MIN_CONDITION[tenant.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0;
+            const conditionLocked = typeof conditionScore === 'number' && conditionScore < minCond;
 
             return (
               <Card
                 key={tenant.id}
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-md border",
-                  isSelected && "ring-2 ring-primary",
+                  "transition-all border",
+                  conditionLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-md",
+                  isSelected && !conditionLocked && "ring-2 ring-primary",
                   ProfileColors[tenant.profile]
                 )}
-                onClick={() => setSelectedTenant(tenant)}
+                onClick={() => { if (!conditionLocked) setSelectedTenant(tenant); }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
