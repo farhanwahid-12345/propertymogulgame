@@ -2877,7 +2877,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      handleRefinance: (propertyId, newLoanAmount, providerId, termYears, mortgageType) => {
+      handleRefinance: (propertyId, newLoanAmount, providerId, termYears, mortgageType, fixedTermYears = 0) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) return;
@@ -2892,11 +2892,13 @@ export const useGameStore = create<GameState & GameActions>()(
         const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+        // Fixed-rate discount/premium vs SVR
+        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(newLoanAmount),
           propertyValue: fromPennies(property.value), propertyMonthlyRent: fromPennies(property.monthlyIncome),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
@@ -2911,6 +2913,9 @@ export const useGameStore = create<GameState & GameActions>()(
           monthlyPayment: toPennies(eligibility.monthlyPayment), remainingBalance: newLoanAmount,
           interestRate: eligibility.adjustedRate, termYears, mortgageType,
           providerId: provider.id, startDate: Date.now(),
+          startMonth: prev.monthsPlayed,
+          fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
+          fixedRate: fixedTermYears > 0 ? eligibility.adjustedRate : undefined,
         };
         const cashDelta = newLoanAmount - currentBal;
         // cashDelta can be positive (cash out) or negative (paying down). Route through credit/debit.
