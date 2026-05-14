@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/ui/game-stats";
@@ -24,6 +24,14 @@ const Index = () => {
   useGameEngine();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+
+  // Heal legacy saves: anyone who already chose an entity has effectively onboarded.
+  useEffect(() => {
+    const s = useGameStore.getState() as any;
+    if (s.entityChosen && !s.onboardingCompleted) {
+      useGameStore.setState({ onboardingCompleted: true } as any);
+    }
+  }, []);
 
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
@@ -179,7 +187,7 @@ const Index = () => {
       />
 
       <OnboardingFlow
-        open={!(gameState as any).entityChosen || !(gameState as any).onboardingCompleted}
+        open={!(gameState as any).entityChosen}
         onComplete={(entity) => {
           gameState.setEntityType(entity);
           useGameStore.setState({ onboardingCompleted: true } as any);
