@@ -11,7 +11,7 @@ import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
-import { playGavel, playLevelUp, playPaper } from '@/lib/sound';
+import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
@@ -880,11 +880,13 @@ export const useGameStore = create<GameState & GameActions>()(
           if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
-          let chance = 0.06;
-          if (property.condition === 'dilapidated') chance += 0.06;
-          else if (property.condition === 'premium') chance -= 0.02;
-          if (t.tenant.profile === 'premium') chance += 0.02;
-          else if (t.tenant.profile === 'risky') chance -= 0.04;
+          let chance = 0.035;
+          if (property.condition === 'dilapidated') chance += 0.04;
+          else if (property.condition === 'premium') chance -= 0.015;
+          if (t.tenant.profile === 'premium') chance += 0.015;
+          else if (t.tenant.profile === 'risky') chance -= 0.025;
+          // 1-month grace after move-in — settling-in period, no surprise concerns
+          if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
           chance = Math.max(0.005, chance);
 
           if (Math.random() >= chance) return;
@@ -915,6 +917,7 @@ export const useGameStore = create<GameState & GameActions>()(
         );
         if (visibleNew.length > 0) {
           showToast("New Tenant Concern 🛠️", `${visibleNew.length} new concern${visibleNew.length > 1 ? 's' : ''} raised — check the feed.`);
+          playConcernChime();
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
@@ -1448,15 +1451,15 @@ export const useGameStore = create<GameState & GameActions>()(
             let valueMult = 1.0, rentMult = 1.0, outcomeNote = '';
             if (renovation.type.category === 'conversion') {
               // Conversions are GDV plays — bigger upside, rarer total flops
-              if (roll < 0.50) { valueMult = 1.0; rentMult = 1.0; outcomeNote = 'on spec'; }
-              else if (roll < 0.80) { valueMult = 1.4; rentMult = 1.4; outcomeNote = 'over-delivered'; }
-              else if (roll < 0.95) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'soft demand'; }
-              else { valueMult = 0.2; rentMult = 0.2; outcomeNote = 'planning issues'; }
+              if (roll < 0.55) { valueMult = 1.0; rentMult = 1.0; outcomeNote = 'on spec'; }
+              else if (roll < 0.85) { valueMult = 1.5; rentMult = 1.5; outcomeNote = 'over-delivered'; }
+              else if (roll < 0.97) { valueMult = 0.8; rentMult = 0.8; outcomeNote = 'soft demand'; }
+              else { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'planning issues'; }
             } else {
-              //  60% — full uplift  · 25% under (×0.7) · 10% break-even (×0.3) · 5% net loss
-              if (roll < 0.60) { outcomeNote = 'on spec'; }
-              else if (roll < 0.85) { valueMult = 0.7; rentMult = 0.7; outcomeNote = 'under-delivered'; }
-              else if (roll < 0.95) { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'underwhelming returns'; }
+              //  70% — full uplift  · 25% slight under (×0.85) · 4% break-even (×0.4) · 1% net loss
+              if (roll < 0.70) { outcomeNote = 'on spec'; }
+              else if (roll < 0.95) { valueMult = 0.85; rentMult = 0.85; outcomeNote = 'minor issues'; }
+              else if (roll < 0.99) { valueMult = 0.4; rentMult = 0.4; outcomeNote = 'underwhelming returns'; }
               else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
             }
 
