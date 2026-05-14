@@ -3380,8 +3380,34 @@ export const useGameStore = create<GameState & GameActions>()(
             conditionTopUpPointsThisMonth: newMonthlyUsed,
           })
         );
-        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, ownedProperties: updated });
-        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).`);
+
+        // Crossing into 80+ absorbs lingering soft (non-damage) maintenance/mould concerns
+        let absorbedConcerns = 0;
+        let updatedConcerns = prev.tenantConcerns;
+        if (newScore >= 80 && currentScore < 80) {
+          updatedConcerns = (prev.tenantConcerns || []).map(c => {
+            if (
+              c && !c.resolvedMonth && c.propertyId === propertyId &&
+              c.source !== 'damage' &&
+              (c.category === 'maintenance' || c.category === 'mould')
+            ) {
+              absorbedConcerns += 1;
+              return { ...c, resolvedMonth: prev.monthsPlayed };
+            }
+            return c;
+          });
+        }
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          ownedProperties: updated,
+          tenantConcerns: updatedConcerns,
+        });
+        const absorbedSuffix = absorbedConcerns > 0
+          ? ` Cleared ${absorbedConcerns} lingering concern${absorbedConcerns > 1 ? 's' : ''}.`
+          : '';
+        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).${absorbedSuffix}`);
       },
 
       dismissTenantConcern: (concernId) => {
