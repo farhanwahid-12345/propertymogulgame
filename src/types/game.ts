@@ -124,6 +124,14 @@ export interface Mortgage {
   providerId: string;
   collateralPropertyIds?: string[];
   startDate: number;
+  /** Snapshot of monthsPlayed when this mortgage was issued — used for fixed-term reversion. */
+  startMonth?: number;
+  /** 0/undefined = SVR/tracker, 2/5/10 = initial fixed-rate term in years. */
+  fixedTermYears?: number;
+  /** Snapshot of the fixed rate (decimal) — preserved for UI display. */
+  fixedRate?: number;
+  /** True once the fix has expired and the mortgage has reverted to SVR. */
+  revertedToSVR?: boolean;
 }
 
 export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour';
