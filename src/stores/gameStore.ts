@@ -2345,12 +2345,12 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
-      evictTenant: (propertyId, ground) => {
+      evictTenant: (propertyId, ground, slotIndex = 0) => {
         const prev = get();
-        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
+        const tenant = prev.tenants.find(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
         if (!tenant) { showToast("No Tenant", "There is no tenant to evict.", "destructive"); return; }
-        if (prev.pendingEvictions.some(e => e.propertyId === propertyId)) {
-          showToast("Eviction Already Served", "Notice already in effect. Cancel it first.", "destructive"); return;
+        if (prev.pendingEvictions.some(e => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) {
+          showToast("Eviction Already Served", "Notice already in effect for this slot. Cancel it first.", "destructive"); return;
         }
 
         // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
@@ -2383,14 +2383,14 @@ export const useGameStore = create<GameState & GameActions>()(
             if (recentDefaults < 2) {
               showToast("Invalid Ground", "Rent arrears requires ≥2 missed payments.", "destructive"); return;
             }
-            noticeMonths = 1; // 4 weeks ≈ 1 month
+            noticeMonths = 1;
             validReason = `Rent arrears (${recentDefaults} missed payments)`;
             break;
           case 'antisocial_behaviour':
             if (tenant.tenant.profile !== 'risky' || !longstandingASB) {
               showToast("Invalid Ground", "ASB requires risky tenant + unresolved noise/safety concern >1 month.", "destructive"); return;
             }
-            noticeMonths = 1; // 2 weeks rounded up to 1 month tick
+            noticeMonths = 1;
             validReason = 'Antisocial behaviour';
             break;
           case 'landlord_sale':
@@ -2403,8 +2403,6 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
         }
 
-        // ── Tenant-driven appeal roll ──
-        // Base probability by ground; adjusted by satisfaction & profile.
         let appealChance =
           ground === 'landlord_sale' || ground === 'landlord_move_in' ? 0.35 :
           ground === 'antisocial_behaviour' ? 0.10 :
@@ -2416,10 +2414,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const effectiveMonth = prev.monthsPlayed + noticeMonths;
         const updatedTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground } : t
+          t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+            ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground }
+            : t
         );
         const newEviction: PendingEviction = {
           propertyId,
+          slotIndex,
           tenantName: tenant.tenant.name,
           ground,
           servedMonth: prev.monthsPlayed,
@@ -2435,14 +2436,16 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      cancelEviction: (propertyId) => {
+      cancelEviction: (propertyId, slotIndex = 0) => {
         const prev = get();
-        if (!prev.pendingEvictions.some(e => e.propertyId === propertyId)) return;
+        if (!prev.pendingEvictions.some(e => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) return;
         showToast("Eviction Withdrawn", "Notice cancelled — tenant stays.");
         set({
-          pendingEvictions: prev.pendingEvictions.filter(e => e.propertyId !== propertyId),
+          pendingEvictions: prev.pendingEvictions.filter(e => !(e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)),
           tenants: prev.tenants.map(t =>
-            t.propertyId === propertyId ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined } : t
+            t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+              ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined }
+              : t
           ),
         });
       },
