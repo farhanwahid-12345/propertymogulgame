@@ -413,4 +413,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
