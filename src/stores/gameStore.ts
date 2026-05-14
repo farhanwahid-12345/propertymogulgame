@@ -705,7 +705,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
           const wear = TENANT_WEAR_MULTIPLIER[wearKey] ?? 1.0;
           const currentScore = p.conditionScore ?? scoreFromConditionTier(p.condition);
-          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear);
+          // Extra drain when there's open, past-grace damage on this property
+          const staleDamage = (prev.tenantConcerns || []).some(c =>
+            c && !c.resolvedMonth && c.source === 'damage' && c.propertyId === p.id &&
+            (newMonthNumber - (c.raisedMonth || 0)) > 2
+          );
+          const damagePenalty = staleDamage ? 1 : 0;
+          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear - damagePenalty);
           const newCondition = conditionTierFromScore(decayed);
           const tierChanged = newCondition !== p.condition;
 
