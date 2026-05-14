@@ -11,7 +11,7 @@ import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
-import { playGavel, playLevelUp, playPaper } from '@/lib/sound';
+import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
@@ -880,11 +880,13 @@ export const useGameStore = create<GameState & GameActions>()(
           if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
-          let chance = 0.06;
-          if (property.condition === 'dilapidated') chance += 0.06;
-          else if (property.condition === 'premium') chance -= 0.02;
-          if (t.tenant.profile === 'premium') chance += 0.02;
-          else if (t.tenant.profile === 'risky') chance -= 0.04;
+          let chance = 0.035;
+          if (property.condition === 'dilapidated') chance += 0.04;
+          else if (property.condition === 'premium') chance -= 0.015;
+          if (t.tenant.profile === 'premium') chance += 0.015;
+          else if (t.tenant.profile === 'risky') chance -= 0.025;
+          // 1-month grace after move-in — settling-in period, no surprise concerns
+          if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
           chance = Math.max(0.005, chance);
 
           if (Math.random() >= chance) return;
@@ -915,6 +917,7 @@ export const useGameStore = create<GameState & GameActions>()(
         );
         if (visibleNew.length > 0) {
           showToast("New Tenant Concern 🛠️", `${visibleNew.length} new concern${visibleNew.length > 1 ? 's' : ''} raised — check the feed.`);
+          playConcernChime();
         }
 
         // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
