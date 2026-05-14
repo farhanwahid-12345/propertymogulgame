@@ -320,6 +320,8 @@ export interface GameState {
   mortgages: Mortgage[];
   mortgageProviderRates: Record<string, number>;
   currentMarketRate: number;
+  /** Current spreads above market rate for personal/business loans. Fluctuates monthly. */
+  currentLoanRates: { personal: number; business: number };
   // Time
   monthsPlayed: number;
   timeUntilNextMonth: number;

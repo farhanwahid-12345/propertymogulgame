@@ -343,7 +343,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 12,
+    _version: 13,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -368,6 +368,7 @@ function createInitialState(): GameState {
     mortgages: [],
     mortgageProviderRates: getInitialProviderRates(),
     currentMarketRate: BASE_MARKET_RATE,
+    currentLoanRates: { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread },
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
     gameSpeed: 1,
@@ -542,6 +543,17 @@ function migrateState(persisted: any): GameState {
       persisted.entityChosen = true;
     }
     persisted._version = 12;
+  }
+
+  // v12 → v13: add currentLoanRates; drop any persisted bridging loans
+  if (persisted._version < 13) {
+    if (Array.isArray(persisted.loans)) {
+      persisted.loans = persisted.loans.filter((l: any) => l.kind !== 'bridging');
+    }
+    if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
+      persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
+    }
+    persisted._version = 13;
   }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
@@ -778,7 +790,11 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
         }, 0);
-        const totalExpenses = mortgagePayments + councilTax;
+        // Landlord insurance — 0.4%/yr of property value, charged every month regardless of tenancy.
+        const insurance = newOwnedProperties.reduce((total, property) => {
+          return total + Math.floor((property.value * 0.004) / 12);
+        }, 0);
+        const totalExpenses = mortgagePayments + councilTax + insurance;
         const netIncome = monthlyIncome - totalExpenses;
 
         // Update mortgage balances + capture this month's actual interest portion
@@ -1316,7 +1332,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const accumulatedProfit = prev.yearlyNetProfit + netIncome;
         const accumulatedGrossRent = (prev.yearlyGrossRent || 0) + monthlyIncome;
         const accumulatedMortgageInterest = (prev.yearlyMortgageInterest || 0) + monthlyMortgageInterest;
-        const accumulatedDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + councilTax;
+        const accumulatedDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + councilTax + insurance;
 
         const currentMonth = newMonthNumber % 12;
         const isApril = currentMonth === 3;
@@ -1368,7 +1384,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // Cashflow: subtract outflows (mortgage + council + tax) directly,
         // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
         // through credit() so any drawn overdraft repays first.
-        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - taxPaid;
+        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - insurance - taxPaid;
         let postOutflowOverdraft = prev.overdraftUsed;
         let cashAfterCredit = cashAfterOutflows;
         // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
@@ -1789,10 +1805,21 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // Functional set — merge by id with whatever's currently in the store
         // so concurrent monthly ticks can't clobber the new damage concerns.
+        // Loan spreads drift slightly each month within product bounds
+        const driftLoanSpread = (current: number, min: number, max: number) => {
+          const next = current + (Math.random() - 0.5) * 0.006;
+          return Math.max(min, Math.min(max, next));
+        };
+        const newLoanRates = {
+          personal: driftLoanSpread(prev.currentLoanRates.personal, LOAN_PRODUCTS.personal.spreadMin, LOAN_PRODUCTS.personal.spreadMax),
+          business: driftLoanSpread(prev.currentLoanRates.business, LOAN_PRODUCTS.business.spreadMin, LOAN_PRODUCTS.business.spreadMax),
+        };
+
         set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
+          currentLoanRates: newLoanRates,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
@@ -3060,13 +3087,24 @@ export const useGameStore = create<GameState & GameActions>()(
           if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
           if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
         }
-        if (amount > product.maxAmountPennies) {
-          showToast("Loan Too Large", `Max £${fromPennies(product.maxAmountPennies).toLocaleString()} for ${kind} loans.`, "destructive"); return;
+        // Dynamic cap based on rent roll & credit score
+        const monthlyRent = prev.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
+        const monthlyMortgage = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
+        const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage);
+        const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
+        const dynamicCap = kind === 'personal'
+          ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 6) * creditFactor)
+          : Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor);
+        if (amount > dynamicCap) {
+          showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
         }
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        const rate = Math.max(0.02, prev.currentMarketRate + product.rateSpread);
+        // Dynamic APR: market rate + product spread + credit-score penalty (shared with mortgages)
+        const creditPenalty = prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
+        const spread = (prev.currentLoanRates as any)[kind] ?? product.baseSpread;
+        const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
         const loan: import('@/types/game').Loan = {
