@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface MortgageManagementProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
@@ -39,6 +39,7 @@ export function MortgageManagement({
   const [singleProvider, setSingleProvider] = useState<string>("");
   const [singleTermYears, setSingleTermYears] = useState<number>(25);
   const [singleMortgageType, setSingleMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [singleFixedTermYears, setSingleFixedTermYears] = useState<number>(0);
 
   const refinanceableProperties = ownedProperties.filter(prop => prop.value > 0);
   
@@ -56,17 +57,20 @@ export function MortgageManagement({
 
   const handleRefinance = () => {
     if (!selectedProperty || !singleProvider || singleLoanAmount[0] <= 0) return;
-    onRefinance(selectedProperty.id, singleLoanAmount[0], singleProvider, singleTermYears, singleMortgageType);
+    onRefinance(selectedProperty.id, singleLoanAmount[0], singleProvider, singleTermYears, singleMortgageType, singleFixedTermYears);
     setSelectedProperty(null);
     setSingleLoanAmount([0]);
     setSingleProvider("");
     setSingleTermYears(25);
     setSingleMortgageType('repayment');
+    setSingleFixedTermYears(0);
     setIsOpen(false);
   };
 
+  const fixedAdjustment = singleFixedTermYears === 2 ? -0.004 : singleFixedTermYears === 5 ? -0.002 : singleFixedTermYears === 10 ? 0.001 : 0;
+
   const singleProviderData = mortgageProviders.find((p: any) => p.id === singleProvider);
-  const adjustedRate = singleProviderData ? Math.max(0.01, singleProviderData.baseRate + ratePenalty) : 0;
+  const adjustedRate = singleProviderData ? Math.max(0.01, singleProviderData.baseRate + ratePenalty + fixedAdjustment) : 0;
   const singleMonthlyPayment = singleProviderData ? calculateMonthlyPayment(
     singleLoanAmount[0], adjustedRate, singleTermYears, singleMortgageType
   ) : 0;
@@ -278,6 +282,24 @@ export function MortgageManagement({
                   </Select>
                 </div>
 
+                <div>
+                  <Label>Initial Fixed Term</Label>
+                  <Select value={singleFixedTermYears.toString()} onValueChange={(value) => setSingleFixedTermYears(Number(value))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">SVR / Tracker (no fix)</SelectItem>
+                      <SelectItem value="2">2-year fix (−0.40%)</SelectItem>
+                      <SelectItem value="5">5-year fix (−0.20%)</SelectItem>
+                      <SelectItem value="10">10-year fix (+0.10%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    When the fix expires, the mortgage reverts to lender SVR — remortgage before then to lock a new rate.
+                  </p>
+                </div>
+
                 {singleProvider && (
                   <Card className="bg-blue-500/10 border-blue-500/30">
                     <CardContent className="p-4">
@@ -299,6 +321,11 @@ export function MortgageManagement({
                             )}
                           </span>
                         </div>
+                        {singleFixedTermYears > 0 && (
+                          <div className="col-span-2 text-xs text-blue-300/90">
+                            Rate fixed for {singleFixedTermYears} year{singleFixedTermYears === 1 ? '' : 's'}, then reverts to lender SVR.
+                          </div>
+                        )}
                         {eligibility?.icrRatio !== undefined && (
                           <div className="col-span-2">
                             <span className="text-muted-foreground">{stressLabel}:</span>

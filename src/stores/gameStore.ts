@@ -91,7 +91,7 @@ interface GameActions {
   // Mortgages
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
-  handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   // Loans
   applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => void;
@@ -593,16 +593,43 @@ export const useGameStore = create<GameState & GameActions>()(
         // Update mortgage balances + capture this month's actual interest portion
         // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
         let monthlyMortgageInterest = 0;
+        const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number }> = [];
         const updatedMortgages = newMortgages.map(mortgage => {
-          const interest = Math.round(mortgage.remainingBalance * (mortgage.interestRate / 12));
-          monthlyMortgageInterest += interest;
-          let newBalance = mortgage.remainingBalance;
-          if (mortgage.mortgageType === 'repayment') {
-            const principal = mortgage.monthlyPayment - interest;
-            newBalance = Math.max(0, mortgage.remainingBalance - principal);
+          // Fixed-term reversion — when initial fix expires, mortgage moves to lender SVR.
+          let workingMortgage = mortgage;
+          if (
+            mortgage.fixedTermYears && mortgage.fixedTermYears > 0 &&
+            mortgage.startMonth !== undefined && !mortgage.revertedToSVR &&
+            newMonthNumber - mortgage.startMonth >= mortgage.fixedTermYears * 12
+          ) {
+            const provider = MORTGAGE_PROVIDERS.find(p => p.id === mortgage.providerId);
+            const providerRate = (prev.mortgageProviderRates[mortgage.providerId] || provider?.baseRate || BASE_MARKET_RATE);
+            const svrRate = providerRate + 0.02 + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+            const monthlyRate = svrRate / 12;
+            const remainingMonths = Math.max(12, mortgage.termYears * 12 - (newMonthNumber - mortgage.startMonth));
+            const newPayment = mortgage.mortgageType === 'interest-only'
+              ? Math.round(mortgage.remainingBalance * monthlyRate)
+              : Math.round(mortgage.remainingBalance * (monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) / (Math.pow(1 + monthlyRate, remainingMonths) - 1));
+            fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate });
+            workingMortgage = { ...mortgage, interestRate: svrRate, monthlyPayment: newPayment, revertedToSVR: true };
           }
-          return { ...mortgage, remainingBalance: newBalance };
+          const interest = Math.round(workingMortgage.remainingBalance * (workingMortgage.interestRate / 12));
+          monthlyMortgageInterest += interest;
+          let newBalance = workingMortgage.remainingBalance;
+          if (workingMortgage.mortgageType === 'repayment') {
+            const principal = workingMortgage.monthlyPayment - interest;
+            newBalance = Math.max(0, workingMortgage.remainingBalance - principal);
+          }
+          return { ...workingMortgage, remainingBalance: newBalance };
         });
+        if (fixedTermReversions.length > 0) {
+          fixedTermReversions.forEach(r => {
+            showToast(
+              "Fixed-rate ended",
+              `Mortgage reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
+            );
+          });
+        }
 
         // ── Credit score ──
         let creditAdj = 0;
@@ -1134,7 +1161,30 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Fluctuate provider rates
+        // ── Commercial triennial rent reviews ──
+        // Every 36 months from the tenant's last review (or move-in), commercial
+        // leases reset to current market rent — bypassing the 3% Section-13 cap.
+        let commercialReviewCount = 0;
+        const commercialUplift = 0.0927; // 3 years compounded at 3%
+        newTenants = newTenants.map(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property || property.type !== 'commercial') return t;
+          const baseline = t.lastRentReviewMonth ?? t.moveInMonth ?? 0;
+          if (newMonthNumber - baseline < 36) return t;
+          const newBase = Math.floor((property.baseRent || property.monthlyIncome) * (1 + commercialUplift));
+          updatedOwnedProperties = updatedOwnedProperties.map(p =>
+            p.id === t.propertyId ? { ...p, baseRent: newBase, monthlyIncome: Math.floor(p.monthlyIncome * (1 + commercialUplift)), lastRentIncrease: newMonthNumber } : p
+          );
+          commercialReviewCount++;
+          return { ...t, lastRentReviewMonth: newMonthNumber };
+        });
+        if (commercialReviewCount > 0) {
+          showToast(
+            "Commercial rent review",
+            `${commercialReviewCount} commercial lease${commercialReviewCount === 1 ? '' : 's'} reviewed to market rate (+${(commercialUplift * 100).toFixed(1)}%).`
+          );
+        }
+
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
         // ── Taxation (UK tax year ends 5 April → use month 3 in 0-indexed) ──
@@ -2827,7 +2877,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      handleRefinance: (propertyId, newLoanAmount, providerId, termYears, mortgageType) => {
+      handleRefinance: (propertyId, newLoanAmount, providerId, termYears, mortgageType, fixedTermYears = 0) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) return;
@@ -2842,11 +2892,13 @@ export const useGameStore = create<GameState & GameActions>()(
         const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+        // Fixed-rate discount/premium vs SVR
+        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(newLoanAmount),
           propertyValue: fromPennies(property.value), propertyMonthlyRent: fromPennies(property.monthlyIncome),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
@@ -2861,6 +2913,9 @@ export const useGameStore = create<GameState & GameActions>()(
           monthlyPayment: toPennies(eligibility.monthlyPayment), remainingBalance: newLoanAmount,
           interestRate: eligibility.adjustedRate, termYears, mortgageType,
           providerId: provider.id, startDate: Date.now(),
+          startMonth: prev.monthsPlayed,
+          fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
+          fixedRate: fixedTermYears > 0 ? eligibility.adjustedRate : undefined,
         };
         const cashDelta = newLoanAmount - currentBal;
         // cashDelta can be positive (cash out) or negative (paying down). Route through credit/debit.

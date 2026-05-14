@@ -124,6 +124,14 @@ export interface Mortgage {
   providerId: string;
   collateralPropertyIds?: string[];
   startDate: number;
+  /** Snapshot of monthsPlayed when this mortgage was issued — used for fixed-term reversion. */
+  startMonth?: number;
+  /** 0/undefined = SVR/tracker, 2/5/10 = initial fixed-rate term in years. */
+  fixedTermYears?: number;
+  /** Snapshot of the fixed rate (decimal) — preserved for UI display. */
+  fixedRate?: number;
+  /** True once the fix has expired and the mortgage has reverted to SVR. */
+  revertedToSVR?: boolean;
 }
 
 export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour';
@@ -146,6 +154,8 @@ export interface PropertyTenant {
   /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
   evictionNoticeMonth?: number;
   evictionGround?: EvictionGround;
+  /** Commercial leases only — monthsPlayed of the most recent triennial rent review. */
+  lastRentReviewMonth?: number;
 }
 
 export interface PendingEviction {
@@ -386,4 +396,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
