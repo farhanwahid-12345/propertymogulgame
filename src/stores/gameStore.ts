@@ -3030,7 +3030,7 @@ export const useGameStore = create<GameState & GameActions>()(
           totalRentalIncome: fromPennies(otherIncome),
           ownedPropertyCount: prev.ownedProperties.length,
         });
-        if (!eligibility.eligible) { showToast("Portfolio Mortgage Rejected", eligibility.reason || "Declined", "destructive"); return; }
+        if (!eligibility.eligible) { console.warn('[handlePortfolioMortgage] ineligible — UI gate missed:', eligibility.reason); return; }
 
         const portfolioMortgage: Mortgage = {
           id: `portfolio_${Date.now()}`, propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
