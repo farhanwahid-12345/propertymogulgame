@@ -34,7 +34,9 @@ export function useGameEngine() {
     const handleTick = (deltaMs: number) => {
       // Reentrancy guard — if a previous handleTick is still running its
       // synchronous catch-up loop, just buffer the delta and bail.
-      const speed = useGameStore.getState().gameSpeed || 1;
+      const gs = useGameStore.getState();
+      if (gs.isPaused) return;
+      const speed = gs.gameSpeed || 1;
       const scaledSec = (deltaMs * speed) / 1000;
       accumulatedSec.current = Math.min(MAX_ACCUMULATOR_SEC, accumulatedSec.current + scaledSec);
       marketAccumSec.current = Math.min(MAX_ACCUMULATOR_SEC, marketAccumSec.current + scaledSec);
