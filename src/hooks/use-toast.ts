@@ -190,6 +190,15 @@ function toast({ ...props }: Toast) {
     },
   })
 
+  // Mirror to persistent notification log so the bell icon stays in sync.
+  const title = plainText(props.title) || "Notification";
+  const description = plainText(props.description);
+  pushNotification({
+    title,
+    description,
+    severity: severityFromVariant((props as any).variant),
+  });
+
   return {
     id: id,
     dismiss,
