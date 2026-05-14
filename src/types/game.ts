@@ -303,6 +303,10 @@ export interface GameState {
   entityType: EntityType;
   /** Has the player explicitly chosen sole_trader vs ltd at game start? */
   entityChosen?: boolean;
+  /** Has the player completed the welcome/onboarding intro? */
+  onboardingCompleted?: boolean;
+  /** Landlord reputation 0-100 — gates premium tenant access, displayed as stars. Starts at 50. */
+  landlordReputation: number;
   // Properties
   ownedProperties: Property[];
   estateAgentProperties: Property[];
@@ -378,4 +382,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 14;
