@@ -84,6 +84,7 @@ interface GameActions {
   // Renovations
   startRenovation: (propertyId: string, renovationType: RenovationType) => void;
   upgradeCondition: (propertyId: string, targetCondition: PropertyCondition) => void;
+  furnishProperty: (propertyId: string, tier: 'unfurnished' | 'part_furnished' | 'fully_furnished') => void;
   // Planning permission
   submitPlanningApplication: (propertyId: string, renovationType: RenovationType) => void;
   acknowledgePlanningDecision: (applicationId: string) => void;
@@ -2677,6 +2678,50 @@ export const useGameStore = create<GameState & GameActions>()(
               : p
           ),
         });
+      },
+
+      furnishProperty: (propertyId: string, tier: 'unfurnished' | 'part_furnished' | 'fully_furnished') => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) return;
+        if (prev.tenants.some(t => t.propertyId === propertyId)) {
+          showToast("Tenant in Place", "Furnish between tenancies — can't refit while occupied.", "destructive");
+          return;
+        }
+        if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
+          showToast("In Conveyancing", "Cannot furnish during conveyancing.", "destructive");
+          return;
+        }
+        const sqft = property.internalSqft || 800;
+        // £8/sqft for part, £18/sqft for fully — typical UK BTL refit costs
+        const costPerSqft = tier === 'fully_furnished' ? 18 : tier === 'part_furnished' ? 8 : 0;
+        const cost = toPennies(sqft * costPerSqft);
+        if (cost > 0) {
+          const debited = debit(prev, cost);
+          if (!debited) {
+            showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} to furnish (even with overdraft).`, "destructive");
+            return;
+          }
+          set({
+            cash: debited.cash,
+            overdraftUsed: debited.overdraftUsed,
+            ownedProperties: prev.ownedProperties.map(p =>
+              p.id === propertyId
+                ? { ...p, furnishingTier: tier, furnishingMonthsRemaining: 60 }
+                : p
+            ),
+          });
+          showToast("Furnishings Installed 🛋️", `${property.name} now ${tier.replace('_', ' ')}. Cost £${fromPennies(cost).toLocaleString()}.`);
+        } else {
+          set({
+            ownedProperties: prev.ownedProperties.map(p =>
+              p.id === propertyId
+                ? { ...p, furnishingTier: 'unfurnished', furnishingMonthsRemaining: undefined }
+                : p
+            ),
+          });
+          showToast("Furnishings Removed", `${property.name} reverted to unfurnished.`);
+        }
       },
 
       // ─── MORTGAGES ─────────────────────────
