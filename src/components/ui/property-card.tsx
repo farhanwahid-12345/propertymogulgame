@@ -453,22 +453,44 @@ export const PropertyCard = memo(function PropertyCard({
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-2 mt-auto">
-                  {onSelectTenant && (
-                    <TenantSelector
+                  {multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
+                    <MultiUnitSlots
                       propertyId={property.id}
-                      baseRent={property.baseRent || property.monthlyIncome}
-                      onSelectTenant={onSelectTenant}
-                      currentTenant={currentTenant}
-                      currentMonthlyRent={property.monthlyIncome}
-                      lastTenantChange={property.lastTenantChange}
-                      monthsPlayed={monthsPlayed}
-                      condition={property.condition}
-                      conditionScore={conditionScore}
+                      propertyName={property.name}
+                      subtype={(property.subtype as 'hmo' | 'flats')}
+                      baseRentPerUnitPounds={Math.round(
+                        ((property.baseRent || property.monthlyIncome) || 0) / multiUnitSlots.length
+                      )}
                       propertyValue={property.value}
                       propertyYield={property.yield}
-                      currentSatisfaction={tenantSatisfaction}
-                      satisfactionReasons={tenantSatisfactionReasons}
+                      condition={property.condition}
+                      conditionScore={conditionScore}
+                      monthsPlayed={monthsPlayed}
+                      playerCash={playerCash}
+                      slots={multiUnitSlots}
+                      onSelectTenant={onSelectTenant}
+                      evictTenant={evictTenant}
+                      cancelEviction={cancelEviction}
+                      applyRentIncrease={applyRentIncrease}
                     />
+                  ) : (
+                    onSelectTenant && (
+                      <TenantSelector
+                        propertyId={property.id}
+                        baseRent={property.baseRent || property.monthlyIncome}
+                        onSelectTenant={onSelectTenant}
+                        currentTenant={currentTenant}
+                        currentMonthlyRent={property.monthlyIncome}
+                        lastTenantChange={property.lastTenantChange}
+                        monthsPlayed={monthsPlayed}
+                        condition={property.condition}
+                        conditionScore={conditionScore}
+                        propertyValue={property.value}
+                        propertyYield={property.yield}
+                        currentSatisfaction={tenantSatisfaction}
+                        satisfactionReasons={tenantSatisfactionReasons}
+                      />
+                    )
                   )}
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">
