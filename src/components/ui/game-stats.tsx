@@ -28,6 +28,7 @@ interface GameStatsProps {
   expenseBreakdown: {
     mortgages: number;
     councilTax: number;
+    insurance: number;
     emptyPropertiesCount: number;
   };
   totalDebt: number;
@@ -145,13 +146,17 @@ export function GameStats({
                         <span className="text-muted-foreground">Council Tax ({expenseBreakdown.emptyPropertiesCount} empty):</span>
                         <span className="font-semibold">£{expenseBreakdown.councilTax.toLocaleString()}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Landlord Insurance:</span>
+                        <span className="font-semibold">£{Math.round(expenseBreakdown.insurance).toLocaleString()}</span>
+                      </div>
                       <div className="border-t pt-1.5 flex justify-between font-medium">
                         <span>Total:</span>
                         <span>£{totalMonthlyExpenses.toLocaleString()}</span>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      💡 Council tax (£150/mo) only on empty properties.
+                      💡 Council tax (£150/mo) only on empty properties. Insurance ~0.4%/yr of value.
                     </p>
                   </div>
                 </PopoverContent>
