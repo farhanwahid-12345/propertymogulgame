@@ -3270,6 +3270,13 @@ export const useGameStore = create<GameState & GameActions>()(
             ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
             : t
         );
+        // Repair-bar lift on the property — varies by concern category.
+        const lift = CONCERN_RESOLVE_CONDITION_LIFT[concern.category] ?? 3;
+        const updatedOwned = prev.ownedProperties.map(p => {
+          if (p.id !== concern.propertyId) return p;
+          const score = Math.max(0, Math.min(100, (p.conditionScore ?? scoreFromConditionTier(p.condition)) + lift));
+          return { ...p, conditionScore: score, condition: conditionTierFromScore(score) };
+        });
 
         // Damage-sourced concerns also update annual repair cap and 48-month cooldown
         let updatedAnnual = prev.annualRepairCosts;
