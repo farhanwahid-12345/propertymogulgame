@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getMarketRentPounds } from "@/lib/engine/market";
 import { RepairBar } from "@/components/ui/repair-bar";
+import { MultiUnitSlots } from "@/components/ui/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
@@ -55,7 +56,7 @@ interface PropertyCardProps {
   property: Property;
   onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
   onSell?: (property: Property, isAuction?: boolean) => void;
-  onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
+  onSelectTenant?: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
   onRemortgage?: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   onRenovate?: (propertyId: string, renovation: RenovationType) => void;
   activeRenovationIds?: string[];
@@ -67,12 +68,14 @@ interface PropertyCardProps {
   tenantSatisfaction?: number;
   tenantSatisfactionReasons?: Array<{ reason: string; delta: number }>;
   propertyListings?: any[];
-  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => void;
-  cancelEviction?: (propertyId: string) => void;
+  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour', slotIndex?: number) => void;
+  cancelEviction?: (propertyId: string, slotIndex?: number) => void;
   pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'; effectiveMonth: number; servedMonth: number };
   rentArrearsCount?: number;
   /** Tenant satisfaction passed for negotiation acceptance probability. */
-  applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number) => void;
+  applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number, slotIndex?: number) => void;
+  /** Per-slot tenant data for HMOs / converted flats. When set, single-tenant block is replaced with multi-unit panel. */
+  multiUnitSlots?: import("@/components/ui/multi-unit-slots").MultiUnitSlot[];
   mortgages?: Array<{
     propertyId: string;
     monthlyPayment: number;
@@ -146,6 +149,7 @@ export const PropertyCard = memo(function PropertyCard({
   pendingEviction,
   rentArrearsCount = 0,
   applyRentIncrease,
+  multiUnitSlots,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -449,22 +453,44 @@ export const PropertyCard = memo(function PropertyCard({
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-2 mt-auto">
-                  {onSelectTenant && (
-                    <TenantSelector
+                  {multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
+                    <MultiUnitSlots
                       propertyId={property.id}
-                      baseRent={property.baseRent || property.monthlyIncome}
-                      onSelectTenant={onSelectTenant}
-                      currentTenant={currentTenant}
-                      currentMonthlyRent={property.monthlyIncome}
-                      lastTenantChange={property.lastTenantChange}
-                      monthsPlayed={monthsPlayed}
-                      condition={property.condition}
-                      conditionScore={conditionScore}
+                      propertyName={property.name}
+                      subtype={(property.subtype as 'hmo' | 'flats')}
+                      baseRentPerUnitPounds={Math.round(
+                        ((property.baseRent || property.monthlyIncome) || 0) / multiUnitSlots.length
+                      )}
                       propertyValue={property.value}
                       propertyYield={property.yield}
-                      currentSatisfaction={tenantSatisfaction}
-                      satisfactionReasons={tenantSatisfactionReasons}
+                      condition={property.condition}
+                      conditionScore={conditionScore}
+                      monthsPlayed={monthsPlayed}
+                      playerCash={playerCash}
+                      slots={multiUnitSlots}
+                      onSelectTenant={onSelectTenant}
+                      evictTenant={evictTenant}
+                      cancelEviction={cancelEviction}
+                      applyRentIncrease={applyRentIncrease}
                     />
+                  ) : (
+                    onSelectTenant && (
+                      <TenantSelector
+                        propertyId={property.id}
+                        baseRent={property.baseRent || property.monthlyIncome}
+                        onSelectTenant={onSelectTenant}
+                        currentTenant={currentTenant}
+                        currentMonthlyRent={property.monthlyIncome}
+                        lastTenantChange={property.lastTenantChange}
+                        monthsPlayed={monthsPlayed}
+                        condition={property.condition}
+                        conditionScore={conditionScore}
+                        propertyValue={property.value}
+                        propertyYield={property.yield}
+                        currentSatisfaction={tenantSatisfaction}
+                        satisfactionReasons={tenantSatisfactionReasons}
+                      />
+                    )
                   )}
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">
@@ -482,6 +508,7 @@ export const PropertyCard = memo(function PropertyCard({
                       🛠 +20
                     </Button>
                   </div>
+                  {!multiUnitSlots && <>
                   {/* Satisfaction bar — only when a tenant is assigned */}
                   {currentTenant && typeof tenantSatisfaction === 'number' && (
                     <TooltipProvider delayDuration={150}>
@@ -593,6 +620,7 @@ export const PropertyCard = memo(function PropertyCard({
                       />
                     </div>
                   )}
+                  </>}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                   {onRenovate && (
