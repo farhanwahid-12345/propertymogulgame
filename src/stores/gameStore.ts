@@ -653,6 +653,20 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // ── Depreciation ──
         let updatedOwnedProperties = newOwnedProperties.map(p => {
+          // Furnishing depreciation — countdown to revert
+          let furnishingTier = p.furnishingTier;
+          let furnishingMonthsRemaining = p.furnishingMonthsRemaining;
+          if (furnishingTier && furnishingTier !== 'unfurnished' && typeof furnishingMonthsRemaining === 'number') {
+            furnishingMonthsRemaining = Math.max(0, furnishingMonthsRemaining - 1);
+            if (furnishingMonthsRemaining === 0) {
+              showToast("Furnishings Worn Out", `${p.name} furnishings have depreciated — reverted to unfurnished.`);
+              furnishingTier = 'unfurnished';
+              furnishingMonthsRemaining = undefined;
+            }
+          }
+          p = { ...p, furnishingTier, furnishingMonthsRemaining };
+          return p;
+        }).map(p => {
           const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
           const depMonths = getDepreciationMonths(p.condition);
           let newCondition = p.condition;
