@@ -227,6 +227,7 @@ export function TenantSelector({
   lastTenantChange,
   monthsPlayed = 0,
   condition,
+  conditionScore,
   propertyValue,
   propertyYield,
   currentSatisfaction,
