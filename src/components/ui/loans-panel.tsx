@@ -11,12 +11,11 @@ import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, formatPounds, toPennies } from "@/lib/formatCurrency";
 import { LOAN_PRODUCTS } from "@/lib/engine/constants";
 
-type LoanKind = 'personal' | 'business' | 'bridging';
+type LoanKind = 'personal' | 'business';
 
 const KIND_META: Record<LoanKind, { label: string; blurb: string }> = {
   personal: { label: 'Personal Loan',  blurb: 'Up to £25,000 over 12–60 months. Min credit 600.' },
   business: { label: 'Business Loan',  blurb: 'Up to £150,000 over 12–84 months. Ltd company with 2+ properties.' },
-  bridging: { label: 'Bridging Loan',  blurb: 'Interest-only, secured against a property. Up to 70% LTV, 1–12 months.' },
 };
 
 export function LoansPanel() {
@@ -27,16 +26,26 @@ export function LoansPanel() {
   const [kind, setKind] = useState<LoanKind>('personal');
   const [amountStr, setAmountStr] = useState("5000");
   const [termMonths, setTermMonths] = useState(36);
-  const [collateralId, setCollateralId] = useState<string>("");
 
   const amountPounds = Math.max(0, Number(amountStr) || 0);
   const product = LOAN_PRODUCTS[kind];
-  const rate = Math.max(0.02, store.currentMarketRate + product.rateSpread);
 
-  const collateralProp = useMemo(
-    () => store.ownedProperties.find(p => p.id === collateralId),
-    [store.ownedProperties, collateralId]
-  );
+  // Dynamic APR: market rate + current spread + credit penalty
+  const creditPenalty = store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
+  const spread = (store.currentLoanRates as any)?.[kind] ?? product.baseSpread;
+  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty);
+
+  // Dynamic cap based on rent roll & credit
+  const dynamicMax = useMemo(() => {
+    const rentRoll = store.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
+    const mortgages = store.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
+    const netMonthly = Math.max(0, rentRoll - mortgages);
+    const creditFactor = Math.max(0.5, Math.min(1.4, store.creditScore / 700));
+    const cap = kind === 'personal'
+      ? Math.min(product.hardCapPennies, netMonthly * 6) * creditFactor
+      : Math.min(product.hardCapPennies, netMonthly * 12 * 4) * creditFactor;
+    return Math.max(0, Math.floor(cap));
+  }, [store.ownedProperties, store.mortgages, store.creditScore, kind, product.hardCapPennies]);
 
   const eligibilityIssue: string | null = (() => {
     if (store.creditScore < product.minCreditScore) return `Credit score ${store.creditScore} below minimum ${product.minCreditScore}.`;
@@ -44,35 +53,22 @@ export function LoansPanel() {
       if (store.entityType !== 'ltd') return 'Business loans require a Ltd company.';
       if (store.ownedProperties.length < 2) return 'Need at least 2 owned properties.';
     }
-    if (kind !== 'bridging') {
-      const max = fromPennies((product as any).maxAmountPennies);
-      if (amountPounds > max) return `Max £${max.toLocaleString()} for ${kind} loans.`;
+    if (toPennies(amountPounds) > dynamicMax) {
+      return `Max £${fromPennies(dynamicMax).toLocaleString()} for your profile.`;
     }
     if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
       return `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`;
-    }
-    if (kind === 'bridging') {
-      if (!collateralProp) return 'Select a collateral property.';
-      const existingDebt = store.mortgages
-        .filter(m => m.propertyId === collateralProp.id)
-        .reduce((s, m) => s + m.remainingBalance, 0);
-      const maxBorrow = Math.floor(collateralProp.value * (product as any).maxLTV) - existingDebt;
-      if (toPennies(amountPounds) > maxBorrow) {
-        return `Max £${fromPennies(Math.max(0, maxBorrow)).toLocaleString()} on this property (70% LTV).`;
-      }
     }
     if (amountPounds < 500) return 'Minimum loan £500.';
     return null;
   })();
 
   const monthlyRate = rate / 12;
-  const estimatedMonthly = kind === 'bridging'
-    ? Math.round(amountPounds * monthlyRate)
-    : Math.round((amountPounds * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+  const estimatedMonthly = Math.round((amountPounds * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 
   const handleApply = () => {
     if (eligibilityIssue) return;
-    (store as any).applyForLoan(kind, toPennies(amountPounds), termMonths, kind === 'bridging' ? collateralId : undefined);
+    (store as any).applyForLoan(kind, toPennies(amountPounds), termMonths);
     setIsOpen(false);
   };
 
@@ -100,7 +96,6 @@ export function LoansPanel() {
                   <SelectContent>
                     <SelectItem value="personal">{KIND_META.personal.label}</SelectItem>
                     <SelectItem value="business">{KIND_META.business.label}</SelectItem>
-                    <SelectItem value="bridging">{KIND_META.bridging.label}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -114,6 +109,9 @@ export function LoansPanel() {
                   min={500}
                   step={500}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max for you: £{fromPennies(dynamicMax).toLocaleString()}
+                </p>
               </div>
 
               <div>
@@ -128,29 +126,12 @@ export function LoansPanel() {
                 />
               </div>
 
-              {kind === 'bridging' && (
-                <div>
-                  <Label>Collateral property</Label>
-                  <Select value={collateralId} onValueChange={setCollateralId}>
-                    <SelectTrigger><SelectValue placeholder="Choose property…" /></SelectTrigger>
-                    <SelectContent>
-                      {store.ownedProperties.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.name} — value {formatPounds(p.value)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               <div className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-1">
                 <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><strong>{(rate * 100).toFixed(2)}% APR</strong></div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{kind === 'bridging' ? 'Monthly interest' : 'Monthly payment'}</span>
+                  <span className="text-muted-foreground">Monthly payment</span>
                   <strong>£{Math.max(0, estimatedMonthly).toLocaleString()}</strong>
                 </div>
-                {kind === 'bridging' && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Bullet repayment at term</span><strong>£{amountPounds.toLocaleString()}</strong></div>
-                )}
               </div>
 
               {eligibilityIssue && (
@@ -181,7 +162,7 @@ export function LoansPanel() {
                   <span className="text-xs text-muted-foreground">@ {(l.interestRate * 100).toFixed(2)}%</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {l.kind === 'bridging' ? 'Interest-only' : `${formatPounds(l.monthlyPayment)}/mo`} · {l.termMonths}mo term
+                  {formatPounds(l.monthlyPayment)}/mo · {l.termMonths}mo term
                 </div>
               </div>
               <Button size="sm" variant="ghost" onClick={() => (store as any).settleLoan(l.id)}>
