@@ -3027,35 +3027,46 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
-      // ─── LOANS (personal / business) ─────────────────
-      applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => {
+      // ─── LOANS (personal / business / investor) ─────────────────
+      applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => {
         const prev = get();
         const product = (LOAN_PRODUCTS as any)[kind];
         if (!product) { showToast("Loan Failed", "Unknown product.", "destructive"); return; }
-        if (prev.creditScore < product.minCreditScore) {
+        if (kind !== 'investor' && prev.creditScore < product.minCreditScore) {
           showToast("Loan Rejected", `Credit score ${prev.creditScore} below minimum ${product.minCreditScore}.`, "destructive"); return;
         }
         if (kind === 'business') {
           if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
           if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
         }
-        // Dynamic cap based on rent roll & credit score
+        if (kind === 'investor') {
+          const minRep = (product as any).minReputation ?? 40;
+          if ((prev.landlordReputation ?? 50) < minRep) {
+            showToast("Investor Declined", `Need landlord reputation ≥ ${minRep}. Yours: ${prev.landlordReputation ?? 50}.`, "destructive"); return;
+          }
+        }
+        // Dynamic cap: investor by reputation, others by rent roll & credit.
         const monthlyRent = prev.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
         const monthlyMortgage = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
         const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage);
         const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
+        const reputationFactor = Math.max(0.4, Math.min(1.5, ((prev.landlordReputation ?? 50)) / 60));
         const dynamicCap = kind === 'personal'
           ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 6) * creditFactor)
-          : Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor);
+          : kind === 'business'
+            ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor)
+            : Math.floor(product.hardCapPennies * reputationFactor);
         if (amount > dynamicCap) {
           showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
         }
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        // Dynamic APR: market rate + product spread + credit-score penalty (shared with mortgages)
-        const creditPenalty = prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
-        const spread = (prev.currentLoanRates as any)[kind] ?? product.baseSpread;
+        // APR: investor uses fixed product spread (no credit penalty); others credit-adjusted.
+        const creditPenalty = kind === 'investor' ? 0
+          : prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
+        const spread = kind === 'investor' ? product.baseSpread
+          : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
         const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
@@ -3064,6 +3075,8 @@ export const useGameStore = create<GameState & GameActions>()(
           kind, principal: amount, remainingBalance: amount,
           monthlyPayment, interestRate: rate, termMonths,
           startMonth: prev.monthsPlayed,
+          onTimeStreak: 0,
+          ...(kind === 'investor' ? { lenderName: 'Family & Friends Syndicate' } : {}),
         };
         const credited = credit(prev, amount);
         set({
