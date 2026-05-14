@@ -49,6 +49,12 @@ export function TenantConcernsFeed({
   const ownedIds = new Set(ownedProperties.map(p => p.id));
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
+  const propsFull = useGameStore((s) => s.ownedProperties);
+  const conditionScoreFor = (id: string) => {
+    const p = propsFull.find((x: any) => x.id === id);
+    if (!p) return 100;
+    return (p as any).conditionScore ?? scoreFromConditionTier((p as any).condition);
+  };
 
   // Flashing + chime when new concerns arrive
   const seenIds = useRef<Set<string>>(new Set());
