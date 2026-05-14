@@ -1,133 +1,110 @@
-# Improvements 21–27
+# Refactor: Maintainability & Store Modularization
 
-## 21. Renovations counted as expenses where tax law allows (item 6a)
-
-UK rule: **revenue-style repairs/maintenance are deductible** against rental income; **capital improvements (extensions, conversions, premium upgrades)** are NOT — they instead increase the CGT base. Today every renovation cost just leaves cash and never feeds `yearlyDeductibleExpenses` or `improvementCosts`.
-
-- `src/lib/engine/renovation.ts`
-  - Add `isDeductibleRevenueRenovation(typeId, category): boolean` — `true` for `category === 'maintenance'` and the dilapidated→standard condition upgrade; `false` for `'extension' | 'conversion'` and standard→premium.
-- `src/stores/gameStore.ts`
-  - In `startRenovation` (~line 2635), after the `debit(...)`:
-    - If revenue-style → add the scaled cost into a new monthly bucket: `pendingDeductibleAddon += scaledCostPennies` and fold into `accumulatedDeductibleExpenses` on the next tick (or directly add to `yearlyDeductibleExpenses` in the action).
-    - If capital → push onto a new per-property accumulator `property.capitalImprovementsPennies` (extend `Property` type) for later CGT use.
-  - In the sale path that calls `calculateCGT(...)`, pass `improvementCosts = property.capitalImprovementsPennies || 0` (currently passed as 0).
-- `src/types/game.ts` — add `capitalImprovementsPennies?: number` on `Property`.
-- `src/components/ui/tax-breakdown.tsx` — add a small caption under "Allowable expenses" noting "includes repair-type renovations; extensions/conversions reduce CGT only".
-
-**Acceptance**: Doing a maintenance renovation visibly bumps the YTD "Allowable expenses" tile and reduces projected tax. Doing an extension does NOT — but selling that property later applies the extension cost as CGT relief.
+Two parallel improvements: (1) break up the 475-line `Index.tsx` and (2) split the 3,400-line `gameStore.ts` into domain slices. Behavior unchanged — pure structural refactor.
 
 ---
 
-## 22. Slow tenant satisfaction decay (item 7)
+## 1. Improve Code Maintainability (`Index.tsx`)
 
-Current monthly decay drops are too steep — `dilapidated -8`, unrepaired damage `-5`, premium-tenant-on-standard `-3`, recent rent hike `-2`, plus per-concern penalties stacking up to `-4` cap.
+### 1a. Extract sub-components
 
-- `src/stores/gameStore.ts` (lines ~879–934)
-  - Halve the structural penalties: dilapidated `-8 → -4`, damage `-5 → -3`, premium-on-standard `-3 → -2`, recent rent hike `-2 → -1`.
-  - Lift the monthly net-drop cap from `-4` to `-3`.
-  - Lengthen the recent-rent-hike window from 3 months → 6 months but with the smaller penalty.
-  - Strengthen the upward drift toward 75 baseline: when no negative pressure, `+2` if `<75`, `+1` if `75–85`, `0` if `>85` (was `+2/-1/+1`).
-- `src/stores/gameStore.ts` (concerns block ~1080)
-  - Cap the per-tick concern penalty at `-2` total per tenant per month (today multiple concerns can stack uncapped before the global `-4` cap).
+Create under `src/components/sections/`:
 
-**Acceptance**: A standard-condition property with one open mid-priority concern no longer drops a tenant from 80 to 60 in a couple of months; it stabilises around 65–70 unless multiple problems pile up.
+- **`PortfolioSummary.tsx`** — totals strip (Total Value / Monthly Income / Avg Yield) + LTV badge + "Your Empire" header.
+- **`PropertyMarket.tsx`** — Market tab content (EstateAgentWindow, AuctionHouse, Reset button).
+- **`BankingPanel.tsx`** — Bank tab content (MortgageSettlement, MortgageManagement, CreditOverdraft, PortfolioMortgage, LoansPanel, TaxBreakdown).
+- **`PortfolioGrid.tsx`** — owned-properties grid + conveyancing-pending cards (the long `.map` blocks at the bottom).
+- **`HeroHeader.tsx`** — top hero with GameClock.
 
----
+`Index.tsx` becomes a thin layout file (~80 lines) that wires `useGameState()` into these sections.
 
-## 23. Lenient but rule-bound DTI / ICR for mortgages (item 8)
+### 1b. Extract logic to custom hooks
 
-Today portfolio ICR uses *current* tenanted income, so a vacant fresh purchase fails the 125% test even when it would clearly let. Plan: count **expected** rent on every owned property (ignoring void state) and tighten the lenient track instead.
+Under `src/hooks/`:
 
-- `src/lib/mortgageEligibility.ts`
-  - Rename request field semantics (no API break): `totalRentalIncome` should now be the **expected** monthly rent across owned properties (`property.monthlyIncome` regardless of tenancy), and `propertyMonthlyRent` is the expected rent on the new collateral.
-  - Single-property branch (owns < 3): keep ICR ≥ 1.0 but switch from "actual rent" to "expected rent".
-  - Portfolio branch (owns ≥ 3): drop the threshold from **1.25 → 1.20** to match how real BTL portfolios stress test, but enforce on **expected** income.
-  - DTI check: same swap to expected income; raise QuickCash/EasyLoan from 0.80 → 0.85 to match their riskier positioning; HSBC stays 0.50.
-- `src/hooks/useGameState.ts` and call-sites in Estate Agent / Auction House / Refinance / Portfolio Mortgage
-  - Pass `totalRentalIncome = ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0)` instead of "tenanted only".
-  - Pass `propertyMonthlyRent` from the prospective property's `monthlyIncome` (already expected rent).
-- `src/components/ui/mortgage-provider-selector.tsx` & `src/components/ui/game-stats.tsx`
-  - Compute the player-facing DTI gauge from the same expected-income basis so the displayed % matches what the engine checks.
+- **`usePortfolioMetrics(ownedProperties, totalDebt)`** — returns `{ totalPortfolioValue, totalPortfolioIncome, avgYield, portfolioLTV, sortedOwnedProperties }`.
+- **`usePropertyDebt(mortgages)`** — returns memoized `getDebtForProperty(id)`.
+- **`useConveyancingDisplay(conveyancing)`** — derives the `conveyancingBuyProperties` list.
 
-**Acceptance**: Buying a sub-£150k Middlesbrough house at 75% LTV is approved by Halifax/Nationwide even when the property is vacant on day one; HSBC still rejects the same deal at >50% DTI.
+All memoized with `useMemo`/`useCallback` to avoid re-computation on unrelated state ticks.
 
 ---
 
-## 24. Delete bridging loans (item 9)
+## 2. Simplify the Game Store (`gameStore.ts` → slices)
 
-- `src/components/ui/loans-panel.tsx` — remove the `'bridging'` option from `LoanKind`, `KIND_META`, the `<SelectItem>`, the collateral picker block, the bridging-only monthly/bullet rendering, and the `kind === 'bridging'` branches.
-- `src/lib/engine/constants.ts` — remove the `bridging` entry from `LOAN_PRODUCTS`.
-- `src/stores/gameStore.ts`
-  - Remove `'bridging'` from the `applyForLoan` signature (and store interface line ~320).
-  - Drop the bridging branch in the loan-amortisation block (~line 1485) and the bridging collateral handling in `applyForLoan` (~line 3063).
-  - Any pre-existing `'bridging'` rows in saved-state get filtered out on rehydrate.
-- `src/types/game.ts` — narrow `Loan.kind` to `'personal' | 'business'`.
+Current store: ~3,400 lines, ~50+ actions, all in one `create<>()`. Split into Zustand slices using the slice pattern (single store, multiple slice creators) — keeps cross-slice access simple while giving file-level separation.
 
-**Acceptance**: Bank tab → Apply for loan only shows Personal and Business. Old saves still load (legacy bridging rows are silently dropped).
+### 2a. Slice files (under `src/stores/slices/`)
 
----
+```text
+slices/
+  playerSlice.ts        cash, creditScore, level, XP, overdraft, entityType, setCash, etc.
+  propertySlice.ts      ownedProperties, availableProperties, auctionProperties,
+                        buyProperty, sellProperty, replenishMarket, removeAuctionProperty
+  marketplaceSlice.ts   propertyListings, offers, counter logic, estate agent + auction sales
+  tenantSlice.ts        tenants, tenantConcerns, tenantEvents, tenantHistory,
+                        selectTenant, evict/cancelEviction, resolve/dismissConcern,
+                        applyRentIncrease, deposit disputes
+  mortgageSlice.ts      mortgages, mortgageProviders, currentLoanRates,
+                        settle/remortgage/refinance/portfolioMortgage
+  loanSlice.ts          loans, applyForLoan, settleLoan
+  renovationSlice.ts    renovations, planningApplications, startRenovation,
+                        upgradeCondition, submitPlanningApplication, acknowledge
+  conveyancingSlice.ts  conveyancing list + withdrawFromConveyancing
+  taxationSlice.ts      yearly accumulators, taxRecords, totalTaxPaidPennies
+  timeSlice.ts          monthsPlayed, timeUntilNextMonth, gameSpeed, clockTick,
+                        processMonthEnd, processMarketUpdate, processCounterResponses
+  economySlice.ts       currentMarketRate, economicEvents, macro events
+  metaSlice.ts          resetGame, migration entry, entity onboarding flag
+```
 
-## 25. Mount portfolio mortgages in the Bank tab (item 10)
+### 2b. Composition
 
-`PortfolioMortgage` exists, the store action `handlePortfolioMortgage` exists, but the component is not imported anywhere — that's why it never appeared.
+`gameStore.ts` becomes a thin composer:
 
-- `src/pages/Index.tsx` (Bank tab, ~line 248)
-  - Import `PortfolioMortgage` and render it under the existing `MortgageSettlement / MortgageManagement / CreditOverdraft` row, **above** `LoansPanel`.
-  - Wire props: `ownedProperties`, `mortgageProviders={gameState.mortgageProviders}`, `cash`, `setCash`, `creditScore`, `onPortfolioMortgage={gameState.handlePortfolioMortgage}`.
-  - The component already self-hides until the player owns ≥ 3 properties.
+```ts
+export const useGameStore = create<GameState & GameActions>()(
+  persist(
+    (...a) => ({
+      ...createPlayerSlice(...a),
+      ...createPropertySlice(...a),
+      ...createTenantSlice(...a),
+      // etc.
+    }),
+    { name: 'game-store', version: 13, migrate: migrateState, ... }
+  )
+);
+```
 
-**Acceptance**: Once the third property is owned, a "Portfolio Mortgage" card appears in the Bank tab with the multi-property selector.
+Each slice creator has signature `(set, get) => ({ ...state, ...actions })`. Cross-slice reads via `get()`.
 
----
+### 2c. Selector hooks
 
-## 26. Dynamic, fair loan interest rates + dynamic loan caps (item 11 + 11a)
+Keep existing `usePlayerData`, `useTimeData`, etc. selectors as the public read API — they already prevent over-rendering. Add slice-scoped selectors where missing (e.g., `useTenantData`, `useMortgageData`) so components subscribe only to relevant slices.
 
-- `src/lib/engine/constants.ts`
-  - Convert `LOAN_PRODUCTS` rate spreads into a small range and let `gameStore` pick a current value each month, similar to overdraft/mortgage-rate fluctuation:
-    - personal: spread 2.5–5.0%
-    - business: spread 1.5–3.5%
-  - Tie the spread floor to credit score: ≥ 800 subtract 0.5%, < 600 add 1.5% (matches the existing mortgage rate-penalty table — keep one source of truth via `getRatePenaltyForCreditScore`).
-- `src/stores/gameStore.ts`
-  - Add `currentLoanRates: { personal: number; business: number }` to state, fluctuate each month (+/- 0.3%) within the bracketed range above, persist with the rest of state.
-  - Replace the hard `LOAN_PRODUCTS[kind].maxAmountPennies` cap inside `applyForLoan` and `LoansPanel.eligibilityIssue` with a **dynamic cap**:
-    - Personal: `min(£25k, 6× monthly net rental income) × creditFactor` where `creditFactor = clamp(creditScore/700, 0.5, 1.4)`.
-    - Business: `min(£150k, 4× annual net rental income) × creditFactor`, plus the existing Ltd + ≥2 properties gate.
-  - Surface the live cap & rate from the store rather than the static constant.
-- `src/components/ui/loans-panel.tsx`
-  - Show "Max for you: £X" under the amount input, derived from the dynamic cap (mirrors the overdraft pattern).
-  - Source the displayed APR from `store.currentLoanRates[kind] + creditPenalty` instead of `currentMarketRate + LOAN_PRODUCTS[kind].rateSpread`.
+### 2d. Migration & persistence
 
-**Acceptance**: APRs on Personal/Business shift slightly month to month and respond to credit score. The personal-loan cap rises as the rent roll grows; a brand-new player with no rent sees a cap well below £25k.
-
----
-
-## 27. Replace "Property Tax" with insurance + (vacant-only) council tax (item 12a)
-
-UK landlords don't pay a "property tax" — they pay landlord **insurance** year-round and **council tax only when no tenant is in residence**. The engine already charges council tax only on empty properties (`gameStore.ts` ~772); the property card UI is the misleading part.
-
-- `src/components/ui/property-card.tsx` (lines ~165–195 and 386–395)
-  - Remove `PROPERTY_TAX_RATE = 0.012` and the "Property Tax (1.2%)" cost row entirely.
-  - Add **Landlord Insurance** at `0.4%/yr` of property value, charged every month (`monthlyInsurance = value * 0.004 / 12`). Always visible in the cost breakdown.
-  - Add **Council Tax** row only when the property is vacant (no tenant prop / `hasTenant === false`): pull the same `COUNCIL_TAX_BAND_D` figure used by the engine so UI matches engine.
-  - Keep the existing **Maintenance (0.8%)** row — it's the implicit upkeep buffer and matches our reno cadence.
-  - Net Monthly Income recalc updates accordingly.
-- `src/stores/gameStore.ts` (~770–780, 1315)
-  - Add `insurance = newOwnedProperties.reduce((s,p) => s + Math.floor(p.value * 0.004 / 12), 0)` to `totalExpenses`.
-  - Add `insurance` to `accumulatedDeductibleExpenses` (legitimately deductible against rental income for both entity types).
-- `src/lib/engine/financials.ts` — export a `MONTHLY_INSURANCE_RATE = 0.004 / 12` constant so card and engine share one value.
-
-**Acceptance**: Property card shows "Insurance" every month and "Council Tax" only on empty properties; the Tax tab's "Allowable expenses" tile rises in step with insurance + (when vacant) council tax. There is no more "Property Tax" string anywhere in the UI.
+- Keep single `persist` wrapper at the composed level (one storage key, version 13 preserved).
+- `migrateState` stays in `metaSlice.ts` or a dedicated `src/stores/migration.ts`.
+- All sanitizers (`sanitizeProperty`, `sanitizeTenantRecord`, etc.) move to `src/stores/sanitizers.ts`.
 
 ---
 
-## Files
+## Scope & Safety
 
-- **Modified**: `src/stores/gameStore.ts`, `src/lib/engine/renovation.ts`, `src/lib/engine/constants.ts`, `src/lib/engine/financials.ts`, `src/lib/mortgageEligibility.ts`, `src/hooks/useGameState.ts`, `src/components/ui/property-card.tsx`, `src/components/ui/loans-panel.tsx`, `src/components/ui/mortgage-provider-selector.tsx`, `src/components/ui/game-stats.tsx`, `src/components/ui/tax-breakdown.tsx`, `src/pages/Index.tsx`, `src/types/game.ts`
-- **New**: none
+- **Pure refactor** — no behavior, no UI, no game-logic changes.
+- Done in two phases so each can ship independently:
+  - **Phase A**: Index.tsx split + custom hooks (low-risk, fast).
+  - **Phase B**: Store slicing (higher-risk, do after Phase A is verified).
+- After each phase: load existing save (version 13 persisted state) and confirm the game runs identically.
 
 ## Out of scope
 
-- Re-pricing existing owned stock or recomputing past tax records.
-- Building a separate "buildings vs contents" insurance toggle — single line item only.
-- Reworking macro-economic event weights (handled in earlier improvement 16).
-- Adding portfolio mortgages to non-Bank surfaces (Index Bank tab is the canonical home).
+- Splitting into multiple Zustand stores (rejected — would complicate cross-domain reads like net-worth calc; slice pattern gives file separation without that cost).
+- Renaming public selector hooks.
+- Any new features.
+
+## Files
+
+**New**: 5 section components, 3 hooks, ~11 slice files, `sanitizers.ts`, `migration.ts`.
+**Modified**: `Index.tsx` (slim), `gameStore.ts` (composer only).
