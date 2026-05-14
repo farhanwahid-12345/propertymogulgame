@@ -25,6 +25,14 @@ const Index = () => {
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
 
+  // Heal legacy saves: anyone who already chose an entity has effectively onboarded.
+  useEffect(() => {
+    const s = useGameStore.getState() as any;
+    if (s.entityChosen && !s.onboardingCompleted) {
+      useGameStore.setState({ onboardingCompleted: true } as any);
+    }
+  }, []);
+
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
     totalPortfolioValue,
