@@ -2964,7 +2964,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         if (newLoanAmount < currentBal) { showToast("Refinance Failed", "Must cover existing balance!", "destructive"); return; }
 
-        const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + (prev.tenants.some(tt => tt.propertyId === p.id) ? p.monthlyIncome : 0), 0);
+        const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
@@ -3018,7 +3018,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
         const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
-        const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + (prev.tenants.some(tt => tt.propertyId === p.id) ? p.monthlyIncome : 0), 0);
+        const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
         // LTD companies get lower max LTV on commercial mortgages
         let adjustedMaxLTV = provider.maxLTV;

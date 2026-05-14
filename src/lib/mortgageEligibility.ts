@@ -14,7 +14,7 @@ export interface MortgageEligibilityRequest {
   mortgageType: 'repayment' | 'interest-only';
   // Existing portfolio context
   existingMonthlyMortgagePayments: number; // total across all existing mortgages
-  totalRentalIncome: number; // total across all existing tenanted properties
+  totalRentalIncome: number; // EXPECTED monthly rent across all owned properties (regardless of current tenancy)
   ownedPropertyCount?: number; // number of properties player currently owns
 }
 
@@ -43,13 +43,14 @@ export function getRatePenaltyForCreditScore(creditScore: number): number {
   return 0.02; // Poor: +2%
 }
 
-// DTI thresholds per provider
+// DTI thresholds per provider — generous on the riskier providers since they
+// already charge a higher rate for taking on stretched borrowers.
 const PROVIDER_DTI_LIMITS: Record<string, number> = {
   hsbc: 0.50,
-  nationwide: 0.50,
+  nationwide: 0.55,
   halifax: 0.65,
-  quickcash: 0.80,
-  easyloan: 0.80,
+  quickcash: 0.85,
+  easyloan: 0.85,
 };
 
 // Random rejection chance for premium providers
