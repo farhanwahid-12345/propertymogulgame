@@ -31,28 +31,40 @@ export function LoansPanel() {
   const amountPounds = Math.max(0, Number(amountStr) || 0);
   const product = LOAN_PRODUCTS[kind];
 
-  // Dynamic APR: market rate + current spread + credit penalty
-  const creditPenalty = store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
-  const spread = (store.currentLoanRates as any)?.[kind] ?? product.baseSpread;
+  // Dynamic APR: market rate + current spread + credit penalty (investor uses fixed product spread).
+  const creditPenalty = kind === 'investor'
+    ? 0
+    : store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
+  const spread = kind === 'investor'
+    ? product.baseSpread
+    : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
   const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty);
 
-  // Dynamic cap based on rent roll & credit
+  // Dynamic cap based on rent roll & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
     const rentRoll = store.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
     const mortgages = store.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
     const netMonthly = Math.max(0, rentRoll - mortgages);
     const creditFactor = Math.max(0.5, Math.min(1.4, store.creditScore / 700));
+    const reputationFactor = Math.max(0.4, Math.min(1.5, (((store as any).landlordReputation ?? 50)) / 60));
     const cap = kind === 'personal'
       ? Math.min(product.hardCapPennies, netMonthly * 6) * creditFactor
-      : Math.min(product.hardCapPennies, netMonthly * 12 * 4) * creditFactor;
+      : kind === 'business'
+        ? Math.min(product.hardCapPennies, netMonthly * 12 * 4) * creditFactor
+        : product.hardCapPennies * reputationFactor;
     return Math.max(0, Math.floor(cap));
-  }, [store.ownedProperties, store.mortgages, store.creditScore, kind, product.hardCapPennies]);
+  }, [store.ownedProperties, store.mortgages, store.creditScore, kind, product.hardCapPennies, (store as any).landlordReputation]);
 
   const eligibilityIssue: string | null = (() => {
-    if (store.creditScore < product.minCreditScore) return `Credit score ${store.creditScore} below minimum ${product.minCreditScore}.`;
+    if (kind !== 'investor' && store.creditScore < product.minCreditScore) return `Credit score ${store.creditScore} below minimum ${product.minCreditScore}.`;
     if (kind === 'business') {
       if (store.entityType !== 'ltd') return 'Business loans require a Ltd company.';
       if (store.ownedProperties.length < 2) return 'Need at least 2 owned properties.';
+    }
+    if (kind === 'investor') {
+      const minRep = (product as any).minReputation ?? 40;
+      const rep = ((store as any).landlordReputation ?? 50);
+      if (rep < minRep) return `Need landlord reputation ≥ ${minRep}. Yours: ${rep}.`;
     }
     if (toPennies(amountPounds) > dynamicMax) {
       return `Max £${fromPennies(dynamicMax).toLocaleString()} for your profile.`;
