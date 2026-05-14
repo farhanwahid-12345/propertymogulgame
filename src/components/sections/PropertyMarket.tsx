@@ -1,0 +1,76 @@
+import { Button } from "@/components/ui/button";
+import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
+import { AuctionHouse } from "@/components/ui/auction-house";
+import { RotateCcw } from "lucide-react";
+import type { useGameState } from "@/hooks/useGameState";
+
+type GameState = ReturnType<typeof useGameState>;
+
+interface PropertyMarketProps {
+  gameState: GameState;
+  totalPortfolioIncome: number;
+}
+
+export function PropertyMarket({ gameState, totalPortfolioIncome }: PropertyMarketProps) {
+  return (
+    <div className="flex items-center justify-end mt-4 mb-3">
+      <div className="flex gap-2">
+        <EstateAgentWindow
+          ownedProperties={gameState.ownedProperties}
+          propertyListings={gameState.propertyListings}
+          onListProperty={gameState.listPropertyForSale}
+          onCancelListing={gameState.cancelPropertyListing}
+          onUpdateListingPrice={gameState.updatePropertyListingPrice}
+          onSetAutoAccept={gameState.setAutoAcceptThreshold}
+          onAcceptOffer={gameState.handleEstateAgentSale}
+          onRejectOffer={gameState.rejectPropertyOffer}
+          onAddOffer={gameState.addOfferToListing}
+          onCounterOffer={gameState.counterOffer}
+          onReducePrice={gameState.reducePriceOnListing}
+          onAcceptBuyerCounter={gameState.acceptBuyerCounter}
+          onRejectBuyerCounter={gameState.rejectBuyerCounter}
+          cash={gameState.cash}
+          availableProperties={gameState.availableProperties}
+          onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => {
+            if (offerAmount !== property.value) {
+              gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType);
+            } else {
+              gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType);
+            }
+          }}
+          getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
+          getAvailablePropertyTypes={gameState.getAvailablePropertyTypes}
+          getMaxPropertyValue={gameState.getMaxPropertyValue}
+          level={gameState.level}
+          mortgageProviders={gameState.mortgageProviders}
+          creditScore={gameState.creditScore}
+          totalRentalIncome={totalPortfolioIncome}
+          existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
+          ownedPropertyCount={gameState.ownedProperties.length}
+        />
+        <AuctionHouse
+          ownedProperties={gameState.ownedProperties}
+          onAuctionSale={gameState.handleAuctionSale}
+          monthsPlayed={gameState.monthsPlayed}
+          auctionProperties={gameState.auctionProperties}
+          onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) =>
+            gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType)
+          }
+          cash={gameState.cash}
+          mortgageProviders={gameState.mortgageProviders}
+          level={gameState.level}
+          onAuctionPropertySold={gameState.removeAuctionProperty}
+          creditScore={gameState.creditScore}
+        />
+        <Button
+          variant="ghost"
+          onClick={gameState.resetGame}
+          className="glass glass-hover text-muted-foreground hover:text-foreground"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Reset
+        </Button>
+      </div>
+    </div>
+  );
+}
