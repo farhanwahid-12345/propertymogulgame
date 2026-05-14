@@ -103,7 +103,7 @@ export interface MortgageProvider {
   description: string;
 }
 
-export type LoanKind = 'personal' | 'business';
+export type LoanKind = 'personal' | 'business' | 'investor';
 
 export interface Loan {
   id: string;
@@ -114,6 +114,8 @@ export interface Loan {
   interestRate: number;     // annual decimal
   termMonths: number;
   startMonth: number;       // monthsPlayed snapshot
+  /** Optional friendly lender name — used by investor loans. */
+  lenderName?: string;
 }
 
 export interface Mortgage {
