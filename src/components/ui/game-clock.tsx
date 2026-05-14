@@ -60,18 +60,18 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
 
   if (inline) {
     return (
-      <div className="flex items-center gap-3 w-full">
+      <div className="flex items-center gap-3 w-full min-w-0">
         <Clock className="h-4 w-4 text-primary shrink-0" />
-        <span className="font-semibold text-sm text-foreground">
+        <span className="font-semibold text-sm text-foreground tabular-nums shrink-0 w-[72px]">
           📅 {monthNames[month - 1]} {year}
         </span>
-        <div className="flex-1 bg-muted rounded-full h-2 min-w-[60px]">
-          <div 
+        <div className="flex-1 bg-muted rounded-full h-2 min-w-[40px]">
+          <div
             className="bg-primary h-2 rounded-full transition-all duration-1000 "
             style={{ width: `${progress}%` }}
           />
         </div>
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="text-xs text-muted-foreground shrink-0 tabular-nums w-[28px] text-right">
           {Math.ceil(timeUntilNextMonth)}s
         </span>
       </div>

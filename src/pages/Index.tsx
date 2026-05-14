@@ -130,7 +130,26 @@ const Index = () => {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection id="section-ops" title="🔨 Operations" defaultOpenMobile={false}>
+        <CollapsibleSection
+          id="section-ops"
+          title="🔨 Operations"
+          alwaysOpenDesktop={false}
+          defaultOpenDesktop={
+            ((gameState.conveyancing?.length || 0) +
+              (gameState.renovations?.length || 0) +
+              ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
+              (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0)) > 0
+          }
+          defaultOpenMobile={false}
+          summary={(() => {
+            const total =
+              (gameState.conveyancing?.length || 0) +
+              (gameState.renovations?.length || 0) +
+              ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
+              (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
+            return total === 0 ? "All quiet" : `${total} active`;
+          })()}
+        >
           <OperationsCenter
             monthsPlayed={gameState.monthsPlayed}
             conveyancing={gameState.conveyancing || []}

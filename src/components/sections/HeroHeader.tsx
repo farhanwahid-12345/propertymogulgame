@@ -81,15 +81,15 @@ export function HeroHeader({
       <div
         className={cn(
           "relative w-full px-4 h-full flex items-center transition-all",
-          compact ? "py-1" : "pb-3 pt-6 md:pt-8 items-end",
+          compact ? "py-1" : "pb-3 pt-6 md:pt-8",
         )}
       >
-        <div className="container mx-auto">
-          <div className={cn("flex items-center justify-between gap-3 flex-wrap", !compact && "items-end")}>
-            <div className="min-w-0">
+        <div className="container mx-auto min-w-0">
+          <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
+            <div className="min-w-0 flex-1">
               <h1
                 className={cn(
-                  "font-bold tracking-tight gradient-text transition-all",
+                  "font-bold tracking-tight gradient-text transition-all truncate",
                   compact ? "text-base md:text-lg" : "text-2xl md:text-3xl",
                 )}
               >
@@ -107,14 +107,8 @@ export function HeroHeader({
                 </p>
               )}
             </div>
-            <div className={cn(
-              "flex items-center gap-2 justify-end",
-              compact ? "flex-nowrap" : "flex-wrap"
-            )}>
-              <div className={cn(
-                "glass rounded-full px-3 py-1 flex items-center min-w-[200px]",
-                compact ? "max-w-[260px]" : "max-w-sm flex-1"
-              )}>
+            <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
+              <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">
                 <GameClock
                   monthsPlayed={monthsPlayed}
                   timeUntilNextMonth={timeUntilNextMonth}

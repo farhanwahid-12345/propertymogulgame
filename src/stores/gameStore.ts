@@ -705,7 +705,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
           const wear = TENANT_WEAR_MULTIPLIER[wearKey] ?? 1.0;
           const currentScore = p.conditionScore ?? scoreFromConditionTier(p.condition);
-          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear);
+          // Extra drain when there's open, past-grace damage on this property
+          const staleDamage = (prev.tenantConcerns || []).some(c =>
+            c && !c.resolvedMonth && c.source === 'damage' && c.propertyId === p.id &&
+            (newMonthNumber - (c.raisedMonth || 0)) > 2
+          );
+          const damagePenalty = staleDamage ? 1 : 0;
+          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear - damagePenalty);
           const newCondition = conditionTierFromScore(decayed);
           const tierChanged = newCondition !== p.condition;
 
@@ -874,9 +880,14 @@ export const useGameStore = create<GameState & GameActions>()(
           if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
+          const conditionScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
           let chance = 0.035;
           if (property.condition === 'dilapidated') chance += 0.04;
           else if (property.condition === 'premium') chance -= 0.015;
+          // Repair-bar coupling: low score → significantly more concerns
+          if (conditionScore < 30) chance += 0.04;
+          else if (conditionScore < 50) chance += 0.02;
+          else if (conditionScore >= 80) chance -= 0.015;
           if (t.tenant.profile === 'premium') chance += 0.015;
           else if (t.tenant.profile === 'risky') chance -= 0.025;
           // 1-month grace after move-in — settling-in period, no surprise concerns
@@ -885,7 +896,11 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (Math.random() >= chance) return;
 
-          const tpl = CONCERN_TEMPLATES[Math.floor(Math.random() * CONCERN_TEMPLATES.length)];
+          // When repair bar is low, bias toward maintenance/mould/safety templates
+          const pool = conditionScore < 50
+            ? CONCERN_TEMPLATES.filter(t => t.category === 'maintenance' || t.category === 'mould' || t.category === 'safety')
+            : CONCERN_TEMPLATES;
+          const tpl = pool[Math.floor(Math.random() * pool.length)];
           const desc = tpl.descriptions[Math.floor(Math.random() * tpl.descriptions.length)];
           const [lo, hi] = tpl.baseCostPct;
           const pct = lo + Math.random() * (hi - lo);
@@ -3365,8 +3380,34 @@ export const useGameStore = create<GameState & GameActions>()(
             conditionTopUpPointsThisMonth: newMonthlyUsed,
           })
         );
-        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, ownedProperties: updated });
-        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).`);
+
+        // Crossing into 80+ absorbs lingering soft (non-damage) maintenance/mould concerns
+        let absorbedConcerns = 0;
+        let updatedConcerns = prev.tenantConcerns;
+        if (newScore >= 80 && currentScore < 80) {
+          updatedConcerns = (prev.tenantConcerns || []).map(c => {
+            if (
+              c && !c.resolvedMonth && c.propertyId === propertyId &&
+              c.source !== 'damage' &&
+              (c.category === 'maintenance' || c.category === 'mould')
+            ) {
+              absorbedConcerns += 1;
+              return { ...c, resolvedMonth: prev.monthsPlayed };
+            }
+            return c;
+          });
+        }
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          ownedProperties: updated,
+          tenantConcerns: updatedConcerns,
+        });
+        const absorbedSuffix = absorbedConcerns > 0
+          ? ` Cleared ${absorbedConcerns} lingering concern${absorbedConcerns > 1 ? 's' : ''}.`
+          : '';
+        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).${absorbedSuffix}`);
       },
 
       dismissTenantConcern: (concernId) => {

@@ -94,12 +94,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
   }, [defaultTab]);
 
   if (allEmpty) {
-    return (
-      <div className="glass p-3 animate-fade-in flex items-center gap-2 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4 text-emerald-400" />
-        All quiet — no operations in progress.
-      </div>
-    );
+    return null;
   }
 
   const tabDef: Array<{ key: TabKey; label: string; icon: any; count: number }> = [

@@ -7,6 +7,8 @@ import { fromPennies } from "@/lib/formatCurrency";
 import type { TenantConcern } from "@/types/game";
 import type { Property } from "@/types/game";
 import { isSoundEnabled, setSoundEnabled, playConcernChime } from "@/lib/sound";
+import { useGameStore } from "@/stores/gameStore";
+import { CONCERN_RESOLVE_CONDITION_LIFT, scoreFromConditionTier } from "@/lib/engine/constants";
 
 interface Props {
   concerns: TenantConcern[];
@@ -47,6 +49,12 @@ export function TenantConcernsFeed({
   const ownedIds = new Set(ownedProperties.map(p => p.id));
   const active = concerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId));
   const propName = (id: string) => ownedProperties.find(p => p.id === id)?.name || "Unknown property";
+  const propsFull = useGameStore((s) => s.ownedProperties);
+  const conditionScoreFor = (id: string) => {
+    const p = propsFull.find((x: any) => x.id === id);
+    if (!p) return 100;
+    return (p as any).conditionScore ?? scoreFromConditionTier((p as any).condition);
+  };
 
   // Flashing + chime when new concerns arrive
   const seenIds = useRef<Set<string>>(new Set());
@@ -123,6 +131,24 @@ export function TenantConcernsFeed({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{c.description || "Tenant concern"}</p>
+                {(() => {
+                  const score = conditionScoreFor(c.propertyId);
+                  const lift = CONCERN_RESOLVE_CONDITION_LIFT[c.category] ?? 3;
+                  return (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {score < 50 && (
+                        <span className="text-[10px] text-red-300/90">
+                          🔧 Repair bar low ({Math.round(score)}) — fix the bar to reduce future risk
+                        </span>
+                      )}
+                      {c.source === 'damage' && (
+                        <span className="text-[10px] text-emerald-300/90">
+                          ✅ Resolving lifts repair bar +{lift}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
                 <Button
