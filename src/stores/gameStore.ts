@@ -110,6 +110,9 @@ interface GameActions {
   dismissTenantConcern: (concernId: string) => void;
   // Speed
   setGameSpeed: (speed: number) => void;
+  // Pause
+  togglePause: () => void;
+  setPaused: (paused: boolean) => void;
   // Game
   resetGame: () => void;
 }
@@ -147,6 +150,7 @@ function createInitialState(): GameState {
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
     gameSpeed: 1,
+    isPaused: false,
     lastYearlyGrowth: 0,
     yearlyNetProfit: 0,
     yearlyGrossRent: 0,
@@ -340,6 +344,8 @@ function migrateState(persisted: any): GameState {
   if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
     persisted.gameSpeed = 1;
   }
+  // Pause never persists as true — always start unpaused for safety
+  persisted.isPaused = false;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
