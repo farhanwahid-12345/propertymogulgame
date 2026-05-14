@@ -459,12 +459,29 @@ export const PropertyCard = memo(function PropertyCard({
                       lastTenantChange={property.lastTenantChange}
                       monthsPlayed={monthsPlayed}
                       condition={property.condition}
+                      conditionScore={conditionScore}
                       propertyValue={property.value}
                       propertyYield={property.yield}
                       currentSatisfaction={tenantSatisfaction}
                       satisfactionReasons={tenantSatisfactionReasons}
                     />
                   )}
+                  {/* Repair Bar + quick top-up */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <RepairBar score={conditionScore} />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => topUpCondition(property.id, 20)}
+                      disabled={conditionScore >= 100}
+                      title={`Top up +20 condition · approx £${topUpCostPounds20.toLocaleString()} (cap ${MAX_TOPUP_POINTS_PER_MONTH}/mo)`}
+                    >
+                      🛠 +20
+                    </Button>
+                  </div>
                   {/* Satisfaction bar — only when a tenant is assigned */}
                   {currentTenant && typeof tenantSatisfaction === 'number' && (
                     <TooltipProvider delayDuration={150}>
