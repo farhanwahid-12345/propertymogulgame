@@ -3225,7 +3225,7 @@ export const useGameStore = create<GameState & GameActions>()(
           setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
           reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction, withdrawFromConveyancing,
           disputeDeposit, dismissDispute,
-          startRenovation, upgradeCondition, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
+          startRenovation, upgradeCondition, furnishProperty, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
           resolveTenantConcern, dismissTenantConcern,
