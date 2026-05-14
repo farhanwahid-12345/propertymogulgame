@@ -317,7 +317,7 @@ interface GameActions {
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   // Loans
-  applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => void;
+  applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => void;
   settleLoan: (loanId: string) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
@@ -1479,25 +1479,16 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        // ── Loans amortisation (personal/business/bridging) ──
-        const prevLoans: import('@/types/game').Loan[] = (prev as any).loans || [];
+        // ── Loans amortisation (personal/business) ──
+        const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
         let loanCashDelta = 0;
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
           loanCashDelta -= l.monthlyPayment;
-          if (l.kind === 'bridging') {
-            const monthsElapsed = newMonthNumber - l.startMonth;
-            if (monthsElapsed >= l.termMonths) {
-              loanCashDelta -= l.remainingBalance;
-              showToast("Bridging Loan Due 🏦", `Repaid £${fromPennies(l.remainingBalance).toLocaleString()} bullet on bridging loan.`);
-              return;
-            }
-            updatedLoans.push(l);
-          } else {
-            const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
-            const newBal = Math.max(0, l.remainingBalance - principalPaid);
-            if (newBal <= 0) {
+          const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
+          const newBal = Math.max(0, l.remainingBalance - principalPaid);
+          if (newBal <= 0) {
               showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
               return;
             }
