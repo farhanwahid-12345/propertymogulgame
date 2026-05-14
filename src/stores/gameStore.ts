@@ -1883,9 +1883,9 @@ export const useGameStore = create<GameState & GameActions>()(
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
-            return total + (prev.tenants.some(t => t.propertyId === prop.id) ? prop.monthlyIncome : 0);
-          }, 0);
+          // Use EXPECTED rent (every owned property's monthlyIncome regardless
+          // of tenancy) so a vacant fresh purchase doesn't fail the ICR test.
+          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
@@ -1969,7 +1969,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + (prev.tenants.some(t => t.propertyId === prop.id) ? prop.monthlyIncome : 0), 0);
+          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
