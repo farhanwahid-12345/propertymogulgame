@@ -113,6 +113,7 @@ interface GameActions {
   replenishMarket: () => void;
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
+  topUpCondition: (propertyId: string, points: number) => void;
   dismissTenantConcern: (concernId: string) => void;
   // Speed
   setGameSpeed: (speed: number) => void;
