@@ -66,6 +66,8 @@ export interface Property {
   subtypeUnits?: number;
   /** Cumulative renovation spend on this property (pennies). */
   totalRenovationSpendPennies?: number;
+  /** Cumulative capital improvement spend (extensions/conversions) — added to CGT base on sale. */
+  capitalImprovementsPennies?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
@@ -93,19 +95,17 @@ export interface MortgageProvider {
   description: string;
 }
 
-export type LoanKind = 'personal' | 'business' | 'bridging';
+export type LoanKind = 'personal' | 'business';
 
 export interface Loan {
   id: string;
   kind: LoanKind;
   principal: number;        // pennies
   remainingBalance: number; // pennies
-  monthlyPayment: number;   // pennies (interest-only for bridging)
+  monthlyPayment: number;   // pennies
   interestRate: number;     // annual decimal
   termMonths: number;
   startMonth: number;       // monthsPlayed snapshot
-  /** Bridging only — secured against this property. */
-  collateralPropertyId?: string;
 }
 
 export interface Mortgage {

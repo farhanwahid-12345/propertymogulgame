@@ -14,7 +14,7 @@ export interface MortgageEligibilityRequest {
   mortgageType: 'repayment' | 'interest-only';
   // Existing portfolio context
   existingMonthlyMortgagePayments: number; // total across all existing mortgages
-  totalRentalIncome: number; // total across all existing tenanted properties
+  totalRentalIncome: number; // EXPECTED monthly rent across all owned properties (regardless of current tenancy)
   ownedPropertyCount?: number; // number of properties player currently owns
 }
 
@@ -43,13 +43,14 @@ export function getRatePenaltyForCreditScore(creditScore: number): number {
   return 0.02; // Poor: +2%
 }
 
-// DTI thresholds per provider
+// DTI thresholds per provider — generous on the riskier providers since they
+// already charge a higher rate for taking on stretched borrowers.
 const PROVIDER_DTI_LIMITS: Record<string, number> = {
   hsbc: 0.50,
-  nationwide: 0.50,
+  nationwide: 0.55,
   halifax: 0.65,
-  quickcash: 0.80,
-  easyloan: 0.80,
+  quickcash: 0.85,
+  easyloan: 0.85,
 };
 
 // Random rejection chance for premium providers
@@ -143,17 +144,19 @@ export function calculateMortgageEligibility(
       }
     }
   } else {
-    // Portfolio affordability: TOTAL rental income must be >= 125% of TOTAL mortgage payments
+    // Portfolio affordability: TOTAL EXPECTED rental income must be >= 120% of TOTAL mortgage payments.
+    // Slightly more lenient than the historic 1.25 threshold to reflect that the
+    // input is now expected (not realised) rent.
     const totalIncomeWithNew = req.totalRentalIncome + req.propertyMonthlyRent;
     const totalPaymentsWithNew = req.existingMonthlyMortgagePayments + monthlyPayment;
     if (totalPaymentsWithNew > 0 && totalIncomeWithNew > 0) {
       const portfolioICR = totalIncomeWithNew / totalPaymentsWithNew;
       result.icrRatio = portfolioICR;
-      if (portfolioICR < 1.25) {
+      if (portfolioICR < 1.20) {
         return {
           ...result,
           eligible: false,
-          reason: `Mortgage Denied: Portfolio rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 125% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.25).toLocaleString()}/mo total rental income.`,
+          reason: `Mortgage Denied: Portfolio expected rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 120% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.20).toLocaleString()}/mo expected income.`,
         };
       }
     }

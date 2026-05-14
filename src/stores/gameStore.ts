@@ -33,7 +33,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -317,7 +317,7 @@ interface GameActions {
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   // Loans
-  applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => void;
+  applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => void;
   settleLoan: (loanId: string) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
@@ -738,11 +738,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const mortgage = newMortgages.find(m => m.propertyId === conv.propertyId);
           const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0);
 
-          // CGT for sole traders
+          // CGT for sole traders — capital improvement spend (extensions/
+          // conversions) increases the cost base, reducing the taxable gain.
           const property = newOwnedProperties.find(p => p.id === conv.propertyId);
           let cgtAmount = 0;
           if (property && prev.entityType === 'sole_trader') {
-            cgtAmount = calculateCGT(salePrice, property.price, 0, prev.entityType);
+            const improvementCosts = property.capitalImprovementsPennies || 0;
+            cgtAmount = calculateCGT(salePrice, property.price, improvementCosts, prev.entityType);
           }
 
           sellCash += net - cgtAmount;
@@ -888,7 +890,7 @@ export const useGameStore = create<GameState & GameActions>()(
           let delta = 0;
 
           if (property.condition === 'dilapidated') {
-            delta -= 8; reasons.push({ reason: 'Dilapidated condition', delta: -8 });
+            delta -= 4; reasons.push({ reason: 'Dilapidated condition', delta: -4 });
           } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
             const hasPlanningCooldown = (prev.propertyLocks || []).some(
               l => l.propertyId === property.id && l.reason === 'planning_cooldown' && newMonthNumber < l.untilMonth,
@@ -899,8 +901,8 @@ export const useGameStore = create<GameState & GameActions>()(
               hasPlanningCooldown,
             });
             if (eligible) {
-              delta -= 3;
-              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -3 });
+              delta -= 2;
+              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -2 });
             } else {
               reasons.push({ reason: 'Premium tenant accepts current standard', delta: 0 });
             }
@@ -909,25 +911,25 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           if (recentDamageIds.has(t.propertyId)) {
-            delta -= 5; reasons.push({ reason: 'Unrepaired damage', delta: -5 });
+            delta -= 3; reasons.push({ reason: 'Unrepaired damage', delta: -3 });
           }
 
-          // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
+          // Recent rent hike (within last 6 months) — milder penalty, skip if tenant moved in after the increase
           const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
-          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
-            delta -= 2; reasons.push({ reason: 'Recent rent increase', delta: -2 });
+          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 6 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+            delta -= 1; reasons.push({ reason: 'Recent rent increase', delta: -1 });
           }
 
-          // Happiness drift: gentle pull toward ~75 baseline whenever no acute pressure
+          // Happiness drift: stronger pull toward ~75 baseline whenever no acute pressure
           const hasNegativePressure = delta < 0;
           if (!hasNegativePressure) {
-            const drift = t.satisfaction < 75 ? 2 : t.satisfaction > 85 ? -1 : 1;
+            const drift = t.satisfaction < 75 ? 2 : t.satisfaction <= 85 ? 1 : 0;
             delta += drift;
             reasons.push({ reason: 'Stable conditions', delta: drift });
           }
 
-          // Cap monthly net drop at -4 to prevent rapid satisfaction collapse
-          if (delta < -4) delta = -4;
+          // Cap monthly net drop at -3 (was -4) — gentler decay overall
+          if (delta < -3) delta = -3;
 
           const newSatisfaction = Math.max(0, Math.min(100, t.satisfaction + delta));
           return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
@@ -1092,7 +1094,9 @@ export const useGameStore = create<GameState & GameActions>()(
           newTenants = newTenants.map(t => {
             const pen = satPenaltyByProp.get(t.propertyId);
             if (!pen) return t;
-            return { ...t, satisfaction: Math.max(0, t.satisfaction - pen) };
+            // Cap concern penalty at -2 per tenant per month (was uncapped)
+            const cappedPen = Math.min(pen, 2);
+            return { ...t, satisfaction: Math.max(0, t.satisfaction - cappedPen) };
           });
         }
         // Trim long-resolved
@@ -1475,30 +1479,20 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        // ── Loans amortisation (personal/business/bridging) ──
-        const prevLoans: import('@/types/game').Loan[] = (prev as any).loans || [];
+        // ── Loans amortisation (personal/business) ──
+        const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
         let loanCashDelta = 0;
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
           loanCashDelta -= l.monthlyPayment;
-          if (l.kind === 'bridging') {
-            const monthsElapsed = newMonthNumber - l.startMonth;
-            if (monthsElapsed >= l.termMonths) {
-              loanCashDelta -= l.remainingBalance;
-              showToast("Bridging Loan Due 🏦", `Repaid £${fromPennies(l.remainingBalance).toLocaleString()} bullet on bridging loan.`);
-              return;
-            }
-            updatedLoans.push(l);
-          } else {
-            const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
-            const newBal = Math.max(0, l.remainingBalance - principalPaid);
-            if (newBal <= 0) {
-              showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
-              return;
-            }
-            updatedLoans.push({ ...l, remainingBalance: newBal });
+          const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
+          const newBal = Math.max(0, l.remainingBalance - principalPaid);
+          if (newBal <= 0) {
+            showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
+            return;
           }
+          updatedLoans.push({ ...l, remainingBalance: newBal });
         });
         if (loanCashDelta < 0) {
           const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
@@ -1879,9 +1873,9 @@ export const useGameStore = create<GameState & GameActions>()(
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => {
-            return total + (prev.tenants.some(t => t.propertyId === prop.id) ? prop.monthlyIncome : 0);
-          }, 0);
+          // Use EXPECTED rent (every owned property's monthlyIncome regardless
+          // of tenancy) so a vacant fresh purchase doesn't fail the ICR test.
+          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
@@ -1965,7 +1959,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + (prev.tenants.some(t => t.propertyId === prop.id) ? prop.monthlyIncome : 0), 0);
+          const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
@@ -2693,18 +2687,31 @@ export const useGameStore = create<GameState & GameActions>()(
               a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
             )
           : prev.planningApplications;
-        // Track cumulative renovation spend on the property record
+        // Track cumulative renovation spend, splitting capital vs revenue:
+        //   • Revenue (maintenance/improvement) → adds to yearly deductible expenses now
+        //   • Capital (extension/conversion)    → adds to property.capitalImprovementsPennies for CGT later
+        const isRevenue = isDeductibleRevenueRenovation(renovationType.category);
         const updatedOwned = prev.ownedProperties.map(p =>
           p.id === propertyId
-            ? { ...p, totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies }
+            ? {
+                ...p,
+                totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies,
+                capitalImprovementsPennies: isRevenue
+                  ? (p.capitalImprovementsPennies || 0)
+                  : (p.capitalImprovementsPennies || 0) + costPennies,
+              }
             : p,
         );
+        const newDeductibleExpenses = isRevenue
+          ? (prev.yearlyDeductibleExpenses || 0) + costPennies
+          : (prev.yearlyDeductibleExpenses || 0);
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           renovations: [...prev.renovations, renovation],
           planningApplications: consumedPlanning,
           ownedProperties: updatedOwned,
+          yearlyDeductibleExpenses: newDeductibleExpenses,
         });
       },
 
@@ -2947,7 +2954,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         if (newLoanAmount < currentBal) { showToast("Refinance Failed", "Must cover existing balance!", "destructive"); return; }
 
-        const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + (prev.tenants.some(tt => tt.propertyId === p.id) ? p.monthlyIncome : 0), 0);
+        const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
 
@@ -3001,7 +3008,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
         const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
-        const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + (prev.tenants.some(tt => tt.propertyId === p.id) ? p.monthlyIncome : 0), 0);
+        const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
         // LTD companies get lower max LTV on commercial mortgages
         let adjustedMaxLTV = provider.maxLTV;
@@ -3041,8 +3048,8 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
-      // ─── LOANS (personal / business / bridging) ─────────────────
-      applyForLoan: (kind: 'personal' | 'business' | 'bridging', amount: number, termMonths: number, collateralPropertyId?: string) => {
+      // ─── LOANS (personal / business) ─────────────────
+      applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => {
         const prev = get();
         const product = (LOAN_PRODUCTS as any)[kind];
         if (!product) { showToast("Loan Failed", "Unknown product.", "destructive"); return; }
@@ -3053,39 +3060,25 @@ export const useGameStore = create<GameState & GameActions>()(
           if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
           if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
         }
-        if (kind !== 'bridging' && (amount > product.maxAmountPennies)) {
+        if (amount > product.maxAmountPennies) {
           showToast("Loan Too Large", `Max £${fromPennies(product.maxAmountPennies).toLocaleString()} for ${kind} loans.`, "destructive"); return;
         }
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        let collateralId: string | undefined;
-        if (kind === 'bridging') {
-          const collateral = prev.ownedProperties.find(p => p.id === collateralPropertyId);
-          if (!collateral) { showToast("Loan Rejected", "Bridging loan needs a collateral property.", "destructive"); return; }
-          const existingDebt = prev.mortgages.filter(m => m.propertyId === collateral.id).reduce((s, m) => s + m.remainingBalance, 0);
-          const maxBorrow = Math.floor(collateral.value * product.maxLTV) - existingDebt;
-          if (amount > maxBorrow) {
-            showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, maxBorrow)).toLocaleString()} on this property (70% LTV).`, "destructive"); return;
-          }
-          collateralId = collateral.id;
-        }
         const rate = Math.max(0.02, prev.currentMarketRate + product.rateSpread);
-        // Repayment monthly payment formula (annuity); bridging is interest-only
         const monthlyRate = rate / 12;
-        const monthlyPayment = kind === 'bridging'
-          ? Math.round(amount * monthlyRate)
-          : Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+        const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
         const loan: import('@/types/game').Loan = {
           id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
           kind, principal: amount, remainingBalance: amount,
           monthlyPayment, interestRate: rate, termMonths,
-          startMonth: prev.monthsPlayed, collateralPropertyId: collateralId,
+          startMonth: prev.monthsPlayed,
         };
         const credited = credit(prev, amount);
         set({
           cash: credited.cash, overdraftUsed: credited.overdraftUsed,
-          loans: [...((prev as any).loans || []), loan],
+          loans: [...((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging'), loan],
         } as any);
         showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
       },

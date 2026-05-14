@@ -21,7 +21,6 @@ export const ERC_WINDOW_MONTHS = 60;
 export const LOAN_PRODUCTS = {
   personal:  { maxAmountPennies: toPennies(25_000),  minTermMonths: 12, maxTermMonths: 60, rateSpread: 0.04,  minCreditScore: 600 },
   business:  { maxAmountPennies: toPennies(150_000), minTermMonths: 12, maxTermMonths: 84, rateSpread: 0.025, minCreditScore: 580 },
-  bridging:  { maxLTV: 0.70,                          minTermMonths: 1,  maxTermMonths: 12, rateSpread: 0.06,  minCreditScore: 550 },
 } as const;
 
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
