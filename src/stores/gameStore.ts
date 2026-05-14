@@ -2438,21 +2438,41 @@ export const useGameStore = create<GameState & GameActions>()(
         const prev = get();
         const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
         if (!conv) { showToast("Not Found", "That transaction is no longer in progress.", "destructive"); return; }
-        if (conv.status !== 'selling') {
-          showToast("Cannot Withdraw", "Only sellers can pull out of a conveyancing chain.", "destructive");
+        if (conv.status === 'selling') {
+          const feePennies = toPennies(1500);
+          const dbg = debit(prev, feePennies);
+          if (!dbg) {
+            showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
+            return;
+          }
+          showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+          set({
+            cash: dbg.cash,
+            overdraftUsed: dbg.overdraftUsed,
+            conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+          });
           return;
         }
-        const feePennies = toPennies(1500);
-        const dbg = debit(prev, feePennies);
-        if (!dbg) {
-          showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
-          return;
-        }
-        showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+        // Buying-side withdrawal — forfeit solicitor fees + 0.5% abort fee.
+        const purchase = conv.purchasePrice || 0;
+        const abortFee = Math.round(purchase * 0.005);
+        // Refund any cash held in escrow (deposit), minus the abort fee.
+        const escrowReturn = Math.max(0, (conv.cashHeld || 0) - abortFee);
+        const credited = credit(prev, escrowReturn);
+        showToast(
+          "Purchase Withdrawn",
+          `${conv.propertyName} aborted. Solicitor fees forfeit; £${fromPennies(abortFee).toLocaleString()} abort fee deducted.`,
+          "destructive",
+        );
+        // Return the property snapshot back to the estate-agent inventory if not already listed.
+        const reinstated = !prev.estateAgentProperties.find((p: any) => p.id === conv.propertyId)
+          ? [...prev.estateAgentProperties, { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: purchase, value: purchase, neighborhood: '', monthlyIncome: 0, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0 } as any]
+          : prev.estateAgentProperties;
         set({
-          cash: dbg.cash,
-          overdraftUsed: dbg.overdraftUsed,
+          cash: credited.cash,
+          overdraftUsed: credited.overdraftUsed,
           conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+          estateAgentProperties: reinstated,
         });
       },
 
