@@ -279,6 +279,7 @@ export function RenovationDialog({
   planningHistory = [],
   monthsPlayed = 0,
   inPlanningCooldown = false,
+  hasTenant = false,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
