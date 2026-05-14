@@ -154,6 +154,8 @@ export interface PropertyTenant {
   /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
   evictionNoticeMonth?: number;
   evictionGround?: EvictionGround;
+  /** Commercial leases only — monthsPlayed of the most recent triennial rent review. */
+  lastRentReviewMonth?: number;
 }
 
 export interface PendingEviction {
