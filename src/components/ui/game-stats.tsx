@@ -7,7 +7,41 @@ import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide
 import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { memo, useState } from "react";
+
+interface MarketSummaryBarProps {
+  currentMarketRate: number;
+  totalDebt: number;
+  monthsPlayed: number;
+  recentEventCount: number;
+  showDetails: boolean;
+}
+
+const MarketSummaryBar = memo(function MarketSummaryBar({
+  currentMarketRate,
+  totalDebt,
+  monthsPlayed,
+  recentEventCount,
+  showDetails,
+}: MarketSummaryBarProps) {
+  return (
+    <button
+      type="button"
+      className="glass w-full p-3 flex items-center justify-between text-sm cursor-pointer hover:bg-white/[0.16]"
+    >
+      <span className="flex items-center gap-2 text-muted-foreground">
+        <TrendingUp className="h-4 w-4" />
+        Market: {(currentMarketRate * 100).toFixed(2)}% | Debt: £{totalDebt.toLocaleString()} | Month {monthsPlayed}
+        {recentEventCount > 0 && (
+          <Badge key={recentEventCount} variant="destructive" className="text-xs px-1.5 py-0">
+            {recentEventCount} events
+          </Badge>
+        )}
+      </span>
+      <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
+    </button>
+  );
+});
 
 interface EconomicEvent {
   id: string;
@@ -226,18 +260,15 @@ export function GameStats({
       {/* Collapsible Market & Events */}
       <Collapsible open={showDetails} onOpenChange={setShowDetails}>
         <CollapsibleTrigger asChild>
-          <button className="glass glass-hover w-full p-3 flex items-center justify-between text-sm cursor-pointer">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              Market: {(currentMarketRate * 100).toFixed(2)}% | Debt: £{totalDebt.toLocaleString()} | Month {monthsPlayed}
-              {recentTenantEvents.length > 0 && (
-                <Badge variant="destructive" className="text-xs px-1.5 py-0">
-                  {recentTenantEvents.length} events
-                </Badge>
-              )}
-            </span>
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
-          </button>
+          <div>
+            <MarketSummaryBar
+              currentMarketRate={currentMarketRate}
+              totalDebt={totalDebt}
+              monthsPlayed={monthsPlayed}
+              recentEventCount={recentTenantEvents.length}
+              showDetails={showDetails}
+            />
+          </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="glass mt-2 p-4 space-y-3">
