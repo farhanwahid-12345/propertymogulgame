@@ -43,6 +43,7 @@ export interface Property {
   renovationCompletionMonths?: Record<string, number>;
   subtypeUnits?: number;
   totalRenovationSpendPennies?: number;
+  epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 }
 
 interface PropertyCardProps {
