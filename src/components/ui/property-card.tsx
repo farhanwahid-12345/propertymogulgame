@@ -16,6 +16,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getMarketRentPounds } from "@/lib/engine/market";
+import { RepairBar } from "@/components/ui/repair-bar";
+import { useGameStore } from "@/stores/gameStore";
+import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
+import { fromPennies } from "@/lib/formatCurrency";
 
 export interface Property {
   id: string;
@@ -35,6 +39,7 @@ export interface Property {
   baseRent?: number;
   lastTenantChange?: number;
   condition: "dilapidated" | "standard" | "premium";
+  conditionScore?: number;
   monthsSinceLastRenovation: number;
   internalSqft?: number;
   plotSqft?: number;
@@ -149,6 +154,12 @@ export const PropertyCard = memo(function PropertyCard({
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const topUpCondition = useGameStore(s => s.topUpCondition);
+  const conditionScore = typeof property.conditionScore === 'number'
+    ? property.conditionScore
+    : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
+  const topUpSqft = Math.max(400, property.internalSqft ?? 900);
+  const topUpCostPounds20 = Math.round(fromPennies(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * topUpSqft * 20 / 100));
   
   const propertyType = property.type in PropertyTypeIcon ? property.type : "residential";
   const Icon = PropertyTypeIcon[propertyType];
@@ -243,15 +254,7 @@ export const PropertyCard = memo(function PropertyCard({
                 EPC {property.epcRating}
               </Badge>
             )}
-            {property.owned && property.condition && (
-              <Badge className={cn("text-[10px]",
-                property.condition === 'premium' ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
-                property.condition === 'dilapidated' ? "bg-red-500/20 text-red-400 border-red-500/30" :
-                "bg-blue-500/20 text-blue-400 border-blue-500/30"
-              )}>
-                {property.condition === 'premium' ? '✨' : property.condition === 'dilapidated' ? '🏚️' : '🏠'} {property.condition}
-              </Badge>
-            )}
+            {/* Repair Bar replaces 3-tier condition badge — surfaced in body */}
             {property.marketTrend === "up" ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : property.marketTrend === "down" ? (
@@ -456,12 +459,29 @@ export const PropertyCard = memo(function PropertyCard({
                       lastTenantChange={property.lastTenantChange}
                       monthsPlayed={monthsPlayed}
                       condition={property.condition}
+                      conditionScore={conditionScore}
                       propertyValue={property.value}
                       propertyYield={property.yield}
                       currentSatisfaction={tenantSatisfaction}
                       satisfactionReasons={tenantSatisfactionReasons}
                     />
                   )}
+                  {/* Repair Bar + quick top-up */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <RepairBar score={conditionScore} />
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => topUpCondition(property.id, 20)}
+                      disabled={conditionScore >= 100}
+                      title={`Top up +20 condition · approx £${topUpCostPounds20.toLocaleString()} (cap ${MAX_TOPUP_POINTS_PER_MONTH}/mo)`}
+                    >
+                      🛠 +20
+                    </Button>
+                  </div>
                   {/* Satisfaction bar — only when a tenant is assigned */}
                   {currentTenant && typeof tenantSatisfaction === 'number' && (
                     <TooltipProvider delayDuration={150}>

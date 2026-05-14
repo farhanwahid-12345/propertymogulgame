@@ -9,6 +9,7 @@ import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierSha
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { PropertyCondition } from "@/types/game";
+import { TENANT_MIN_CONDITION } from "@/lib/engine/constants";
 
 // --- Trait system ---
 
@@ -210,6 +211,7 @@ interface TenantSelectorProps {
   lastTenantChange?: number;
   monthsPlayed?: number;
   condition?: PropertyCondition;
+  conditionScore?: number;
   propertyValue?: number; // pounds; used as fallback for £0 baseRent
   propertyYield?: number; // % annual yield; used with value as last-resort
   /** Current tenant's satisfaction (0-100) — shown in the dialog header. */
@@ -225,6 +227,7 @@ export function TenantSelector({
   lastTenantChange,
   monthsPlayed = 0,
   condition,
+  conditionScore,
   propertyValue,
   propertyYield,
   currentSatisfaction,
@@ -345,16 +348,19 @@ export function TenantSelector({
             const isSelected = selectedTenant?.id === tenant.id;
             const reliabilityStars = riskToStars(tenant.defaultRisk, 50);
             const careStars = riskToStars(tenant.damageRisk, 12);
+            const minCond = TENANT_MIN_CONDITION[tenant.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0;
+            const conditionLocked = typeof conditionScore === 'number' && conditionScore < minCond;
 
             return (
               <Card
                 key={tenant.id}
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-md border",
-                  isSelected && "ring-2 ring-primary",
+                  "transition-all border",
+                  conditionLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-md",
+                  isSelected && !conditionLocked && "ring-2 ring-primary",
                   ProfileColors[tenant.profile]
                 )}
-                onClick={() => setSelectedTenant(tenant)}
+                onClick={() => { if (!conditionLocked) setSelectedTenant(tenant); }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -369,6 +375,11 @@ export function TenantSelector({
                 </CardHeader>
 
                 <CardContent className="space-y-2.5">
+                  {conditionLocked && (
+                    <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-300 flex items-center gap-1.5">
+                      <Lock className="h-3 w-3" /> Won't accept — needs condition ≥ {minCond} (currently {Math.round(conditionScore!)})
+                    </div>
+                  )}
                   <p className="text-sm text-muted-foreground italic">{tenant.description}</p>
 
                   {/* Trait badges */}
@@ -467,7 +478,10 @@ export function TenantSelector({
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-          <Button onClick={handleSelectTenant} disabled={!selectedTenant}>
+          <Button
+            onClick={handleSelectTenant}
+            disabled={!selectedTenant || (typeof conditionScore === 'number' && conditionScore < (TENANT_MIN_CONDITION[selectedTenant?.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0))}
+          >
             Select Tenant
           </Button>
         </div>
