@@ -72,6 +72,10 @@ export interface Property {
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   /** Months remaining before furnishings depreciate back to unfurnished. */
   furnishingMonthsRemaining?: number;
+  /** EPC energy rating A–G. Defaults derived from condition for legacy saves. */
+  epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  /** monthsPlayed snapshot of last EICR (electrical safety) check. */
+  lastEicrMonth?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
