@@ -93,12 +93,13 @@ export function PortfolioGrid({
           const activeRenoIds = (gameState.renovations || [])
             .filter((r) => r.propertyId === property.id && r?.type?.id)
             .map((r) => r.type.id);
-          const tenantRec = gameState.tenants.find((t) => t.propertyId === property.id);
+          const tenantRecs = gameState.tenants.filter((t) => t.propertyId === property.id);
+          const slot0 = tenantRecs.find((t) => (t.slotIndex ?? 0) === 0);
           const concernCount = (gameState.tenantConcerns || []).filter(
             (c: any) => c.propertyId === property.id && !c.resolvedMonth
           ).length;
-          const pendingEv = (gameState.pendingEvictions || []).find(
-            (e: any) => e.propertyId === property.id
+          const pendingEvSlot0 = (gameState.pendingEvictions || []).find(
+            (e: any) => e.propertyId === property.id && (e.slotIndex ?? 0) === 0
           );
           const arrearsCount = (gameState.tenantEvents || []).filter(
             (e: any) => e.propertyId === property.id && e.type === "default"
@@ -112,6 +113,34 @@ export function PortfolioGrid({
               l.reason === "planning_cooldown" &&
               l.untilMonth > gameState.monthsPlayed
           );
+
+          // Multi-unit slot data for HMOs / converted flats
+          const isMultiUnit =
+            (property.subtype === "hmo" || property.subtype === "flats") &&
+            (property.subtypeUnits ?? 1) > 1;
+          const multiUnitSlots = isMultiUnit
+            ? Array.from({ length: property.subtypeUnits ?? 1 }, (_, slotIndex) => {
+                const rec = tenantRecs.find((t) => (t.slotIndex ?? 0) === slotIndex);
+                const ev = (gameState.pendingEvictions || []).find(
+                  (e: any) => e.propertyId === property.id && (e.slotIndex ?? 0) === slotIndex
+                );
+                return {
+                  slotIndex,
+                  tenant: rec?.tenant,
+                  satisfaction: rec?.satisfaction,
+                  satisfactionReasons: rec?.satisfactionReasons,
+                  rentPounds: rec?.rentPennies != null ? Math.round(rec.rentPennies / 100) : undefined,
+                  pendingEviction: ev
+                    ? {
+                        ground: ev.ground,
+                        effectiveMonth: ev.effectiveMonth,
+                        servedMonth: ev.servedMonth,
+                      }
+                    : undefined,
+                };
+              })
+            : undefined;
+
           return (
             <PropertyCard
               key={property.id}
@@ -121,9 +150,9 @@ export function PortfolioGrid({
               onRenovate={gameState.startRenovation}
               activeRenovationIds={activeRenoIds}
               playerCash={gameState.cash}
-              currentTenant={tenantRec?.tenant}
-              tenantSatisfaction={tenantRec?.satisfaction}
-              tenantSatisfactionReasons={tenantRec?.satisfactionReasons}
+              currentTenant={slot0?.tenant}
+              tenantSatisfaction={slot0?.satisfaction}
+              tenantSatisfactionReasons={slot0?.satisfactionReasons}
               mortgages={gameState.mortgages}
               monthsPlayed={gameState.monthsPlayed}
               isInConveyancing={!!conv}
@@ -134,11 +163,11 @@ export function PortfolioGrid({
               evictTenant={gameState.evictTenant}
               cancelEviction={gameState.cancelEviction}
               pendingEviction={
-                pendingEv
+                pendingEvSlot0
                   ? {
-                      ground: pendingEv.ground,
-                      effectiveMonth: pendingEv.effectiveMonth,
-                      servedMonth: pendingEv.servedMonth,
+                      ground: pendingEvSlot0.ground,
+                      effectiveMonth: pendingEvSlot0.effectiveMonth,
+                      servedMonth: pendingEvSlot0.servedMonth,
                     }
                   : undefined
               }
@@ -147,6 +176,7 @@ export function PortfolioGrid({
               planningApplications={propertyApps}
               planningHistory={(gameState as any).planningApplications || []}
               inPlanningCooldown={inPlanningCooldown}
+              multiUnitSlots={multiUnitSlots}
             />
           );
         })}
