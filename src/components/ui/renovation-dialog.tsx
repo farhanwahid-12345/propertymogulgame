@@ -361,6 +361,9 @@ export function RenovationDialog({
 
   /** Returns null if eligible, else a short reason string. */
   const ineligibilityReason = (r: RenovationType): string | null => {
+    if (hasTenant) {
+      return `Tenant in residence — serve eviction or wait for vacancy`;
+    }
     if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
       return `Only for ${r.allowedTypes.join('/')}`;
     }
@@ -375,20 +378,6 @@ export function RenovationDialog({
     }
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
       return `Already converted to ${currentSubtype}`;
-    }
-    // Suppress redundant maintenance after recent redec / conversion
-    const lastRedec = renovationCompletionMonths['full_redecoration'];
-    const lastConv = renovationCompletionMonths['__lastConversion'];
-    if (r.id === 'basic_repair') {
-      if (typeof lastRedec === 'number' && (monthsPlayed - lastRedec) < 24) {
-        return `Recently redecorated — repairs not needed (${24 - (monthsPlayed - lastRedec)}mo left)`;
-      }
-      if (typeof lastConv === 'number' && (monthsPlayed - lastConv) < 12) {
-        return `Recently converted — repairs not needed (${12 - (monthsPlayed - lastConv)}mo left)`;
-      }
-    }
-    if (r.id === 'full_redecoration' && typeof lastConv === 'number' && (monthsPlayed - lastConv) < 12) {
-      return `Recently converted — redecoration not needed (${12 - (monthsPlayed - lastConv)}mo left)`;
     }
     return null;
   };
