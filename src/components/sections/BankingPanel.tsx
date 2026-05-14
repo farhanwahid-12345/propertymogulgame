@@ -76,19 +76,46 @@ export function BankingPanel({ gameState, getDebtForProperty, totalPortfolioInco
         />
       </div>
       <div className="mt-4">
-        <LoansPanel />
+        <CollapsibleSection
+          id="section-loans"
+          title="💷 Loans"
+          alwaysOpenDesktop={false}
+          defaultOpenDesktop={((gameState as any).loans?.length || 0) > 0}
+          badge={
+            ((gameState as any).loans?.length || 0) > 0 ? (
+              <Badge variant="secondary" className="text-[10px]">
+                {(gameState as any).loans.length}
+              </Badge>
+            ) : null
+          }
+          summary={
+            ((gameState as any).loans?.length || 0) === 0
+              ? "No active loans"
+              : `${(gameState as any).loans.length} active`
+          }
+        >
+          <LoansPanel />
+        </CollapsibleSection>
       </div>
       <div className="mt-4">
-        <TaxBreakdown
-          entityType={gameState.entityType}
-          yearlyGrossRent={(gameState as any).yearlyGrossRentPennies || 0}
-          yearlyMortgageInterest={(gameState as any).yearlyMortgageInterestPennies || 0}
-          yearlyDeductibleExpenses={(gameState as any).yearlyDeductibleExpensesPennies || 0}
-          taxRecords={gameState.taxRecords || []}
-          totalTaxPaidPennies={(gameState as any).totalTaxPaidPennies || 0}
-          monthsPlayed={gameState.monthsPlayed}
-          lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
-        />
+        <CollapsibleSection
+          id="section-tax"
+          title="🧾 Tax — current year"
+          alwaysOpenDesktop={false}
+          defaultOpenDesktop={false}
+          summary={`Paid £${fromPennies(((gameState as any).totalTaxPaidPennies || 0)).toLocaleString()} to date`}
+        >
+          <TaxBreakdown
+            entityType={gameState.entityType}
+            yearlyGrossRent={(gameState as any).yearlyGrossRentPennies || 0}
+            yearlyMortgageInterest={(gameState as any).yearlyMortgageInterestPennies || 0}
+            yearlyDeductibleExpenses={(gameState as any).yearlyDeductibleExpensesPennies || 0}
+            taxRecords={gameState.taxRecords || []}
+            totalTaxPaidPennies={(gameState as any).totalTaxPaidPennies || 0}
+            monthsPlayed={gameState.monthsPlayed}
+            lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
+          />
+        </CollapsibleSection>
       </div>
     </>
   );
