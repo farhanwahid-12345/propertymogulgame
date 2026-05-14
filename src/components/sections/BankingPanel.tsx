@@ -26,15 +26,6 @@ export function BankingPanel({ gameState, getDebtForProperty, totalPortfolioInco
 
   return (
     <>
-      <div className="mt-4">
-        <UpcomingEvents
-          monthsPlayed={gameState.monthsPlayed}
-          entityType={gameState.entityType}
-          pendingEvictions={gameState.pendingEvictions || []}
-          planningApplications={(gameState as any).planningApplications || []}
-          lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
-        />
-      </div>
       <div className="flex flex-wrap gap-2 mt-4">
         <MortgageSettlement
           ownedProperties={gameState.ownedProperties}
