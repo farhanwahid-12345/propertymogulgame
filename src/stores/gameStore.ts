@@ -343,7 +343,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 12,
+    _version: 13,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -543,6 +543,17 @@ function migrateState(persisted: any): GameState {
       persisted.entityChosen = true;
     }
     persisted._version = 12;
+  }
+
+  // v12 → v13: add currentLoanRates; drop any persisted bridging loans
+  if (persisted._version < 13) {
+    if (Array.isArray(persisted.loans)) {
+      persisted.loans = persisted.loans.filter((l: any) => l.kind !== 'bridging');
+    }
+    if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
+      persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
+    }
+    persisted._version = 13;
   }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
