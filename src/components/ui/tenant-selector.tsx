@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, DollarSign } from "lucide-react";
+import { Users, DollarSign, Lock, CreditCard, FileSearch, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
+import { useGameStore } from "@/stores/gameStore";
+import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { PropertyCondition } from "@/types/game";
 
 // --- Trait system ---
@@ -231,15 +233,25 @@ export function TenantSelector({
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
+  type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
+  const [screened, setScreened] = useState<Record<string, Screened>>({});
 
   useEffect(() => {
     if (isOpen) {
       setTenantProfiles(generateTenantProfiles());
       setSelectedTenant(null);
+      setScreened({});
     }
   }, [isOpen]);
 
   const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
+
+  const runScreening = useCallback((tenantId: string, kind: keyof Screened, costPounds: number) => {
+    const cashPennies = useGameStore.getState().cash;
+    if (cashPennies < toPennies(costPounds)) return;
+    useGameStore.getState().setCash(cashPennies - toPennies(costPounds));
+    setScreened(prev => ({ ...prev, [tenantId]: { ...prev[tenantId], [kind]: true } }));
+  }, []);
 
   const handleSelectTenant = useCallback(() => {
     if (selectedTenant) {
