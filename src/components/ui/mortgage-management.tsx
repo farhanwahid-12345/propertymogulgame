@@ -282,6 +282,24 @@ export function MortgageManagement({
                   </Select>
                 </div>
 
+                <div>
+                  <Label>Initial Fixed Term</Label>
+                  <Select value={singleFixedTermYears.toString()} onValueChange={(value) => setSingleFixedTermYears(Number(value))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">SVR / Tracker (no fix)</SelectItem>
+                      <SelectItem value="2">2-year fix (−0.40%)</SelectItem>
+                      <SelectItem value="5">5-year fix (−0.20%)</SelectItem>
+                      <SelectItem value="10">10-year fix (+0.10%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    When the fix expires, the mortgage reverts to lender SVR — remortgage before then to lock a new rate.
+                  </p>
+                </div>
+
                 {singleProvider && (
                   <Card className="bg-blue-500/10 border-blue-500/30">
                     <CardContent className="p-4">
