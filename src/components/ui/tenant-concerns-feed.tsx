@@ -8,8 +8,7 @@ import type { TenantConcern } from "@/types/game";
 import type { Property } from "@/types/game";
 import { isSoundEnabled, setSoundEnabled, playConcernChime } from "@/lib/sound";
 import { useGameStore } from "@/stores/gameStore";
-import { CONCERN_RESOLVE_CONDITION_LIFT } from "@/lib/engine/constants";
-import { scoreFromConditionTier } from "@/lib/engine/condition";
+import { CONCERN_RESOLVE_CONDITION_LIFT, scoreFromConditionTier } from "@/lib/engine/constants";
 
 interface Props {
   concerns: TenantConcern[];
