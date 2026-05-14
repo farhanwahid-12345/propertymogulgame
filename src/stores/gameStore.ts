@@ -77,10 +77,10 @@ interface GameActions {
   acceptBuyerCounter: (propertyId: string, offerId: string) => void;
   rejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   // Tenants
-  selectTenant: (propertyId: string, tenant: Tenant) => void;
-  applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number) => void;
-  evictTenant: (propertyId: string, ground: EvictionGround) => void;
-  cancelEviction: (propertyId: string) => void;
+  selectTenant: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
+  applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number, slotIndex?: number) => void;
+  evictTenant: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
+  cancelEviction: (propertyId: string, slotIndex?: number) => void;
   withdrawFromConveyancing: (conveyancingId: string) => void;
   // appealEviction removed — appeals are now tenant-driven & resolved by tick
   disputeDeposit: (disputeId: string) => void;
