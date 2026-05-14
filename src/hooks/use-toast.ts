@@ -4,6 +4,22 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import { pushNotification, type NotificationSeverity } from "@/lib/notifications"
+
+function severityFromVariant(variant?: string): NotificationSeverity {
+  if (variant === "destructive") return "destructive";
+  return "info";
+}
+
+function plainText(node: React.ReactNode): string | undefined {
+  if (node == null || typeof node === "boolean") return undefined;
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(plainText).filter(Boolean).join(" ");
+  // ReactElement — best-effort
+  const props = (node as any)?.props;
+  if (props && "children" in props) return plainText(props.children);
+  return undefined;
+}
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 4000
@@ -173,6 +189,15 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Mirror to persistent notification log so the bell icon stays in sync.
+  const title = plainText(props.title) || "Notification";
+  const description = plainText(props.description);
+  pushNotification({
+    title,
+    description,
+    severity: severityFromVariant((props as any).variant),
+  });
 
   return {
     id: id,

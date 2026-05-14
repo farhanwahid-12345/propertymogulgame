@@ -1,56 +1,108 @@
-## Three improvements
+## Overview
 
-### 1. Repair bar ↔ tenant concerns realism
+Eight related fixes across dashboard layout, notifications, banking flows, and property UI. Grouped below in build order.
 
-**Goal:** the repair bar and the concerns feed feel like the same system rather than two unrelated meters.
+---
 
-Changes in `src/stores/gameStore.ts`:
-- **Low repair → more concerns.** In the monthly concern generator, scale `chance` by `conditionScore`:
-  - `score < 30` → +0.04 chance + bias template pool toward `maintenance` / `mould` / `safety`
-  - `score < 50` → +0.02 chance
-  - `score ≥ 80` → −0.015 chance (already-tidy property)
-- **High repair auto-clears stale soft concerns.** When `topUpCondition` raises a property past 80, mark any open non-damage `maintenance` or `mould` concern on that property as `resolvedMonth = monthsPlayed` (no extra cash spent — they were absorbed by the repair work).
-- **Repair bar drains on ignored damage.** Each in-game month, every open `source: 'damage'` concern older than its grace window subtracts an extra 1 point from `conditionScore` (compounds with existing decay), so neglecting damage visibly tanks the bar.
+### 1. Move "Upcoming Events" out of the central UI
 
-Changes in `src/components/ui/tenant-concerns-feed.tsx`:
-- Per-row hint badge: when the property's `conditionScore < 50`, append "Repair bar low — fix the bar to reduce future risk" under the cost line.
-- When a damage concern is shown, surface "Resolving lifts repair bar +N" using `CONCERN_RESOLVE_CONDITION_LIFT[category]`.
+**Goal:** the Upcoming Events card no longer occupies a slot in the main column — its rows feed the notification centre instead.
 
-### 2. Stop the top bar bouncing
+- In `src/pages/Index.tsx`, remove the `<UpcomingEvents />` render from the main grid.
+- In `src/components/ui/notification-centre.tsx`, add an "Upcoming" group at the top:
+  - Reuse the row-building logic from `UpcomingEvents.tsx` (extract into `src/lib/upcomingEvents.ts` as `buildUpcomingRows({ monthsPlayed, entityType, pendingEvictions, planningApplications, lastCorporationTaxMonth })`).
+  - Render each row as a `notification-centre` item with the same icon + months-away badge.
+- Delete `UpcomingEvents.tsx` once unreferenced (keep the helper only).
 
-**Cause:** the right-hand cluster in `HeroHeader.tsx` uses `flex-wrap`, so when the GameClock label width changes ("Mar 2026" → "April 2026") or `SpeedSelector` toggles `compact`, items reflow onto a new line and the sticky bar's height jumps.
+### 2. Notification ↔ feed parity
 
-Changes in `src/components/sections/HeroHeader.tsx`:
-- Change the right cluster to `flex-nowrap` always, with `min-w-0` and `overflow-hidden` so children shrink instead of wrapping.
-- Give the clock pill a stable width (`w-[220px]` desktop, `w-[180px]` compact) and add `tabular-nums` to the date/progress text inside `GameClock`.
-- Outer wrapper switches to `items-center` always; remove `items-end` swap that triggers an extra reflow on scroll.
-- Keep the `compact` height toggle (56px ↔ 160px) but transition only `height`, not `padding`+`align`, so the swap is a single transform.
+**Bug:** ping fires but notification centre is empty, or centre has rows but no ping fired.
 
-### 3. Collapsible Loans / Tax / Operations panels
+- Audit `pushNotification` callers in `gameStore.ts` and `use-toast.ts`. Every `showToast` that should be persistent must also push into `notifications` (and vice versa).
+- Add a single helper `notify({title, description, severity, category})` in `src/lib/notify.ts` that:
+  - Pushes into the store's `notifications` array (cap 50, newest first).
+  - Triggers the toast via `useToast`.
+  - Plays the ping sound when `severity !== 'silent'`.
+- Replace bare `showToast(...)` calls that represent real events (sale completed, chain collapse, loan approved, eviction served, planning decision, tax due, etc.) with `notify(...)`.
+- Add a dev-mode console warning when a notification is added with no matching toast or vice versa.
 
-**Goal:** declutter the dashboard. Panels should be collapsed by default when "quiet" and show a one-line summary in the header.
+### 3. Seller pull-out ping
 
-Changes:
-- Wrap each of these in the existing `CollapsibleSection` (used already for Operations on mobile), rendered in `src/pages/Index.tsx`:
-  - **Loans panel** (`BankingPanel` / loans area) — default collapsed when `loans.length === 0`. Header summary: "No active loans" or "2 loans · £X/mo".
-  - **Tax — current year** — default collapsed always. Header summary: "Tax due Apr · £X estimated · Y mo".
-  - **Operations** — already collapsible on mobile; make it default-collapsed on desktop too when `totalActionable === 0`. Header summary already shows the count.
-- Each `CollapsibleSection` keeps its open/closed state in `localStorage` keyed by section id so the user's preference persists.
-- Inside `OperationsCenter.tsx` remove the extra "All quiet — no operations in progress" empty card (the collapsible header already conveys this).
+- In `gameStore.ts` chain-collapse path (~line where `chain risk` resolves), call `notify({title: 'Sale fell through', description: '${propName}: buyer pulled out.', severity: 'warning', category: 'sales'})`.
+- Same on the buying side when the seller collapses (the player is buyer).
+
+### 4. Fixed-term selector when buying
+
+**Currently** `MortgageProviderSelector` only shows fixed-term options inside `MortgageRefinance`.
+
+- Add the same `<Select>` for "Initial Fixed Term" (2yr / 5yr / SVR) into `mortgage-provider-selector.tsx`.
+- Plumb `initialFixedTermYears` through `buyProperty` → `useGameState.buyProperty` → `gameStore.buyProperty` → stored on the new `Mortgage` record (already supported by the type).
+- Default = SVR (no fix), matching today's behaviour.
+
+### 5. Operations panel — make it hide away
+
+- In `operations-center.tsx`, swap the always-on glass card for a header-only collapsed state:
+  - When `totalActionable === 0`, render only the 36px summary chip; do not reserve grid space for the body.
+  - When actionable, default to collapsed and show "X active — tap to view".
+- Keep the existing `CollapsibleSection` wrapper from `Index.tsx`; remove the inner duplicate `Card` chrome that adds vertical bulk.
+- Persist open/closed in `localStorage` (already done by `CollapsibleSection`).
+
+### 6. Loans panel fixes
+
+- **"No active loans" bug:** `BankingPanel` summary uses `(gameState as any).loans` but `useGameState` does not surface `loans`. Add `loans: store.loans` to the returned object in `useGameState.ts`. Update the summary + `defaultOpenDesktop` to use the typed value.
+- **Cash flow ignores loans:** in `useGameState.ts`:
+  - Add `loanExpenses = loans.reduce((s, l) => s + fromPennies(l.monthlyPayment), 0)`.
+  - Include in `totalMonthlyExpenses`.
+  - Add `loans: loanExpenses` to `expenseBreakdown`.
+- In `game-stats.tsx` cash-flow popover, render a "Loan Payments" row when `expenseBreakdown.loans > 0`.
+
+### 7. Renovation ROI accuracy
+
+- In `src/lib/engine/renovation.ts`, audit `expectedROI` / `valueUplift` formulas against what `gameStore.completeRenovation` actually applies (cost debited vs. value added).
+- Replace the headline number shown in `renovation-dialog.tsx` with the same formula the store uses, expressed as `(uplift - cost) / cost`. Show a range if the roll is probabilistic.
+- Add a unit-style sanity check in `renovation.ts`: assert that the median rolled outcome matches the displayed estimate within ±2pp.
+
+### 8. Portfolio mortgage — secure button silently fails + ensure payoff/cash-out
+
+- In `gameStore.handlePortfolioMortgage`, replace the silent `console.warn` on ineligibility with `showToast("Portfolio mortgage rejected", reason, "destructive")` so the user sees why.
+- Verify the existing logic that filters out `selectedPropertyIds` from `prev.mortgages` (already pays off old mortgages by removing them and using `cashDelta = loanAmount - totalCurrentMortgages`). Surface this in the UI:
+  - In `portfolio-mortgage.tsx`, add a "Settles £X of existing mortgages" line above the cash-out figure.
+  - Cap the slider's lower bound at `totalCurrentMortgages` (already correct) and clamp upper bound to `min(maxLoanAmount, totalPortfolioValue)`.
+- After success, fire `notify({title: 'Portfolio mortgage secured', ...})`.
+
+### 9. Tenant Concerns → folded into Property Condition bar
+
+- Delete the standalone `tenant-concerns-feed.tsx` from the dashboard render in `Index.tsx`.
+- In `property-card.tsx`, attach concerns to the existing `RepairBar` row:
+  - Show concern count as a small chip beside the bar (`⚠ 2 concerns`).
+  - Clicking the chip opens a popover listing the property's open concerns with their existing action buttons (resolve, ignore, dispute) — reuse the row component logic from the deleted feed.
+- Keep all engine logic (concern generation, decay, auto-resolve on top-up) untouched.
+- Drop `TenantConcernsFeed` import from `Index.tsx`; archive the file.
+
+---
 
 ### Technical notes
 
-- Concern generation lives in the monthly tick (`gameStore.ts` ~lines 870-905) — modifier added before the `Math.random() >= chance` gate.
-- `topUpCondition` (~line 3336) needs a post-update sweep over `prev.tenantConcerns` filtered by `propertyId` and category.
-- `CollapsibleSection` already supports `defaultOpenMobile` and a render-prop summary; extend with `defaultOpenDesktop` if not present.
-- No data-model migration needed — purely behavioural + UI.
+- Notification refactor (#2) is the only structural change — everything else is local.
+- No store-shape migration. `loans` is already persisted; only the hook exposure is missing.
+- `CollapsibleSection` already supports `defaultOpenDesktop` + localStorage; reuse it.
+- All money math stays in pennies in the store, pounds at the UI boundary.
 
 ### Files touched
 
-- `src/stores/gameStore.ts` (concern chance modifier, topUp auto-resolve, damage decay)
-- `src/components/ui/tenant-concerns-feed.tsx` (badges)
-- `src/components/sections/HeroHeader.tsx` (no-wrap cluster, stable widths)
-- `src/components/ui/game-clock.tsx` (tabular-nums)
-- `src/components/ui/operations-center.tsx` (drop empty card)
-- `src/pages/Index.tsx` (wrap Loans / Tax / Operations in collapsibles)
-- `src/components/ui/collapsible-section.tsx` (add `defaultOpenDesktop` if missing)
+- `src/pages/Index.tsx` — drop `UpcomingEvents`, drop `TenantConcernsFeed`, restyle Operations slot.
+- `src/components/sections/UpcomingEvents.tsx` — delete after extraction.
+- `src/lib/upcomingEvents.ts` — new helper.
+- `src/lib/notify.ts` — new unified notify helper.
+- `src/components/ui/notification-centre.tsx` — render upcoming rows; consume notify.
+- `src/stores/gameStore.ts` — chain-collapse notify, portfolio-mortgage toast on ineligible.
+- `src/hooks/useGameState.ts` — expose `loans`; add `loanExpenses` to expenses + breakdown.
+- `src/components/sections/BankingPanel.tsx` — typed loans summary.
+- `src/components/ui/loans-panel.tsx` — minor (uses store directly already).
+- `src/components/ui/game-stats.tsx` — loan row in cash-flow popover.
+- `src/components/ui/mortgage-provider-selector.tsx` — fixed-term select for buy flow.
+- `src/components/ui/operations-center.tsx` — slimmer collapsed chrome.
+- `src/components/ui/portfolio-mortgage.tsx` — show payoff line; success notify.
+- `src/components/ui/property-card.tsx` — concerns chip + popover beside RepairBar.
+- `src/components/ui/tenant-concerns-feed.tsx` — extract row component, then archive.
+- `src/lib/engine/renovation.ts` + `src/components/ui/renovation-dialog.tsx` — ROI accuracy.

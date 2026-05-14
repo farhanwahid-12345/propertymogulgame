@@ -58,6 +58,10 @@ const Index = () => {
         conveyancing={gameState.conveyancing || []}
         taxRecords={(gameState as any).taxRecords}
         ownedProperties={gameState.ownedProperties.map((p) => ({ id: p.id, name: p.name }))}
+        pendingEvictions={gameState.pendingEvictions || []}
+        planningApplications={(gameState as any).planningApplications || []}
+        lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
+        entityType={gameState.entityType}
       />
 
       <div className="container mx-auto px-4 py-6 space-y-5 pb-24 md:pb-6">

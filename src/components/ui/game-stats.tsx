@@ -184,6 +184,12 @@ export function GameStats({
                         <span className="text-muted-foreground">Landlord Insurance:</span>
                         <span className="font-semibold">£{Math.round(expenseBreakdown.insurance).toLocaleString()}</span>
                       </div>
+                      {(expenseBreakdown as any).loans > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Loan Payments:</span>
+                          <span className="font-semibold">£{Math.round((expenseBreakdown as any).loans).toLocaleString()}</span>
+                        </div>
+                      )}
                       <div className="border-t pt-1.5 flex justify-between font-medium">
                         <span>Total:</span>
                         <span>£{totalMonthlyExpenses.toLocaleString()}</span>

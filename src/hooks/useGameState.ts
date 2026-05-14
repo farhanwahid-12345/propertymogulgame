@@ -139,7 +139,9 @@ export function useGameState() {
   }, 0);
   const insuranceExpenses = ownedProperties.reduce((sum, p) => sum + (p.value * 0.004) / 12, 0);
   const emptyPropertiesCount = ownedProperties.filter(p => !tenantsRaw.some(t => t.propertyId === p.id)).length;
-  const totalMonthlyExpenses = mortgageExpenses + councilTaxExpenses + insuranceExpenses;
+  const loansRaw = ((store as any).loans || []) as Array<{ monthlyPayment: number }>;
+  const loanExpenses = loansRaw.reduce((s, l) => s + fromPennies(l.monthlyPayment || 0), 0);
+  const totalMonthlyExpenses = mortgageExpenses + councilTaxExpenses + insuranceExpenses + loanExpenses;
   const totalDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
 
   // Credit score — use the value from the store directly (it's maintained there)
@@ -411,8 +413,10 @@ export function useGameState() {
       mortgages: mortgageExpenses,
       councilTax: councilTaxExpenses,
       insurance: insuranceExpenses,
+      loans: loanExpenses,
       emptyPropertiesCount,
     },
+    loans: loansRaw,
     totalDebt,
     mortgageProviders,
     availableProperties: estateAgentProperties,
