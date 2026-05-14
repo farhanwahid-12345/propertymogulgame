@@ -375,6 +375,11 @@ export function TenantSelector({
                 </CardHeader>
 
                 <CardContent className="space-y-2.5">
+                  {conditionLocked && (
+                    <div className="rounded-md border border-amber-400/40 bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-300 flex items-center gap-1.5">
+                      <Lock className="h-3 w-3" /> Won't accept — needs condition ≥ {minCond} (currently {Math.round(conditionScore!)})
+                    </div>
+                  )}
                   <p className="text-sm text-muted-foreground italic">{tenant.description}</p>
 
                   {/* Trait badges */}
