@@ -55,7 +55,7 @@ interface PropertyCardProps {
   property: Property;
   onBuy?: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
   onSell?: (property: Property, isAuction?: boolean) => void;
-  onSelectTenant?: (propertyId: string, tenant: Tenant) => void;
+  onSelectTenant?: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
   onRemortgage?: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   onRenovate?: (propertyId: string, renovation: RenovationType) => void;
   activeRenovationIds?: string[];
@@ -67,12 +67,14 @@ interface PropertyCardProps {
   tenantSatisfaction?: number;
   tenantSatisfactionReasons?: Array<{ reason: string; delta: number }>;
   propertyListings?: any[];
-  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => void;
-  cancelEviction?: (propertyId: string) => void;
+  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour', slotIndex?: number) => void;
+  cancelEviction?: (propertyId: string, slotIndex?: number) => void;
   pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'; effectiveMonth: number; servedMonth: number };
   rentArrearsCount?: number;
   /** Tenant satisfaction passed for negotiation acceptance probability. */
-  applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number) => void;
+  applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number, slotIndex?: number) => void;
+  /** Per-slot tenant data for HMOs / converted flats. When set, single-tenant block is replaced with multi-unit panel. */
+  multiUnitSlots?: import("@/components/ui/multi-unit-slots").MultiUnitSlot[];
   mortgages?: Array<{
     propertyId: string;
     monthlyPayment: number;
