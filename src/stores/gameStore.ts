@@ -752,6 +752,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
         let walkoutDepositRefund = 0;
         const walkoutDisputes: DepositDispute[] = [];
+        let reputationDelta = 0;
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
           const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && Math.random() < 0.05;
@@ -798,6 +799,7 @@ export const useGameStore = create<GameState & GameActions>()(
             month: newMonthNumber,
             detail: `Satisfaction ${Math.round(t.satisfaction)}/100${withheld > 0 ? ` — £${fromPennies(withheld).toLocaleString()} withheld` : ''}`,
           });
+          reputationDelta -= guaranteedExit ? 4 : 2;
           return false;
         });
         newTenants = satisfactionAdjustedTenants;
@@ -989,6 +991,8 @@ export const useGameStore = create<GameState & GameActions>()(
             month: newMonthNumber,
             detail: ev.ground.replace(/_/g, ' '),
           });
+          // Reputation: antisocial removal earns goodwill; other grounds dent reputation
+          reputationDelta += ev.ground === 'antisocial_behaviour' ? 1 : -3;
 
           // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
           if (ev.ground === 'landlord_sale') {
@@ -1352,6 +1356,7 @@ export const useGameStore = create<GameState & GameActions>()(
           planningApplications: newPlanningApplications,
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
+          landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
         } as any));
       },
 
