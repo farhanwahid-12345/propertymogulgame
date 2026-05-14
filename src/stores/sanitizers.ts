@@ -64,6 +64,7 @@ export function sanitizeTenantRecord(record: any, monthsPlayed: number): Propert
   return {
     ...record,
     propertyId: asString(record?.propertyId),
+    slotIndex: typeof record?.slotIndex === 'number' ? record.slotIndex : 0,
     tenant: {
       ...tenant,
       id: asString(tenant?.id, `tenant_${Math.random().toString(36).slice(2, 8)}`),
@@ -78,6 +79,7 @@ export function sanitizeTenantRecord(record: any, monthsPlayed: number): Propert
       traits: Array.isArray(tenant?.traits) ? tenant.traits : [],
     },
     rentMultiplier: asNumber(record?.rentMultiplier, asNumber(tenant?.rentMultiplier, 1)),
+    rentPennies: typeof record?.rentPennies === 'number' ? record.rentPennies : undefined,
     startDate: asNumber(record?.startDate, Date.now()),
     satisfaction: asNumber(record?.satisfaction, 80),
     lastSatisfactionUpdate: asNumber(record?.lastSatisfactionUpdate, monthsPlayed),

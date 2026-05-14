@@ -155,6 +155,8 @@ export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_i
 
 export interface PropertyTenant {
   propertyId: string;
+  /** Unit slot index for HMO rooms / converted flats. 0 for standard properties. */
+  slotIndex: number;
   tenant: Tenant;
   rentMultiplier: number;
   startDate: number;
@@ -168,6 +170,8 @@ export interface PropertyTenant {
   moveInMonth?: number;
   /** Deposit held under TDS (pennies). 5 weeks of rent on tenancy start. 0 for grandfathered tenants. */
   depositHeld: number;
+  /** Per-tenant rent (pennies/mo). For multi-slot properties this is the slot's contribution. */
+  rentPennies?: number;
   /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
   evictionNoticeMonth?: number;
   evictionGround?: EvictionGround;
@@ -177,6 +181,8 @@ export interface PropertyTenant {
 
 export interface PendingEviction {
   propertyId: string;
+  /** Unit slot index. 0 for standard properties. */
+  slotIndex: number;
   tenantName: string;
   ground: EvictionGround;
   servedMonth: number;

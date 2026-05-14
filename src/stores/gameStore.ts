@@ -77,10 +77,10 @@ interface GameActions {
   acceptBuyerCounter: (propertyId: string, offerId: string) => void;
   rejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   // Tenants
-  selectTenant: (propertyId: string, tenant: Tenant) => void;
-  applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number) => void;
-  evictTenant: (propertyId: string, ground: EvictionGround) => void;
-  cancelEviction: (propertyId: string) => void;
+  selectTenant: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
+  applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number, slotIndex?: number) => void;
+  evictTenant: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
+  cancelEviction: (propertyId: string, slotIndex?: number) => void;
   withdrawFromConveyancing: (conveyancingId: string) => void;
   // appealEviction removed — appeals are now tenant-driven & resolved by tick
   disputeDeposit: (disputeId: string) => void;
@@ -2180,7 +2180,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // ─── TENANTS ───────────────────────────
-      selectTenant: (propertyId, tenant) => {
+      selectTenant: (propertyId, tenant, slotIndex = 0) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) return;
@@ -2204,45 +2204,56 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return;
         }
-        // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
-        // valid eviction notice and wait out the notice period before re-letting.
-        if (prev.tenants.some(t => t.propertyId === propertyId)) {
+
+        // Multi-slot capacity (HMO rooms / converted flats)
+        const isMultiUnit = property.subtype === 'hmo' || property.subtype === 'flats';
+        const unitCount = isMultiUnit ? Math.max(1, property.subtypeUnits || 1) : 1;
+        const safeSlot = Math.max(0, Math.min(unitCount - 1, slotIndex));
+
+        // Renters' Rights — sitting tenants in THIS slot cannot be replaced.
+        if (prev.tenants.some(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === safeSlot)) {
           showToast(
-            "Tenant in Place",
-            "You can't replace a sitting tenant — serve a valid eviction notice first.",
+            "Slot Occupied",
+            isMultiUnit
+              ? `Slot already let — serve a valid eviction notice on that unit first.`
+              : "You can't replace a sitting tenant — serve a valid eviction notice first.",
             "destructive"
           );
           return;
         }
 
-        // Robust base-rent fallback: stored baseRent → current monthlyIncome →
-        // value × yield/12 (last-resort for properties created via inline conveyancing)
-        let currentBaseRent = property.baseRent || property.monthlyIncome;
-        if (currentBaseRent <= 0 && property.value > 0) {
+        // Robust base-rent fallback. For multi-unit properties, base-rent is divided by unit count.
+        let propertyBaseRent = property.baseRent || property.monthlyIncome;
+        if (propertyBaseRent <= 0 && property.value > 0) {
           const yieldPct = property.yield ?? 7;
-          currentBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
+          propertyBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
         }
-        // Use shared helper so the displayed preview matches the actual rent
-        const newRent = calcTenantRent(currentBaseRent, tenant, property.condition, property.furnishingTier);
-        const isIncrease = newRent > property.monthlyIncome;
+        const slotBaseRent = isMultiUnit
+          ? Math.floor(propertyBaseRent / unitCount)
+          : propertyBaseRent;
+        const slotRent = calcTenantRent(slotBaseRent, tenant, property.condition, property.furnishingTier);
 
-        if (isIncrease && property.lastTenantChange !== undefined) {
-          const months = prev.monthsPlayed - property.lastTenantChange;
-          if (months < 3) {
-            showToast("Too Soon", `Wait ${3 - months} more month(s) for a higher-paying tenant.`, "destructive");
-            return;
+        // The 3-month wait between higher-paying tenants only applies to the
+        // single-tenant case — multi-unit slots are independent.
+        if (!isMultiUnit) {
+          const isIncrease = slotRent > property.monthlyIncome;
+          if (isIncrease && property.lastTenantChange !== undefined) {
+            const months = prev.monthsPlayed - property.lastTenantChange;
+            if (months < 3) {
+              showToast("Too Soon", `Wait ${3 - months} more month(s) for a higher-paying tenant.`, "destructive");
+              return;
+            }
           }
         }
 
         // Renters' Rights / Tenant Fees Act: 5-week deposit (capped) is paid by the
         // TENANT and held in TDS protection — landlord cash is NOT debited at move-in.
-        // Landlord only loses cash if they wrongly withhold and lose a deposit dispute.
-        const requiredDeposit = calcDeposit(newRent);
+        const requiredDeposit = calcDeposit(slotRent);
 
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
-        const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
         const rec: PropertyTenant = {
           propertyId,
+          slotIndex: safeSlot,
           tenant,
           rentMultiplier: tenant.rentMultiplier,
           startDate: Date.now(),
@@ -2251,16 +2262,24 @@ export const useGameStore = create<GameState & GameActions>()(
           satisfactionReasons: [],
           moveInMonth: prev.monthsPlayed,
           depositHeld: requiredDeposit,
+          rentPennies: slotRent,
         };
-        const updatedTenants = existingIdx >= 0
-          ? prev.tenants.map((t, i) => i === existingIdx ? rec : t)
-          : [...prev.tenants, rec];
+        const updatedTenants = [...prev.tenants, rec];
+
+        // monthlyIncome = sum of slot rents (multi-unit) or just this rent (single)
+        const newMonthlyIncome = isMultiUnit
+          ? updatedTenants
+              .filter(t => t.propertyId === propertyId)
+              .reduce((sum, t) => sum + (t.rentPennies ?? 0), 0)
+          : slotRent;
+
         const updatedProps = prev.ownedProperties.map(p =>
-          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
+          p.id === propertyId ? { ...p, monthlyIncome: newMonthlyIncome, baseRent: propertyBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
+        const slotLabel = isMultiUnit ? ` (${property.subtype === 'flats' ? 'Flat' : 'Room'} ${safeSlot + 1})` : '';
         showToast(
           "Tenant Moved In!",
-          `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
+          `${tenant.name}${slotLabel} renting at £${fromPennies(slotRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
         );
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
       },
@@ -2326,12 +2345,12 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // Renters' Rights — Section 21 abolished. Eviction requires a valid ground + notice period.
-      evictTenant: (propertyId, ground) => {
+      evictTenant: (propertyId, ground, slotIndex = 0) => {
         const prev = get();
-        const tenant = prev.tenants.find(t => t.propertyId === propertyId);
+        const tenant = prev.tenants.find(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
         if (!tenant) { showToast("No Tenant", "There is no tenant to evict.", "destructive"); return; }
-        if (prev.pendingEvictions.some(e => e.propertyId === propertyId)) {
-          showToast("Eviction Already Served", "Notice already in effect. Cancel it first.", "destructive"); return;
+        if (prev.pendingEvictions.some(e => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) {
+          showToast("Eviction Already Served", "Notice already in effect for this slot. Cancel it first.", "destructive"); return;
         }
 
         // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
@@ -2364,14 +2383,14 @@ export const useGameStore = create<GameState & GameActions>()(
             if (recentDefaults < 2) {
               showToast("Invalid Ground", "Rent arrears requires ≥2 missed payments.", "destructive"); return;
             }
-            noticeMonths = 1; // 4 weeks ≈ 1 month
+            noticeMonths = 1;
             validReason = `Rent arrears (${recentDefaults} missed payments)`;
             break;
           case 'antisocial_behaviour':
             if (tenant.tenant.profile !== 'risky' || !longstandingASB) {
               showToast("Invalid Ground", "ASB requires risky tenant + unresolved noise/safety concern >1 month.", "destructive"); return;
             }
-            noticeMonths = 1; // 2 weeks rounded up to 1 month tick
+            noticeMonths = 1;
             validReason = 'Antisocial behaviour';
             break;
           case 'landlord_sale':
@@ -2384,8 +2403,6 @@ export const useGameStore = create<GameState & GameActions>()(
             break;
         }
 
-        // ── Tenant-driven appeal roll ──
-        // Base probability by ground; adjusted by satisfaction & profile.
         let appealChance =
           ground === 'landlord_sale' || ground === 'landlord_move_in' ? 0.35 :
           ground === 'antisocial_behaviour' ? 0.10 :
@@ -2397,10 +2414,13 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const effectiveMonth = prev.monthsPlayed + noticeMonths;
         const updatedTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground } : t
+          t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+            ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground }
+            : t
         );
         const newEviction: PendingEviction = {
           propertyId,
+          slotIndex,
           tenantName: tenant.tenant.name,
           ground,
           servedMonth: prev.monthsPlayed,
@@ -2416,14 +2436,16 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      cancelEviction: (propertyId) => {
+      cancelEviction: (propertyId, slotIndex = 0) => {
         const prev = get();
-        if (!prev.pendingEvictions.some(e => e.propertyId === propertyId)) return;
+        if (!prev.pendingEvictions.some(e => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) return;
         showToast("Eviction Withdrawn", "Notice cancelled — tenant stays.");
         set({
-          pendingEvictions: prev.pendingEvictions.filter(e => e.propertyId !== propertyId),
+          pendingEvictions: prev.pendingEvictions.filter(e => !(e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)),
           tenants: prev.tenants.map(t =>
-            t.propertyId === propertyId ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined } : t
+            t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+              ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined }
+              : t
           ),
         });
       },
