@@ -122,7 +122,7 @@ interface GameActions {
 function createInitialState(): GameState {
   const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
   return {
-    _version: 13,
+    _version: 14,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
@@ -133,6 +133,8 @@ function createInitialState(): GameState {
     overdraftUsed: 0,
     entityType: 'sole_trader',
     entityChosen: false,
+    onboardingCompleted: false,
+    landlordReputation: 50,
     ownedProperties: [],
     estateAgentProperties: shuffled.slice(5),
     auctionProperties: shuffled.slice(0, 5),
@@ -334,6 +336,13 @@ function migrateState(persisted: any): GameState {
       persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
     }
     persisted._version = 13;
+  }
+
+  // v13 → v14: add landlordReputation + onboardingCompleted (existing saves grandfathered)
+  if (persisted._version < 14) {
+    if (typeof persisted.landlordReputation !== 'number') persisted.landlordReputation = 50;
+    if (typeof persisted.onboardingCompleted !== 'boolean') persisted.onboardingCompleted = true;
+    persisted._version = 14;
   }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
