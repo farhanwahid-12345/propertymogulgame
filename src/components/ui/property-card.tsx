@@ -148,6 +148,7 @@ export const PropertyCard = memo(function PropertyCard({
   pendingEviction,
   rentArrearsCount = 0,
   applyRentIncrease,
+  multiUnitSlots,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
