@@ -33,7 +33,10 @@ const Index = () => {
     portfolioLTV,
     sortedOwnedProperties,
   } = usePortfolioMetrics(gameState.ownedProperties, gameState.totalDebt);
-  const conveyancingBuyProperties = useConveyancingDisplay(gameState.conveyancing || []);
+  const conveyancingBuyProperties = useConveyancingDisplay(
+    gameState.conveyancing || [],
+    [...(gameState.estateAgentProperties || []), ...(gameState.auctionProperties || []), ...(gameState.ownedProperties || [])],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-city">
