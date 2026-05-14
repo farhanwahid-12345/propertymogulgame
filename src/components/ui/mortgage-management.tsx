@@ -321,6 +321,11 @@ export function MortgageManagement({
                             )}
                           </span>
                         </div>
+                        {singleFixedTermYears > 0 && (
+                          <div className="col-span-2 text-xs text-blue-300/90">
+                            Rate fixed for {singleFixedTermYears} year{singleFixedTermYears === 1 ? '' : 's'}, then reverts to lender SVR.
+                          </div>
+                        )}
                         {eligibility?.icrRatio !== undefined && (
                           <div className="col-span-2">
                             <span className="text-muted-foreground">{stressLabel}:</span>
