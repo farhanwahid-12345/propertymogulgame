@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
-import { GameClock } from "@/components/ui/game-clock";
+import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
 import { NotificationCentre } from "@/components/ui/notification-centre";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
