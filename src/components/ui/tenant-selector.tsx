@@ -211,6 +211,7 @@ interface TenantSelectorProps {
   lastTenantChange?: number;
   monthsPlayed?: number;
   condition?: PropertyCondition;
+  conditionScore?: number;
   propertyValue?: number; // pounds; used as fallback for £0 baseRent
   propertyYield?: number; // % annual yield; used with value as last-resort
   /** Current tenant's satisfaction (0-100) — shown in the dialog header. */
