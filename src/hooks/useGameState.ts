@@ -189,8 +189,8 @@ export function useGameState() {
     store.sellProperty(pennyProp as any, isAuction);
   }, [store.sellProperty]);
 
-  const selectTenant = useCallback((propertyId: string, tenant: Tenant) => {
-    store.selectTenant(propertyId, tenant);
+  const selectTenant = useCallback((propertyId: string, tenant: Tenant, slotIndex?: number) => {
+    store.selectTenant(propertyId, tenant, slotIndex);
   }, [store.selectTenant]);
 
   const applyRentIncrease = useCallback((
@@ -198,16 +198,17 @@ export function useGameState() {
     newRentPounds: number,
     outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant',
     tribunalFeePounds: number,
+    slotIndex?: number,
   ) => {
-    store.applyRentIncrease(propertyId, toPennies(newRentPounds), outcome, toPennies(tribunalFeePounds));
+    store.applyRentIncrease(propertyId, toPennies(newRentPounds), outcome, toPennies(tribunalFeePounds), slotIndex);
   }, [store.applyRentIncrease]);
 
-  const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour') => {
-    store.evictTenant(propertyId, ground);
+  const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour', slotIndex?: number) => {
+    store.evictTenant(propertyId, ground, slotIndex);
   }, [store.evictTenant]);
 
-  const cancelEviction = useCallback((propertyId: string) => {
-    store.cancelEviction(propertyId);
+  const cancelEviction = useCallback((propertyId: string, slotIndex?: number) => {
+    store.cancelEviction(propertyId, slotIndex);
   }, [store.cancelEviction]);
 
   const withdrawFromConveyancing = useCallback((conveyancingId: string) => {
