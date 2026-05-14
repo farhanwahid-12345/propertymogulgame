@@ -82,29 +82,6 @@ interface RenovationDialogProps {
 const RENOVATION_OPTIONS: RenovationType[] = [
   // Maintenance
   {
-    id: "basic_repair",
-    name: "Basic Repairs",
-    cost: 2500,
-    rentIncrease: 60,
-    valueIncrease: 4000,
-    duration: 14,
-    description: "Fix leaks, cracks, and basic wear and tear",
-    icon: Wrench,
-    category: "maintenance"
-  },
-  {
-    id: "full_redecoration",
-    name: "Full Redecoration",
-    cost: 4500,
-    rentIncrease: 150,
-    valueIncrease: 7500,
-    duration: 28,
-    description: "Complete interior painting and minor cosmetic updates",
-    icon: Paintbrush,
-    category: "maintenance",
-    requiresVacant: true,
-  },
-  {
     id: "epc_upgrade",
     name: "EPC Upgrade (insulation + boiler)",
     cost: 7000,
