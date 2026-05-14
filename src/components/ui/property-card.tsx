@@ -165,11 +165,14 @@ export const PropertyCard = memo(function PropertyCard({
   // Calculate monthly costs for owned properties
   const propertyMortgage = mortgages.find(m => m.propertyId === property.id);
   const monthlyMortgagePayment = propertyMortgage?.monthlyPayment || 0;
-  const PROPERTY_TAX_RATE = 0.012; // 1.2% annual
+  const INSURANCE_RATE = 0.004; // 0.4% annual landlord insurance
   const MAINTENANCE_RATE = 0.008; // 0.8% annual
-  const monthlyPropertyTax = (property.value * PROPERTY_TAX_RATE) / 12;
+  const COUNCIL_TAX_MONTHLY = 150; // Band D, vacant properties only
+  const monthlyInsurance = (property.value * INSURANCE_RATE) / 12;
   const monthlyMaintenance = (property.value * MAINTENANCE_RATE) / 12;
-  const totalMonthlyExpenses = monthlyMortgagePayment + monthlyPropertyTax + monthlyMaintenance;
+  const propertyHasTenant = (property as any).hasTenant ?? false;
+  const monthlyCouncilTax = propertyHasTenant ? 0 : COUNCIL_TAX_MONTHLY;
+  const totalMonthlyExpenses = monthlyMortgagePayment + monthlyInsurance + monthlyMaintenance + monthlyCouncilTax;
   const netMonthlyIncome = property.monthlyIncome - totalMonthlyExpenses;
 
   const handleAction = async (action: () => void) => {
@@ -384,13 +387,20 @@ export const PropertyCard = memo(function PropertyCard({
                   )}
                   
                   <div className="flex justify-between items-center text-muted-foreground">
-                    <span>- Property Tax (1.2%):</span>
-                    <span className="font-medium">£{monthlyPropertyTax.toLocaleString()}</span>
+                    <span>- Insurance (0.4%):</span>
+                    <span className="font-medium">£{Math.round(monthlyInsurance).toLocaleString()}</span>
                   </div>
-                  
+
+                  {monthlyCouncilTax > 0 && (
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>- Council Tax (vacant):</span>
+                      <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>- Maintenance (0.8%):</span>
-                    <span className="font-medium">£{monthlyMaintenance.toLocaleString()}</span>
+                    <span className="font-medium">£{Math.round(monthlyMaintenance).toLocaleString()}</span>
                   </div>
                   
                   <div className="flex justify-between items-center pt-1.5 border-t font-semibold">
