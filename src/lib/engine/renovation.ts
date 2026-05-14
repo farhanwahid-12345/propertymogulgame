@@ -162,6 +162,26 @@ export function isConditionUpgradeRenovation(renovationTypeId: string): boolean 
 }
 
 /**
+ * UK rule: revenue-style repairs/maintenance are deductible against rental
+ * income; capital improvements (extensions, conversions, premium fit-outs)
+ * are NOT — they instead increase the CGT base on disposal.
+ *
+ * - 'maintenance' category   → deductible (boilers, repairs, decoration)
+ * - 'improvement' category   → deductible if it's a like-for-like upgrade
+ *                              (kitchen/bathroom/heating/glazing) — these
+ *                              are treated as repairs by HMRC when they
+ *                              don't add a new feature. Premium fit-outs
+ *                              that go beyond replacement are capital.
+ * - 'extension' / 'conversion' → capital (CGT base only)
+ *
+ * We keep it simple: maintenance + improvement → revenue (deductible),
+ * extension + conversion → capital.
+ */
+export function isDeductibleRevenueRenovation(category: string | undefined): boolean {
+  return category === 'maintenance' || category === 'improvement';
+}
+
+/**
  * True when every premium-tier upgrade renovation has been completed.
  * A fully-upgraded property won't degrade premium → standard from neglect alone.
  */

@@ -66,6 +66,8 @@ export interface Property {
   subtypeUnits?: number;
   /** Cumulative renovation spend on this property (pennies). */
   totalRenovationSpendPennies?: number;
+  /** Cumulative capital improvement spend (extensions/conversions) — added to CGT base on sale. */
+  capitalImprovementsPennies?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
