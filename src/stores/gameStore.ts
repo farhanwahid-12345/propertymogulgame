@@ -368,6 +368,7 @@ function createInitialState(): GameState {
     mortgages: [],
     mortgageProviderRates: getInitialProviderRates(),
     currentMarketRate: BASE_MARKET_RATE,
+    currentLoanRates: { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread },
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
     gameSpeed: 1,
@@ -778,7 +779,11 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
         }, 0);
-        const totalExpenses = mortgagePayments + councilTax;
+        // Landlord insurance — 0.4%/yr of property value, charged every month regardless of tenancy.
+        const insurance = newOwnedProperties.reduce((total, property) => {
+          return total + Math.floor((property.value * 0.004) / 12);
+        }, 0);
+        const totalExpenses = mortgagePayments + councilTax + insurance;
         const netIncome = monthlyIncome - totalExpenses;
 
         // Update mortgage balances + capture this month's actual interest portion
@@ -1316,7 +1321,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const accumulatedProfit = prev.yearlyNetProfit + netIncome;
         const accumulatedGrossRent = (prev.yearlyGrossRent || 0) + monthlyIncome;
         const accumulatedMortgageInterest = (prev.yearlyMortgageInterest || 0) + monthlyMortgageInterest;
-        const accumulatedDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + councilTax;
+        const accumulatedDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + councilTax + insurance;
 
         const currentMonth = newMonthNumber % 12;
         const isApril = currentMonth === 3;
@@ -1368,7 +1373,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // Cashflow: subtract outflows (mortgage + council + tax) directly,
         // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
         // through credit() so any drawn overdraft repays first.
-        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - taxPaid;
+        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - insurance - taxPaid;
         let postOutflowOverdraft = prev.overdraftUsed;
         let cashAfterCredit = cashAfterOutflows;
         // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
