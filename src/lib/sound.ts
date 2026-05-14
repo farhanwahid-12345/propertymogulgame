@@ -1,9 +1,8 @@
 /**
  * Tiny one-shot sound utility.
  *
- * No audio assets — uses a short two-tone WebAudio chime so the bundle stays
- * small. Respects a `soundEnabled` flag persisted in localStorage so the
- * player can mute. Reads on every play so toggling is immediate.
+ * No audio assets — uses short WebAudio tones so the bundle stays small.
+ * Respects `pm_sound_enabled` flag persisted in localStorage.
  */
 
 const STORAGE_KEY = 'pm_sound_enabled';
@@ -20,7 +19,7 @@ export function setSoundEnabled(enabled: boolean): void {
   window.dispatchEvent(new CustomEvent('pm:sound-toggled', { detail: enabled }));
 }
 
-let lastPlayed = 0;
+let lastPlayed: Record<string, number> = {};
 let cachedCtx: AudioContext | null = null;
 
 function getCtx(): AudioContext | null {
@@ -36,32 +35,91 @@ function getCtx(): AudioContext | null {
   }
 }
 
-/** Plays a soft two-tone chime. Throttled to once per 500ms. */
-export function playConcernChime(): void {
+interface Tone {
+  freq: number;
+  /** Seconds offset from cue start. */
+  at: number;
+  /** Seconds duration. */
+  dur?: number;
+  /** Peak gain (0..1). */
+  gain?: number;
+  type?: OscillatorType;
+}
+
+function playCue(key: string, throttleMs: number, tones: Tone[]): void {
   if (!isSoundEnabled()) return;
   const now = Date.now();
-  if (now - lastPlayed < 500) return;
-  lastPlayed = now;
+  if (now - (lastPlayed[key] || 0) < throttleMs) return;
+  lastPlayed[key] = now;
   const ctx = getCtx();
   if (!ctx) return;
   try {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const start = ctx.currentTime;
-    const tones = [660, 880];
-    tones.forEach((freq, i) => {
+    tones.forEach(({ freq, at, dur = 0.22, gain = 0.18, type = 'sine' }) => {
       const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
+      const g = ctx.createGain();
+      osc.type = type;
       osc.frequency.value = freq;
-      const t0 = start + i * 0.12;
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.25);
-      osc.connect(gain).connect(ctx.destination);
+      const t0 = start + at;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(gain, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(ctx.destination);
       osc.start(t0);
-      osc.stop(t0 + 0.3);
+      osc.stop(t0 + dur + 0.05);
     });
   } catch {
     /* ignore */
   }
+}
+
+/** Soft two-tone chime — tenant concern raised. */
+export function playConcernChime(): void {
+  playCue('concern', 500, [
+    { freq: 660, at: 0 },
+    { freq: 880, at: 0.12 },
+  ]);
+}
+
+/** Bright triple — rent collected / income event. */
+export function playCoinChime(): void {
+  playCue('coin', 400, [
+    { freq: 988, at: 0, dur: 0.12, gain: 0.14 },
+    { freq: 1318, at: 0.07, dur: 0.18, gain: 0.14 },
+  ]);
+}
+
+/** Heavy triangle — sale completed / auction won. */
+export function playGavel(): void {
+  playCue('gavel', 800, [
+    { freq: 220, at: 0, dur: 0.15, type: 'triangle', gain: 0.22 },
+    { freq: 165, at: 0.1, dur: 0.25, type: 'triangle', gain: 0.18 },
+  ]);
+}
+
+/** Dry square — paperwork: eviction served, tax filed. */
+export function playPaper(): void {
+  playCue('paper', 600, [
+    { freq: 380, at: 0, dur: 0.08, type: 'square', gain: 0.1 },
+    { freq: 320, at: 0.1, dur: 0.08, type: 'square', gain: 0.1 },
+  ]);
+}
+
+/** Descending alert — warning, mortgage shock, refusal. */
+export function playWarning(): void {
+  playCue('warning', 700, [
+    { freq: 520, at: 0, dur: 0.18, type: 'sawtooth', gain: 0.16 },
+    { freq: 392, at: 0.18, dur: 0.22, type: 'sawtooth', gain: 0.14 },
+  ]);
+}
+
+/** Ascending arpeggio — level up, milestone. */
+export function playLevelUp(): void {
+  playCue('levelup', 1200, [
+    { freq: 523, at: 0, dur: 0.14 },
+    { freq: 659, at: 0.1, dur: 0.14 },
+    { freq: 784, at: 0.2, dur: 0.18 },
+    { freq: 1047, at: 0.32, dur: 0.24, gain: 0.22 },
+  ]);
 }

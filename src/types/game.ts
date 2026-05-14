@@ -327,6 +327,8 @@ export interface GameState {
   timeUntilNextMonth: number;
   /** Wall-clock-to-game-time multiplier. 1 = normal, 2 = 2x, 0.5 = half. */
   gameSpeed: number;
+  /** When true, engine ticks are skipped — clock and month-end pause. */
+  isPaused: boolean;
   lastYearlyGrowth: number;
   yearlyNetProfit: number; // pennies — running net cashflow (legacy / level signal)
   /** Pennies — actual gross rent received in the current tax year (resets at April tax point). */

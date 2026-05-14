@@ -11,6 +11,7 @@ import type { Tenant } from '@/components/ui/tenant-selector';
 import type { RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
+import { playGavel, playLevelUp, playPaper } from '@/lib/sound';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
@@ -110,6 +111,9 @@ interface GameActions {
   dismissTenantConcern: (concernId: string) => void;
   // Speed
   setGameSpeed: (speed: number) => void;
+  // Pause
+  togglePause: () => void;
+  setPaused: (paused: boolean) => void;
   // Game
   resetGame: () => void;
 }
@@ -147,6 +151,7 @@ function createInitialState(): GameState {
     monthsPlayed: 0,
     timeUntilNextMonth: MONTH_DURATION_SECONDS,
     gameSpeed: 1,
+    isPaused: false,
     lastYearlyGrowth: 0,
     yearlyNetProfit: 0,
     yearlyGrossRent: 0,
@@ -340,6 +345,8 @@ function migrateState(persisted: any): GameState {
   if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
     persisted.gameSpeed = 1;
   }
+  // Pause never persists as true — always start unpaused for safety
+  persisted.isPaused = false;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
@@ -542,6 +549,7 @@ export const useGameStore = create<GameState & GameActions>()(
           newPropertyListings = newPropertyListings.filter(l => l.propertyId !== conv.propertyId);
 
           showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}`);
+          playGavel();
         });
 
         // ── Monthly income (skip conveyancing properties) ──
@@ -984,6 +992,7 @@ export const useGameStore = create<GameState & GameActions>()(
             "Eviction Complete",
             `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${withheld > 0 ? ` (£${fromPennies(withheld).toLocaleString()} withheld — tenant may dispute)` : ''}.`,
           );
+          playPaper();
         });
         // Drop expired locks
         newPropertyLocks = newPropertyLocks.filter(l => newMonthNumber < l.untilMonth);
@@ -1048,6 +1057,7 @@ export const useGameStore = create<GameState & GameActions>()(
         while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
         if (newLevel > prev.level) {
           showToast("Level Up!", `Congratulations! You reached level ${newLevel}!`);
+          playLevelUp();
         }
 
         // ── Monthly property value drift (~3%/yr nominal w/ small frequent dips) ──
@@ -3114,6 +3124,14 @@ export const useGameStore = create<GameState & GameActions>()(
       setGameSpeed: (speed) => {
         const clamped = Math.max(0.25, Math.min(8, speed));
         set({ gameSpeed: clamped });
+      },
+
+      togglePause: () => {
+        set({ isPaused: !get().isPaused });
+      },
+
+      setPaused: (paused: boolean) => {
+        set({ isPaused: !!paused });
       },
 
     }),
