@@ -234,6 +234,15 @@ export const PropertyCard = memo(function PropertyCard({
                 ⏳ {conveyancingStatus === 'buying' ? 'Buying' : 'Selling'} (Mo {conveyancingCompletion})
               </Badge>
             )}
+            {property.epcRating && (
+              <Badge className={cn("text-[10px]",
+                ['A','B','C'].includes(property.epcRating) ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                ['D','E'].includes(property.epcRating) ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                "bg-red-500/20 text-red-400 border-red-500/30"
+              )}>
+                EPC {property.epcRating}
+              </Badge>
+            )}
             {property.owned && property.condition && (
               <Badge className={cn("text-[10px]",
                 property.condition === 'premium' ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
