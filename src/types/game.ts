@@ -76,6 +76,13 @@ export interface Property {
   epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
   /** monthsPlayed snapshot of last EICR (electrical safety) check. */
   lastEicrMonth?: number;
+  /** Continuous condition score 0–100. Replaces the discrete condition tier;
+   *  the legacy `condition` field is now derived from this each tick. */
+  conditionScore?: number;
+  /** monthsPlayed snapshot of the last repair-bar top-up — used to throttle spam. */
+  conditionLastTopUpMonth?: number;
+  /** Sum of repair-bar points purchased in the current month (caps spam). */
+  conditionTopUpPointsThisMonth?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
@@ -406,4 +413,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;

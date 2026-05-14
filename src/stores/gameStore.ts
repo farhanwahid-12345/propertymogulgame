@@ -17,6 +17,10 @@ import {
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
   MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS,
   ERC_PERCENT, ERC_WINDOW_MONTHS, LOAN_PRODUCTS, EICR_COST_PENNIES, computeErcRate,
+  conditionTierFromScore, scoreFromConditionTier,
+  TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
+  CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH,
+  CONCERN_RESOLVE_CONDITION_LIFT,
   getCeilingPrice,
 } from '@/lib/engine/constants';
 import {
@@ -109,6 +113,7 @@ interface GameActions {
   replenishMarket: () => void;
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
+  topUpCondition: (propertyId: string, points: number) => void;
   dismissTenantConcern: (concernId: string) => void;
   // Speed
   setGameSpeed: (speed: number) => void;
@@ -695,37 +700,26 @@ export const useGameStore = create<GameState & GameActions>()(
           return p;
         }).map(p => {
           const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
-          const depMonths = getDepreciationMonths(p.condition);
-          let newCondition = p.condition;
-          let resetMonths = newMonthsSince;
+          // ── Continuous repair-bar decay ──
+          const tenantHere = newTenants.find(t => t.propertyId === p.id);
+          const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
+          const wear = TENANT_WEAR_MULTIPLIER[wearKey] ?? 1.0;
+          const currentScore = p.conditionScore ?? scoreFromConditionTier(p.condition);
+          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear);
+          const newCondition = conditionTierFromScore(decayed);
+          const tierChanged = newCondition !== p.condition;
 
-          if (newMonthsSince >= depMonths) {
-            if (p.condition === 'premium') {
-              // Fully-upgraded properties don't degrade from neglect alone —
-              // every premium-tier renovation has been done, so just reset the
-              // counter to half a window so they cycle slowly without falling.
-              if (isFullyUpgraded(p.completedRenovationIds)) {
-                resetMonths = Math.floor(depMonths / 2);
-              } else {
-                newCondition = 'standard';
-                resetMonths = 0;
-                showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
-              }
-            } else if (p.condition === 'standard') {
-              newCondition = 'dilapidated';
-              resetMonths = 0;
-              showToast("🏚️ Property Dilapidated!", `${p.name} has degraded to Dilapidated! Rent reduced.`, "destructive");
+          if (tierChanged) {
+            if (p.condition === 'premium' && newCondition === 'standard') {
+              showToast("⚠️ Property Degraded", `${p.name} dropped from Premium to Standard.`);
+            } else if (newCondition === 'dilapidated' && p.condition !== 'dilapidated') {
+              showToast("🏚️ Property Dilapidated!", `${p.name} fell to dilapidated condition.`, "destructive");
             }
-          }
-
-          // Apply condition rent multiplier to base rent
-          if (newCondition !== p.condition) {
             const baseRent = p.baseRent || p.monthlyIncome;
             const newRent = Math.floor(baseRent * getConditionRentMultiplier(newCondition));
-            return { ...p, condition: newCondition, monthsSinceLastRenovation: resetMonths, monthlyIncome: newRent };
+            return { ...p, condition: newCondition, conditionScore: decayed, monthsSinceLastRenovation: newMonthsSince, monthlyIncome: newRent };
           }
-
-          return { ...p, monthsSinceLastRenovation: resetMonths };
+          return { ...p, conditionScore: decayed, monthsSinceLastRenovation: newMonthsSince };
         });
 
         // ── Tenant satisfaction & early exit ──
@@ -1819,7 +1813,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { showToast("Mortgage Rejected", eligibility.reason || "Declined", "destructive"); return; }
+          if (!eligibility.eligible) { console.warn('[buyProperty] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
@@ -1903,7 +1897,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { showToast("Mortgage Rejected", eligibility.reason || "Declined", "destructive"); return; }
+          if (!eligibility.eligible) { console.warn('[buyPropertyAtPrice] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
@@ -3025,7 +3019,7 @@ export const useGameStore = create<GameState & GameActions>()(
           totalRentalIncome: fromPennies(otherIncome),
           ownedPropertyCount: prev.ownedProperties.length,
         });
-        if (!eligibility.eligible) { showToast("Portfolio Mortgage Rejected", eligibility.reason || "Declined", "destructive"); return; }
+        if (!eligibility.eligible) { console.warn('[handlePortfolioMortgage] ineligible — UI gate missed:', eligibility.reason); return; }
 
         const portfolioMortgage: Mortgage = {
           id: `portfolio_${Date.now()}`, propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
@@ -3270,6 +3264,13 @@ export const useGameStore = create<GameState & GameActions>()(
             ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
             : t
         );
+        // Repair-bar lift on the property — varies by concern category.
+        const lift = CONCERN_RESOLVE_CONDITION_LIFT[concern.category] ?? 3;
+        const updatedOwned = prev.ownedProperties.map(p => {
+          if (p.id !== concern.propertyId) return p;
+          const score = Math.max(0, Math.min(100, (p.conditionScore ?? scoreFromConditionTier(p.condition)) + lift));
+          return { ...p, conditionScore: score, condition: conditionTierFromScore(score) };
+        });
 
         // Damage-sourced concerns also update annual repair cap and 48-month cooldown
         let updatedAnnual = prev.annualRepairCosts;
@@ -3301,12 +3302,49 @@ export const useGameStore = create<GameState & GameActions>()(
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           tenants: updatedTenants,
+          ownedProperties: updatedOwned,
           annualRepairCosts: updatedAnnual,
           damageHistory: updatedHistory,
           tenantConcerns: concerns.map(c =>
             c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
           ),
         });
+      },
+
+      topUpCondition: (propertyId, pointsRequested) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) return;
+        const currentScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
+        const headroomToCap = Math.max(0, 100 - currentScore);
+        const monthlyUsed = (property.conditionLastTopUpMonth === prev.monthsPlayed)
+          ? (property.conditionTopUpPointsThisMonth ?? 0) : 0;
+        const monthlyHeadroom = Math.max(0, MAX_TOPUP_POINTS_PER_MONTH - monthlyUsed);
+        const pts = Math.max(0, Math.min(pointsRequested, headroomToCap, monthlyHeadroom));
+        if (pts <= 0) {
+          showToast("Nothing to do", "Already at the cap (100) or this month's spend limit reached.");
+          return;
+        }
+        const sqft = Math.max(400, property.internalSqft ?? 900);
+        const cost = Math.max(1, Math.round(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * sqft * pts / 100));
+        const debited = debit(prev, cost);
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} (even with overdraft) for ${pts} points of repairs.`, "destructive");
+          return;
+        }
+        const newScore = Math.min(100, currentScore + pts);
+        const newMonthlyUsed = monthlyUsed + pts;
+        const updated = prev.ownedProperties.map(p =>
+          p.id !== propertyId ? p : ({
+            ...p,
+            conditionScore: newScore,
+            condition: conditionTierFromScore(newScore),
+            conditionLastTopUpMonth: prev.monthsPlayed,
+            conditionTopUpPointsThisMonth: newMonthlyUsed,
+          })
+        );
+        set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, ownedProperties: updated });
+        showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).`);
       },
 
       dismissTenantConcern: (concernId) => {
@@ -3369,7 +3407,7 @@ export const useGameStore = create<GameState & GameActions>()(
           startRenovation, upgradeCondition, furnishProperty, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
           handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
           dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
-          resolveTenantConcern, dismissTenantConcern,
+          resolveTenantConcern, dismissTenantConcern, topUpCondition,
           applyForLoan, settleLoan,
           ...data } = state;
         return data;

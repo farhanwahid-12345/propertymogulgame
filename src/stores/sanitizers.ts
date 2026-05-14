@@ -23,6 +23,10 @@ export function sanitizeProperty(property: any): Property {
   const condition = property?.condition === 'premium' || property?.condition === 'dilapidated' || property?.condition === 'standard'
     ? property.condition
     : 'standard';
+  // Condition score: prefer persisted value, otherwise derive from legacy tier.
+  const conditionScore = typeof property?.conditionScore === 'number'
+    ? Math.max(0, Math.min(100, property.conditionScore))
+    : (condition === 'premium' ? 85 : condition === 'dilapidated' ? 25 : 60);
 
   return {
     ...property,
@@ -36,6 +40,7 @@ export function sanitizeProperty(property: any): Property {
     image: asString(property?.image),
     marketTrend,
     condition,
+    conditionScore,
     monthsSinceLastRenovation: asNumber(property?.monthsSinceLastRenovation),
     mortgageRemaining: typeof property?.mortgageRemaining === 'number' ? property.mortgageRemaining : undefined,
     marketValue: typeof property?.marketValue === 'number' ? property.marketValue : undefined,
