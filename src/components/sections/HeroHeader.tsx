@@ -14,6 +14,9 @@ import type {
   TenantEvent,
   MacroEconomicEvent,
   TaxRecord,
+  PendingEviction,
+  PlanningApplication,
+  EntityType,
 } from "@/types/game";
 
 interface HeroHeaderProps {
@@ -26,6 +29,10 @@ interface HeroHeaderProps {
   conveyancing?: Conveyancing[];
   taxRecords?: TaxRecord[];
   ownedProperties?: Array<{ id: string; name: string }>;
+  pendingEvictions?: PendingEviction[];
+  planningApplications?: PlanningApplication[];
+  lastCorporationTaxMonth?: number;
+  entityType?: EntityType;
 }
 
 export function HeroHeader({
@@ -38,6 +45,10 @@ export function HeroHeader({
   conveyancing,
   taxRecords,
   ownedProperties,
+  pendingEvictions,
+  planningApplications,
+  lastCorporationTaxMonth,
+  entityType,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
