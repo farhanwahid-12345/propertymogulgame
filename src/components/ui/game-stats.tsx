@@ -179,36 +179,29 @@ export function GameStats({
               {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                 Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
+                <InfoTip text={TIP_TEXTS.CREDIT_SCORE} label="About credit score" />
               </span>
               {portfolioLTV > 0 && (
                 <span className={cn(
-                  "text-xs font-semibold",
+                  "text-xs font-semibold inline-flex items-center gap-1",
                   portfolioLTV > 80 ? "text-danger" :
                   portfolioLTV > 60 ? "text-yellow-400" :
                   "text-success"
                 )}>
                   LTV: {portfolioLTV.toFixed(0)}%
+                  <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
                 </span>
               )}
               {totalMonthlyExpenses > 0 && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className={cn(
-                        "text-xs font-semibold inline-flex items-center gap-1 cursor-help",
-                        dtiColor
-                      )}>
-                        DTI: {Math.round(dtiRatio)}%
-                        <Info className="h-3 w-3 opacity-70" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[250px]">
-                      <p className="text-xs">DTI is the share of your rental income that goes to debt payments. Above 80% puts you at high risk if interest rates rise.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <span className={cn(
+                  "text-xs font-semibold inline-flex items-center gap-1",
+                  dtiColor
+                )}>
+                  DTI: {Math.round(dtiRatio)}%
+                  <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
+                </span>
               )}
               <CreditImprovementGuide
                 creditScore={creditScore}
