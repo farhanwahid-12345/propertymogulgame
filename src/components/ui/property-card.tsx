@@ -154,6 +154,12 @@ export const PropertyCard = memo(function PropertyCard({
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const topUpCondition = useGameStore(s => s.topUpCondition);
+  const conditionScore = typeof property.conditionScore === 'number'
+    ? property.conditionScore
+    : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
+  const topUpSqft = Math.max(400, property.internalSqft ?? 900);
+  const topUpCostPounds20 = Math.round(fromPennies(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * topUpSqft * 20 / 100));
   
   const propertyType = property.type in PropertyTypeIcon ? property.type : "residential";
   const Icon = PropertyTypeIcon[propertyType];
