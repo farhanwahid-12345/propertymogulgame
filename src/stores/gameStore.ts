@@ -874,9 +874,14 @@ export const useGameStore = create<GameState & GameActions>()(
           if (inConveyancingIds.has(t.propertyId)) return;
           if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
 
+          const conditionScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
           let chance = 0.035;
           if (property.condition === 'dilapidated') chance += 0.04;
           else if (property.condition === 'premium') chance -= 0.015;
+          // Repair-bar coupling: low score → significantly more concerns
+          if (conditionScore < 30) chance += 0.04;
+          else if (conditionScore < 50) chance += 0.02;
+          else if (conditionScore >= 80) chance -= 0.015;
           if (t.tenant.profile === 'premium') chance += 0.015;
           else if (t.tenant.profile === 'risky') chance -= 0.025;
           // 1-month grace after move-in — settling-in period, no surprise concerns
