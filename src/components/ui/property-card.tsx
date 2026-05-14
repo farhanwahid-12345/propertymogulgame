@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getMarketRentPounds } from "@/lib/engine/market";
 import { RepairBar } from "@/components/ui/repair-bar";
+import { MultiUnitSlots } from "@/components/ui/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
