@@ -11,11 +11,12 @@ import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, formatPounds, toPennies } from "@/lib/formatCurrency";
 import { LOAN_PRODUCTS } from "@/lib/engine/constants";
 
-type LoanKind = 'personal' | 'business';
+type LoanKind = 'personal' | 'business' | 'investor';
 
 const KIND_META: Record<LoanKind, { label: string; blurb: string }> = {
   personal: { label: 'Personal Loan',  blurb: 'Up to £25,000 over 12–60 months. Min credit 600.' },
   business: { label: 'Business Loan',  blurb: 'Up to £150,000 over 12–84 months. Ltd company with 2+ properties.' },
+  investor: { label: 'Investor Loan',  blurb: 'Friends & family money. 12–18% APR, 12–36 months. No credit check — capped by your landlord reputation.' },
 };
 
 export function LoansPanel() {
