@@ -17,11 +17,30 @@ export const MONTH_DURATION_SECONDS = 180;
 export const ERC_PERCENT = 0.02;
 /** ERC applies if the mortgage is less than this many in-game months old. */
 export const ERC_WINDOW_MONTHS = 60;
+/** Annual electrical safety / EICR check (per residential property). */
+export const EICR_COST_PENNIES = toPennies(220);
 /** Loan products — limits & rate spreads above current market rate. */
 export const LOAN_PRODUCTS = {
   personal:  { hardCapPennies: toPennies(25_000),  minTermMonths: 12, maxTermMonths: 60, baseSpread: 0.04,  spreadMin: 0.025, spreadMax: 0.05,  minCreditScore: 600 },
   business:  { hardCapPennies: toPennies(150_000), minTermMonths: 12, maxTermMonths: 84, baseSpread: 0.025, spreadMin: 0.015, spreadMax: 0.035, minCreditScore: 580 },
+  // Investor / friends & family — high rate, no credit check, gated by reputation.
+  investor:  { hardCapPennies: toPennies(75_000),  minTermMonths: 12, maxTermMonths: 36, baseSpread: 0.10,  spreadMin: 0.08,  spreadMax: 0.13,  minCreditScore: 0,   minReputation: 40 },
 } as const;
+
+/** Default EPC rating derived from condition (legacy backfill). */
+export function defaultEpcForCondition(c?: 'dilapidated' | 'standard' | 'premium'): 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' {
+  if (c === 'premium') return 'B';
+  if (c === 'dilapidated') return 'F';
+  return 'D';
+}
+
+/** Bump EPC by N grades up the alphabet (A is best). */
+export function bumpEpcRating(current: string | undefined, grades: number): 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' {
+  const order: Array<'A'|'B'|'C'|'D'|'E'|'F'|'G'> = ['A','B','C','D','E','F','G'];
+  const idx = Math.max(0, order.indexOf((current as any) ?? 'D'));
+  const newIdx = Math.max(0, idx - Math.max(0, grades));
+  return order[newIdx];
+}
 
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   { id: "hsbc", name: "HSBC", baseRate: 0.035, maxLTV: 0.75, minCreditScore: 740, description: "Premier bank with the best rates but strictest criteria" },
