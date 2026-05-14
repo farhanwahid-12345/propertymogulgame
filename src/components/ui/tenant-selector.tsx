@@ -478,7 +478,10 @@ export function TenantSelector({
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-          <Button onClick={handleSelectTenant} disabled={!selectedTenant}>
+          <Button
+            onClick={handleSelectTenant}
+            disabled={!selectedTenant || (typeof conditionScore === 'number' && conditionScore < (TENANT_MIN_CONDITION[selectedTenant?.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0))}
+          >
             Select Tenant
           </Button>
         </div>
