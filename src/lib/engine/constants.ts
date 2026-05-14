@@ -19,8 +19,8 @@ export const ERC_PERCENT = 0.02;
 export const ERC_WINDOW_MONTHS = 60;
 /** Loan products — limits & rate spreads above current market rate. */
 export const LOAN_PRODUCTS = {
-  personal:  { maxAmountPennies: toPennies(25_000),  minTermMonths: 12, maxTermMonths: 60, rateSpread: 0.04,  minCreditScore: 600 },
-  business:  { maxAmountPennies: toPennies(150_000), minTermMonths: 12, maxTermMonths: 84, rateSpread: 0.025, minCreditScore: 580 },
+  personal:  { hardCapPennies: toPennies(25_000),  minTermMonths: 12, maxTermMonths: 60, baseSpread: 0.04,  spreadMin: 0.025, spreadMax: 0.05,  minCreditScore: 600 },
+  business:  { hardCapPennies: toPennies(150_000), minTermMonths: 12, maxTermMonths: 84, baseSpread: 0.025, spreadMin: 0.015, spreadMax: 0.035, minCreditScore: 580 },
 } as const;
 
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [

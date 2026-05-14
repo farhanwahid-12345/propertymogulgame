@@ -3,6 +3,10 @@ import type { Property, Mortgage, PropertyTenant, MortgageProvider } from "@/typ
 import { toPennies } from "@/lib/formatCurrency";
 import { MORTGAGE_PROVIDERS, BASE_MARKET_RATE } from "./constants";
 
+/** Landlord buildings/contents insurance: ~0.4% of property value per year. */
+export const ANNUAL_INSURANCE_RATE = 0.004;
+export const MONTHLY_INSURANCE_RATE = ANNUAL_INSURANCE_RATE / 12;
+
 // UK Stamp Duty Land Tax — input & output in pennies
 export function calculateStampDuty(purchasePrice: number): number {
   const p = purchasePrice; // pennies
