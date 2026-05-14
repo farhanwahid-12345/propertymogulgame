@@ -1489,11 +1489,10 @@ export const useGameStore = create<GameState & GameActions>()(
           const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
           const newBal = Math.max(0, l.remainingBalance - principalPaid);
           if (newBal <= 0) {
-              showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
-              return;
-            }
-            updatedLoans.push({ ...l, remainingBalance: newBal });
+            showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
+            return;
           }
+          updatedLoans.push({ ...l, remainingBalance: newBal });
         });
         if (loanCashDelta < 0) {
           const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
