@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface MortgageManagementProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
