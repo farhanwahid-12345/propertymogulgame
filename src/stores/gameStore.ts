@@ -3076,6 +3076,8 @@ export const useGameStore = create<GameState & GameActions>()(
           pmCashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
         }
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
+        const cashOut = Math.max(0, cashDelta);
+        showToast("Portfolio mortgage secured 🏦", `Settled £${fromPennies(totalCurrentMortgages).toLocaleString()} of existing debt · £${fromPennies(cashOut).toLocaleString()} cash released.`);
       },
 
       // ─── LOANS (personal / business / investor) ─────────────────
