@@ -890,7 +890,7 @@ export const useGameStore = create<GameState & GameActions>()(
           let delta = 0;
 
           if (property.condition === 'dilapidated') {
-            delta -= 8; reasons.push({ reason: 'Dilapidated condition', delta: -8 });
+            delta -= 4; reasons.push({ reason: 'Dilapidated condition', delta: -4 });
           } else if (property.condition === 'standard' && t.tenant.profile === 'premium') {
             const hasPlanningCooldown = (prev.propertyLocks || []).some(
               l => l.propertyId === property.id && l.reason === 'planning_cooldown' && newMonthNumber < l.untilMonth,
@@ -901,8 +901,8 @@ export const useGameStore = create<GameState & GameActions>()(
               hasPlanningCooldown,
             });
             if (eligible) {
-              delta -= 3;
-              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -3 });
+              delta -= 2;
+              reasons.push({ reason: 'Premium tenant wants premium finish — renovate to fix', delta: -2 });
             } else {
               reasons.push({ reason: 'Premium tenant accepts current standard', delta: 0 });
             }
@@ -911,25 +911,25 @@ export const useGameStore = create<GameState & GameActions>()(
           }
 
           if (recentDamageIds.has(t.propertyId)) {
-            delta -= 5; reasons.push({ reason: 'Unrepaired damage', delta: -5 });
+            delta -= 3; reasons.push({ reason: 'Unrepaired damage', delta: -3 });
           }
 
-          // Recent rent hike (within last 3 months) — skip if tenant moved in after the increase
+          // Recent rent hike (within last 6 months) — milder penalty, skip if tenant moved in after the increase
           const tenantMovedInAfterIncrease = (t.moveInMonth ?? 0) >= (property.lastRentIncrease ?? 0);
-          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 3 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
-            delta -= 2; reasons.push({ reason: 'Recent rent increase', delta: -2 });
+          if (property.lastRentIncrease !== undefined && newMonthNumber - (property.lastRentIncrease ?? 0) <= 6 && property.lastRentIncrease !== prev.monthsPlayed && !tenantMovedInAfterIncrease) {
+            delta -= 1; reasons.push({ reason: 'Recent rent increase', delta: -1 });
           }
 
-          // Happiness drift: gentle pull toward ~75 baseline whenever no acute pressure
+          // Happiness drift: stronger pull toward ~75 baseline whenever no acute pressure
           const hasNegativePressure = delta < 0;
           if (!hasNegativePressure) {
-            const drift = t.satisfaction < 75 ? 2 : t.satisfaction > 85 ? -1 : 1;
+            const drift = t.satisfaction < 75 ? 2 : t.satisfaction <= 85 ? 1 : 0;
             delta += drift;
             reasons.push({ reason: 'Stable conditions', delta: drift });
           }
 
-          // Cap monthly net drop at -4 to prevent rapid satisfaction collapse
-          if (delta < -4) delta = -4;
+          // Cap monthly net drop at -3 (was -4) — gentler decay overall
+          if (delta < -3) delta = -3;
 
           const newSatisfaction = Math.max(0, Math.min(100, t.satisfaction + delta));
           return { ...t, satisfaction: newSatisfaction, lastSatisfactionUpdate: newMonthNumber, satisfactionReasons: reasons };
