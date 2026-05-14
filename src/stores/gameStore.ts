@@ -39,6 +39,7 @@ import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 // ─── Helpers ──────────────────────────────────────────────
 import { showToast, debit, credit, calcDeposit } from './storeHelpers';
 import {
+  asNumber, asString,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
   sanitizeTenantConcern, mergeConcernsById, sanitizeOffer, sanitizePropertyListing,
 } from './sanitizers';
