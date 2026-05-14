@@ -109,6 +109,7 @@ export function LoansPanel() {
                   <SelectContent>
                     <SelectItem value="personal">{KIND_META.personal.label}</SelectItem>
                     <SelectItem value="business">{KIND_META.business.label}</SelectItem>
+                    <SelectItem value="investor">{KIND_META.investor.label}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
