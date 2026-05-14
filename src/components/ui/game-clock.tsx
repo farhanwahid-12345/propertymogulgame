@@ -15,7 +15,7 @@ const SPEED_OPTIONS = [
   { value: 4, label: "4×" },
 ];
 
-function SpeedSelector({ compact = false }: { compact?: boolean }) {
+export function SpeedSelector({ compact = false }: { compact?: boolean }) {
   const gameSpeed = useGameStore((s) => s.gameSpeed);
   const setGameSpeed = useGameStore((s) => s.setGameSpeed);
 
