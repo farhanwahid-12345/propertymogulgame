@@ -3357,6 +3357,8 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, ownedProperties: updated });
         showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).`);
       },
+
+      dismissTenantConcern: (concernId) => {
         // "Snooze" — keep in feed; satisfaction will decay each month it remains unresolved
         showToast("Concern Snoozed", "It'll keep nagging until resolved.");
       },
