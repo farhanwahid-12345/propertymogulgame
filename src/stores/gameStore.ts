@@ -700,37 +700,26 @@ export const useGameStore = create<GameState & GameActions>()(
           return p;
         }).map(p => {
           const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
-          const depMonths = getDepreciationMonths(p.condition);
-          let newCondition = p.condition;
-          let resetMonths = newMonthsSince;
+          // ── Continuous repair-bar decay ──
+          const tenantHere = newTenants.find(t => t.propertyId === p.id);
+          const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
+          const wear = TENANT_WEAR_MULTIPLIER[wearKey] ?? 1.0;
+          const currentScore = p.conditionScore ?? scoreFromConditionTier(p.condition);
+          const decayed = Math.max(CONDITION_DECAY_FLOOR, currentScore - BASE_CONDITION_DECAY * wear);
+          const newCondition = conditionTierFromScore(decayed);
+          const tierChanged = newCondition !== p.condition;
 
-          if (newMonthsSince >= depMonths) {
-            if (p.condition === 'premium') {
-              // Fully-upgraded properties don't degrade from neglect alone —
-              // every premium-tier renovation has been done, so just reset the
-              // counter to half a window so they cycle slowly without falling.
-              if (isFullyUpgraded(p.completedRenovationIds)) {
-                resetMonths = Math.floor(depMonths / 2);
-              } else {
-                newCondition = 'standard';
-                resetMonths = 0;
-                showToast("⚠️ Property Degraded", `${p.name} has degraded from Premium to Standard condition.`);
-              }
-            } else if (p.condition === 'standard') {
-              newCondition = 'dilapidated';
-              resetMonths = 0;
-              showToast("🏚️ Property Dilapidated!", `${p.name} has degraded to Dilapidated! Rent reduced.`, "destructive");
+          if (tierChanged) {
+            if (p.condition === 'premium' && newCondition === 'standard') {
+              showToast("⚠️ Property Degraded", `${p.name} dropped from Premium to Standard.`);
+            } else if (newCondition === 'dilapidated' && p.condition !== 'dilapidated') {
+              showToast("🏚️ Property Dilapidated!", `${p.name} fell to dilapidated condition.`, "destructive");
             }
-          }
-
-          // Apply condition rent multiplier to base rent
-          if (newCondition !== p.condition) {
             const baseRent = p.baseRent || p.monthlyIncome;
             const newRent = Math.floor(baseRent * getConditionRentMultiplier(newCondition));
-            return { ...p, condition: newCondition, monthsSinceLastRenovation: resetMonths, monthlyIncome: newRent };
+            return { ...p, condition: newCondition, conditionScore: decayed, monthsSinceLastRenovation: newMonthsSince, monthlyIncome: newRent };
           }
-
-          return { ...p, monthsSinceLastRenovation: resetMonths };
+          return { ...p, conditionScore: decayed, monthsSinceLastRenovation: newMonthsSince };
         });
 
         // ── Tenant satisfaction & early exit ──
