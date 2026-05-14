@@ -2130,7 +2130,7 @@ export const useGameStore = create<GameState & GameActions>()(
           currentBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
         }
         // Use shared helper so the displayed preview matches the actual rent
-        const newRent = calcTenantRent(currentBaseRent, tenant, property.condition);
+        const newRent = calcTenantRent(currentBaseRent, tenant, property.condition, property.furnishingTier);
         const isIncrease = newRent > property.monthlyIncome;
 
         if (isIncrease && property.lastTenantChange !== undefined) {

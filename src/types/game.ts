@@ -68,6 +68,10 @@ export interface Property {
   totalRenovationSpendPennies?: number;
   /** Cumulative capital improvement spend (extensions/conversions) — added to CGT base on sale. */
   capitalImprovementsPennies?: number;
+  /** Furnishing tier — affects rent multiplier and tenant pool. Defaults to unfurnished. */
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Months remaining before furnishings depreciate back to unfurnished. */
+  furnishingMonthsRemaining?: number;
 }
 
 // Tenant concerns — issues raised that decay satisfaction if ignored

@@ -42,6 +42,18 @@ export function getConditionRentMultiplierShared(condition?: PropertyCondition):
   }
 }
 
+/** Rent multiplier from furnishing tier. Defaults to unfurnished (1.0). */
+export function getFurnishingRentMultiplier(
+  tier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
+): number {
+  switch (tier) {
+    case 'part_furnished':  return 1.05;
+    case 'fully_furnished': return 1.12;
+    case 'unfurnished':
+    default:                return 1.00;
+  }
+}
+
 /**
  * Calculate tenant rent. Pass `baseRent` in any consistent unit (pounds OR pennies).
  * Returns the same unit, floored to an integer.
@@ -49,9 +61,11 @@ export function getConditionRentMultiplierShared(condition?: PropertyCondition):
 export function calcTenantRent(
   baseRent: number,
   tenant: { profile: TenantRentInput["profile"] },
-  condition?: PropertyCondition
+  condition?: PropertyCondition,
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
 ): number {
   const profileMult = getProfileRentMultiplier(tenant.profile);
   const conditionMult = getConditionRentMultiplierShared(condition);
-  return Math.floor(baseRent * profileMult * conditionMult);
+  const furnishingMult = getFurnishingRentMultiplier(furnishingTier);
+  return Math.floor(baseRent * profileMult * conditionMult * furnishingMult);
 }
