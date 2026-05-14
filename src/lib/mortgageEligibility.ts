@@ -144,17 +144,19 @@ export function calculateMortgageEligibility(
       }
     }
   } else {
-    // Portfolio affordability: TOTAL rental income must be >= 125% of TOTAL mortgage payments
+    // Portfolio affordability: TOTAL EXPECTED rental income must be >= 120% of TOTAL mortgage payments.
+    // Slightly more lenient than the historic 1.25 threshold to reflect that the
+    // input is now expected (not realised) rent.
     const totalIncomeWithNew = req.totalRentalIncome + req.propertyMonthlyRent;
     const totalPaymentsWithNew = req.existingMonthlyMortgagePayments + monthlyPayment;
     if (totalPaymentsWithNew > 0 && totalIncomeWithNew > 0) {
       const portfolioICR = totalIncomeWithNew / totalPaymentsWithNew;
       result.icrRatio = portfolioICR;
-      if (portfolioICR < 1.25) {
+      if (portfolioICR < 1.20) {
         return {
           ...result,
           eligible: false,
-          reason: `Mortgage Denied: Portfolio rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 125% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.25).toLocaleString()}/mo total rental income.`,
+          reason: `Mortgage Denied: Portfolio expected rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 120% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.20).toLocaleString()}/mo expected income.`,
         };
       }
     }
