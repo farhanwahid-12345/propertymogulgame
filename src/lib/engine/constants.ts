@@ -60,6 +60,41 @@ export function bumpEpcRating(current: string | undefined, grades: number): 'A' 
   return order[newIdx];
 }
 
+// ─── Repair Bar (Continuous Condition Score) ──────────────────────
+/** Map a 0–100 condition score onto the legacy 3-tier enum used downstream. */
+export function conditionTierFromScore(score: number | undefined): 'dilapidated' | 'standard' | 'premium' {
+  const s = typeof score === 'number' ? score : 60;
+  if (s >= 80) return 'premium';
+  if (s >= 45) return 'standard';
+  return 'dilapidated';
+}
+/** Migrate legacy condition tier → starting score. */
+export function scoreFromConditionTier(tier?: 'dilapidated' | 'standard' | 'premium'): number {
+  if (tier === 'premium') return 85;
+  if (tier === 'dilapidated') return 25;
+  return 60;
+}
+/** Tenant-profile wear multiplier on monthly decay. */
+export const TENANT_WEAR_MULTIPLIER: Record<'premium' | 'standard' | 'budget' | 'risky' | 'vacant', number> = {
+  premium: 0.7, standard: 1.0, budget: 1.3, risky: 1.7, vacant: 0.4,
+};
+/** Base monthly decay (points) before tenant multiplier. ≈ 6–10 pts/yr typical. */
+export const BASE_CONDITION_DECAY = 0.6;
+/** Floor below which neglect alone won't push a property — only damage events can. */
+export const CONDITION_DECAY_FLOOR = 5;
+/** Cost in pennies per condition point per sqft. £25/sqft × points/100 ≈ 25p per pt-sqft. */
+export const CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT = 25;
+/** Maximum condition points a player may buy in a single in-game month. */
+export const MAX_TOPUP_POINTS_PER_MONTH = 40;
+/** Minimum acceptable condition score by tenant profile (gates selection). */
+export const TENANT_MIN_CONDITION: Record<'premium' | 'standard' | 'budget' | 'risky', number> = {
+  premium: 75, standard: 55, budget: 35, risky: 15,
+};
+/** Lift in condition points for resolving a tenant concern, by category. */
+export const CONCERN_RESOLVE_CONDITION_LIFT: Record<'maintenance' | 'noise' | 'mould' | 'appliance' | 'safety', number> = {
+  maintenance: 4, noise: 1, mould: 6, appliance: 4, safety: 5,
+};
+
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   { id: "hsbc", name: "HSBC", baseRate: 0.035, maxLTV: 0.75, minCreditScore: 740, description: "Premier bank with the best rates but strictest criteria" },
   { id: "nationwide", name: "Nationwide", baseRate: 0.045, maxLTV: 0.80, minCreditScore: 680, description: "Building society with competitive rates" },
