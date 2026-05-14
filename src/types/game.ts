@@ -116,6 +116,10 @@ export interface Loan {
   startMonth: number;       // monthsPlayed snapshot
   /** Optional friendly lender name — used by investor loans. */
   lenderName?: string;
+  /** Number of consecutive on-time monthly payments (resets on miss). */
+  onTimeStreak?: number;
+  /** Snapshot of monthsPlayed when last payment was missed (for arrears + credit penalty). */
+  lastMissedMonth?: number;
 }
 
 export interface Mortgage {
