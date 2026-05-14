@@ -1,69 +1,56 @@
-# Fix Pack: 6 Gameplay & UI Issues
+## Three improvements
 
-## 1. Toasts dismiss on submenu interaction
-**File:** `src/hooks/use-toast.ts`
+### 1. Repair bar ↔ tenant concerns realism
 
-- Reduce `TOAST_REMOVE_DELAY` from 1,000,000 ms to ~5,000 ms so toasts auto-clear quickly.
-- Add a global listener (mounted in `App.tsx` or inside the toaster) that calls `dismiss()` on any `pointerdown` whose target is inside `[role="dialog"], [data-state="open"], [role="menu"], .sheet`. This ensures the "Offer Accepted" / "Mortgage declined" toasts disappear the moment the player opens or clicks inside any sub-menu, dialog, sheet, or popover.
+**Goal:** the repair bar and the concerns feed feel like the same system rather than two unrelated meters.
 
-## 2. Single pause / sound button
-**File:** `src/components/ui/notification-centre.tsx`
+Changes in `src/stores/gameStore.ts`:
+- **Low repair → more concerns.** In the monthly concern generator, scale `chance` by `conditionScore`:
+  - `score < 30` → +0.04 chance + bias template pool toward `maintenance` / `mould` / `safety`
+  - `score < 50` → +0.02 chance
+  - `score ≥ 80` → −0.015 chance (already-tidy property)
+- **High repair auto-clears stale soft concerns.** When `topUpCondition` raises a property past 80, mark any open non-damage `maintenance` or `mould` concern on that property as `resolvedMonth = monthsPlayed` (no extra cash spent — they were absorbed by the repair work).
+- **Repair bar drains on ignored damage.** Each in-game month, every open `source: 'damage'` concern older than its grace window subtracts an extra 1 point from `conditionScore` (compounds with existing decay), so neglecting damage visibly tanks the bar.
 
-The header already renders pause + sound in `HeroHeader.tsx`. `NotificationCentre` duplicates them.
+Changes in `src/components/ui/tenant-concerns-feed.tsx`:
+- Per-row hint badge: when the property's `conditionScore < 50`, append "Repair bar low — fix the bar to reduce future risk" under the cost line.
+- When a damage concern is shown, surface "Resolving lifts repair bar +N" using `CONCERN_RESOLVE_CONDITION_LIFT[category]`.
 
-- Remove the pause `<Button>` and sound `<Button>` blocks from `NotificationCentre` — keep only the bell + sheet.
-- Drop now-unused imports (`Pause`, `Play`, `Volume2`, `VolumeX`, `isSoundEnabled`, `setSoundEnabled`, `useGameStore`, `togglePause`).
-- Change the wrapper `<div className="flex items-center gap-1.5">` to just the bell trigger.
+### 2. Stop the top bar bouncing
 
-## 3. Trim renovation menu + scale up "Basic Repairs" cost
-**File:** `src/components/ui/renovation-dialog.tsx`
+**Cause:** the right-hand cluster in `HeroHeader.tsx` uses `flex-wrap`, so when the GameClock label width changes ("Mar 2026" → "April 2026") or `SpeedSelector` toggles `compact`, items reflow onto a new line and the sticky bar's height jumps.
 
-- Remove `basic_repair` and `full_redecoration` entries from `RENOVATION_OPTIONS`.
-- Repair-bar top-up (the `RepairBar` "Top up condition" action in `property-card.tsx`) is now the sole repair channel. Re-cost it so it's no longer trivially cheap:
-  - **File:** `src/lib/engine/constants.ts` — raise `CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT` so a 20-point top-up on a 900 sqft property costs roughly £600–£900 (currently far below). Target: ~£0.05 per point per sqft → 20 pts × 900 sqft = £900.
-  - Optionally cap `MAX_TOPUP_POINTS_PER_MONTH` if it currently allows full restoration in one click.
-- Verify suppression/cooldown logic that referenced `basic_repair` / `full_redecoration` (`renovationCompletionMonths['full_redecoration']`, etc.) still compiles; remove the now-dead `ineligibilityReason` branches that look up those IDs.
+Changes in `src/components/sections/HeroHeader.tsx`:
+- Change the right cluster to `flex-nowrap` always, with `min-w-0` and `overflow-hidden` so children shrink instead of wrapping.
+- Give the clock pill a stable width (`w-[220px]` desktop, `w-[180px]` compact) and add `tabular-nums` to the date/progress text inside `GameClock`.
+- Outer wrapper switches to `items-center` always; remove `items-end` swap that triggers an extra reflow on scroll.
+- Keep the `compact` height toggle (56px ↔ 160px) but transition only `height`, not `padding`+`align`, so the swap is a single transform.
 
-## 4. Stop the "Market | Debt | Month" bar from flashing
-**File:** `src/components/ui/game-stats.tsx` (lines ~226-241)
+### 3. Collapsible Loans / Tax / Operations panels
 
-The flashing comes from the `recentTenantEvents` `Badge` (destructive variant) re-mounting on every render and the `glass-hover` transition firing on parent re-renders.
+**Goal:** declutter the dashboard. Panels should be collapsed by default when "quiet" and show a one-line summary in the header.
 
-- Wrap the `CollapsibleTrigger` button in `React.memo` (extract a small `MarketSummaryBar` component) so it only re-renders when `currentMarketRate`, `totalDebt`, `monthsPlayed`, or `recentTenantEvents.length` actually change.
-- Remove the `transition-all duration-300` from `glass-hover` for this specific element (use plain `glass` + a static hover bg) to kill the perceived pulse on parent state churn.
-- Stabilise the badge: render it conditionally on `recentTenantEvents.length > 0` only, and key it by `length` so React doesn't reconcile a fresh node every tick.
+Changes:
+- Wrap each of these in the existing `CollapsibleSection` (used already for Operations on mobile), rendered in `src/pages/Index.tsx`:
+  - **Loans panel** (`BankingPanel` / loans area) — default collapsed when `loans.length === 0`. Header summary: "No active loans" or "2 loans · £X/mo".
+  - **Tax — current year** — default collapsed always. Header summary: "Tax due Apr · £X estimated · Y mo".
+  - **Operations** — already collapsible on mobile; make it default-collapsed on desktop too when `totalActionable === 0`. Header summary already shows the count.
+- Each `CollapsibleSection` keeps its open/closed state in `localStorage` keyed by section id so the user's preference persists.
+- Inside `OperationsCenter.tsx` remove the extra "All quiet — no operations in progress" empty card (the collapsible header already conveys this).
 
-## 5. Renovations only when vacant
-**File:** `src/components/ui/renovation-dialog.tsx`
+### Technical notes
 
-Today only some options carry `requiresVacant: true`. User wants ALL renovations gated.
+- Concern generation lives in the monthly tick (`gameStore.ts` ~lines 870-905) — modifier added before the `Math.random() >= chance` gate.
+- `topUpCondition` (~line 3336) needs a post-update sweep over `prev.tenantConcerns` filtered by `propertyId` and category.
+- `CollapsibleSection` already supports `defaultOpenMobile` and a render-prop summary; extend with `defaultOpenDesktop` if not present.
+- No data-model migration needed — purely behavioural + UI.
 
-- In `ineligibilityReason`, add a top-level rule: `if (hasTenant) return 'Tenant in residence — serve eviction or wait for vacancy';` (regardless of `requiresVacant`).
-- Pass `hasTenant` through from `PropertyCard` (already in props as `currentTenant` — derive `hasTenant={!!currentTenant}` and forward).
-- Keep the per-option `requiresVacant` flag for clarity but it becomes redundant.
+### Files touched
 
-## 6. Multi-tenant slots after conversions
-**Files:** `src/types/game.ts`, `src/stores/gameStore.ts`, `src/components/ui/property-card.tsx`, `src/components/ui/tenant-selector.tsx`
-
-A converted HMO with 4 rooms or a building converted to 3 flats currently still has one tenant slot. After conversion, each unit needs its own tenant.
-
-- **Type:** change `Property.currentTenantId?: string` to `currentTenantIds?: string[]` (length 1 for standard properties, `subtypeUnits` for HMO/flats). Provide a sanitiser that migrates legacy single-tenant saves into a one-element array.
-- **Store actions:** `assignTenant(propertyId, tenant, slotIndex?)`, `removeTenant(propertyId, slotIndex)`, evictions per-slot. Rent aggregation sums all occupied slots; council tax only when ALL slots vacant; satisfaction tracked per slot.
-- **Tenant generation (`tenant-selector.tsx`):** when `property.subtype === 'hmo'`, bias profiles toward `student`/`budget`/`young couple`; when `subtype === 'flats'`, allow per-flat profile mix. Show a slot picker (e.g. "Room 1 of 4 — vacant") at the top of the dialog.
-- **`PropertyCard`:** show a compact occupancy strip (`👤👤👤·` style) for multi-unit properties, with an "Assign" button per vacant slot. Existing single-tenant UI remains for `subtype === 'standard'`.
-- **Activity feed / events:** include slot index in departure / eviction entries.
-
-This is the largest item — touches state shape, persistence, and UI. Worth landing in its own PR after the other five quick fixes.
-
-## Technical notes
-
-- All financial deltas remain in pennies via existing helpers.
-- No engine constants outside `CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT` change.
-- No new packages.
-- Save-game compatibility preserved via sanitisers in `src/stores/sanitizers.ts`.
-
-## Suggested order
-1. Items 2, 4 — pure UI, low risk.
-2. Item 1 — toast UX.
-3. Items 3, 5 — renovation rules.
-4. Item 6 — multi-tenant slots (largest, ship last).
+- `src/stores/gameStore.ts` (concern chance modifier, topUp auto-resolve, damage decay)
+- `src/components/ui/tenant-concerns-feed.tsx` (badges)
+- `src/components/sections/HeroHeader.tsx` (no-wrap cluster, stable widths)
+- `src/components/ui/game-clock.tsx` (tabular-nums)
+- `src/components/ui/operations-center.tsx` (drop empty card)
+- `src/pages/Index.tsx` (wrap Loans / Tax / Operations in collapsibles)
+- `src/components/ui/collapsible-section.tsx` (add `defaultOpenDesktop` if missing)
