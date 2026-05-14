@@ -2180,7 +2180,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // ─── TENANTS ───────────────────────────
-      selectTenant: (propertyId, tenant) => {
+      selectTenant: (propertyId, tenant, slotIndex = 0) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) return;
@@ -2204,45 +2204,56 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return;
         }
-        // Renters' Rights — sitting tenants cannot be replaced. Player must serve a
-        // valid eviction notice and wait out the notice period before re-letting.
-        if (prev.tenants.some(t => t.propertyId === propertyId)) {
+
+        // Multi-slot capacity (HMO rooms / converted flats)
+        const isMultiUnit = property.subtype === 'hmo' || property.subtype === 'flats';
+        const unitCount = isMultiUnit ? Math.max(1, property.subtypeUnits || 1) : 1;
+        const safeSlot = Math.max(0, Math.min(unitCount - 1, slotIndex));
+
+        // Renters' Rights — sitting tenants in THIS slot cannot be replaced.
+        if (prev.tenants.some(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === safeSlot)) {
           showToast(
-            "Tenant in Place",
-            "You can't replace a sitting tenant — serve a valid eviction notice first.",
+            "Slot Occupied",
+            isMultiUnit
+              ? `Slot already let — serve a valid eviction notice on that unit first.`
+              : "You can't replace a sitting tenant — serve a valid eviction notice first.",
             "destructive"
           );
           return;
         }
 
-        // Robust base-rent fallback: stored baseRent → current monthlyIncome →
-        // value × yield/12 (last-resort for properties created via inline conveyancing)
-        let currentBaseRent = property.baseRent || property.monthlyIncome;
-        if (currentBaseRent <= 0 && property.value > 0) {
+        // Robust base-rent fallback. For multi-unit properties, base-rent is divided by unit count.
+        let propertyBaseRent = property.baseRent || property.monthlyIncome;
+        if (propertyBaseRent <= 0 && property.value > 0) {
           const yieldPct = property.yield ?? 7;
-          currentBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
+          propertyBaseRent = Math.floor((property.value * (yieldPct / 100)) / 12);
         }
-        // Use shared helper so the displayed preview matches the actual rent
-        const newRent = calcTenantRent(currentBaseRent, tenant, property.condition, property.furnishingTier);
-        const isIncrease = newRent > property.monthlyIncome;
+        const slotBaseRent = isMultiUnit
+          ? Math.floor(propertyBaseRent / unitCount)
+          : propertyBaseRent;
+        const slotRent = calcTenantRent(slotBaseRent, tenant, property.condition, property.furnishingTier);
 
-        if (isIncrease && property.lastTenantChange !== undefined) {
-          const months = prev.monthsPlayed - property.lastTenantChange;
-          if (months < 3) {
-            showToast("Too Soon", `Wait ${3 - months} more month(s) for a higher-paying tenant.`, "destructive");
-            return;
+        // The 3-month wait between higher-paying tenants only applies to the
+        // single-tenant case — multi-unit slots are independent.
+        if (!isMultiUnit) {
+          const isIncrease = slotRent > property.monthlyIncome;
+          if (isIncrease && property.lastTenantChange !== undefined) {
+            const months = prev.monthsPlayed - property.lastTenantChange;
+            if (months < 3) {
+              showToast("Too Soon", `Wait ${3 - months} more month(s) for a higher-paying tenant.`, "destructive");
+              return;
+            }
           }
         }
 
         // Renters' Rights / Tenant Fees Act: 5-week deposit (capped) is paid by the
         // TENANT and held in TDS protection — landlord cash is NOT debited at move-in.
-        // Landlord only loses cash if they wrongly withhold and lose a deposit dispute.
-        const requiredDeposit = calcDeposit(newRent);
+        const requiredDeposit = calcDeposit(slotRent);
 
         const updatedVoids = prev.voidPeriods.filter(vp => vp.propertyId !== propertyId);
-        const existingIdx = prev.tenants.findIndex(t => t.propertyId === propertyId);
         const rec: PropertyTenant = {
           propertyId,
+          slotIndex: safeSlot,
           tenant,
           rentMultiplier: tenant.rentMultiplier,
           startDate: Date.now(),
@@ -2251,16 +2262,24 @@ export const useGameStore = create<GameState & GameActions>()(
           satisfactionReasons: [],
           moveInMonth: prev.monthsPlayed,
           depositHeld: requiredDeposit,
+          rentPennies: slotRent,
         };
-        const updatedTenants = existingIdx >= 0
-          ? prev.tenants.map((t, i) => i === existingIdx ? rec : t)
-          : [...prev.tenants, rec];
+        const updatedTenants = [...prev.tenants, rec];
+
+        // monthlyIncome = sum of slot rents (multi-unit) or just this rent (single)
+        const newMonthlyIncome = isMultiUnit
+          ? updatedTenants
+              .filter(t => t.propertyId === propertyId)
+              .reduce((sum, t) => sum + (t.rentPennies ?? 0), 0)
+          : slotRent;
+
         const updatedProps = prev.ownedProperties.map(p =>
-          p.id === propertyId ? { ...p, monthlyIncome: newRent, baseRent: currentBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
+          p.id === propertyId ? { ...p, monthlyIncome: newMonthlyIncome, baseRent: propertyBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
         );
+        const slotLabel = isMultiUnit ? ` (${property.subtype === 'flats' ? 'Flat' : 'Room'} ${safeSlot + 1})` : '';
         showToast(
           "Tenant Moved In!",
-          `${tenant.name} renting at £${fromPennies(newRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
+          `${tenant.name}${slotLabel} renting at £${fromPennies(slotRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
         );
         set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
       },
