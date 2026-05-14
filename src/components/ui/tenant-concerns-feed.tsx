@@ -131,6 +131,24 @@ export function TenantConcernsFeed({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">{c.description || "Tenant concern"}</p>
+                {(() => {
+                  const score = conditionScoreFor(c.propertyId);
+                  const lift = CONCERN_RESOLVE_CONDITION_LIFT[c.category] ?? 3;
+                  return (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {score < 50 && (
+                        <span className="text-[10px] text-red-300/90">
+                          🔧 Repair bar low ({Math.round(score)}) — fix the bar to reduce future risk
+                        </span>
+                      )}
+                      {c.source === 'damage' && (
+                        <span className="text-[10px] text-emerald-300/90">
+                          ✅ Resolving lifts repair bar +{lift}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
                 <Button
