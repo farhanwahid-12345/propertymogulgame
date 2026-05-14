@@ -890,7 +890,11 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (Math.random() >= chance) return;
 
-          const tpl = CONCERN_TEMPLATES[Math.floor(Math.random() * CONCERN_TEMPLATES.length)];
+          // When repair bar is low, bias toward maintenance/mould/safety templates
+          const pool = conditionScore < 50
+            ? CONCERN_TEMPLATES.filter(t => t.category === 'maintenance' || t.category === 'mould' || t.category === 'safety')
+            : CONCERN_TEMPLATES;
+          const tpl = pool[Math.floor(Math.random() * pool.length)];
           const desc = tpl.descriptions[Math.floor(Math.random() * tpl.descriptions.length)];
           const [lo, hi] = tpl.baseCostPct;
           const pct = lo + Math.random() * (hi - lo);
