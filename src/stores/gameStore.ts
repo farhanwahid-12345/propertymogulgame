@@ -1361,32 +1361,63 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        // ── Loans amortisation (personal/business) ──
+        // ── Loans amortisation (personal/business/investor) ──
         const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
-        let loanCashDelta = 0;
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
-          loanCashDelta -= l.monthlyPayment;
           const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
           const newBal = Math.max(0, l.remainingBalance - principalPaid);
-          if (newBal <= 0) {
-            showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
-            return;
-          }
-          updatedLoans.push({ ...l, remainingBalance: newBal });
-        });
-        if (loanCashDelta < 0) {
-          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
+          // Try to debit the loan payment from cash/overdraft first.
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, l.monthlyPayment);
           if (debited) {
             finalCash = debited.cash;
             finalOverdraftUsed = debited.overdraftUsed;
+            const newStreak = (l.onTimeStreak ?? 0) + 1;
+            // 12-month on-time streak → +5 credit
+            if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
+            if (newBal <= 0) {
+              showToast("Loan Paid Off! 🎉", `${l.kind} loan fully repaid.`);
+              return;
+            }
+            updatedLoans.push({ ...l, remainingBalance: newBal, onTimeStreak: newStreak });
           } else {
-            finalCash += loanCashDelta;
-            creditAdj -= 5;
-            showToast("Loan Payment Missed", "Insufficient funds for loan payment — credit score affected.", "destructive");
+            // Missed payment — credit penalty + arrears flag, +2% penalty rate.
+            creditAdj -= 15;
+            const penalisedRate = Math.min(0.30, l.interestRate + 0.02);
+            const repenalisedPayment = (() => {
+              const remaining = Math.max(1, l.termMonths - Math.max(0, prev.monthsPlayed - l.startMonth));
+              const r = penalisedRate / 12;
+              return Math.round((l.remainingBalance * r) / (1 - Math.pow(1 + r, -remaining)));
+            })();
+            showToast("Loan Payment Missed", `${l.kind} loan in arrears — credit −15, rate now ${(penalisedRate * 100).toFixed(2)}%.`, "destructive");
+            updatedLoans.push({
+              ...l,
+              interestRate: penalisedRate,
+              monthlyPayment: Math.max(l.monthlyPayment, repenalisedPayment),
+              onTimeStreak: 0,
+              lastMissedMonth: prev.monthsPlayed,
+            });
           }
+        });
+
+        // ── Annual EICR (electrical safety) check on residential properties ──
+        let eicrCharged = 0;
+        const eicrUpdatedProps = updatedOwnedProperties.map(p => {
+          if (p.type !== 'residential') return p;
+          const last = p.lastEicrMonth ?? 0;
+          if (newMonthNumber - last < 12) return p;
+          eicrCharged += EICR_COST_PENNIES;
+          return { ...p, lastEicrMonth: newMonthNumber };
+        });
+        if (eicrCharged > 0) {
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, eicrCharged);
+          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
+          else { finalCash -= eicrCharged; }
+          finalYearlyDeductibleExpenses += eicrCharged;
         }
+        // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
+        updatedOwnedProperties = eicrUpdatedProps;
 
         set(s => ({
           cash: finalCash,
