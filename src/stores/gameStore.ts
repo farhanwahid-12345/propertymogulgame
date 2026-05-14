@@ -593,16 +593,43 @@ export const useGameStore = create<GameState & GameActions>()(
         // Update mortgage balances + capture this month's actual interest portion
         // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
         let monthlyMortgageInterest = 0;
+        const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number }> = [];
         const updatedMortgages = newMortgages.map(mortgage => {
-          const interest = Math.round(mortgage.remainingBalance * (mortgage.interestRate / 12));
-          monthlyMortgageInterest += interest;
-          let newBalance = mortgage.remainingBalance;
-          if (mortgage.mortgageType === 'repayment') {
-            const principal = mortgage.monthlyPayment - interest;
-            newBalance = Math.max(0, mortgage.remainingBalance - principal);
+          // Fixed-term reversion — when initial fix expires, mortgage moves to lender SVR.
+          let workingMortgage = mortgage;
+          if (
+            mortgage.fixedTermYears && mortgage.fixedTermYears > 0 &&
+            mortgage.startMonth !== undefined && !mortgage.revertedToSVR &&
+            newMonthNumber - mortgage.startMonth >= mortgage.fixedTermYears * 12
+          ) {
+            const provider = MORTGAGE_PROVIDERS.find(p => p.id === mortgage.providerId);
+            const providerRate = (prev.mortgageProviderRates[mortgage.providerId] || provider?.baseRate || BASE_MARKET_RATE);
+            const svrRate = providerRate + 0.02 + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+            const monthlyRate = svrRate / 12;
+            const remainingMonths = Math.max(12, mortgage.termYears * 12 - (newMonthNumber - mortgage.startMonth));
+            const newPayment = mortgage.mortgageType === 'interest-only'
+              ? Math.round(mortgage.remainingBalance * monthlyRate)
+              : Math.round(mortgage.remainingBalance * (monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) / (Math.pow(1 + monthlyRate, remainingMonths) - 1));
+            fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate });
+            workingMortgage = { ...mortgage, interestRate: svrRate, monthlyPayment: newPayment, revertedToSVR: true };
           }
-          return { ...mortgage, remainingBalance: newBalance };
+          const interest = Math.round(workingMortgage.remainingBalance * (workingMortgage.interestRate / 12));
+          monthlyMortgageInterest += interest;
+          let newBalance = workingMortgage.remainingBalance;
+          if (workingMortgage.mortgageType === 'repayment') {
+            const principal = workingMortgage.monthlyPayment - interest;
+            newBalance = Math.max(0, workingMortgage.remainingBalance - principal);
+          }
+          return { ...workingMortgage, remainingBalance: newBalance };
         });
+        if (fixedTermReversions.length > 0) {
+          fixedTermReversions.forEach(r => {
+            showToast(
+              "Fixed-rate ended",
+              `Mortgage reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
+            );
+          });
+        }
 
         // ── Credit score ──
         let creditAdj = 0;
