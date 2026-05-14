@@ -39,6 +39,7 @@ export function MortgageManagement({
   const [singleProvider, setSingleProvider] = useState<string>("");
   const [singleTermYears, setSingleTermYears] = useState<number>(25);
   const [singleMortgageType, setSingleMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [singleFixedTermYears, setSingleFixedTermYears] = useState<number>(0);
 
   const refinanceableProperties = ownedProperties.filter(prop => prop.value > 0);
   
@@ -56,17 +57,20 @@ export function MortgageManagement({
 
   const handleRefinance = () => {
     if (!selectedProperty || !singleProvider || singleLoanAmount[0] <= 0) return;
-    onRefinance(selectedProperty.id, singleLoanAmount[0], singleProvider, singleTermYears, singleMortgageType);
+    onRefinance(selectedProperty.id, singleLoanAmount[0], singleProvider, singleTermYears, singleMortgageType, singleFixedTermYears);
     setSelectedProperty(null);
     setSingleLoanAmount([0]);
     setSingleProvider("");
     setSingleTermYears(25);
     setSingleMortgageType('repayment');
+    setSingleFixedTermYears(0);
     setIsOpen(false);
   };
 
+  const fixedAdjustment = singleFixedTermYears === 2 ? -0.004 : singleFixedTermYears === 5 ? -0.002 : singleFixedTermYears === 10 ? 0.001 : 0;
+
   const singleProviderData = mortgageProviders.find((p: any) => p.id === singleProvider);
-  const adjustedRate = singleProviderData ? Math.max(0.01, singleProviderData.baseRate + ratePenalty) : 0;
+  const adjustedRate = singleProviderData ? Math.max(0.01, singleProviderData.baseRate + ratePenalty + fixedAdjustment) : 0;
   const singleMonthlyPayment = singleProviderData ? calculateMonthlyPayment(
     singleLoanAmount[0], adjustedRate, singleTermYears, singleMortgageType
   ) : 0;
