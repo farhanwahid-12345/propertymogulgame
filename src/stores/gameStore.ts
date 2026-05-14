@@ -1824,7 +1824,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { showToast("Mortgage Rejected", eligibility.reason || "Declined", "destructive"); return; }
+          if (!eligibility.eligible) { console.warn('[buyProperty] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
