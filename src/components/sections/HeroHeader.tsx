@@ -108,7 +108,7 @@ export function HeroHeader({
               )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
-              <div className="glass rounded-full px-3 py-1 flex items-center w-[220px] hidden sm:flex">
+              <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">
                 <GameClock
                   monthsPlayed={monthsPlayed}
                   timeUntilNextMonth={timeUntilNextMonth}
