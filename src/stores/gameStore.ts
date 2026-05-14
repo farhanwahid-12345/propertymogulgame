@@ -2797,9 +2797,14 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
         if (!mortgage) { showToast("Settlement Failed", "Mortgage not found!", "destructive"); return; }
 
-        // Compute Early Repayment Charge (2% of amount being settled if within ERC window).
-        const monthsHeld = Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
-        const ercApplies = monthsHeld < ERC_WINDOW_MONTHS;
+        // Compute ERC: dynamic schedule for fixed-term products, legacy flat for SVR/tracker.
+        const monthsIntoTerm = typeof mortgage.startMonth === 'number'
+          ? Math.max(0, prev.monthsPlayed - mortgage.startMonth)
+          : Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
+        const ercRate = mortgage.fixedTermYears && !mortgage.revertedToSVR
+          ? computeErcRate(mortgage.fixedTermYears, monthsIntoTerm)
+          : (monthsIntoTerm < ERC_WINDOW_MONTHS ? ERC_PERCENT : 0);
+        const ercApplies = ercRate > 0;
 
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
