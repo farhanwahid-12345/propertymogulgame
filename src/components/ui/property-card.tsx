@@ -508,6 +508,7 @@ export const PropertyCard = memo(function PropertyCard({
                       🛠 +20
                     </Button>
                   </div>
+                  {!multiUnitSlots && <>
                   {/* Satisfaction bar — only when a tenant is assigned */}
                   {currentTenant && typeof tenantSatisfaction === 'number' && (
                     <TooltipProvider delayDuration={150}>
