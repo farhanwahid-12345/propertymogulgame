@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
-import { GameClock } from "@/components/ui/game-clock";
+import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
 import { NotificationCentre } from "@/components/ui/notification-centre";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
@@ -107,35 +107,44 @@ export function HeroHeader({
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-1.5 flex-1 min-w-[200px] max-w-md justify-end">
-              <div className={cn("flex-1 min-w-[160px]", compact ? "max-w-[220px]" : "max-w-sm")}>
+            <div className={cn(
+              "flex items-center gap-2 justify-end",
+              compact ? "flex-nowrap" : "flex-wrap"
+            )}>
+              <div className={cn(
+                "glass rounded-full px-3 py-1 flex items-center min-w-[200px]",
+                compact ? "max-w-[260px]" : "max-w-sm flex-1"
+              )}>
                 <GameClock
                   monthsPlayed={monthsPlayed}
                   timeUntilNextMonth={timeUntilNextMonth}
                   inline
                 />
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={togglePause}
-                className="glass rounded-full h-8 w-8 p-0"
-                aria-label={isPaused ? "Resume game" : "Pause game"}
-                title={isPaused ? "Resume" : "Pause"}
-              >
-                {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={toggleSound}
-                className="glass rounded-full h-8 w-8 p-0"
-                aria-label={soundOn ? "Mute sound" : "Enable sound"}
-                title={soundOn ? "Sound on" : "Sound off"}
-              >
-                {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-              </Button>
-              <div className="glass rounded-full px-1 py-0.5 flex items-center">
+              <div className="glass rounded-full px-1.5 py-1 flex items-center">
+                <SpeedSelector compact={compact} />
+              </div>
+              <div className="glass rounded-full px-1 py-0.5 flex items-center gap-0.5">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={togglePause}
+                  className="rounded-full h-8 w-8 p-0"
+                  aria-label={isPaused ? "Resume game" : "Pause game"}
+                  title={isPaused ? "Resume" : "Pause"}
+                >
+                  {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={toggleSound}
+                  className="rounded-full h-8 w-8 p-0"
+                  aria-label={soundOn ? "Mute sound" : "Enable sound"}
+                  title={soundOn ? "Sound on" : "Sound off"}
+                >
+                  {soundOn ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                </Button>
                 <NotificationCentre
                   monthsPlayed={monthsPlayed}
                   tenantHistory={tenantHistory}
