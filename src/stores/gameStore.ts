@@ -33,7 +33,7 @@ import {
   getConditionValueUplift,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability } from '@/lib/engine/planning';
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -738,11 +738,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const mortgage = newMortgages.find(m => m.propertyId === conv.propertyId);
           const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0);
 
-          // CGT for sole traders
+          // CGT for sole traders — capital improvement spend (extensions/
+          // conversions) increases the cost base, reducing the taxable gain.
           const property = newOwnedProperties.find(p => p.id === conv.propertyId);
           let cgtAmount = 0;
           if (property && prev.entityType === 'sole_trader') {
-            cgtAmount = calculateCGT(salePrice, property.price, 0, prev.entityType);
+            const improvementCosts = property.capitalImprovementsPennies || 0;
+            cgtAmount = calculateCGT(salePrice, property.price, improvementCosts, prev.entityType);
           }
 
           sellCash += net - cgtAmount;
@@ -2693,18 +2695,31 @@ export const useGameStore = create<GameState & GameActions>()(
               a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
             )
           : prev.planningApplications;
-        // Track cumulative renovation spend on the property record
+        // Track cumulative renovation spend, splitting capital vs revenue:
+        //   • Revenue (maintenance/improvement) → adds to yearly deductible expenses now
+        //   • Capital (extension/conversion)    → adds to property.capitalImprovementsPennies for CGT later
+        const isRevenue = isDeductibleRevenueRenovation(renovationType.category);
         const updatedOwned = prev.ownedProperties.map(p =>
           p.id === propertyId
-            ? { ...p, totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies }
+            ? {
+                ...p,
+                totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies,
+                capitalImprovementsPennies: isRevenue
+                  ? (p.capitalImprovementsPennies || 0)
+                  : (p.capitalImprovementsPennies || 0) + costPennies,
+              }
             : p,
         );
+        const newDeductibleExpenses = isRevenue
+          ? (prev.yearlyDeductibleExpenses || 0) + costPennies
+          : (prev.yearlyDeductibleExpenses || 0);
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
           renovations: [...prev.renovations, renovation],
           planningApplications: consumedPlanning,
           ownedProperties: updatedOwned,
+          yearlyDeductibleExpenses: newDeductibleExpenses,
         });
       },
 

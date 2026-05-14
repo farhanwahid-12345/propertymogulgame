@@ -105,6 +105,9 @@ export function TaxBreakdown({
         <div className="glass p-2 rounded-lg">
           <div className="text-muted-foreground">Allowable expenses</div>
           <div className="font-semibold">{fmt(yearlyDeductibleExpenses)}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">
+            Incl. repair-style renos
+          </div>
         </div>
         <div className="glass p-2 rounded-lg">
           <div className="text-muted-foreground">{isLtd ? "Taxable profit" : "Taxable income"}</div>
