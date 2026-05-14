@@ -1794,10 +1794,21 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // Functional set — merge by id with whatever's currently in the store
         // so concurrent monthly ticks can't clobber the new damage concerns.
+        // Loan spreads drift slightly each month within product bounds
+        const driftLoanSpread = (current: number, min: number, max: number) => {
+          const next = current + (Math.random() - 0.5) * 0.006;
+          return Math.max(min, Math.min(max, next));
+        };
+        const newLoanRates = {
+          personal: driftLoanSpread(prev.currentLoanRates.personal, LOAN_PRODUCTS.personal.spreadMin, LOAN_PRODUCTS.personal.spreadMax),
+          business: driftLoanSpread(prev.currentLoanRates.business, LOAN_PRODUCTS.business.spreadMin, LOAN_PRODUCTS.business.spreadMax),
+        };
+
         set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
           currentMarketRate: newMarketRate,
+          currentLoanRates: newLoanRates,
           voidPeriods: activeVoids,
           propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
