@@ -1161,7 +1161,30 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Fluctuate provider rates
+        // ── Commercial triennial rent reviews ──
+        // Every 36 months from the tenant's last review (or move-in), commercial
+        // leases reset to current market rent — bypassing the 3% Section-13 cap.
+        let commercialReviewCount = 0;
+        const commercialUplift = 0.0927; // 3 years compounded at 3%
+        newTenants = newTenants.map(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property || property.type !== 'commercial') return t;
+          const baseline = t.lastRentReviewMonth ?? t.moveInMonth ?? 0;
+          if (newMonthNumber - baseline < 36) return t;
+          const newBase = Math.floor((property.baseRent || property.monthlyIncome) * (1 + commercialUplift));
+          updatedOwnedProperties = updatedOwnedProperties.map(p =>
+            p.id === t.propertyId ? { ...p, baseRent: newBase, monthlyIncome: Math.floor(p.monthlyIncome * (1 + commercialUplift)), lastRentIncrease: newMonthNumber } : p
+          );
+          commercialReviewCount++;
+          return { ...t, lastRentReviewMonth: newMonthNumber };
+        });
+        if (commercialReviewCount > 0) {
+          showToast(
+            "Commercial rent review",
+            `${commercialReviewCount} commercial lease${commercialReviewCount === 1 ? '' : 's'} reviewed to market rate (+${(commercialUplift * 100).toFixed(1)}%).`
+          );
+        }
+
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
         // ── Taxation (UK tax year ends 5 April → use month 3 in 0-indexed) ──
