@@ -244,15 +244,7 @@ export const PropertyCard = memo(function PropertyCard({
                 EPC {property.epcRating}
               </Badge>
             )}
-            {property.owned && property.condition && (
-              <Badge className={cn("text-[10px]",
-                property.condition === 'premium' ? "bg-purple-500/20 text-purple-400 border-purple-500/30" :
-                property.condition === 'dilapidated' ? "bg-red-500/20 text-red-400 border-red-500/30" :
-                "bg-blue-500/20 text-blue-400 border-blue-500/30"
-              )}>
-                {property.condition === 'premium' ? '✨' : property.condition === 'dilapidated' ? '🏚️' : '🏠'} {property.condition}
-              </Badge>
-            )}
+            {/* Repair Bar replaces 3-tier condition badge — surfaced in body */}
             {property.marketTrend === "up" ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : property.marketTrend === "down" ? (
