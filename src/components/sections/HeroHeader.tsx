@@ -159,6 +159,10 @@ export function HeroHeader({
                   conveyancing={conveyancing}
                   taxRecords={taxRecords}
                   ownedProperties={ownedProperties}
+                  pendingEvictions={pendingEvictions}
+                  planningApplications={planningApplications}
+                  lastCorporationTaxMonth={lastCorporationTaxMonth}
+                  entityType={entityType}
                 />
               </div>
             </div>
