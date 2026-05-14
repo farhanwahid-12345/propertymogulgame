@@ -35,6 +35,7 @@ export interface Property {
   baseRent?: number;
   lastTenantChange?: number;
   condition: "dilapidated" | "standard" | "premium";
+  conditionScore?: number;
   monthsSinceLastRenovation: number;
   internalSqft?: number;
   plotSqft?: number;
