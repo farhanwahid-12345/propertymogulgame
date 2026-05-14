@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, DollarSign } from "lucide-react";
+import { Users, DollarSign, Lock, CreditCard, FileSearch, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
+import { useGameStore } from "@/stores/gameStore";
+import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { PropertyCondition } from "@/types/game";
 
 // --- Trait system ---
@@ -231,15 +233,25 @@ export function TenantSelector({
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
+  type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
+  const [screened, setScreened] = useState<Record<string, Screened>>({});
 
   useEffect(() => {
     if (isOpen) {
       setTenantProfiles(generateTenantProfiles());
       setSelectedTenant(null);
+      setScreened({});
     }
   }, [isOpen]);
 
   const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
+
+  const runScreening = useCallback((tenantId: string, kind: keyof Screened, costPounds: number) => {
+    const cashPennies = useGameStore.getState().cash;
+    if (cashPennies < toPennies(costPounds)) return;
+    useGameStore.getState().setCash(cashPennies - toPennies(costPounds));
+    setScreened(prev => ({ ...prev, [tenantId]: { ...prev[tenantId], [kind]: true } }));
+  }, []);
 
   const handleSelectTenant = useCallback(() => {
     if (selectedTenant) {
@@ -375,13 +387,23 @@ export function TenantSelector({
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-xs text-muted-foreground">Credit Score</span>
-                      <div className={cn(
-                        "font-semibold",
-                        tenant.creditScore >= 700 ? "text-emerald-400" :
-                        tenant.creditScore >= 600 ? "text-amber-400" : "text-red-400"
-                      )}>
-                        {tenant.creditScore}
-                      </div>
+                      {screened[tenant.id]?.credit ? (
+                        <div className={cn(
+                          "font-semibold",
+                          tenant.creditScore >= 700 ? "text-emerald-400" :
+                          tenant.creditScore >= 600 ? "text-amber-400" : "text-red-400"
+                        )}>
+                          {tenant.creditScore}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'credit', 35); }}
+                          className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200"
+                        >
+                          <CreditCard className="h-3 w-3" /> Run check (£35)
+                        </button>
+                      )}
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground">Income</span>
@@ -404,11 +426,39 @@ export function TenantSelector({
                     </div>
                   </div>
 
-                  {/* Star ratings */}
-                  <div className="flex gap-4 pt-1">
-                    <StarRating value={reliabilityStars} label="Reliability" />
-                    <StarRating value={careStars} label="Property Care" />
-                  </div>
+                  {/* Star ratings — gated behind reference check */}
+                  {screened[tenant.id]?.ref ? (
+                    <div className="flex gap-4 pt-1">
+                      <StarRating value={reliabilityStars} label="Reliability" />
+                      <StarRating value={careStars} label="Property Care" />
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        Default risk: {tenant.defaultRisk.toFixed(1)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'ref', 50); }}
+                      className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200 pt-1"
+                    >
+                      <FileSearch className="h-3 w-3" /> Reference check (£50) — reveal reliability + risk
+                    </button>
+                  )}
+
+                  {/* Right-to-rent — required check */}
+                  {screened[tenant.id]?.rtr ? (
+                    <div className="flex items-center gap-1 text-[11px] text-emerald-400">
+                      <ShieldCheck className="h-3 w-3" /> Right to rent verified
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'rtr', 25); }}
+                      className="flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200"
+                    >
+                      <Lock className="h-3 w-3" /> Right-to-rent check (£25) — legally required
+                    </button>
+                  )}
                 </CardContent>
               </Card>
             );
