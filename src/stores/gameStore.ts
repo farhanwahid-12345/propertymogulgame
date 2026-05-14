@@ -3122,6 +3122,14 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ gameSpeed: clamped });
       },
 
+      togglePause: () => {
+        set({ isPaused: !get().isPaused });
+      },
+
+      setPaused: (paused: boolean) => {
+        set({ isPaused: !!paused });
+      },
+
     }),
     {
       name: 'propertyTycoonSave',
