@@ -6,7 +6,20 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 4000
+
+if (typeof window !== "undefined" && !(window as any).__pmToastDismissBound) {
+  (window as any).__pmToastDismissBound = true;
+  const handler = (e: Event) => {
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    // Dismiss on any interaction inside dialogs / sheets / popovers / menus / drawers
+    if (t.closest('[role="dialog"], [role="menu"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-state="open"][data-side]')) {
+      dispatch({ type: "DISMISS_TOAST" });
+    }
+  };
+  window.addEventListener("pointerdown", handler, true);
+}
 
 type ToasterToast = ToastProps & {
   id: string

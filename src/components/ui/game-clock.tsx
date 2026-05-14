@@ -67,7 +67,7 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
         </span>
         <div className="flex-1 bg-muted rounded-full h-2 min-w-[60px]">
           <div 
-            className="bg-primary h-2 rounded-full transition-all duration-1000 animate-pulse-glow"
+            className="bg-primary h-2 rounded-full transition-all duration-1000 "
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -96,7 +96,7 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
           </div>
           <div className="w-full bg-muted rounded-full h-2">
             <div 
-              className="bg-primary h-2 rounded-full transition-all duration-1000 animate-pulse-glow"
+              className="bg-primary h-2 rounded-full transition-all duration-1000 "
               style={{ width: `${progress}%` }}
             />
           </div>

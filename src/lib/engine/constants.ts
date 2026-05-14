@@ -82,10 +82,11 @@ export const TENANT_WEAR_MULTIPLIER: Record<'premium' | 'standard' | 'budget' | 
 export const BASE_CONDITION_DECAY = 0.6;
 /** Floor below which neglect alone won't push a property — only damage events can. */
 export const CONDITION_DECAY_FLOOR = 5;
-/** Cost in pennies per condition point per sqft. £25/sqft × points/100 ≈ 25p per pt-sqft. */
-export const CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT = 25;
+/** Cost in pennies per condition point per sqft (UI divides by 100 → £/pt-sqft).
+ *  500 → 20pts × 900sqft × 500 / 100 = 90,000p = £900 per 20-pt top-up. */
+export const CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT = 500;
 /** Maximum condition points a player may buy in a single in-game month. */
-export const MAX_TOPUP_POINTS_PER_MONTH = 40;
+export const MAX_TOPUP_POINTS_PER_MONTH = 20;
 /** Minimum acceptable condition score by tenant profile (gates selection). */
 export const TENANT_MIN_CONDITION: Record<'premium' | 'standard' | 'budget' | 'risky', number> = {
   premium: 75, standard: 55, budget: 35, risky: 15,
