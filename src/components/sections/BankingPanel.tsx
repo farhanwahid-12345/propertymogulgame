@@ -5,6 +5,9 @@ import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
 import { LoansPanel } from "@/components/ui/loans-panel";
 import { TaxBreakdown } from "@/components/ui/tax-breakdown";
 import { UpcomingEvents } from "@/components/sections/UpcomingEvents";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { Badge } from "@/components/ui/badge";
+import { fromPennies } from "@/lib/formatCurrency";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
