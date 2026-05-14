@@ -108,7 +108,7 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
                     </span>
                   )}
                 </div>
-                {!isBuying && onWithdraw && (
+                {onWithdraw && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -117,21 +117,28 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
                         className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10 -my-1"
                       >
                         <Ban className="h-3 w-3 mr-1" />
-                        Pull out
+                        {isBuying ? 'Withdraw' : 'Pull out'}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Pull {c.propertyName} out of sale?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                          {isBuying ? `Withdraw from purchasing ${c.propertyName}?` : `Pull ${c.propertyName} out of sale?`}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                          This collapses the chain and triggers a <strong>£1,500</strong> solicitor + estate agent fee.
-                          The property stays in your portfolio.
+                          {isBuying ? (
+                            <>You forfeit the <strong>£600 solicitor fee</strong> already paid plus a <strong>0.5% abort fee (£{Math.round(((c.purchasePrice || 0) / 100) * 0.005).toLocaleString()})</strong> from your held deposit. Property returns to the market.</>
+                          ) : (
+                            <>This collapses the chain and triggers a <strong>£1,500</strong> solicitor + estate agent fee. The property stays in your portfolio.</>
+                          )}
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Keep selling</AlertDialogCancel>
+                        <AlertDialogCancel>{isBuying ? 'Keep buying' : 'Keep selling'}</AlertDialogCancel>
                         <AlertDialogAction onClick={() => onWithdraw(c.id)}>
-                          Withdraw (£1,500)
+                          {isBuying
+                            ? `Withdraw (£${Math.round(((c.purchasePrice || 0) / 100) * 0.005).toLocaleString()} fee)`
+                            : 'Withdraw (£1,500)'}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>

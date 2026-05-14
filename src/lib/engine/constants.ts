@@ -13,10 +13,28 @@ export const SOLICITOR_FEES = toPennies(600);
 export const ESTATE_AGENT_RATE = 0.015;
 export const AUCTION_SELLER_FEE = 0.05;
 export const MONTH_DURATION_SECONDS = 180;
-/** Early Repayment Charge: % of remaining/partial balance if mortgage is settled within ERC window. */
+/** Legacy flat Early Repayment Charge (used as fallback for SVR/tracker mortgages
+ *  with no fixed-term schedule). New fixed-term mortgages use computeErcRate(). */
 export const ERC_PERCENT = 0.02;
-/** ERC applies if the mortgage is less than this many in-game months old. */
+/** ERC fallback window for legacy/SVR mortgages (in-game months). */
 export const ERC_WINDOW_MONTHS = 60;
+
+/** Sliding ERC schedule by fixed-term product. Year index 0 = first 12 months, etc. */
+const ERC_SCHEDULES: Record<number, number[]> = {
+  2:  [0.03, 0.02],
+  5:  [0.05, 0.04, 0.03, 0.02, 0.01],
+  10: [0.06, 0.05, 0.04, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01, 0.01],
+};
+/** Returns the ERC rate (decimal) for a mortgage given its fixed term and months elapsed.
+ *  Returns 0 once outside the fixed term, or for SVR/tracker (fixedTermYears falsy). */
+export function computeErcRate(fixedTermYears: number | undefined, monthsIntoTerm: number): number {
+  if (!fixedTermYears) return 0;
+  const schedule = ERC_SCHEDULES[fixedTermYears];
+  if (!schedule) return 0;
+  const yearIdx = Math.floor(Math.max(0, monthsIntoTerm) / 12);
+  if (yearIdx >= schedule.length) return 0;
+  return schedule[yearIdx];
+}
 /** Annual electrical safety / EICR check (per residential property). */
 export const EICR_COST_PENNIES = toPennies(220);
 /** Loan products — limits & rate spreads above current market rate. */

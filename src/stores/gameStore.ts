@@ -16,7 +16,7 @@ import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
   MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS,
-  ERC_PERCENT, ERC_WINDOW_MONTHS, LOAN_PRODUCTS,
+  ERC_PERCENT, ERC_WINDOW_MONTHS, LOAN_PRODUCTS, EICR_COST_PENNIES, computeErcRate,
   getCeilingPrice,
 } from '@/lib/engine/constants';
 import {
@@ -94,7 +94,7 @@ interface GameActions {
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
   // Loans
-  applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => void;
+  applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
   settleLoan: (loanId: string) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
@@ -1361,32 +1361,63 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
-        // ── Loans amortisation (personal/business) ──
+        // ── Loans amortisation (personal/business/investor) ──
         const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
-        let loanCashDelta = 0;
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
-          loanCashDelta -= l.monthlyPayment;
           const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
           const newBal = Math.max(0, l.remainingBalance - principalPaid);
-          if (newBal <= 0) {
-            showToast("Loan Paid Off! 🎉", `${l.kind === 'personal' ? 'Personal' : 'Business'} loan fully repaid.`);
-            return;
-          }
-          updatedLoans.push({ ...l, remainingBalance: newBal });
-        });
-        if (loanCashDelta < 0) {
-          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, -loanCashDelta);
+          // Try to debit the loan payment from cash/overdraft first.
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, l.monthlyPayment);
           if (debited) {
             finalCash = debited.cash;
             finalOverdraftUsed = debited.overdraftUsed;
+            const newStreak = (l.onTimeStreak ?? 0) + 1;
+            // 12-month on-time streak → +5 credit
+            if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
+            if (newBal <= 0) {
+              showToast("Loan Paid Off! 🎉", `${l.kind} loan fully repaid.`);
+              return;
+            }
+            updatedLoans.push({ ...l, remainingBalance: newBal, onTimeStreak: newStreak });
           } else {
-            finalCash += loanCashDelta;
-            creditAdj -= 5;
-            showToast("Loan Payment Missed", "Insufficient funds for loan payment — credit score affected.", "destructive");
+            // Missed payment — credit penalty + arrears flag, +2% penalty rate.
+            creditAdj -= 15;
+            const penalisedRate = Math.min(0.30, l.interestRate + 0.02);
+            const repenalisedPayment = (() => {
+              const remaining = Math.max(1, l.termMonths - Math.max(0, prev.monthsPlayed - l.startMonth));
+              const r = penalisedRate / 12;
+              return Math.round((l.remainingBalance * r) / (1 - Math.pow(1 + r, -remaining)));
+            })();
+            showToast("Loan Payment Missed", `${l.kind} loan in arrears — credit −15, rate now ${(penalisedRate * 100).toFixed(2)}%.`, "destructive");
+            updatedLoans.push({
+              ...l,
+              interestRate: penalisedRate,
+              monthlyPayment: Math.max(l.monthlyPayment, repenalisedPayment),
+              onTimeStreak: 0,
+              lastMissedMonth: prev.monthsPlayed,
+            });
           }
+        });
+
+        // ── Annual EICR (electrical safety) check on residential properties ──
+        let eicrCharged = 0;
+        const eicrUpdatedProps = updatedOwnedProperties.map(p => {
+          if (p.type !== 'residential') return p;
+          const last = p.lastEicrMonth ?? 0;
+          if (newMonthNumber - last < 12) return p;
+          eicrCharged += EICR_COST_PENNIES;
+          return { ...p, lastEicrMonth: newMonthNumber };
+        });
+        if (eicrCharged > 0) {
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, eicrCharged);
+          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
+          else { finalCash -= eicrCharged; }
+          finalYearlyDeductibleExpenses += eicrCharged;
         }
+        // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
+        updatedOwnedProperties = eicrUpdatedProps;
 
         set(s => ({
           cash: finalCash,
@@ -2407,21 +2438,41 @@ export const useGameStore = create<GameState & GameActions>()(
         const prev = get();
         const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
         if (!conv) { showToast("Not Found", "That transaction is no longer in progress.", "destructive"); return; }
-        if (conv.status !== 'selling') {
-          showToast("Cannot Withdraw", "Only sellers can pull out of a conveyancing chain.", "destructive");
+        if (conv.status === 'selling') {
+          const feePennies = toPennies(1500);
+          const dbg = debit(prev, feePennies);
+          if (!dbg) {
+            showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
+            return;
+          }
+          showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+          set({
+            cash: dbg.cash,
+            overdraftUsed: dbg.overdraftUsed,
+            conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+          });
           return;
         }
-        const feePennies = toPennies(1500);
-        const dbg = debit(prev, feePennies);
-        if (!dbg) {
-          showToast("Insufficient Funds", `Need £1,500 (even with overdraft) to cover chain-collapse fees.`, "destructive");
-          return;
-        }
-        showToast("Sale Withdrawn", `${conv.propertyName} pulled from sale. Chain-collapse fee £1,500 paid.`, "destructive");
+        // Buying-side withdrawal — forfeit solicitor fees + 0.5% abort fee.
+        const purchase = conv.purchasePrice || 0;
+        const abortFee = Math.round(purchase * 0.005);
+        // Refund any cash held in escrow (deposit), minus the abort fee.
+        const escrowReturn = Math.max(0, (conv.cashHeld || 0) - abortFee);
+        const credited = credit(prev, escrowReturn);
+        showToast(
+          "Purchase Withdrawn",
+          `${conv.propertyName} aborted. Solicitor fees forfeit; £${fromPennies(abortFee).toLocaleString()} abort fee deducted.`,
+          "destructive",
+        );
+        // Return the property snapshot back to the estate-agent inventory if not already listed.
+        const reinstated = !prev.estateAgentProperties.find((p: any) => p.id === conv.propertyId)
+          ? [...prev.estateAgentProperties, { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: purchase, value: purchase, neighborhood: '', monthlyIncome: 0, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0 } as any]
+          : prev.estateAgentProperties;
         set({
-          cash: dbg.cash,
-          overdraftUsed: dbg.overdraftUsed,
+          cash: credited.cash,
+          overdraftUsed: credited.overdraftUsed,
           conveyancing: (prev.conveyancing || []).filter((c: any) => c.id !== conveyancingId),
+          estateAgentProperties: reinstated,
         });
       },
 
@@ -2797,9 +2848,14 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgage = prev.mortgages.find(m => m.propertyId === mortgagePropertyId);
         if (!mortgage) { showToast("Settlement Failed", "Mortgage not found!", "destructive"); return; }
 
-        // Compute Early Repayment Charge (2% of amount being settled if within ERC window).
-        const monthsHeld = Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
-        const ercApplies = monthsHeld < ERC_WINDOW_MONTHS;
+        // Compute ERC: dynamic schedule for fixed-term products, legacy flat for SVR/tracker.
+        const monthsIntoTerm = typeof mortgage.startMonth === 'number'
+          ? Math.max(0, prev.monthsPlayed - mortgage.startMonth)
+          : Math.floor((Date.now() - mortgage.startDate) / (MONTH_DURATION_SECONDS * 1000));
+        const ercRate = mortgage.fixedTermYears && !mortgage.revertedToSVR
+          ? computeErcRate(mortgage.fixedTermYears, monthsIntoTerm)
+          : (monthsIntoTerm < ERC_WINDOW_MONTHS ? ERC_PERCENT : 0);
+        const ercApplies = ercRate > 0;
 
         if (useCash) {
           if (partialAmount && partialAmount > 0) {
@@ -2991,35 +3047,46 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
       },
 
-      // ─── LOANS (personal / business) ─────────────────
-      applyForLoan: (kind: 'personal' | 'business', amount: number, termMonths: number) => {
+      // ─── LOANS (personal / business / investor) ─────────────────
+      applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => {
         const prev = get();
         const product = (LOAN_PRODUCTS as any)[kind];
         if (!product) { showToast("Loan Failed", "Unknown product.", "destructive"); return; }
-        if (prev.creditScore < product.minCreditScore) {
+        if (kind !== 'investor' && prev.creditScore < product.minCreditScore) {
           showToast("Loan Rejected", `Credit score ${prev.creditScore} below minimum ${product.minCreditScore}.`, "destructive"); return;
         }
         if (kind === 'business') {
           if (prev.entityType !== 'ltd') { showToast("Loan Rejected", "Business loans require a Ltd company.", "destructive"); return; }
           if (prev.ownedProperties.length < 2) { showToast("Loan Rejected", "Need at least 2 owned properties.", "destructive"); return; }
         }
-        // Dynamic cap based on rent roll & credit score
+        if (kind === 'investor') {
+          const minRep = (product as any).minReputation ?? 40;
+          if ((prev.landlordReputation ?? 50) < minRep) {
+            showToast("Investor Declined", `Need landlord reputation ≥ ${minRep}. Yours: ${prev.landlordReputation ?? 50}.`, "destructive"); return;
+          }
+        }
+        // Dynamic cap: investor by reputation, others by rent roll & credit.
         const monthlyRent = prev.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
         const monthlyMortgage = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
         const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage);
         const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
+        const reputationFactor = Math.max(0.4, Math.min(1.5, ((prev.landlordReputation ?? 50)) / 60));
         const dynamicCap = kind === 'personal'
           ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 6) * creditFactor)
-          : Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor);
+          : kind === 'business'
+            ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor)
+            : Math.floor(product.hardCapPennies * reputationFactor);
         if (amount > dynamicCap) {
           showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
         }
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        // Dynamic APR: market rate + product spread + credit-score penalty (shared with mortgages)
-        const creditPenalty = prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
-        const spread = (prev.currentLoanRates as any)[kind] ?? product.baseSpread;
+        // APR: investor uses fixed product spread (no credit penalty); others credit-adjusted.
+        const creditPenalty = kind === 'investor' ? 0
+          : prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
+        const spread = kind === 'investor' ? product.baseSpread
+          : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
         const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
@@ -3028,6 +3095,8 @@ export const useGameStore = create<GameState & GameActions>()(
           kind, principal: amount, remainingBalance: amount,
           monthlyPayment, interestRate: rate, termMonths,
           startMonth: prev.monthsPlayed,
+          onTimeStreak: 0,
+          ...(kind === 'investor' ? { lenderName: 'Family & Friends Syndicate' } : {}),
         };
         const credited = credit(prev, amount);
         set({
