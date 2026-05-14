@@ -9,6 +9,7 @@ import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierSha
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { PropertyCondition } from "@/types/game";
+import { TENANT_MIN_CONDITION } from "@/lib/engine/constants";
 
 // --- Trait system ---
 
