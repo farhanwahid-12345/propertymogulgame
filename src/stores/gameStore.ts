@@ -1048,11 +1048,12 @@ export const useGameStore = create<GameState & GameActions>()(
           // Reputation: antisocial removal earns goodwill; other grounds dent reputation
           reputationDelta += ev.ground === 'antisocial_behaviour' ? 1 : -3;
 
-          // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
+          // Anti-abuse locks (12 months) — scoped to the evicted slot only.
           if (ev.ground === 'landlord_sale') {
+            // Sale lock applies property-wide (must list/sell whole property).
             newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'sale_lock', untilMonth: newMonthNumber + 12 });
           } else if (ev.ground === 'landlord_move_in') {
-            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12 });
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12, slotIndex: ev.slotIndex });
           }
 
           showToast(
