@@ -3161,16 +3161,23 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Investor Declined", `Need landlord reputation ≥ ${minRep}. Yours: ${prev.landlordReputation ?? 50}.`, "destructive"); return;
           }
         }
-        // Dynamic cap: investor by reputation, others by rent roll & credit.
+        // Dynamic cap: investor by reputation, others by rent roll, existing
+        // debt service (mortgages + loans), and credit-tier multiplier.
         const monthlyRent = prev.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
         const monthlyMortgage = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
-        const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage);
+        const existingLoanPayments = ((prev as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
+        const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage - existingLoanPayments);
         const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
         const reputationFactor = Math.max(0.4, Math.min(1.5, ((prev.landlordReputation ?? 50)) / 60));
+        // Credit-tier hard-cap multiplier on top of creditFactor
+        const creditTierMult =
+          prev.creditScore < 500 ? 0.4 :
+          prev.creditScore < 650 ? 0.7 :
+          prev.creditScore < 750 ? 1.0 : 1.25;
         const dynamicCap = kind === 'personal'
-          ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 6) * creditFactor)
+          ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 6) * creditFactor)
           : kind === 'business'
-            ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor)
+            ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 12 * 4) * creditFactor)
             : Math.floor(product.hardCapPennies * reputationFactor);
         if (amount > dynamicCap) {
           showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
@@ -3186,6 +3193,20 @@ export const useGameStore = create<GameState & GameActions>()(
         const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+
+        // Combined-DTI gate (skipped for investor — relationship-based)
+        if (kind !== 'investor' && monthlyRent > 0) {
+          const combinedDTI = (monthlyMortgage + existingLoanPayments + monthlyPayment) / monthlyRent;
+          const dtiCap = kind === 'business' ? 0.85 : 0.75;
+          if (combinedDTI > dtiCap) {
+            showToast(
+              "Loan Rejected",
+              `Combined debt-to-income ${(combinedDTI * 100).toFixed(0)}% exceeds ${(dtiCap * 100).toFixed(0)}%. Reduce existing debt first.`,
+              "destructive",
+            );
+            return;
+          }
+        }
         const loan: import('@/types/game').Loan = {
           id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
           kind, principal: amount, remainingBalance: amount,
