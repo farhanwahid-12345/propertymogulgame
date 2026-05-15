@@ -2737,6 +2737,29 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
 
+        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        if (renovationType.category === 'conversion') {
+          if (prev.tenants.some(t => t.propertyId === propertyId)) {
+            showToast(
+              "Conversion Blocked",
+              "Vacate every unit (serve eviction notice) before applying to convert.",
+              "destructive",
+            );
+            return;
+          }
+          if (property.subtype && property.subtype !== 'standard') {
+            showToast("Already Converted", `This property has already been converted to ${property.subtype}.`, "destructive");
+            return;
+          }
+          const completedConversion = (property.completedRenovationIds || []).find(
+            id => id === 'convert_hmo' || id === 'convert_flats' || id === 'convert_multi_let',
+          );
+          if (completedConversion) {
+            showToast("Already Converted", "Only one conversion type per property.", "destructive");
+            return;
+          }
+        }
+
         // Block if a previous refusal is still in cooldown
         const cooldown = (prev.propertyLocks || []).find(
           l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
