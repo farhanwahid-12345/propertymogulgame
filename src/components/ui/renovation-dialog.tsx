@@ -361,8 +361,9 @@ export function RenovationDialog({
 
   /** Returns null if eligible, else a short reason string. */
   const ineligibilityReason = (r: RenovationType): string | null => {
-    if (hasTenant) {
-      return `Tenant in residence — serve eviction or wait for vacancy`;
+    // Conversions structurally rebuild the property — must be vacant.
+    if (r.category === 'conversion' && hasTenant) {
+      return `Vacate every unit (serve eviction notice) before converting`;
     }
     if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
       return `Only for ${r.allowedTypes.join('/')}`;
@@ -376,8 +377,13 @@ export function RenovationDialog({
     if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
       return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
     }
+    // Already-converted: hide ANY further conversion option.
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
       return `Already converted to ${currentSubtype}`;
+    }
+    // One conversion only — block alternates if any conversion already completed.
+    if (r.category === 'conversion' && completedRenovationIds.some(id => id === 'convert_hmo' || id === 'convert_flats' || id === 'convert_multi_let')) {
+      return `Property has already been converted`;
     }
     return null;
   };
