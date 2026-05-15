@@ -1889,9 +1889,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(purchasePrice * 0.01) : 0;
         const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        const debited = debit(prev, cashRequired);
-        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
-
+        // Pre-flight mortgage eligibility BEFORE debiting cash.
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
         if (mortgageAmount > 0) {
@@ -1929,6 +1927,9 @@ export const useGameStore = create<GameState & GameActions>()(
             interestRate: eligibility.adjustedRate,
           };
         }
+
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
         const conv: Conveyancing = {
