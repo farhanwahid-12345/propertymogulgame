@@ -1828,7 +1828,10 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { console.warn('[buyProperty] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
+          if (!eligibility.eligible) {
+            showToast("Mortgage Rejected", eligibility.reason || "Lender declined this application.", "destructive");
+            return;
+          }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
@@ -1912,7 +1915,10 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { console.warn('[buyPropertyAtPrice] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
+          if (!eligibility.eligible) {
+            showToast("Mortgage Rejected", eligibility.reason || "Lender declined this application.", "destructive");
+            return;
+          }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
