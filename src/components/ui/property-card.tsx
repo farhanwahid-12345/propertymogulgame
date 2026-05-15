@@ -146,6 +146,7 @@ export const PropertyCard = memo(function PropertyCard({
   planningApplications = [],
   planningHistory = [],
   inPlanningCooldown = false,
+  hasAnyTenant = false,
   evictTenant,
   cancelEviction,
   pendingEviction,
@@ -644,6 +645,7 @@ export const PropertyCard = memo(function PropertyCard({
                       planningHistory={planningHistory}
                       monthsPlayed={monthsPlayed}
                       inPlanningCooldown={inPlanningCooldown}
+                      hasTenant={hasAnyTenant || !!currentTenant}
                     />
                   )}
                   <FurnishingDialog
