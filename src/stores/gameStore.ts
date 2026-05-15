@@ -2612,6 +2612,39 @@ export const useGameStore = create<GameState & GameActions>()(
       startRenovation: (propertyId, renovationType) => {
         const prev = get();
 
+        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        if (renovationType.category === 'conversion') {
+          if (prev.tenants.some(t => t.propertyId === propertyId)) {
+            showToast(
+              "Conversion Blocked",
+              "Vacate every unit (serve eviction notice) before converting.",
+              "destructive",
+            );
+            return;
+          }
+          const propertyForCheck = prev.ownedProperties.find(p => p.id === propertyId);
+          const subtype = propertyForCheck?.subtype;
+          if (subtype && subtype !== 'standard') {
+            showToast(
+              "Already Converted",
+              `This property has already been converted to ${subtype}.`,
+              "destructive",
+            );
+            return;
+          }
+          const completedConversion = (propertyForCheck?.completedRenovationIds || []).find(
+            id => id === 'convert_hmo' || id === 'convert_flats' || id === 'convert_multi_let',
+          );
+          if (completedConversion) {
+            showToast(
+              "Already Converted",
+              "Only one conversion type per property.",
+              "destructive",
+            );
+            return;
+          }
+        }
+
         // Renovations needing planning permission must be applied for first —
         // route the call to the planning-application flow instead of starting
         // work immediately. The store's monthly tick will auto-start the
