@@ -40,20 +40,38 @@ export function LoansPanel() {
     : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
   const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty);
 
-  // Dynamic cap based on rent roll & credit (investor capped by reputation instead).
+  // Dynamic cap based on rent roll, debt service & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
     const rentRoll = store.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
     const mortgages = store.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
-    const netMonthly = Math.max(0, rentRoll - mortgages);
+    const existingLoanPmts = ((store as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
+    const netMonthly = Math.max(0, rentRoll - mortgages - existingLoanPmts);
     const creditFactor = Math.max(0.5, Math.min(1.4, store.creditScore / 700));
     const reputationFactor = Math.max(0.4, Math.min(1.5, (((store as any).landlordReputation ?? 50)) / 60));
+    const creditTierMult =
+      store.creditScore < 500 ? 0.4 :
+      store.creditScore < 650 ? 0.7 :
+      store.creditScore < 750 ? 1.0 : 1.25;
     const cap = kind === 'personal'
-      ? Math.min(product.hardCapPennies, netMonthly * 6) * creditFactor
+      ? Math.min(product.hardCapPennies * creditTierMult, netMonthly * 6) * creditFactor
       : kind === 'business'
-        ? Math.min(product.hardCapPennies, netMonthly * 12 * 4) * creditFactor
+        ? Math.min(product.hardCapPennies * creditTierMult, netMonthly * 12 * 4) * creditFactor
         : product.hardCapPennies * reputationFactor;
     return Math.max(0, Math.floor(cap));
-  }, [store.ownedProperties, store.mortgages, store.creditScore, kind, product.hardCapPennies, (store as any).landlordReputation]);
+  }, [store.ownedProperties, store.mortgages, (store as any).loans, store.creditScore, kind, product.hardCapPennies, (store as any).landlordReputation]);
+
+  // Combined-DTI gate (skipped for investor)
+  const combinedDTIInfo = useMemo(() => {
+    if (kind === 'investor') return null;
+    const rentRoll = store.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
+    if (rentRoll <= 0) return null;
+    const mortgages = store.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
+    const existingLoanPmts = ((store as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
+    return { rentRoll, mortgages, existingLoanPmts };
+  }, [kind, store.ownedProperties, store.mortgages, (store as any).loans]);
+
+  const monthlyRate = (Math.max(0.02, store.currentMarketRate + (kind === 'investor' ? product.baseSpread : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread)) + creditPenalty)) / 12;
+  const estimatedMonthly = termMonths > 0 ? Math.round((toPennies(amountPounds) * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths))) : 0;
 
   const eligibilityIssue: string | null = (() => {
     if (kind !== 'investor' && store.creditScore < product.minCreditScore) return `Credit score ${store.creditScore} below minimum ${product.minCreditScore}.`;
@@ -73,11 +91,15 @@ export function LoansPanel() {
       return `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`;
     }
     if (amountPounds < 500) return 'Minimum loan £500.';
+    if (combinedDTIInfo && estimatedMonthly > 0) {
+      const combinedDTI = (combinedDTIInfo.mortgages + combinedDTIInfo.existingLoanPmts + estimatedMonthly) / combinedDTIInfo.rentRoll;
+      const dtiCap = kind === 'business' ? 0.85 : 0.75;
+      if (combinedDTI > dtiCap) {
+        return `Combined debt-to-income ${(combinedDTI * 100).toFixed(0)}% exceeds ${(dtiCap * 100).toFixed(0)}% cap.`;
+      }
+    }
     return null;
   })();
-
-  const monthlyRate = rate / 12;
-  const estimatedMonthly = Math.round((amountPounds * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 
   const handleApply = () => {
     if (eligibilityIssue) return;
