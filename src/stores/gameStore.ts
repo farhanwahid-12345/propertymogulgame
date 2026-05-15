@@ -986,7 +986,7 @@ export const useGameStore = create<GameState & GameActions>()(
               // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
               const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
               if (cooldownGrounds.includes(ev.ground)) {
-                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6 });
+                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6, slotIndex: ev.slotIndex });
               }
               newTenants = newTenants.map(t =>
                 t.propertyId === ev.propertyId
@@ -2211,10 +2211,10 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
         }
-        // Can't let to a new tenant during a relet lock (post move-in eviction)
-        const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth);
+        // Can't let to a new tenant during a relet lock (post move-in eviction) — slot-scoped
+        const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex));
         if (releLock) {
-          showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
+          showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let this slot until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
         // sale_lock — must list/sell after serving landlord-sale grounds
@@ -2379,7 +2379,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
         if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
           const appealCd = (prev.propertyLocks || []).find(
-            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth,
+            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex),
           );
           if (appealCd) {
             showToast(
