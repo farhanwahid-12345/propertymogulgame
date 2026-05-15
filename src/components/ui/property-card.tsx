@@ -101,6 +101,8 @@ interface PropertyCardProps {
   planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
   /** True if this property has an active planning_cooldown lock. */
   inPlanningCooldown?: boolean;
+  /** True when ANY slot of the property is occupied — used to gate conversions. */
+  hasAnyTenant?: boolean;
 }
 
 const PropertyTypeIcon = {
