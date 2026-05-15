@@ -1800,15 +1800,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(property.price * 0.01) : 0;
         const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        const debited = debit(prev, cashRequired);
-        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
-
+        // Pre-flight mortgage eligibility BEFORE debiting cash so a rejection
+        // doesn't leave the player out-of-pocket.
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          // Use EXPECTED rent (every owned property's monthlyIncome regardless
-          // of tenancy) so a vacant fresh purchase doesn't fail the ICR test.
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
@@ -1842,6 +1839,9 @@ export const useGameStore = create<GameState & GameActions>()(
             interestRate: eligibility.adjustedRate,
           };
         }
+
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         // Create conveyancing entry instead of instant purchase
         const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
