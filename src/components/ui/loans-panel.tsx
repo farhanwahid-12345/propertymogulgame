@@ -70,8 +70,8 @@ export function LoansPanel() {
     return { rentRoll, mortgages, existingLoanPmts };
   }, [kind, store.ownedProperties, store.mortgages, (store as any).loans]);
 
-  const monthlyRate = (Math.max(0.02, store.currentMarketRate + (kind === 'investor' ? product.baseSpread : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread)) + creditPenalty)) / 12;
-  const estimatedMonthly = termMonths > 0 ? Math.round((toPennies(amountPounds) * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths))) : 0;
+  const monthlyRate = rate / 12;
+  const estimatedMonthlyPennies = termMonths > 0 ? Math.round((toPennies(amountPounds) * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths))) : 0;
 
   const eligibilityIssue: string | null = (() => {
     if (kind !== 'investor' && store.creditScore < product.minCreditScore) return `Credit score ${store.creditScore} below minimum ${product.minCreditScore}.`;
@@ -91,8 +91,8 @@ export function LoansPanel() {
       return `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`;
     }
     if (amountPounds < 500) return 'Minimum loan £500.';
-    if (combinedDTIInfo && estimatedMonthly > 0) {
-      const combinedDTI = (combinedDTIInfo.mortgages + combinedDTIInfo.existingLoanPmts + estimatedMonthly) / combinedDTIInfo.rentRoll;
+    if (combinedDTIInfo && estimatedMonthlyPennies > 0) {
+      const combinedDTI = (combinedDTIInfo.mortgages + combinedDTIInfo.existingLoanPmts + estimatedMonthlyPennies) / combinedDTIInfo.rentRoll;
       const dtiCap = kind === 'business' ? 0.85 : 0.75;
       if (combinedDTI > dtiCap) {
         return `Combined debt-to-income ${(combinedDTI * 100).toFixed(0)}% exceeds ${(dtiCap * 100).toFixed(0)}% cap.`;
@@ -166,7 +166,7 @@ export function LoansPanel() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Rate</span><strong>{(rate * 100).toFixed(2)}% APR</strong></div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly payment</span>
-                  <strong>£{Math.max(0, estimatedMonthly).toLocaleString()}</strong>
+                  <strong>£{fromPennies(Math.max(0, estimatedMonthlyPennies)).toLocaleString()}</strong>
                 </div>
               </div>
 
