@@ -177,6 +177,7 @@ export function PortfolioGrid({
               planningHistory={(gameState as any).planningApplications || []}
               inPlanningCooldown={inPlanningCooldown}
               multiUnitSlots={multiUnitSlots}
+              hasAnyTenant={tenantRecs.length > 0}
             />
           );
         })}

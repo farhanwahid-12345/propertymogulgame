@@ -1,108 +1,110 @@
-## Overview
+## Seven targeted fixes
 
-Eight related fixes across dashboard layout, notifications, banking flows, and property UI. Grouped below in build order.
-
----
-
-### 1. Move "Upcoming Events" out of the central UI
-
-**Goal:** the Upcoming Events card no longer occupies a slot in the main column — its rows feed the notification centre instead.
-
-- In `src/pages/Index.tsx`, remove the `<UpcomingEvents />` render from the main grid.
-- In `src/components/ui/notification-centre.tsx`, add an "Upcoming" group at the top:
-  - Reuse the row-building logic from `UpcomingEvents.tsx` (extract into `src/lib/upcomingEvents.ts` as `buildUpcomingRows({ monthsPlayed, entityType, pendingEvictions, planningApplications, lastCorporationTaxMonth })`).
-  - Render each row as a `notification-centre` item with the same icon + months-away badge.
-- Delete `UpcomingEvents.tsx` once unreferenced (keep the helper only).
-
-### 2. Notification ↔ feed parity
-
-**Bug:** ping fires but notification centre is empty, or centre has rows but no ping fired.
-
-- Audit `pushNotification` callers in `gameStore.ts` and `use-toast.ts`. Every `showToast` that should be persistent must also push into `notifications` (and vice versa).
-- Add a single helper `notify({title, description, severity, category})` in `src/lib/notify.ts` that:
-  - Pushes into the store's `notifications` array (cap 50, newest first).
-  - Triggers the toast via `useToast`.
-  - Plays the ping sound when `severity !== 'silent'`.
-- Replace bare `showToast(...)` calls that represent real events (sale completed, chain collapse, loan approved, eviction served, planning decision, tax due, etc.) with `notify(...)`.
-- Add a dev-mode console warning when a notification is added with no matching toast or vice versa.
-
-### 3. Seller pull-out ping
-
-- In `gameStore.ts` chain-collapse path (~line where `chain risk` resolves), call `notify({title: 'Sale fell through', description: '${propName}: buyer pulled out.', severity: 'warning', category: 'sales'})`.
-- Same on the buying side when the seller collapses (the player is buyer).
-
-### 4. Fixed-term selector when buying
-
-**Currently** `MortgageProviderSelector` only shows fixed-term options inside `MortgageRefinance`.
-
-- Add the same `<Select>` for "Initial Fixed Term" (2yr / 5yr / SVR) into `mortgage-provider-selector.tsx`.
-- Plumb `initialFixedTermYears` through `buyProperty` → `useGameState.buyProperty` → `gameStore.buyProperty` → stored on the new `Mortgage` record (already supported by the type).
-- Default = SVR (no fix), matching today's behaviour.
-
-### 5. Operations panel — make it hide away
-
-- In `operations-center.tsx`, swap the always-on glass card for a header-only collapsed state:
-  - When `totalActionable === 0`, render only the 36px summary chip; do not reserve grid space for the body.
-  - When actionable, default to collapsed and show "X active — tap to view".
-- Keep the existing `CollapsibleSection` wrapper from `Index.tsx`; remove the inner duplicate `Card` chrome that adds vertical bulk.
-- Persist open/closed in `localStorage` (already done by `CollapsibleSection`).
-
-### 6. Loans panel fixes
-
-- **"No active loans" bug:** `BankingPanel` summary uses `(gameState as any).loans` but `useGameState` does not surface `loans`. Add `loans: store.loans` to the returned object in `useGameState.ts`. Update the summary + `defaultOpenDesktop` to use the typed value.
-- **Cash flow ignores loans:** in `useGameState.ts`:
-  - Add `loanExpenses = loans.reduce((s, l) => s + fromPennies(l.monthlyPayment), 0)`.
-  - Include in `totalMonthlyExpenses`.
-  - Add `loans: loanExpenses` to `expenseBreakdown`.
-- In `game-stats.tsx` cash-flow popover, render a "Loan Payments" row when `expenseBreakdown.loans > 0`.
-
-### 7. Renovation ROI accuracy
-
-- In `src/lib/engine/renovation.ts`, audit `expectedROI` / `valueUplift` formulas against what `gameStore.completeRenovation` actually applies (cost debited vs. value added).
-- Replace the headline number shown in `renovation-dialog.tsx` with the same formula the store uses, expressed as `(uplift - cost) / cost`. Show a range if the roll is probabilistic.
-- Add a unit-style sanity check in `renovation.ts`: assert that the median rolled outcome matches the displayed estimate within ±2pp.
-
-### 8. Portfolio mortgage — secure button silently fails + ensure payoff/cash-out
-
-- In `gameStore.handlePortfolioMortgage`, replace the silent `console.warn` on ineligibility with `showToast("Portfolio mortgage rejected", reason, "destructive")` so the user sees why.
-- Verify the existing logic that filters out `selectedPropertyIds` from `prev.mortgages` (already pays off old mortgages by removing them and using `cashDelta = loanAmount - totalCurrentMortgages`). Surface this in the UI:
-  - In `portfolio-mortgage.tsx`, add a "Settles £X of existing mortgages" line above the cash-out figure.
-  - Cap the slider's lower bound at `totalCurrentMortgages` (already correct) and clamp upper bound to `min(maxLoanAmount, totalPortfolioValue)`.
-- After success, fire `notify({title: 'Portfolio mortgage secured', ...})`.
-
-### 9. Tenant Concerns → folded into Property Condition bar
-
-- Delete the standalone `tenant-concerns-feed.tsx` from the dashboard render in `Index.tsx`.
-- In `property-card.tsx`, attach concerns to the existing `RepairBar` row:
-  - Show concern count as a small chip beside the bar (`⚠ 2 concerns`).
-  - Clicking the chip opens a popover listing the property's open concerns with their existing action buttons (resolve, ignore, dispute) — reuse the row component logic from the deleted feed.
-- Keep all engine logic (concern generation, decay, auto-resolve on top-up) untouched.
-- Drop `TenantConcernsFeed` import from `Index.tsx`; archive the file.
+Grouped in build order. All scoped — no schema migrations.
 
 ---
 
-### Technical notes
+### 1. Move "Portfolio Mortgage" into the main banking button row
 
-- Notification refactor (#2) is the only structural change — everything else is local.
-- No store-shape migration. `loans` is already persisted; only the hook exposure is missing.
-- `CollapsibleSection` already supports `defaultOpenDesktop` + localStorage; reuse it.
-- All money math stays in pennies in the store, pounds at the UI boundary.
+`BankingPanel.tsx` currently renders `<PortfolioMortgage />` on its own line below the Pay/Manage/Credit row.
+
+- Move `<PortfolioMortgage />` into the same `flex flex-wrap gap-2` row as `MortgageSettlement`, `MortgageManagement`, `CreditOverdraft`.
+- Drop the separate `<div className="mt-4">` wrapper.
+- Restyle its trigger button to match the others (same `variant="outline"` glass treatment, same height).
+- Keep the "Need 3+ properties" disabled state.
+
+---
+
+### 2. Block conversions while a property has any tenant
+
+Conversions structurally rebuild the property; today the dialog allows them on let units.
+
+- In `gameStore.ts` `completeRenovation` (~line 2660), if `renovationType.category === 'conversion'`, check `prev.tenants.some(t => t.propertyId === propertyId)`. If so → `showToast("Conversion Blocked", "Vacate every unit (serve eviction notices) before converting.", "destructive")` and return.
+- Mirror the same gate at the planning-application step (`submitPlanningApplication` for conversions) so the player isn't allowed to spend the LPA fee on an impossible job.
+- In `renovation-dialog.tsx`, when the selected option is a conversion and the property has a tenant, disable the "Start renovation" button and show an inline warning ("Cannot convert while occupied — serve notice first"). Reuse the existing tenant lookup already passed to the dialog.
+
+---
+
+### 3. Mortgage acceptance silently failing on buy
+
+`buyProperty` and `buyPropertyAtPrice` currently `return` with only a `console.warn` when the eligibility check fails after the user clicks Accept.
+
+- In both store actions, replace the silent warn with `showToast("Mortgage rejected", eligibility.reason || "Lender declined this application.", "destructive")`.
+- Add a pre-submit eligibility recheck inside `MortgageProviderSelector` so already-ineligible providers are visibly disabled (already partially done) — but additionally re-run `calculateMortgageEligibility` against the live cash/credit/DTI snapshot at click time and short-circuit with the same toast before calling the store, so the failure path is consistent.
+- Add a `notify({title: "Mortgage approved", ...})` on success in both `buyProperty`/`buyPropertyAtPrice` so the user gets positive confirmation too.
+
+---
+
+### 4. Chime + sub-menu when planning is approved
+
+`gameStore.ts` already toasts "Planning Approved" at line 1074, but it's a passive ping with no follow-through.
+
+- Replace the bare `showToast` with the unified `notify({title, description, severity: 'success', category: 'planning'})` so it lands in the notification centre AND plays the success chime.
+- Add a `pendingPlanningCelebrations: string[]` slice (just approval IDs) populated alongside the resolution.
+- New component `src/components/ui/planning-approved-dialog.tsx`: subscribes to `pendingPlanningCelebrations`, opens automatically when non-empty, lists each newly-approved application with the property name, renovation name, and a primary "Start renovation now" button that opens `renovation-dialog` for that property and pre-selects the approved type. A "Later" button just clears the entry.
+- Mount the dialog once in `Index.tsx` so it triggers from anywhere.
+
+---
+
+### 5. One conversion type per property
+
+Today a player can stack `convert_hmo` then `convert_flats` on the same building.
+
+- In `renovation-dialog.tsx` (~line 379 — already filters conversions where subtype != standard), broaden the rule: if `property.completedRenovationIds` contains ANY id from the conversion category, hide every other conversion option and show "Already converted to {subtype}".
+- In `gameStore.completeRenovation`, add a server-side guard: refuse a conversion when the property already has a completed conversion renovation. Toast: "Already Converted", "This property has already been converted to {existing subtype}."
+- Same guard inside `submitPlanningApplication` so the player can't even apply.
+
+---
+
+### 6. Loan limits respect mortgages, existing loans, and credit rating
+
+`applyForLoan` currently caps by `monthlyNetRent * 6/48 × creditFactor` — mortgages reduce net rent, but existing loan repayments and credit-tier hard caps are not applied.
+
+- Subtract existing loan monthly payments from `monthlyNetRent` before computing `dynamicCap`:
+  ```
+  const existingLoanPayments = (prev.loans || []).reduce((s, l) => s + l.monthlyPayment, 0);
+  const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage - existingLoanPayments);
+  ```
+- Add a credit-tier hard cap multiplier on top of `creditFactor`:
+  - <500: 0.4× hardCap
+  - 500–649: 0.7× hardCap
+  - 650–749: 1.0× hardCap
+  - ≥750: 1.25× hardCap
+- Add a portfolio-DTI gate: combined `(monthlyMortgage + existingLoanPayments + newLoanPayment) / monthlyRent ≤ 0.75` for personal, ≤ 0.85 for business. Reject with `showToast("Loan Rejected", "Combined debt-to-income exceeds X%. Reduce existing debt first.", "destructive")` before debiting.
+- Surface the same calculation in `loans-panel.tsx` so the slider's max binds to the live cap (no more "approved then surprise rejection").
+
+---
+
+### 7. Per-slot eviction, locks, and re-let scope
+
+Today `PropertyLock` is property-wide, so evicting one flat (`relet_lock` after a `landlord_move_in`) blocks letting the OTHER flat too.
+
+- Add optional `slotIndex?: number` to `PropertyLock` in `src/types/game.ts`. Migration: existing locks default to all-slots (undefined = property-wide, preserves current behaviour for legacy single-unit data).
+- In `gameStore.ts`:
+  - When pushing `relet_lock` (line 1055) and `appeal_cooldown` after eviction completion, set `slotIndex: ev.slotIndex`.
+  - In the `releLock` lookup (line 2207) and `appealCd` lookup (line 2374), filter by both propertyId AND `(l.slotIndex === undefined || l.slotIndex === slotIndex)`.
+  - Audit other lock consumers for the same scoping.
+- In the let-flow guard at line 2233, only block the slot being filled, not the whole property.
+- No UI changes required — repair bar / concerns chip already render per-property.
+
+---
 
 ### Files touched
 
-- `src/pages/Index.tsx` — drop `UpcomingEvents`, drop `TenantConcernsFeed`, restyle Operations slot.
-- `src/components/sections/UpcomingEvents.tsx` — delete after extraction.
-- `src/lib/upcomingEvents.ts` — new helper.
-- `src/lib/notify.ts` — new unified notify helper.
-- `src/components/ui/notification-centre.tsx` — render upcoming rows; consume notify.
-- `src/stores/gameStore.ts` — chain-collapse notify, portfolio-mortgage toast on ineligible.
-- `src/hooks/useGameState.ts` — expose `loans`; add `loanExpenses` to expenses + breakdown.
-- `src/components/sections/BankingPanel.tsx` — typed loans summary.
-- `src/components/ui/loans-panel.tsx` — minor (uses store directly already).
-- `src/components/ui/game-stats.tsx` — loan row in cash-flow popover.
-- `src/components/ui/mortgage-provider-selector.tsx` — fixed-term select for buy flow.
-- `src/components/ui/operations-center.tsx` — slimmer collapsed chrome.
-- `src/components/ui/portfolio-mortgage.tsx` — show payoff line; success notify.
-- `src/components/ui/property-card.tsx` — concerns chip + popover beside RepairBar.
-- `src/components/ui/tenant-concerns-feed.tsx` — extract row component, then archive.
-- `src/lib/engine/renovation.ts` + `src/components/ui/renovation-dialog.tsx` — ROI accuracy.
+- `src/components/sections/BankingPanel.tsx` — #1
+- `src/components/ui/portfolio-mortgage.tsx` — #1 button styling parity
+- `src/stores/gameStore.ts` — #2, #3, #4, #5, #6, #7
+- `src/components/ui/renovation-dialog.tsx` — #2, #5
+- `src/components/ui/mortgage-provider-selector.tsx` — #3 pre-submit recheck
+- `src/components/sections/PropertyMarket.tsx` — #3 plumbing if needed
+- `src/components/ui/planning-approved-dialog.tsx` — new file (#4)
+- `src/pages/Index.tsx` — mount new dialog (#4)
+- `src/components/ui/loans-panel.tsx` — #6 live cap binding
+- `src/types/game.ts` — `PropertyLock.slotIndex?` (#7)
+- `src/lib/notifications.ts` / `src/hooks/use-toast.ts` — already in place from prior pass; reuse `notify`/`pushNotification` for #3 success and #4 chime.
+
+### Notes
+
+- No store-shape migration: `slotIndex?` is additive; existing persisted locks remain valid (treated as property-wide).
+- All money math stays in pennies in the store, pounds at the UI boundary.
+- The planning-approved dialog deliberately avoids auto-starting work — the player must confirm so they don't burn cash unintentionally.

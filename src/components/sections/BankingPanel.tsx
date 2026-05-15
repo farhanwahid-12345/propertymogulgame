@@ -55,8 +55,6 @@ export function BankingPanel({ gameState, getDebtForProperty, totalPortfolioInco
           totalMortgagePayments={gameState.totalMonthlyExpenses}
           netWorth={gameState.netWorth}
         />
-      </div>
-      <div className="mt-4">
         <PortfolioMortgage
           ownedProperties={propertiesWithDebt}
           mortgageProviders={gameState.mortgageProviders}

@@ -986,7 +986,7 @@ export const useGameStore = create<GameState & GameActions>()(
               // Overturned — drop the eviction, restore tenant satisfaction, add cooldown for misused grounds
               const cooldownGrounds: EvictionGround[] = ['landlord_sale', 'landlord_move_in'];
               if (cooldownGrounds.includes(ev.ground)) {
-                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6 });
+                newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'appeal_cooldown', untilMonth: newMonthNumber + 6, slotIndex: ev.slotIndex });
               }
               newTenants = newTenants.map(t =>
                 t.propertyId === ev.propertyId
@@ -1048,11 +1048,12 @@ export const useGameStore = create<GameState & GameActions>()(
           // Reputation: antisocial removal earns goodwill; other grounds dent reputation
           reputationDelta += ev.ground === 'antisocial_behaviour' ? 1 : -3;
 
-          // Anti-abuse locks (12 months) for landlord_sale and landlord_move_in
+          // Anti-abuse locks (12 months) — scoped to the evicted slot only.
           if (ev.ground === 'landlord_sale') {
+            // Sale lock applies property-wide (must list/sell whole property).
             newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'sale_lock', untilMonth: newMonthNumber + 12 });
           } else if (ev.ground === 'landlord_move_in') {
-            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12 });
+            newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12, slotIndex: ev.slotIndex });
           }
 
           showToast(
@@ -1800,15 +1801,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(property.price * 0.01) : 0;
         const cashRequired = property.price - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        const debited = debit(prev, cashRequired);
-        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
-
+        // Pre-flight mortgage eligibility BEFORE debiting cash so a rejection
+        // doesn't leave the player out-of-pocket.
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
         if (mortgageAmount > 0) {
           const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
-          // Use EXPECTED rent (every owned property's monthlyIncome regardless
-          // of tenancy) so a vacant fresh purchase doesn't fail the ICR test.
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
@@ -1828,7 +1826,10 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { console.warn('[buyProperty] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
+          if (!eligibility.eligible) {
+            showToast("Mortgage Rejected", eligibility.reason || "Lender declined this application.", "destructive");
+            return;
+          }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
@@ -1839,6 +1840,9 @@ export const useGameStore = create<GameState & GameActions>()(
             interestRate: eligibility.adjustedRate,
           };
         }
+
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         // Create conveyancing entry instead of instant purchase
         const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
@@ -1886,9 +1890,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = mortgageAmount > 0 ? Math.round(purchasePrice * 0.01) : 0;
         const cashRequired = purchasePrice - mortgageAmount + SOLICITOR_FEES + stampDuty + mortgageFee;
 
-        const debited = debit(prev, cashRequired);
-        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
-
+        // Pre-flight mortgage eligibility BEFORE debiting cash.
         let mortgageData: Conveyancing['mortgageData'] = undefined;
         let creditAdj = 0;
         if (mortgageAmount > 0) {
@@ -1912,7 +1914,10 @@ export const useGameStore = create<GameState & GameActions>()(
             ownedPropertyCount: prev.ownedProperties.length,
           });
 
-          if (!eligibility.eligible) { console.warn('[buyPropertyAtPrice] mortgage ineligible — UI gate missed:', eligibility.reason); return; }
+          if (!eligibility.eligible) {
+            showToast("Mortgage Rejected", eligibility.reason || "Lender declined this application.", "destructive");
+            return;
+          }
           if (mortgagePercentage / 100 > 0.85) creditAdj -= 3;
 
           mortgageData = {
@@ -1923,6 +1928,9 @@ export const useGameStore = create<GameState & GameActions>()(
             interestRate: eligibility.adjustedRate,
           };
         }
+
+        const debited = debit(prev, cashRequired);
+        if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
         const conv: Conveyancing = {
@@ -2203,10 +2211,10 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
         }
-        // Can't let to a new tenant during a relet lock (post move-in eviction)
-        const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth);
+        // Can't let to a new tenant during a relet lock (post move-in eviction) — slot-scoped
+        const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex));
         if (releLock) {
-          showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let until month ${releLock.untilMonth}.`, "destructive");
+          showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let this slot until month ${releLock.untilMonth}.`, "destructive");
           return;
         }
         // sale_lock — must list/sell after serving landlord-sale grounds
@@ -2371,7 +2379,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // Enforce appeal_cooldown — overturned landlord_sale/move_in cases lock re-attempts for 6 months
         if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
           const appealCd = (prev.propertyLocks || []).find(
-            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth,
+            l => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex),
           );
           if (appealCd) {
             showToast(
@@ -2605,6 +2613,39 @@ export const useGameStore = create<GameState & GameActions>()(
       startRenovation: (propertyId, renovationType) => {
         const prev = get();
 
+        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        if (renovationType.category === 'conversion') {
+          if (prev.tenants.some(t => t.propertyId === propertyId)) {
+            showToast(
+              "Conversion Blocked",
+              "Vacate every unit (serve eviction notice) before converting.",
+              "destructive",
+            );
+            return;
+          }
+          const propertyForCheck = prev.ownedProperties.find(p => p.id === propertyId);
+          const subtype = propertyForCheck?.subtype;
+          if (subtype && subtype !== 'standard') {
+            showToast(
+              "Already Converted",
+              `This property has already been converted to ${subtype}.`,
+              "destructive",
+            );
+            return;
+          }
+          const completedConversion = (propertyForCheck?.completedRenovationIds || []).find(
+            id => id === 'convert_hmo' || id === 'convert_flats' || id === 'convert_multi_let',
+          );
+          if (completedConversion) {
+            showToast(
+              "Already Converted",
+              "Only one conversion type per property.",
+              "destructive",
+            );
+            return;
+          }
+        }
+
         // Renovations needing planning permission must be applied for first —
         // route the call to the planning-application flow instead of starting
         // work immediately. The store's monthly tick will auto-start the
@@ -2696,6 +2737,29 @@ export const useGameStore = create<GameState & GameActions>()(
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
+
+        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        if (renovationType.category === 'conversion') {
+          if (prev.tenants.some(t => t.propertyId === propertyId)) {
+            showToast(
+              "Conversion Blocked",
+              "Vacate every unit (serve eviction notice) before applying to convert.",
+              "destructive",
+            );
+            return;
+          }
+          if (property.subtype && property.subtype !== 'standard') {
+            showToast("Already Converted", `This property has already been converted to ${property.subtype}.`, "destructive");
+            return;
+          }
+          const completedConversion = (property.completedRenovationIds || []).find(
+            id => id === 'convert_hmo' || id === 'convert_flats' || id === 'convert_multi_let',
+          );
+          if (completedConversion) {
+            showToast("Already Converted", "Only one conversion type per property.", "destructive");
+            return;
+          }
+        }
 
         // Block if a previous refusal is still in cooldown
         const cooldown = (prev.propertyLocks || []).find(
@@ -3098,16 +3162,23 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Investor Declined", `Need landlord reputation ≥ ${minRep}. Yours: ${prev.landlordReputation ?? 50}.`, "destructive"); return;
           }
         }
-        // Dynamic cap: investor by reputation, others by rent roll & credit.
+        // Dynamic cap: investor by reputation, others by rent roll, existing
+        // debt service (mortgages + loans), and credit-tier multiplier.
         const monthlyRent = prev.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
         const monthlyMortgage = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
-        const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage);
+        const existingLoanPayments = ((prev as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
+        const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage - existingLoanPayments);
         const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
         const reputationFactor = Math.max(0.4, Math.min(1.5, ((prev.landlordReputation ?? 50)) / 60));
+        // Credit-tier hard-cap multiplier on top of creditFactor
+        const creditTierMult =
+          prev.creditScore < 500 ? 0.4 :
+          prev.creditScore < 650 ? 0.7 :
+          prev.creditScore < 750 ? 1.0 : 1.25;
         const dynamicCap = kind === 'personal'
-          ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 6) * creditFactor)
+          ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 6) * creditFactor)
           : kind === 'business'
-            ? Math.floor(Math.min(product.hardCapPennies, monthlyNetRent * 12 * 4) * creditFactor)
+            ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 12 * 4) * creditFactor)
             : Math.floor(product.hardCapPennies * reputationFactor);
         if (amount > dynamicCap) {
           showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
@@ -3123,6 +3194,20 @@ export const useGameStore = create<GameState & GameActions>()(
         const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
+
+        // Combined-DTI gate (skipped for investor — relationship-based)
+        if (kind !== 'investor' && monthlyRent > 0) {
+          const combinedDTI = (monthlyMortgage + existingLoanPayments + monthlyPayment) / monthlyRent;
+          const dtiCap = kind === 'business' ? 0.85 : 0.75;
+          if (combinedDTI > dtiCap) {
+            showToast(
+              "Loan Rejected",
+              `Combined debt-to-income ${(combinedDTI * 100).toFixed(0)}% exceeds ${(dtiCap * 100).toFixed(0)}%. Reduce existing debt first.`,
+              "destructive",
+            );
+            return;
+          }
+        }
         const loan: import('@/types/game').Loan = {
           id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
           kind, principal: amount, remainingBalance: amount,

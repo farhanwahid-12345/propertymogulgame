@@ -199,6 +199,8 @@ export interface PropertyLock {
   propertyId: string;
   reason: 'sale_lock' | 'relet_lock' | 'appeal_cooldown' | 'planning_cooldown';
   untilMonth: number;
+  /** Optional slot scope for multi-unit properties. Undefined = property-wide (legacy). */
+  slotIndex?: number;
 }
 
 export type PlanningStatus = 'pending' | 'approved' | 'refused';
