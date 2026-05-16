@@ -179,6 +179,7 @@ function createInitialState(): GameState {
     planningApplications: [],
     tenantHistory: [],
     loans: [],
+    pendingPlanningCelebrations: [],
   };
 }
 
