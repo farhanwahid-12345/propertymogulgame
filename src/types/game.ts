@@ -401,6 +401,8 @@ export interface GameState {
   tenantHistory: TenantDeparture[];
   // Personal / business / bridging loans
   loans: Loan[];
+  // Planning approvals awaiting player acknowledgement (drives celebration dialog)
+  pendingPlanningCelebrations: string[];
 }
 
 /** A single tenant-departure event for the persistent activity log. */

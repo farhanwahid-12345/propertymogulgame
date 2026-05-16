@@ -179,6 +179,7 @@ function createInitialState(): GameState {
     planningApplications: [],
     tenantHistory: [],
     loans: [],
+    pendingPlanningCelebrations: [],
   };
 }
 
@@ -1067,11 +1068,14 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // ── Resolve pending planning applications whose decision month has arrived ──
         let newPlanningApplications = [...(prev.planningApplications || [])];
+        const newlyApprovedPlanningIds: string[] = [];
         newPlanningApplications = newPlanningApplications.map(app => {
           if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
             const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
             const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
             if (app.approved) {
+              newlyApprovedPlanningIds.push(app.id);
+              playLevelUp();
               showToast(
                 "Planning Approved! ✅",
                 `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
@@ -1463,6 +1467,10 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
+          pendingPlanningCelebrations: [
+            ...((s as any).pendingPlanningCelebrations || []),
+            ...newlyApprovedPlanningIds,
+          ],
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
@@ -2856,6 +2864,15 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ planningApplications: prev.planningApplications.filter(a => a.id !== applicationId) });
       },
 
+      dismissPlanningCelebration: (applicationId: string) => {
+        const prev = get() as any;
+        const list: string[] = prev.pendingPlanningCelebrations || [];
+        set({ pendingPlanningCelebrations: list.filter(id => id !== applicationId) } as any);
+      },
+
+      clearPlanningCelebrations: () => {
+        set({ pendingPlanningCelebrations: [] } as any);
+      },
 
 
       upgradeCondition: (propertyId, targetCondition) => {
