@@ -217,6 +217,8 @@ const Index = () => {
           useGameStore.setState({ onboardingCompleted: true } as any);
         }}
       />
+
+      <PlanningApprovedDialog />
     </div>
   );
 };
