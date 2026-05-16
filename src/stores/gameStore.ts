@@ -2864,6 +2864,15 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ planningApplications: prev.planningApplications.filter(a => a.id !== applicationId) });
       },
 
+      dismissPlanningCelebration: (applicationId: string) => {
+        const prev = get() as any;
+        const list: string[] = prev.pendingPlanningCelebrations || [];
+        set({ pendingPlanningCelebrations: list.filter(id => id !== applicationId) } as any);
+      },
+
+      clearPlanningCelebrations: () => {
+        set({ pendingPlanningCelebrations: [] } as any);
+      },
 
 
       upgradeCondition: (propertyId, targetCondition) => {
