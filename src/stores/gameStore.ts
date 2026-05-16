@@ -1068,11 +1068,14 @@ export const useGameStore = create<GameState & GameActions>()(
 
         // ── Resolve pending planning applications whose decision month has arrived ──
         let newPlanningApplications = [...(prev.planningApplications || [])];
+        const newlyApprovedPlanningIds: string[] = [];
         newPlanningApplications = newPlanningApplications.map(app => {
           if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
             const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
             const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
             if (app.approved) {
+              newlyApprovedPlanningIds.push(app.id);
+              playLevelUp();
               showToast(
                 "Planning Approved! ✅",
                 `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
