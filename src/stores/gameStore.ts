@@ -1467,6 +1467,10 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyLocks: newPropertyLocks,
           depositDisputes: newDepositDisputes,
           planningApplications: newPlanningApplications,
+          pendingPlanningCelebrations: [
+            ...((s as any).pendingPlanningCelebrations || []),
+            ...newlyApprovedPlanningIds,
+          ],
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
