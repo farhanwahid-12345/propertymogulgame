@@ -65,6 +65,16 @@ export function PropertyMarketActions({ gameState, totalPortfolioIncome }: Prope
       />
       <Button
         variant="ghost"
+        size="sm"
+        onClick={() => useGameStore.setState({ onboardingCompleted: false } as any)}
+        className="glass glass-hover text-muted-foreground hover:text-foreground"
+        title="Replay the welcome tour"
+      >
+        <HelpCircle className="h-4 w-4 mr-2" />
+        Tour
+      </Button>
+      <Button
+        variant="ghost"
         onClick={gameState.resetGame}
         className="glass glass-hover text-muted-foreground hover:text-foreground"
       >
