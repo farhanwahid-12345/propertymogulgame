@@ -5,10 +5,63 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 import { pushNotification, type NotificationSeverity } from "@/lib/notifications"
+import {
+  playWarning,
+  playCoinChime,
+  playLevelUp,
+  playConcernChime,
+  playPaper,
+  playGavel,
+  isSoundEnabled,
+} from "@/lib/sound"
 
 function severityFromVariant(variant?: string): NotificationSeverity {
   if (variant === "destructive") return "destructive";
+  if (variant === "success") return "success";
   return "info";
+}
+
+// Tiny heuristic — pick a chime by toast variant / title keywords.
+// Skips firing when the caller already played its own sound this tick.
+let lastChimeTs = 0;
+function chimeForToast(variant: string | undefined, title: string | undefined) {
+  if (!isSoundEnabled()) return;
+  const now = Date.now();
+  if (now - lastChimeTs < 250) return; // collapse rapid bursts
+  lastChimeTs = now;
+  const t = (title || "").toLowerCase();
+  // Specific intents first
+  if (/walk|leaving|low satisfaction|critical/.test(t)) { playWarning(); return; }
+  if (/concern|repair|leak|mould|boiler|appliance|safety/.test(t)) { playConcernChime(); return; }
+  if (/eviction|notice|planning|tax|fixed-rate/.test(t)) { playPaper(); return; }
+  if (/sold|auction|completion|complete/.test(t)) { playGavel(); return; }
+  if (/level|approved|paid off|milestone/.test(t)) { playLevelUp(); return; }
+  if (/rent collected|income|deposit refunded|cashback/.test(t)) { playCoinChime(); return; }
+  // Variant fallback
+  if (variant === "destructive") { playWarning(); return; }
+  if (variant === "success") { playCoinChime(); return; }
+}
+
+// One-shot AudioContext arming on first user gesture (browsers suspend
+// audio until a real input event). Without this no chimes ever fire
+// before the player has clicked something.
+if (typeof window !== "undefined" && !(window as any).__pmAudioArmed) {
+  (window as any).__pmAudioArmed = true;
+  const arm = () => {
+    try {
+      const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (Ctor) {
+        const ctx = new Ctor();
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        // Immediately discard — getCtx() in sound.ts caches its own instance.
+        try { ctx.close(); } catch { /* noop */ }
+      }
+    } catch { /* noop */ }
+    window.removeEventListener("pointerdown", arm, true);
+    window.removeEventListener("keydown", arm, true);
+  };
+  window.addEventListener("pointerdown", arm, true);
+  window.addEventListener("keydown", arm, true);
 }
 
 function plainText(node: React.ReactNode): string | undefined {
@@ -198,6 +251,8 @@ function toast({ ...props }: Toast) {
     description,
     severity: severityFromVariant((props as any).variant),
   });
+  // Auto chime based on variant + title hint.
+  chimeForToast((props as any).variant, title);
 
   return {
     id: id,
