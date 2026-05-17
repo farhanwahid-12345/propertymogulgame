@@ -71,7 +71,8 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   };
 
   const selectedProviderData = mortgageProviders.find((p: any) => p.id === selectedProvider);
-  const portfolioRate = selectedProviderData ? Math.max(0.01, selectedProviderData.baseRate + 0.005 + ratePenalty) : 0;
+  const fixedAdj = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
+  const portfolioRate = selectedProviderData ? Math.max(0.01, selectedProviderData.baseRate + 0.005 + ratePenalty + fixedAdj) : 0;
   const monthlyPayment = selectedProviderData ? calculateMonthlyPayment(
     loanAmount[0], portfolioRate, termYears, mortgageType
   ) : 0;
