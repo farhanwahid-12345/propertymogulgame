@@ -226,12 +226,8 @@ const Index = () => {
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
       />
 
-      <OnboardingFlow
-        open={!(gameState as any).entityChosen || !(gameState as any).onboardingCompleted}
-        skipEntity={!!(gameState as any).entityChosen}
-        onEntityPick={(entity) => gameState.setEntityType(entity)}
-        onFinish={() => useGameStore.setState({ onboardingCompleted: true } as any)}
-      />
+      <OnboardingGate />
+
 
       <PlanningApprovedDialog />
     </div>
