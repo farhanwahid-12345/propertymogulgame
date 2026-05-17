@@ -282,6 +282,21 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 </Select>
               </div>
 
+              <div>
+                <Label>Initial Fixed Term</Label>
+                <Select value={String(fixedTermYears)} onValueChange={(v) => { setRejectionReason(null); setFixedTermYears(Number(v)); }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">SVR / Tracker (variable)</SelectItem>
+                    <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
+                    <SelectItem value="5">5-year fixed (−0.2%)</SelectItem>
+                    <SelectItem value="10">10-year fixed (+0.1%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {selectedProvider && (
                 <Card className="bg-purple-500/10 border-purple-500/30">
                   <CardContent className="p-4">
