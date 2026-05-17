@@ -24,6 +24,8 @@ interface Mortgage {
   interestRate: number;
   providerId: string;
   startDate: number;
+  /** Present for portfolio mortgages — the bundle of properties used as collateral. */
+  collateralPropertyIds?: string[];
 }
 
 interface MortgageSettlementProps {
@@ -43,13 +45,22 @@ export function MortgageSettlement({
   const [partialAmount, setPartialAmount] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
 
-  // Only show properties with mortgages
-  const propertiesWithMortgages = ownedProperties.filter(property => 
-    mortgages.some(mortgage => mortgage.propertyId === property.id)
-  );
+  // Build picker from mortgages directly so portfolio mortgages (whose synthetic
+  // propertyId doesn't match an owned property) are included too.
+  const isPortfolio = (m: Mortgage) =>
+    (m.collateralPropertyIds?.length ?? 0) > 1 || (m as any).id?.startsWith?.("portfolio_");
 
-  const selectedMortgageDetails = mortgages.find(m => m.propertyId === selectedMortgage);
-  const selectedMortgageProperty = ownedProperties.find(p => p.id === selectedMortgage);
+  const propertyName = (id: string) => ownedProperties.find(p => p.id === id)?.name;
+
+  const mortgageOptions = mortgages.map((m) => {
+    if (isPortfolio(m)) {
+      const count = m.collateralPropertyIds?.length ?? 0;
+      return { id: m.propertyId, label: `Portfolio mortgage · ${count} properties`, mortgage: m };
+    }
+    return { id: m.propertyId, label: propertyName(m.propertyId) ?? "Property", mortgage: m };
+  });
+
+  const hasMortgages = mortgageOptions.length > 0;
 
   const paymentAmount = partialAmount ? parseFloat(partialAmount) : 0;
   // ERC: 2% within first 5 years (60 months @ 180s/month)
