@@ -180,6 +180,7 @@ function createInitialState(): GameState {
     tenantHistory: [],
     loans: [],
     pendingPlanningCelebrations: [],
+    arrears: null,
   };
 }
 
