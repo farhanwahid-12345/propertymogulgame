@@ -274,7 +274,7 @@ export const PropertyCard = memo(function PropertyCard({
         </div>
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
         {/* Sqft + concern chips row */}
-        {(property.internalSqft || activeConcernCount > 0 || property.subtype) && (
+        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {property.internalSqft && (
               <span className="text-[10px] text-muted-foreground">
@@ -287,6 +287,17 @@ export const PropertyCard = memo(function PropertyCard({
                 {property.subtype}
               </Badge>
             )}
+            {currentTenant && typeof currentTenant.defaultRisk === 'number' && (() => {
+              const r = currentTenant.defaultRisk;
+              const band = r <= 10 ? { label: 'Low Risk', cls: 'border-green-400/40 text-green-400' }
+                : r <= 25 ? { label: 'Med Risk', cls: 'border-amber-400/40 text-amber-400' }
+                : { label: 'High Risk', cls: 'border-red-400/40 text-red-400' };
+              return (
+                <Badge variant="outline" className={cn("text-[10px]", band.cls)} title={`Tenant default risk: ${r.toFixed(1)}%`}>
+                  👤 {band.label}
+                </Badge>
+              );
+            })()}
             {activeConcernCount > 0 && (
               <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
                 🛠️ {activeConcernCount} concern{activeConcernCount > 1 ? 's' : ''}

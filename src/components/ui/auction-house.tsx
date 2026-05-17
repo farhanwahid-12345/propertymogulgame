@@ -50,7 +50,7 @@ interface AuctionHouseProps {
   onAuctionSale: (propertyId: string, salePrice: number) => void;
   monthsPlayed: number;
   auctionProperties: Property[];
-  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
+  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   cash: number;
   mortgageProviders: any[];
   level: number;
@@ -78,6 +78,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [selectedProviderId, setSelectedProviderId] = useState<string>("halifax");
   const [selectedTermYears, setSelectedTermYears] = useState<number>(25);
   const [selectedMortgageType, setSelectedMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [selectedFixedTermYears, setSelectedFixedTermYears] = useState<number>(0);
 
   // Get properties that aren't already listed
   const unlistedProperties = ownedProperties.filter(
@@ -127,7 +128,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           if (prev.currentBid >= prev.reservePrice) {
             if (isUserWinner) {
               // Pass mortgage details through to purchase
-              onBuyProperty(prev.property, prev.currentBid, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType);
+              onBuyProperty(prev.property, prev.currentBid, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType, selectedFixedTermYears);
             } else {
               toast({
                 title: "Auction Lost",
@@ -230,7 +231,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
     }, 100);
 
     return () => clearInterval(interval);
-  }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType]);
+  }, [liveAuction, cash, userMaxAutoBid, onBuyProperty, onAuctionPropertySold, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType, selectedFixedTermYears]);
 
   // Monthly auction cycle for property listings - uses monthsPlayed
   useEffect(() => {
@@ -495,6 +496,20 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                       </div>
                     )}
                   </div>
+                  {selectedMortgagePercent > 0 && (
+                    <div>
+                      <Label className="text-xs">Initial Fixed Term</Label>
+                      <Select value={String(selectedFixedTermYears)} onValueChange={(v) => setSelectedFixedTermYears(Number(v))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">SVR / Tracker (variable)</SelectItem>
+                          <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
+                          <SelectItem value="5">5-year fixed (−0.2%)</SelectItem>
+                          <SelectItem value="10">10-year fixed (+0.1%)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Cash: £{cash.toLocaleString()}</span>
                     <span className="font-medium">Max Budget: £{maxBudget.toLocaleString()}</span>
