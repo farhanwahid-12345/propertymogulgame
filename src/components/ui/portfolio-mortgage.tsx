@@ -269,7 +269,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
               <div>
                 <Label>Mortgage Type</Label>
-                <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => setMortgageType(value)}>
+                <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => { setRejectionReason(null); setMortgageType(value); }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
