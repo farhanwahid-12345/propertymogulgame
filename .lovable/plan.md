@@ -1,24 +1,17 @@
 ## Plan
 
-1. Fix the tutorial dismissal path
-- Update the onboarding gate so it uses both the Zustand `onboardingCompleted` flag and the `pm_onboarding_done` localStorage fallback when deciding whether to show the tutorial.
-- Keep `Got it`, `Skip tour`, and the close button routed through the shared `dismissTour()` helper so all exits persist the completed state.
-- Remove the stale tour reference to `section-ops` being under the Market tab, since Operations was moved into Bank.
+Move the four Bank action buttons (Pay Mortgage, Manage Mortgages, Credit & Banking, Portfolio Mortgage) out of the tab header row and into the Bank tab content area, sitting above the Operations / Loans / Tax sections.
 
-2. Restore the Market purchase experience
-- Put the actual `PropertyMarket` content back inside the Market tab, not just the action toolbar.
-- Keep the compact Estate Agent and Auction action buttons inline with the tab header, but make sure their dialogs still expose the purchase/bid flow.
-- Add a visible `section-market` anchor so mobile navigation and tour scrolling can target the Market area correctly.
+### Changes
 
-3. Restore Bank, mortgage, loans, tax, and operations visibility
-- Keep Bank actions inline, but render the full `BankingPanel` content under the Bank tab.
-- Ensure Operations lives under Bank after the previous approved move, and update the tour/mobile nav to switch to Bank before scrolling to Operations.
-- Ensure mortgage controls remain available: settle mortgage, manage mortgages/refinance, overdraft, and portfolio mortgage.
+1. `src/components/sections/BankingPanel.tsx`
+   - Render the `BankingPanelActions` toolbar at the top of the `BankingPanel` content (above the Operations CollapsibleSection), inside a glass container styled to match the other rows.
+   - Keep the same props wiring; no logic changes.
 
-4. Fix the tab/header layout regression
-- Replace the current duplicated `TabsContent` header setup with one stable tab header above the tab contents.
-- Use a responsive layout that keeps Market/Bank triggers visible and wraps action buttons instead of clipping them at the 1001px viewport.
-- Avoid horizontal clipping/hidden overflow around the action buttons.
+2. `src/pages/Index.tsx`
+   - In the tab header row, stop rendering `BankingPanelActions` when the Bank tab is active (since it now lives in the panel body).
+   - Keep `PropertyMarketActions` inline on the Market tab unchanged.
+   - Result: when on Bank, the header row shows only the Market/Bank toggle; when on Market, it still shows Estate Agent + Auction House inline.
 
-5. Validate the fix
-- Use the preview at the reported 1001px width to confirm: `Got it` closes the tutorial, Market shows purchase entry points, Bank shows mortgage/banking controls, and the Bank tab content is accessible.
+### Out of scope
+- No changes to Market actions, Operations/Loans/Tax internals, mortgage logic, or onboarding.

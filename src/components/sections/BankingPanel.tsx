@@ -68,7 +68,7 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
 }
 
 /** Collapsible content below the toolbar (Loans + Tax). */
-export function BankingPanel({ gameState }: BankingPanelProps) {
+export function BankingPanel({ gameState, getDebtForProperty, totalPortfolioIncome }: BankingPanelProps) {
   const opsActive =
     (gameState.conveyancing?.length || 0) +
     (gameState.renovations?.length || 0) +
@@ -76,6 +76,13 @@ export function BankingPanel({ gameState }: BankingPanelProps) {
     (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
   return (
     <>
+      <div className="mt-2 glass rounded-2xl border border-white/10 p-2 flex flex-wrap gap-2">
+        <BankingPanelActions
+          gameState={gameState}
+          getDebtForProperty={getDebtForProperty}
+          totalPortfolioIncome={totalPortfolioIncome}
+        />
+      </div>
       <div className="mt-4">
         <CollapsibleSection
           id="section-ops"
