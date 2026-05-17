@@ -142,7 +142,13 @@ export function useGameState() {
   const loansRaw = ((store as any).loans || []) as Array<{ monthlyPayment: number }>;
   const loanExpenses = loansRaw.reduce((s, l) => s + fromPennies(l.monthlyPayment || 0), 0);
   const totalMonthlyExpenses = mortgageExpenses + councilTaxExpenses + insuranceExpenses + loanExpenses;
-  const totalDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
+  // Include unsecured loan balances so net worth reflects ALL debt the
+  // player owes (mortgages + personal / business / investor loans).
+  const totalLoanBalance = loansRaw.reduce(
+    (s, l: any) => s + fromPennies(l.remainingBalance || 0),
+    0,
+  );
+  const totalDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0) + totalLoanBalance;
 
   // Credit score — use the value from the store directly (it's maintained there)
   const creditScore = store.creditScore;
