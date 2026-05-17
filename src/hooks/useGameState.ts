@@ -258,8 +258,8 @@ export function useGameState() {
     store.handleRefinance(propertyId, toPennies(newLoanAmount), providerId, termYears, mortgageType);
   }, [store.handleRefinance]);
 
-  const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
-    return store.handlePortfolioMortgage(selectedPropertyIds, toPennies(loanAmount), providerId, termYears, mortgageType);
+  const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => {
+    return store.handlePortfolioMortgage(selectedPropertyIds, toPennies(loanAmount), providerId, termYears, mortgageType, fixedTermYears);
   }, [store.handlePortfolioMortgage]);
 
   const handleApplyOverdraft = useCallback((requestedLimit: number) => {
