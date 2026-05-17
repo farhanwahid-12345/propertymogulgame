@@ -101,7 +101,7 @@ export function MortgageSettlement({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" disabled={propertiesWithMortgages.length === 0}>
+        <Button variant="outline" disabled={!hasMortgages}>
           <Building2 className="h-4 w-4 mr-2" />
           Pay Mortgage
         </Button>
@@ -117,39 +117,36 @@ export function MortgageSettlement({
             Make a partial or full payment on your mortgage.
           </div>
           
-          {propertiesWithMortgages.length === 0 ? (
+          {!hasMortgages ? (
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No properties with mortgages to settle</p>
+              <p className="text-muted-foreground">No mortgages to settle</p>
             </div>
           ) : (
             <>
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">
-                    Select property with mortgage to settle:
+                    Select mortgage to pay down:
                   </label>
                   <Select value={selectedMortgage} onValueChange={(value) => {
                     setSelectedMortgage(value);
                     setPartialAmount("");
                   }}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose property with mortgage..." />
+                      <SelectValue placeholder="Choose mortgage..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {propertiesWithMortgages.map((property) => {
-                        const mortgage = mortgages.find(m => m.propertyId === property.id);
-                        return (
-                          <SelectItem key={property.id} value={property.id}>
-                            <div className="flex justify-between items-center w-full">
-                              <span>{property.name}</span>
-                              <Badge variant="destructive" className="ml-2">
-                                £{mortgage?.remainingBalance.toLocaleString()} debt
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
+                      {mortgageOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          <div className="flex justify-between items-center w-full gap-2">
+                            <span>{opt.label}</span>
+                            <Badge variant="destructive" className="ml-2">
+                              £{opt.mortgage.remainingBalance.toLocaleString()} debt
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
