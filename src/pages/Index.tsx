@@ -88,20 +88,36 @@ const Index = () => {
         />
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 glass border-0 bg-white/[0.06]">
-            <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-xl">
-              🏪 Market
-            </TabsTrigger>
-            <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-xl">
-              🏦 Bank
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="market">
-            <PropertyMarket gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+          <TabsContent value="market" className="mt-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
+                  🏪 Market
+                </TabsTrigger>
+                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
+                  🏦 Bank
+                </TabsTrigger>
+              </TabsList>
+              <PropertyMarket gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+            </div>
           </TabsContent>
 
-          <TabsContent value="bank">
+          <TabsContent value="bank" className="mt-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
+                  🏪 Market
+                </TabsTrigger>
+                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
+                  🏦 Bank
+                </TabsTrigger>
+              </TabsList>
+              <BankingPanel.Actions
+                gameState={gameState}
+                getDebtForProperty={getDebtForProperty}
+                totalPortfolioIncome={totalPortfolioIncome}
+              />
+            </div>
             <BankingPanel
               gameState={gameState}
               getDebtForProperty={getDebtForProperty}
