@@ -14,7 +14,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthly
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
+  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
