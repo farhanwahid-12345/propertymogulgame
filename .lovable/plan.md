@@ -1,35 +1,34 @@
 ## Goal
-Make every tutorial exit button reliably close the tutorial, keep the tutorial available, and prevent the floating coach card from trapping the player after the last step.
+Fix the entity picker (Sole Trader / Limited Company) so Confirm actually proceeds, without re-breaking tutorial exit.
+
+## Root cause
+In `OnboardingGate`:
+- `dismissed` is initialized from `onboardingCompleted` only.
+- An effect closes the flow whenever `onboardingCompleted` becomes true.
+
+Two failure modes follow:
+1. Returning saves migrated to `onboardingCompleted=true` but with `entityChosen=false` start with `dismissed=true`, so the entity dialog never opens.
+2. When the user picks an entity, `setEntityType` runs synchronously and (for new sessions where the tour is being replayed) the store can settle `onboardingCompleted=true` from a prior dismiss, which then trips the effect and closes the dialog before `setStage('tour-market')` renders.
 
 ## Plan
-1. **Separate tutorial visibility from persisted game state while mounted**
-   - Add a local `dismissed` state in `OnboardingGate` so clicking `Skip intro`, `Skip tour`, `Got it`, or `X` immediately hides the tutorial in the current render cycle.
-   - Keep `onboardingCompleted` persisted in the game store so the tutorial still stays dismissed after reload.
-   - Reset local dismissal only when the persisted store explicitly asks to replay the tutorial.
+1. **Gate dismissal on entity choice**
+   - In `OnboardingGate`, treat the entity picker as non-dismissible: `open = !entityChosen || (!onboardingCompleted && !dismissed)`.
+   - Initialize `dismissed` to `false` whenever `!entityChosen`, regardless of `onboardingCompleted`.
 
-2. **Make `OnboardingFlow` controlled and reset-safe**
-   - Reset the internal stage when the tutorial is opened: first-time users start at welcome/entity; replay starts at the market tour.
-   - Prevent stale stages from staying active if the tutorial is closed and reopened.
-   - Use one shared `finish()` path for all close actions.
+2. **Stop the auto-close effect from firing during entity stage**
+   - Only mirror `onboardingCompleted → dismissed` when `entityChosen` is also true.
 
-3. **Fix entity selection closing race**
-   - Ensure choosing an entity does not accidentally close or reopen the tutorial because `entityChosen` changes during the same click.
-   - Keep the entity picker, then continue into the tour if the user confirms; if they skip, dismiss cleanly.
+3. **Make entity pick + advance atomic**
+   - In `OnboardingFlow`, on Confirm: call `onEntityPick(picked)` then `setStage('tour-market')` in the same handler (already the case) but ensure parent does not interfere — covered by step 2.
+   - On entity-stage "Skip tour": pick the entity, then `finish()` (existing behaviour, keep).
 
-4. **Clean up the duplicated localStorage/store dismissal logic**
-   - Keep `dismissTour()` as the canonical completion helper.
-   - Remove redundant localStorage writes from `Index.tsx` so there is only one completion path.
-   - Update stale comments in `src/lib/onboarding.ts` so future fixes do not reintroduce the old two-source bug.
-
-5. **Verify the actual failing buttons**
-   - Test first-time flow: `Skip intro`, entity `Skip tour`, tour `Skip tour`, `X`, and final `Got it`.
-   - Test replay flow from the header menu: replay opens the tour, then each close button exits.
-   - Confirm the underlying Market/Bank/Operations buttons remain clickable once the tutorial is closed.
+4. **Verify**
+   - Fresh game: entity dialog appears; clicking Sole Trader/LTD highlights, Confirm advances to the tour, tour exit buttons still close it.
+   - Returning save with migrated onboardingCompleted=true and no entity chosen: entity dialog appears and Confirm proceeds.
+   - Replay tour from header: full flow runs and every close button exits.
 
 ## Files to change
-- `src/pages/Index.tsx`
-- `src/components/ui/onboarding-flow.tsx`
-- `src/lib/onboarding.ts`
+- `src/pages/Index.tsx` (only `OnboardingGate`)
 
 ## Expected result
-The tutorial remains in the game, but every exit control closes it immediately and permanently until the player deliberately chooses replay tour again.
+Sole Trader / Limited Company buttons select and Confirm advances to the tour; previous tutorial-exit fix remains intact.
