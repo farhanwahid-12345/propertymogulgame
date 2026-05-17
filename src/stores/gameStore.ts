@@ -1280,6 +1280,16 @@ export const useGameStore = create<GameState & GameActions>()(
         let finalCash = Math.max(0, credited.cash);
         let finalOverdraftUsed = credited.overdraftUsed;
 
+        // Defensive: if any prior code path bypassed `credit()` and left cash
+        // sitting alongside drawn overdraft, sweep it now. Without this the
+        // net-worth display under-reports because overdraftUsed is subtracted
+        // even though the player effectively has the cash to clear it.
+        if (finalCash > 0 && finalOverdraftUsed > 0) {
+          const sweep = Math.min(finalCash, finalOverdraftUsed);
+          finalCash -= sweep;
+          finalOverdraftUsed -= sweep;
+        }
+
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
         let economicEvents = [...prev.economicEvents];
