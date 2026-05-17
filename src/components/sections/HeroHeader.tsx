@@ -3,9 +3,17 @@ import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
 import { NotificationCentre } from "@/components/ui/notification-centre";
 import { Button } from "@/components/ui/button";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useGameStore } from "@/stores/gameStore";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
+import { replayTour } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import type {
   Conveyancing,
