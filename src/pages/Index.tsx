@@ -226,7 +226,7 @@ const Index = () => {
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
       />
 
-      <OnboardingGate />
+      <OnboardingGate setEntityType={gameState.setEntityType} />
 
 
       <PlanningApprovedDialog />
