@@ -47,6 +47,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const maxLoanAmount = totalPortfolioValue * creditMaxLTV; // Credit-score capped LTV
 
   const togglePropertySelection = (propertyId: string) => {
+    setRejectionReason(null);
     setSelectedPropertyIds(prev => 
       prev.includes(propertyId) 
         ? prev.filter(id => id !== propertyId)
@@ -56,7 +57,12 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
   const handlePortfolioMortgage = () => {
     if (selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0) return;
-    onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    if (result && result.ok === false) {
+      setRejectionReason(result.reason);
+      return;
+    }
+    setRejectionReason(null);
     setSelectedPropertyIds([]);
     setLoanAmount([0]);
     setSelectedProvider("");
