@@ -12,8 +12,8 @@ import { OnboardingFlow } from "@/components/ui/onboarding-flow";
 import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
-import { PropertyMarket } from "@/components/sections/PropertyMarket";
-import { BankingPanel } from "@/components/sections/BankingPanel";
+import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
+import { BankingPanel, BankingPanelActions } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
@@ -98,7 +98,7 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <PropertyMarket gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+              <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
             </div>
           </TabsContent>
 
@@ -112,7 +112,7 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <BankingPanel.Actions
+              <BankingPanelActions
                 gameState={gameState}
                 getDebtForProperty={getDebtForProperty}
                 totalPortfolioIncome={totalPortfolioIncome}
