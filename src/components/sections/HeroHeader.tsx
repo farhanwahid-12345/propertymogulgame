@@ -41,6 +41,8 @@ interface HeroHeaderProps {
   planningApplications?: PlanningApplication[];
   lastCorporationTaxMonth?: number;
   entityType?: EntityType;
+  currentMarketRate?: number;
+  totalDebt?: number;
 }
 
 export function HeroHeader({
@@ -57,18 +59,13 @@ export function HeroHeader({
   planningApplications,
   lastCorporationTaxMonth,
   entityType,
+  currentMarketRate = 0,
+  totalDebt = 0,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
   const reputation = useGameStore((s) => (s as any).landlordReputation ?? 50);
-  const currentMarketRate = useGameStore((s) => (s as any).currentMarketRate ?? 0);
-  const totalDebtPennies = useGameStore((s) => {
-    const ms = (s as any).mortgages || [];
-    const ls = (s as any).loans || [];
-    return ms.reduce((a: number, m: any) => a + (m.remainingPennies ?? m.remaining ?? 0), 0)
-      + ls.reduce((a: number, l: any) => a + (l.remainingPennies ?? l.remaining ?? 0), 0);
-  });
   const [compact, setCompact] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
