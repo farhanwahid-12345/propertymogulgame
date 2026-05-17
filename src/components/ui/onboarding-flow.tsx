@@ -85,6 +85,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   }, [stage, open, setActiveTab]);
 
   const finish = useCallback(() => {
+    // Mark completed in the store FIRST (single source of truth) before notifying parent.
     dismissTour();
     onFinish();
   }, [onFinish]);
