@@ -27,6 +27,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [fixedTermYears, setFixedTermYears] = useState<number>(0);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   const canUsePortfolioMortgage = ownedProperties.length >= 3;
