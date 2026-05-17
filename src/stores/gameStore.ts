@@ -575,8 +575,27 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Monthly income (skip conveyancing properties) ──
         const conveyancingPropertyIds = new Set([...activeConveyancing.map(c => c.propertyId), ...cancelledConveyancing.map(c => c.propertyId)]);
 
+        // Risk-weighted missed-rent roll: probability scales with tenant.defaultRisk.
+        // defaultRisk is ~1–60; convert to monthly miss probability with a 0.4 dampener.
+        const missedRentPropertyIds = new Set<string>();
+        const newDefaultEvents: TenantEvent[] = [];
+        prev.tenants.forEach(t => {
+          if (conveyancingPropertyIds.has(t.propertyId)) return;
+          const risk = (t.tenant as any).defaultRisk ?? 5;
+          const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          if (Math.random() < monthlyP) {
+            missedRentPropertyIds.add(t.propertyId);
+            const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+            newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
+            if (prop) {
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}.`, "destructive");
+            }
+          }
+        });
+
         const monthlyIncome = newOwnedProperties.reduce((total, property) => {
           if (conveyancingPropertyIds.has(property.id)) return total; // No rent during conveyancing
+          if (missedRentPropertyIds.has(property.id)) return total;   // Tenant defaulted this month
           const hasTenant = newTenants.some(t => t.propertyId === property.id);
           const isInVoid = newVoidPeriods.some(vp =>
             vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
