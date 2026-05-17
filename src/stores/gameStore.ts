@@ -959,6 +959,34 @@ export const useGameStore = create<GameState & GameActions>()(
           existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
         });
 
+        // ── MEES (Minimum Energy Efficiency Standards) ──
+        // F/G rated occupied properties are unlawful to let. Push a high-penalty
+        // safety concern (2× normal decay) once per property until they upgrade.
+        const meesAlreadyByProp = new Set(
+          prevConcerns
+            .filter(c => !c.resolvedMonth && c.category === 'safety' && c.description.startsWith('EPC '))
+            .map(c => c.propertyId)
+        );
+        newTenants.forEach(t => {
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          if (!property) return;
+          const epc = property.epcRating;
+          if (epc !== 'F' && epc !== 'G') return;
+          if (meesAlreadyByProp.has(property.id)) return;
+          if (inConveyancingIds.has(property.id)) return;
+          newConcerns.push({
+            id: `mees_${newMonthNumber}_${property.id}_${Math.random().toString(36).slice(2, 6)}`,
+            propertyId: property.id,
+            tenantProfile: t.tenant.profile as any,
+            category: 'safety',
+            description: `EPC ${epc} — illegal to let under MEES. Upgrade or face fines.`,
+            raisedMonth: newMonthNumber,
+            resolveCost: 0,
+            satisfactionPenaltyIfIgnored: 12,
+          });
+          meesAlreadyByProp.add(property.id);
+        });
+
         // Only toast for concerns that will actually appear in the feed
         // (owned, unresolved, not in conveyancing).
         const visibleNew = newConcerns.filter(c =>
