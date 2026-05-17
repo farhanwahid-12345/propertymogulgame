@@ -1509,6 +1509,78 @@ export const useGameStore = create<GameState & GameActions>()(
         // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
         updatedOwnedProperties = eicrUpdatedProps;
 
+        // ── Arrears / Court / Bailiff escalation ──────────────────────────
+        // Three-stage: warning → court order + scheduled forced sale → bankruptcy.
+        let newArrears: import('@/types/game').ArrearsState | null = prev.arrears ?? null;
+        const overdraftHeadroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
+        const projectedNet = monthlyIncome - totalExpenses;
+        const cashEffective = finalCash - finalOverdraftUsed;
+        const inDistress = cashEffective < 0 || (projectedNet < 0 && (finalCash + overdraftHeadroom) < Math.abs(projectedNet));
+
+        // 1. Execute any previously-scheduled forced sale
+        if (newArrears?.forcedAuctionPropertyId && newArrears.scheduledSaleMonth && newMonthNumber >= newArrears.scheduledSaleMonth) {
+          const pid = newArrears.forcedAuctionPropertyId;
+          const propIdx = updatedOwnedProperties.findIndex(p => p.id === pid);
+          if (propIdx >= 0) {
+            const prop = updatedOwnedProperties[propIdx];
+            const salePrice = Math.floor((prop.marketValue || prop.value) * 0.90);
+            const mortgageIdx = finalMortgages.findIndex(m => m.propertyId === pid);
+            const owed = mortgageIdx >= 0 ? finalMortgages[mortgageIdx].remainingBalance : 0;
+            const netProceeds = Math.max(0, salePrice - owed);
+            finalCash += netProceeds;
+            updatedOwnedProperties.splice(propIdx, 1);
+            if (mortgageIdx >= 0) finalMortgages.splice(mortgageIdx, 1);
+            showToast("⚖️ Bailiffs Sold Property", `${prop.name} was forcibly auctioned at 90% of value. Net proceeds £${(netProceeds/100).toLocaleString()} applied to arrears.`, "destructive");
+          }
+          newArrears = { ...newArrears, forcedAuctionPropertyId: undefined, scheduledSaleMonth: undefined };
+        }
+
+        // Recompute net worth AFTER forced sale
+        const propertyEquityFinal = updatedOwnedProperties.reduce((t, p) => {
+          const m = finalMortgages.find(mt => mt.propertyId === p.id);
+          return t + p.value - (m?.remainingBalance || 0);
+        }, 0);
+        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP;
+
+        let isBankrupt = false;
+        if (inDistress) {
+          const months = (newArrears?.monthsBehind ?? 0) + 1;
+          if (!newArrears) {
+            newArrears = { startMonth: newMonthNumber, monthsBehind: 1 };
+            showToast("⚠️ Cashflow Warning", "Your expenses exceed income and your cash buffer is gone. Sell, refinance, or raise rent — or the bailiffs will be called next month.", "destructive");
+          } else if (months >= 2 && !newArrears.forcedAuctionPropertyId && !newArrears.courtOrderMonth) {
+            // Court order: pick highest-equity property to force-auction next month
+            const target = [...updatedOwnedProperties].sort((a, b) => {
+              const ma = finalMortgages.find(m => m.propertyId === a.id)?.remainingBalance || 0;
+              const mb = finalMortgages.find(m => m.propertyId === b.id)?.remainingBalance || 0;
+              return (b.value - mb) - (a.value - ma);
+            })[0];
+            if (target) {
+              newArrears = { ...newArrears, monthsBehind: months, courtOrderMonth: newMonthNumber, forcedAuctionPropertyId: target.id, scheduledSaleMonth: newMonthNumber + 1 };
+              showToast("⚖️ Court Order Issued", `Persistent arrears — ${target.name} will be forcibly auctioned next month at 90% of value.`, "destructive");
+            } else {
+              // No property to seize → straight to bankruptcy
+              isBankrupt = true;
+            }
+          } else {
+            newArrears = { ...newArrears, monthsBehind: months };
+          }
+        } else {
+          // Recovered — clear arrears
+          if (newArrears) {
+            showToast("✅ Arrears Cleared", "Cashflow back in the black — court action paused.");
+          }
+          newArrears = null;
+        }
+
+        // Final bankruptcy gate: post-forced-sale net worth still negative
+        if (!isBankrupt && netWorthFinal < 0 && updatedOwnedProperties.length === 0 && cashEffective < 0) {
+          isBankrupt = true;
+        }
+        if (isBankrupt && !prev.isBankrupt) {
+          showToast("💀 BANKRUPTCY!", "Court ordered insolvency — game over.", "destructive");
+        }
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
@@ -1518,6 +1590,7 @@ export const useGameStore = create<GameState & GameActions>()(
           monthsPlayed: newMonthNumber,
           timeUntilNextMonth: MONTH_DURATION_SECONDS,
           isBankrupt,
+          arrears: newArrears,
           creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdj)),
           lastYearlyGrowth: newLastYearlyGrowth,
           mortgageProviderRates: finalProviderRates,
