@@ -34,19 +34,38 @@ function OnboardingGate({
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
 
-  // Single source of truth = zustand. Open when entity not chosen OR tour not completed.
-  const open = !entityChosen || !onboardingCompleted;
+  // Local "dismissed" flag = instant close. Survives reload via zustand persist.
+  const [dismissed, setDismissed] = useState<boolean>(() => !!onboardingCompleted);
+  const [replayNonce, setReplayNonce] = useState<number>(() => onboardingModule.getReplayNonce());
+
+  // If store flips completed externally (e.g. dismissTour from anywhere), close locally too.
+  useEffect(() => {
+    if (onboardingCompleted) setDismissed(true);
+  }, [onboardingCompleted]);
+
+  // Subscribe to explicit replay requests — reopen and reset dismissal.
+  useEffect(() => {
+    return onboardingModule.subscribeReplay((n) => {
+      setReplayNonce(n);
+      setDismissed(false);
+    });
+  }, []);
+
+  // Open when entity not chosen OR tour not completed, AND not locally dismissed.
+  const open = (!entityChosen || !onboardingCompleted) && !dismissed;
 
   return (
     <OnboardingFlow
+      // key forces a fresh mount (and stage reset) on replay and on first open
+      key={`onboarding-${replayNonce}`}
       open={open}
       skipEntity={!!entityChosen}
       activeTab={activeTab}
       setActiveTab={setActiveTab}
       onEntityPick={(entity) => setEntityType(entity)}
       onFinish={() => {
-        try { window.localStorage.setItem('pm_onboarding_done', '1'); } catch { /* noop */ }
-        useGameStore.setState({ onboardingCompleted: true } as any);
+        setDismissed(true);
+        onboardingModule.dismissTour();
       }}
     />
   );
