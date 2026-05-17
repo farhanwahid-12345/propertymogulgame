@@ -848,6 +848,22 @@ export const useGameStore = create<GameState & GameActions>()(
         newTenants = satisfactionAdjustedTenants;
         newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
 
+        // ── Proactive walkout warnings ──
+        // Surface a destructive toast (+ chime) when a sitting tenant's satisfaction
+        // drops under 25 and we haven't already warned about them recently.
+        newTenants = newTenants.map(t => {
+          if (t.satisfaction >= 25 || t.satisfaction <= 0) return t;
+          const lastWarn = (t as any).lastWalkoutWarningMonth ?? -Infinity;
+          if (newMonthNumber - lastWarn < 3) return t;
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          showToast(
+            "⚠️ Tenant at risk of leaving",
+            `${t.tenant.name}${property ? ` at ${property.name}` : ''} is critically unhappy (satisfaction ${Math.round(t.satisfaction)}). Address concerns or they may walk.`,
+            "destructive",
+          );
+          return { ...t, lastWalkoutWarningMonth: newMonthNumber } as any;
+        });
+
         // ── Tenant concerns: monthly generation + satisfaction decay + auto-resolution ──
         const CONCERN_TEMPLATES: Array<{ category: import('@/types/game').ConcernCategory; descriptions: string[]; baseCostPct: [number, number]; penalty: number }> = [
           { category: 'maintenance', descriptions: ['Boiler not heating properly', 'Leaking tap in kitchen', 'Cracked window seal'], baseCostPct: [0.0008, 0.003], penalty: 3 },
@@ -1280,6 +1296,16 @@ export const useGameStore = create<GameState & GameActions>()(
         let finalCash = Math.max(0, credited.cash);
         let finalOverdraftUsed = credited.overdraftUsed;
 
+        // Defensive: if any prior code path bypassed `credit()` and left cash
+        // sitting alongside drawn overdraft, sweep it now. Without this the
+        // net-worth display under-reports because overdraftUsed is subtracted
+        // even though the player effectively has the cash to clear it.
+        if (finalCash > 0 && finalOverdraftUsed > 0) {
+          const sweep = Math.min(finalCash, finalOverdraftUsed);
+          finalCash -= sweep;
+          finalOverdraftUsed -= sweep;
+        }
+
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
         let economicEvents = [...prev.economicEvents];
@@ -1505,11 +1531,14 @@ export const useGameStore = create<GameState & GameActions>()(
               else if (roll < 0.97) { valueMult = 0.8; rentMult = 0.8; outcomeNote = 'soft demand'; }
               else { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'planning issues'; }
             } else {
-              //  70% — full uplift  · 25% slight under (×0.85) · 4% break-even (×0.4) · 1% net loss
-              if (roll < 0.70) { outcomeNote = 'on spec'; }
-              else if (roll < 0.95) { valueMult = 0.85; rentMult = 0.85; outcomeNote = 'minor issues'; }
-              else if (roll < 0.99) { valueMult = 0.4; rentMult = 0.4; outcomeNote = 'underwhelming returns'; }
-              else { valueMult = 0; rentMult = 0; outcomeNote = 'major issues found'; }
+              //  Realistic outcome distribution — tightened so "underwhelming"
+              //  no longer means losing money. Full ROI is the common case;
+              //  significant under-deliveries are rare.
+              //  60% × 1.0 (on spec) · 30% × 0.85 · 8% × 0.65 · 2% × 0.45
+              if (roll < 0.60) { outcomeNote = 'on spec'; }
+              else if (roll < 0.90) { valueMult = 0.85; rentMult = 0.85; outcomeNote = 'minor issues'; }
+              else if (roll < 0.98) { valueMult = 0.65; rentMult = 0.65; outcomeNote = 'underwhelming returns'; }
+              else { valueMult = 0.45; rentMult = 0.45; outcomeNote = 'major issues found'; }
             }
 
             const propRecord = updatedProperties[idx];
@@ -2746,16 +2775,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
 
-        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        // Conversion-specific gates: only one conversion per property.
+        // (Tenants ARE allowed during the LPA application — the physical
+        //  works are gated separately in `startRenovation`.)
         if (renovationType.category === 'conversion') {
-          if (prev.tenants.some(t => t.propertyId === propertyId)) {
-            showToast(
-              "Conversion Blocked",
-              "Vacate every unit (serve eviction notice) before applying to convert.",
-              "destructive",
-            );
-            return;
-          }
           if (property.subtype && property.subtype !== 'standard') {
             showToast("Already Converted", `This property has already been converted to ${property.subtype}.`, "destructive");
             return;

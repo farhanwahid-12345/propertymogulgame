@@ -38,10 +38,10 @@ export function calcDeposit(monthlyRentPennies: number): number {
 }
 
 /** Side-effect free toast trigger — dynamic import keeps the store decoupled from React. */
-export function showToast(title: string, description: string, variant?: 'destructive') {
+export function showToast(title: string, description: string, variant?: 'destructive' | 'success') {
   import('@/hooks/use-toast')
     .then(({ toast }) => {
-      try { toast({ title, description, variant }); } catch (e) { /* noop */ }
+      try { toast({ title, description, variant: variant as any }); } catch (e) { /* noop */ }
     })
     .catch(() => { /* noop — never let toast import crash the app */ });
 }

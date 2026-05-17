@@ -175,6 +175,9 @@ export interface PropertyTenant {
   /** monthsPlayed when an eviction notice was served. Tenant pays no rent during notice if arrears. */
   evictionNoticeMonth?: number;
   evictionGround?: EvictionGround;
+  /** monthsPlayed snapshot of the last "tenant at risk of leaving" warning fired
+   *  for this tenant — prevents the chime/toast from spamming every tick. */
+  lastWalkoutWarningMonth?: number;
   /** Commercial leases only — monthsPlayed of the most recent triennial rent review. */
   lastRentReviewMonth?: number;
 }
