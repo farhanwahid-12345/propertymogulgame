@@ -14,7 +14,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthly
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
@@ -27,6 +27,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   const canUsePortfolioMortgage = ownedProperties.length >= 3;
   
