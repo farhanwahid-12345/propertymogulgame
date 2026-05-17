@@ -4,6 +4,7 @@ import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
 import { LoansPanel } from "@/components/ui/loans-panel";
 import { TaxBreakdown } from "@/components/ui/tax-breakdown";
+import { OperationsCenter } from "@/components/ui/operations-center";
 
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Badge } from "@/components/ui/badge";
