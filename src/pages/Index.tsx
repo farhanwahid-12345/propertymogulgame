@@ -160,9 +160,9 @@ const Index = () => {
           id="section-alerts"
           title="⚠️ Action Required"
           badge={
-            (gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) > 0 ? (
+            (gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0) > 0 ? (
               <Badge variant="destructive" className="text-[10px]">
-                {(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
+                {(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0)}
               </Badge>
             ) : null
           }
