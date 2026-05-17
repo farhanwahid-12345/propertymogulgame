@@ -128,10 +128,8 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
-                <div className="flex justify-end">
-                  <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
-                </div>
+              <div className="ml-auto shrink-0 flex items-center">
+                <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
               </div>
             </div>
           </TabsContent>
