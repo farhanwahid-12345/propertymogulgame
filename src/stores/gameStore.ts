@@ -3137,7 +3137,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType) => {
+      handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType, fixedTermYears = 0) => {
         const prev = get();
         if (prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)))) {
           return { ok: false, reason: "Properties already secured under a portfolio mortgage." };
@@ -3149,6 +3149,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
+        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
         const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
         const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
@@ -3160,7 +3161,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(loanAmount),
           propertyValue: fromPennies(totalValue), propertyMonthlyRent: fromPennies(totalRent),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: adjustedMaxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
@@ -3177,6 +3178,9 @@ export const useGameStore = create<GameState & GameActions>()(
           remainingBalance: loanAmount, interestRate: eligibility.adjustedRate,
           termYears, mortgageType, providerId: provider.id,
           collateralPropertyIds: [...selectedPropertyIds], startDate: Date.now(),
+          startMonth: prev.monthsPlayed,
+          fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
+          fixedRate: fixedTermYears > 0 ? eligibility.adjustedRate : undefined,
         };
         const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
         const cashDelta = loanAmount - totalCurrentMortgages;
