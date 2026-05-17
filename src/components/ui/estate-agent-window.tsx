@@ -782,7 +782,8 @@ export function EstateAgentWindow({
                             mortgagePercentage[0],
                             selectedProvider,
                             termYears,
-                            mortgageType
+                            mortgageType,
+                            fixedTermYears,
                           );
                           setSelectedBuyProperty(null);
                           resetNegotiation();
