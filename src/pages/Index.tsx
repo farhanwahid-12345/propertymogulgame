@@ -20,6 +20,20 @@ import { useGameEngine } from "@/hooks/useGameEngine";
 import { usePropertyDebt } from "@/hooks/usePropertyDebt";
 import { usePortfolioMetrics } from "@/hooks/usePortfolioMetrics";
 import { useConveyancingDisplay } from "@/hooks/useConveyancingDisplay";
+import type { EntityType } from "@/types/game";
+
+function OnboardingGate({ setEntityType }: { setEntityType: (e: EntityType) => void }) {
+  const entityChosen = useGameStore((s: any) => s.entityChosen);
+  const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
+  return (
+    <OnboardingFlow
+      open={!entityChosen || !onboardingCompleted}
+      skipEntity={!!entityChosen}
+      onEntityPick={(entity) => setEntityType(entity)}
+      onFinish={() => useGameStore.setState({ onboardingCompleted: true } as any)}
+    />
+  );
+}
 
 const Index = () => {
   useGameEngine();
