@@ -53,8 +53,8 @@ const TOUR_STEPS: TourStep[] = [
     body: "This is the Market tab — estate agent listings and the auction house. We've switched you here now so you can see what's for sale." },
   { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 2, tab: 'bank', scrollId: 'section-tabs',
     body: "The Bank tab covers mortgages, overdraft, loans and your tax bill. Refinance equity here to fund your next deposit." },
-  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 3, tab: 'market', scrollId: 'section-ops',
-    body: "Conveyancing, renovations and planning permission live in Operations. Open it to track what's in-flight and chase tenant concerns." },
+  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 3, tab: 'bank', scrollId: 'section-ops',
+    body: "Conveyancing, renovations and planning permission live in Operations (inside the Bank tab). Open it to track what's in-flight and chase tenant concerns." },
   { id: 'tour-alerts', icon: Bell,          title: "Action Required", index: 4, tab: 'market', scrollId: 'section-alerts',
     body: "Evictions, deposit disputes and warnings appear under Action Required. Clear them before they drag your reputation down." },
 ];
