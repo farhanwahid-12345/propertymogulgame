@@ -134,6 +134,18 @@ const Index = () => {
               {activeTab === 'market' && (
                 <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
               )}
+              {activeTab === 'bank' && (
+                <>
+                  <BankingPanelActions
+                    gameState={gameState}
+                    getDebtForProperty={getDebtForProperty}
+                    totalPortfolioIncome={totalPortfolioIncome}
+                  />
+                  <OperationsInlineButton gameState={gameState} />
+                  <LoansInlineButton gameState={gameState} />
+                  <TaxInlineButton gameState={gameState} />
+                </>
+              )}
             </div>
           </div>
 
@@ -143,13 +155,7 @@ const Index = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="bank" className="mt-0">
-            <BankingPanel
-              gameState={gameState}
-              getDebtForProperty={getDebtForProperty}
-              totalPortfolioIncome={totalPortfolioIncome}
-            />
-          </TabsContent>
+          <TabsContent value="bank" className="mt-0" />
         </Tabs>
 
         <CollapsibleSection
