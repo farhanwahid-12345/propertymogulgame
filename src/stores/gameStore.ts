@@ -1918,7 +1918,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      buyPropertyAtPrice: (property, purchasePrice, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment') => {
+      buyPropertyAtPrice: (property, purchasePrice, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment', fixedTermYears = 0) => {
         const prev = get();
         if (prev.isBankrupt) return;
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", `You already own ${property.name}!`, "destructive"); return; }
