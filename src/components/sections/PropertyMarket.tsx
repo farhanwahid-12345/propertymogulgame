@@ -12,7 +12,7 @@ interface PropertyMarketProps {
 /** Action buttons only — placed inline with the Market/Bank tab toggle. */
 export function PropertyMarketActions({ gameState, totalPortfolioIncome }: PropertyMarketProps) {
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="flex gap-2 [&_button]:h-8 [&_button]:text-xs [&_button]:px-2.5 [&_button_svg]:h-3.5 [&_button_svg]:w-3.5">
       <EstateAgentWindow
         ownedProperties={gameState.ownedProperties}
         propertyListings={gameState.propertyListings}
