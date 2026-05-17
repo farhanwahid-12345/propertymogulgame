@@ -1179,10 +1179,8 @@ export const useGameStore = create<GameState & GameActions>()(
         });
 
 
-        const isBankrupt = newCashBeforeTax < 0 && totalExpenses > monthlyIncome;
-        if (isBankrupt && !prev.isBankrupt) {
-          showToast("BANKRUPTCY!", "Your expenses exceed your income and you've run out of cash!", "destructive");
-        }
+        // Bankruptcy/arrears computation is deferred until after forced-sale
+        // execution below (so a successful forced auction can clear the debt).
 
         // Level check
         const propertyEquity = updatedOwnedProperties.reduce((total, p) => {
