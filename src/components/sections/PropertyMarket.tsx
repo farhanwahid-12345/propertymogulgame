@@ -54,8 +54,8 @@ export function PropertyMarketActions({ gameState, totalPortfolioIncome }: Prope
         onAuctionSale={gameState.handleAuctionSale}
         monthsPlayed={gameState.monthsPlayed}
         auctionProperties={gameState.auctionProperties}
-        onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) =>
-          gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType)
+        onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears) =>
+          gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears)
         }
         cash={gameState.cash}
         mortgageProviders={gameState.mortgageProviders}
