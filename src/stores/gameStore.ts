@@ -525,12 +525,16 @@ export const useGameStore = create<GameState & GameActions>()(
           newAuction = newAuction.filter(p => p.id !== conv.propertyId);
 
           if (conv.mortgageData) {
+            const fxYears = conv.mortgageData.fixedTermYears;
             newMortgages.push({
               id: `${conv.propertyId}_${Date.now()}`, propertyId: conv.propertyId,
               principal: conv.mortgageData.amount, monthlyPayment: conv.mortgageData.monthlyPayment,
               remainingBalance: conv.mortgageData.amount, interestRate: conv.mortgageData.interestRate,
               termYears: conv.mortgageData.termYears, mortgageType: conv.mortgageData.mortgageType,
               providerId: conv.mortgageData.providerId, startDate: Date.now(),
+              startMonth: newMonthNumber,
+              fixedTermYears: fxYears && fxYears > 0 ? fxYears : undefined,
+              fixedRate: fxYears && fxYears > 0 ? conv.mortgageData.interestRate : undefined,
             });
           }
           showToast("Conveyancing Complete! 🏠", `${conv.propertyName} is now yours!`);
