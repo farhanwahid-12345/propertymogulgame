@@ -227,11 +227,10 @@ const Index = () => {
       />
 
       <OnboardingFlow
-        open={!(gameState as any).entityChosen}
-        onComplete={(entity) => {
-          gameState.setEntityType(entity);
-          useGameStore.setState({ onboardingCompleted: true } as any);
-        }}
+        open={!(gameState as any).entityChosen || !(gameState as any).onboardingCompleted}
+        skipEntity={!!(gameState as any).entityChosen}
+        onEntityPick={(entity) => gameState.setEntityType(entity)}
+        onFinish={() => useGameStore.setState({ onboardingCompleted: true } as any)}
       />
 
       <PlanningApprovedDialog />
