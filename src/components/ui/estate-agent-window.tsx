@@ -692,6 +692,20 @@ export function EstateAgentWindow({
                               </SelectContent>
                             </Select>
                           </div>
+                          <div className="space-y-2">
+                            <Label>Initial Fixed Term</Label>
+                            <Select value={String(fixedTermYears)} onValueChange={(v) => setFixedTermYears(Number(v))}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">SVR / Tracker</SelectItem>
+                                <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
+                                <SelectItem value="5">5-year fixed (−0.2%)</SelectItem>
+                                <SelectItem value="10">10-year fixed (+0.1%)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </>
                       )}
 
