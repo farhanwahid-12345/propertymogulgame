@@ -133,11 +133,12 @@ const Index = () => {
                     getDebtForProperty={getDebtForProperty}
                     totalPortfolioIncome={totalPortfolioIncome}
                   />
-                  <OperationsInlineButton gameState={gameState} />
                   <LoansInlineButton gameState={gameState} />
                   <TaxInlineButton gameState={gameState} />
                 </>
               )}
+              {/* Operations is always visible — flashes when tenant concerns arrive. */}
+              <OperationsInlineButton gameState={gameState} />
             </div>
           </div>
 
