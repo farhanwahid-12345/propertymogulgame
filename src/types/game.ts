@@ -27,6 +27,8 @@ export interface Conveyancing {
     mortgageType: 'repayment' | 'interest-only';
     monthlyPayment: number; // pennies
     interestRate: number;
+    /** 0 = SVR/tracker, 2/5/10 = initial fixed-rate term in years. */
+    fixedTermYears?: number;
   };
   cashHeld: number; // pennies - cash locked in escrow
   isAuction?: boolean;
