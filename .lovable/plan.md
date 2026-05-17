@@ -1,17 +1,34 @@
-## Plan
+## Goal
+Put Operations, Loans, Tax and the four mortgage buttons (Pay Mortgage, Manage Mortgages, Credit & Banking, Portfolio Mortgage) on the same horizontal row as the Market / Bank toggle, instead of stacking them below.
 
-Move the four Bank action buttons (Pay Mortgage, Manage Mortgages, Credit & Banking, Portfolio Mortgage) out of the tab header row and into the Bank tab content area, sitting above the Operations / Loans / Tax sections.
+## Changes
 
-### Changes
+### `src/pages/Index.tsx` — tab header row
+Restructure the row containing `TabsList` so it becomes a single wrap-friendly flex row holding, in order:
 
-1. `src/components/sections/BankingPanel.tsx`
-   - Render the `BankingPanelActions` toolbar at the top of the `BankingPanel` content (above the Operations CollapsibleSection), inside a glass container styled to match the other rows.
-   - Keep the same props wiring; no logic changes.
+1. Market / Bank toggle (unchanged `TabsList`).
+2. When `activeTab === 'market'`: `PropertyMarketActions` (Estate Agent + Auction House).
+3. When `activeTab === 'bank'`:
+   - The four mortgage buttons rendered via `BankingPanelActions` (Pay Mortgage, Manage Mortgages, Credit & Banking, Portfolio Mortgage).
+   - Three compact trigger buttons that open Operations, Loans, Tax in modal dialogs (since the full collapsible sections won't fit inline). Each shows the icon + label + the same summary badge currently shown on the collapsible (e.g. "All quiet", "No active loans", "Paid £0 to date").
 
-2. `src/pages/Index.tsx`
-   - In the tab header row, stop rendering `BankingPanelActions` when the Bank tab is active (since it now lives in the panel body).
-   - Keep `PropertyMarketActions` inline on the Market tab unchanged.
-   - Result: when on Bank, the header row shows only the Market/Bank toggle; when on Market, it still shows Estate Agent + Auction House inline.
+The row uses `flex flex-wrap gap-2 items-center` so it gracefully wraps on the 1001px viewport.
+
+### `src/components/sections/BankingPanel.tsx`
+- Keep `BankingPanelActions` exporting the four mortgage buttons (used inline from Index).
+- Remove the in-panel toolbar render and the three `CollapsibleSection`s for Operations / Loans / Tax from the default `BankingPanel`.
+- Export three new lightweight components consumed by Index:
+  - `OperationsInlineButton` → opens a Dialog containing `<OperationsCenter …>`.
+  - `LoansInlineButton` → opens a Dialog containing `<LoansPanel />`.
+  - `TaxInlineButton` → opens a Dialog containing `<TaxBreakdown …>`.
+  Each button shows its emoji + label and the dynamic summary text currently used as the `summary` prop on the collapsibles.
+- `BankingPanel` itself becomes a thin wrapper that renders nothing on the Bank tab body (since everything moved into the header row); the `TabsContent value="bank"` in Index can be removed or left empty.
 
 ### Out of scope
-- No changes to Market actions, Operations/Loans/Tax internals, mortgage logic, or onboarding.
+- No changes to mortgage logic, Operations/Loans/Tax internals, onboarding tour anchors, or Market actions behavior.
+- No styling overhaul beyond what's required to keep the row readable when it wraps.
+
+## Technical notes
+- Dialogs use the existing shadcn `Dialog` primitive already used elsewhere in the app.
+- Tour anchors (`tour-ops`, etc.) move with the inline buttons so the onboarding still highlights them under the Bank tab.
+- Summary badges read from the same `gameState` fields the collapsibles use today.
