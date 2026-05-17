@@ -135,7 +135,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="bank" className="mt-0">
-            <div className="flex items-center gap-2 mt-2 min-w-0">
+            <div className="flex items-center gap-2 mt-2 flex-wrap md:flex-nowrap min-w-0">
               <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
                   🏪 Market
@@ -144,14 +144,12 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
-                <div className="flex justify-end">
-                  <BankingPanelActions
-                    gameState={gameState}
-                    getDebtForProperty={getDebtForProperty}
-                    totalPortfolioIncome={totalPortfolioIncome}
-                  />
-                </div>
+              <div className="ml-auto shrink-0 flex items-center">
+                <BankingPanelActions
+                  gameState={gameState}
+                  getDebtForProperty={getDebtForProperty}
+                  totalPortfolioIncome={totalPortfolioIncome}
+                />
               </div>
             </div>
             <BankingPanel
