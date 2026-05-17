@@ -231,7 +231,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Specialist Lender</Label>
-                  <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                  <Select value={selectedProvider} onValueChange={(v) => { setRejectionReason(null); setSelectedProvider(v); }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose lender..." />
                     </SelectTrigger>
