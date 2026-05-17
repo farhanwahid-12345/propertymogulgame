@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type {
   GameState, Property, Mortgage, PropertyTenant, VoidPeriod,
   PropertyListing, PropertyOffer, Renovation,
-  PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
+  PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord, TenantEvent,
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
   DepositDispute, PlanningApplication,
 } from '@/types/game';
