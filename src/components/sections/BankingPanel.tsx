@@ -4,6 +4,7 @@ import { CreditOverdraft } from "@/components/ui/credit-overdraft";
 import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
 import { LoansPanel } from "@/components/ui/loans-panel";
 import { TaxBreakdown } from "@/components/ui/tax-breakdown";
+import { OperationsCenter } from "@/components/ui/operations-center";
 
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Badge } from "@/components/ui/badge";
@@ -68,8 +69,41 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
 
 /** Collapsible content below the toolbar (Loans + Tax). */
 export function BankingPanel({ gameState }: BankingPanelProps) {
+  const opsActive =
+    (gameState.conveyancing?.length || 0) +
+    (gameState.renovations?.length || 0) +
+    ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
+    (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
   return (
     <>
+      <div className="mt-4">
+        <CollapsibleSection
+          id="section-ops"
+          title="🔨 Operations"
+          alwaysOpenDesktop={false}
+          defaultOpenDesktop={opsActive > 0}
+          defaultOpenMobile={false}
+          summary={opsActive === 0 ? "All quiet" : `${opsActive} active`}
+        >
+          <OperationsCenter
+            monthsPlayed={gameState.monthsPlayed}
+            conveyancing={gameState.conveyancing || []}
+            renovations={gameState.renovations || []}
+            planningApplications={(gameState as any).planningApplications || []}
+            tenantConcerns={(gameState.tenantConcerns || []) as any}
+            ownedProperties={gameState.ownedProperties.map((p) => ({ id: p.id, name: p.name }))}
+            ownedPropertiesFull={gameState.ownedProperties}
+            playerCash={gameState.cash * 100}
+            onResolveConcern={gameState.resolveTenantConcern}
+            onSnoozeConcern={gameState.dismissTenantConcern}
+            onWithdrawConveyancing={gameState.withdrawFromConveyancing}
+            tenantHistory={(gameState as any).tenantHistory || []}
+            tenantEvents={gameState.tenantEvents}
+            economicEvents={gameState.economicEvents}
+            taxRecords={gameState.taxRecords || []}
+          />
+        </CollapsibleSection>
+      </div>
       <div className="mt-4">
         <CollapsibleSection
           id="section-loans"

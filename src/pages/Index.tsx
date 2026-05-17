@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/ui/game-stats";
 import { ListedProperties } from "@/components/ui/listed-properties";
-import { OperationsCenter } from "@/components/ui/operations-center";
+
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
@@ -119,7 +119,7 @@ const Index = () => {
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsContent value="market" className="mt-0">
-            <div className="flex items-center gap-2 mt-2 min-w-0">
+            <div className="flex items-center gap-2 mt-2 flex-wrap md:flex-nowrap min-w-0">
               <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
                   🏪 Market
@@ -128,16 +128,14 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
-                <div className="flex justify-end">
-                  <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
-                </div>
+              <div className="ml-auto shrink-0 flex items-center">
+                <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="bank" className="mt-0">
-            <div className="flex items-center gap-2 mt-2 min-w-0">
+            <div className="flex items-center gap-2 mt-2 flex-wrap md:flex-nowrap min-w-0">
               <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
                   🏪 Market
@@ -146,14 +144,12 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
-                <div className="flex justify-end">
-                  <BankingPanelActions
-                    gameState={gameState}
-                    getDebtForProperty={getDebtForProperty}
-                    totalPortfolioIncome={totalPortfolioIncome}
-                  />
-                </div>
+              <div className="ml-auto shrink-0 flex items-center">
+                <BankingPanelActions
+                  gameState={gameState}
+                  getDebtForProperty={getDebtForProperty}
+                  totalPortfolioIncome={totalPortfolioIncome}
+                />
               </div>
             </div>
             <BankingPanel
@@ -221,44 +217,7 @@ const Index = () => {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection
-          id="section-ops"
-          title="🔨 Operations"
-          alwaysOpenDesktop={false}
-          defaultOpenDesktop={
-            ((gameState.conveyancing?.length || 0) +
-              (gameState.renovations?.length || 0) +
-              ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
-              (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0)) > 0
-          }
-          defaultOpenMobile={false}
-          summary={(() => {
-            const total =
-              (gameState.conveyancing?.length || 0) +
-              (gameState.renovations?.length || 0) +
-              ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
-              (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
-            return total === 0 ? "All quiet" : `${total} active`;
-          })()}
-        >
-          <OperationsCenter
-            monthsPlayed={gameState.monthsPlayed}
-            conveyancing={gameState.conveyancing || []}
-            renovations={gameState.renovations || []}
-            planningApplications={(gameState as any).planningApplications || []}
-            tenantConcerns={(gameState.tenantConcerns || []) as any}
-            ownedProperties={gameState.ownedProperties.map((p) => ({ id: p.id, name: p.name }))}
-            ownedPropertiesFull={gameState.ownedProperties}
-            playerCash={gameState.cash * 100}
-            onResolveConcern={gameState.resolveTenantConcern}
-            onSnoozeConcern={gameState.dismissTenantConcern}
-            onWithdrawConveyancing={gameState.withdrawFromConveyancing}
-            tenantHistory={(gameState as any).tenantHistory || []}
-            tenantEvents={gameState.tenantEvents}
-            economicEvents={gameState.economicEvents}
-            taxRecords={gameState.taxRecords || []}
-          />
-        </CollapsibleSection>
+
 
         <CollapsibleSection
           title="📃 Listed Properties"
