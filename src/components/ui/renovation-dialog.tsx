@@ -426,7 +426,6 @@ export function RenovationDialog({
                   const affordable = canAfford(renovation);
                   const inProgress = isInProgress(renovation);
                   const completed = isCompleted(renovation);
-                  const ineligible = ineligibilityReason(renovation);
 
                   // Planning state for this renovation
                   const application = renovation.requiresPlanning ? findApplication(renovation.id) : undefined;
