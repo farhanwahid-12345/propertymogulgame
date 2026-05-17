@@ -448,7 +448,7 @@ export function RenovationDialog({
                   const expectedMult = renovation.category === 'conversion'
                     ? CONVERSION_EXPECTED_MULTIPLIER
                     : RENOVATION_EXPECTED_MULTIPLIER;
-                  const valueLow = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 0.5 : 0.3));
+                  const valueLow = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 0.5 : 0.45));
                   const valueHigh = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 1.4 : 1.0));
                   const expectedValueUp = Math.round(cappedValueUp * expectedMult);
 
