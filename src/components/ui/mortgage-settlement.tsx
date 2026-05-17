@@ -190,9 +190,9 @@ export function MortgageSettlement({
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Property:</span>
+                        <span className="text-muted-foreground">{selectedIsPortfolio ? "Portfolio:" : "Property:"}</span>
                         <br />
-                        <span className="font-medium">{selectedMortgageProperty?.name}</span>
+                        <span className="font-medium">{selectedOption?.label}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Current Balance:</span>
