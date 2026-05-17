@@ -14,7 +14,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthly
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
@@ -27,6 +27,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   const canUsePortfolioMortgage = ownedProperties.length >= 3;
   
@@ -46,6 +47,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const maxLoanAmount = totalPortfolioValue * creditMaxLTV; // Credit-score capped LTV
 
   const togglePropertySelection = (propertyId: string) => {
+    setRejectionReason(null);
     setSelectedPropertyIds(prev => 
       prev.includes(propertyId) 
         ? prev.filter(id => id !== propertyId)
@@ -55,7 +57,12 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
   const handlePortfolioMortgage = () => {
     if (selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0) return;
-    onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    if (result && result.ok === false) {
+      setRejectionReason(result.reason);
+      return;
+    }
+    setRejectionReason(null);
     setSelectedPropertyIds([]);
     setLoanAmount([0]);
     setSelectedProvider("");
@@ -196,7 +203,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 <Label>Portfolio Loan Amount: £{loanAmount[0].toLocaleString()}</Label>
                 <Slider
                   value={loanAmount}
-                  onValueChange={setLoanAmount}
+                  onValueChange={(v) => { setRejectionReason(null); setLoanAmount(v); }}
                   min={totalCurrentMortgages}
                   max={Math.floor(maxLoanAmount)}
                   step={5000}
@@ -224,7 +231,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Specialist Lender</Label>
-                  <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                  <Select value={selectedProvider} onValueChange={(v) => { setRejectionReason(null); setSelectedProvider(v); }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose lender..." />
                     </SelectTrigger>
@@ -245,7 +252,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 
                 <div>
                   <Label>Term (years)</Label>
-                  <Select value={termYears.toString()} onValueChange={(value) => setTermYears(Number(value))}>
+                  <Select value={termYears.toString()} onValueChange={(value) => { setRejectionReason(null); setTermYears(Number(value)); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -262,7 +269,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
               <div>
                 <Label>Mortgage Type</Label>
-                <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => setMortgageType(value)}>
+                <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => { setRejectionReason(null); setMortgageType(value); }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -303,6 +310,16 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                     </p>
                   </CardContent>
                 </Card>
+              )}
+
+              {rejectionReason && (
+                <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                  <div className="text-red-300">
+                    <strong className="text-red-200">Portfolio mortgage rejected.</strong>{' '}
+                    {rejectionReason}
+                  </div>
+                </div>
               )}
 
               <Button 

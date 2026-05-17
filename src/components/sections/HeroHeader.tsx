@@ -57,8 +57,25 @@ export function HeroHeader({
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
   useEffect(() => {
-    const onScroll = () => setCompact(window.scrollY > 80);
-    onScroll();
+    let ticking = false;
+    let currentCompact = window.scrollY > 96;
+    setCompact(currentCompact);
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        // Hysteresis: enter compact >96px, leave <48px → no thrash near threshold.
+        if (!currentCompact && y > 96) {
+          currentCompact = true;
+          setCompact(true);
+        } else if (currentCompact && y < 48) {
+          currentCompact = false;
+          setCompact(false);
+        }
+        ticking = false;
+      });
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);

@@ -96,7 +96,7 @@ interface GameActions {
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
-  handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => void;
+  handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
   // Loans
   applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
   settleLoan: (loanId: string) => void;
@@ -3109,7 +3109,7 @@ export const useGameStore = create<GameState & GameActions>()(
       handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType) => {
         const prev = get();
         if (prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)))) {
-          showToast("Cannot Create", "Properties already in a portfolio mortgage.", "destructive"); return;
+          return { ok: false, reason: "Properties already secured under a portfolio mortgage." };
         }
         const selectedProps = prev.ownedProperties.filter(p => selectedPropertyIds.includes(p.id));
         const totalValue = selectedProps.reduce((s, p) => s + p.value, 0);
@@ -3121,7 +3121,6 @@ export const useGameStore = create<GameState & GameActions>()(
         const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
         const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
-        // LTD companies get lower max LTV on commercial mortgages
         let adjustedMaxLTV = provider.maxLTV;
         if (prev.entityType === 'ltd') {
           adjustedMaxLTV = Math.min(adjustedMaxLTV, 0.75);
@@ -3137,7 +3136,9 @@ export const useGameStore = create<GameState & GameActions>()(
           totalRentalIncome: fromPennies(otherIncome),
           ownedPropertyCount: prev.ownedProperties.length,
         });
-        if (!eligibility.eligible) { showToast("Portfolio mortgage rejected", eligibility.reason || "Failed lender criteria.", "destructive"); return; }
+        if (!eligibility.eligible) {
+          return { ok: false, reason: eligibility.reason || "Failed lender criteria." };
+        }
 
         const portfolioMortgage: Mortgage = {
           id: `portfolio_${Date.now()}`, propertyId: `portfolio_${selectedPropertyIds[0] || 'group'}`,
@@ -3153,12 +3154,15 @@ export const useGameStore = create<GameState & GameActions>()(
           pmCashUpdate = credit(prev, cashDelta);
         } else {
           const dbg = debit(prev, -cashDelta);
-          if (!dbg) { showToast("Insufficient Cash", `Need £${fromPennies(-cashDelta).toLocaleString()} (even with overdraft).`, "destructive"); return; }
+          if (!dbg) {
+            return { ok: false, reason: `Need £${fromPennies(-cashDelta).toLocaleString()} cash (including overdraft) to settle existing debt.` };
+          }
           pmCashUpdate = { cash: dbg.cash, overdraftUsed: dbg.overdraftUsed };
         }
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
         const cashOut = Math.max(0, cashDelta);
         showToast("Portfolio mortgage secured 🏦", `Settled £${fromPennies(totalCurrentMortgages).toLocaleString()} of existing debt · £${fromPennies(cashOut).toLocaleString()} cash released.`);
+        return { ok: true };
       },
 
       // ─── LOANS (personal / business / investor) ─────────────────

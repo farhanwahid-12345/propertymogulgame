@@ -12,8 +12,8 @@ import { OnboardingFlow } from "@/components/ui/onboarding-flow";
 import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
-import { PropertyMarket } from "@/components/sections/PropertyMarket";
-import { BankingPanel } from "@/components/sections/BankingPanel";
+import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
+import { BankingPanel, BankingPanelActions } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
@@ -88,20 +88,36 @@ const Index = () => {
         />
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 glass border-0 bg-white/[0.06]">
-            <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-xl">
-              🏪 Market
-            </TabsTrigger>
-            <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-xl">
-              🏦 Bank
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="market">
-            <PropertyMarket gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+          <TabsContent value="market" className="mt-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
+                  🏪 Market
+                </TabsTrigger>
+                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
+                  🏦 Bank
+                </TabsTrigger>
+              </TabsList>
+              <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+            </div>
           </TabsContent>
 
-          <TabsContent value="bank">
+          <TabsContent value="bank" className="mt-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
+                  🏪 Market
+                </TabsTrigger>
+                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
+                  🏦 Bank
+                </TabsTrigger>
+              </TabsList>
+              <BankingPanelActions
+                gameState={gameState}
+                getDebtForProperty={getDebtForProperty}
+                totalPortfolioIncome={totalPortfolioIncome}
+              />
+            </div>
             <BankingPanel
               gameState={gameState}
               getDebtForProperty={getDebtForProperty}
@@ -211,11 +227,10 @@ const Index = () => {
       />
 
       <OnboardingFlow
-        open={!(gameState as any).entityChosen}
-        onComplete={(entity) => {
-          gameState.setEntityType(entity);
-          useGameStore.setState({ onboardingCompleted: true } as any);
-        }}
+        open={!(gameState as any).entityChosen || !(gameState as any).onboardingCompleted}
+        skipEntity={!!(gameState as any).entityChosen}
+        onEntityPick={(entity) => gameState.setEntityType(entity)}
+        onFinish={() => useGameStore.setState({ onboardingCompleted: true } as any)}
       />
 
       <PlanningApprovedDialog />

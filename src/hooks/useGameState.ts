@@ -253,7 +253,7 @@ export function useGameState() {
   }, [store.handleRefinance]);
 
   const handlePortfolioMortgage = useCallback((selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => {
-    store.handlePortfolioMortgage(selectedPropertyIds, toPennies(loanAmount), providerId, termYears, mortgageType);
+    return store.handlePortfolioMortgage(selectedPropertyIds, toPennies(loanAmount), providerId, termYears, mortgageType);
   }, [store.handlePortfolioMortgage]);
 
   const handleApplyOverdraft = useCallback((requestedLimit: number) => {
