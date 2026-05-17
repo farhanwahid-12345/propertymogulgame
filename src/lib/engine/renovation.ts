@@ -87,9 +87,9 @@ export function applyCeilingDiminishingReturns(
 /**
  * Probability-weighted expected outcome multiplier for a renovation.
  * Mirrors the engine's completion roll in `gameStore.ts`:
- *   70% × 1.0 + 25% × 0.85 + 4% × 0.4 + 1% × 0 ≈ 0.929
+ *   60% × 1.0 + 30% × 0.85 + 8% × 0.65 + 2% × 0.45 ≈ 0.916
  */
-export const RENOVATION_EXPECTED_MULTIPLIER = 0.929;
+export const RENOVATION_EXPECTED_MULTIPLIER = 0.916;
 
 /**
  * Conversion-only expected multiplier.
