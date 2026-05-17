@@ -33,10 +33,23 @@ function OnboardingGate({
 }) {
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
-  const lsDone = (() => {
+
+  // Local "dismissed" flag is the single source of truth for visibility.
+  // Initialized from store + localStorage; flipped synchronously by onFinish
+  // so the coach card vanishes immediately on Got it / Skip / X — without
+  // depending on store-update or persist-middleware timing.
+  const [dismissed, setDismissed] = useState(() => {
+    if (onboardingCompleted) return true;
     try { return window.localStorage.getItem('pm_onboarding_done') === '1'; } catch { return false; }
-  })();
-  const open = !entityChosen || (!onboardingCompleted && !lsDone);
+  });
+
+  // If the store flips completed elsewhere (e.g. heal effect), close too.
+  useEffect(() => {
+    if (onboardingCompleted && !dismissed) setDismissed(true);
+  }, [onboardingCompleted, dismissed]);
+
+  const open = !dismissed && (!entityChosen || !onboardingCompleted);
+
   return (
     <OnboardingFlow
       open={open}
@@ -45,6 +58,7 @@ function OnboardingGate({
       setActiveTab={setActiveTab}
       onEntityPick={(entity) => setEntityType(entity)}
       onFinish={() => {
+        setDismissed(true);
         try { window.localStorage.setItem('pm_onboarding_done', '1'); } catch { /* noop */ }
         useGameStore.setState({ onboardingCompleted: true } as any);
       }}
