@@ -2,28 +2,30 @@ import { useGameStore } from "@/stores/gameStore";
 
 export const ONBOARDING_DONE_KEY = "pm_onboarding_done";
 
-/**
- * Re-open the welcome tour from anywhere. Clears both the localStorage flag
- * (which acts as a defensive fallback in OnboardingGate) AND the zustand flag,
- * so the gate condition `(!onboardingCompleted && !lsDone)` evaluates true and
- * the floating coach card appears at step 1.
- */
-export function replayTour() {
-  try {
-    window.localStorage.removeItem(ONBOARDING_DONE_KEY);
-  } catch {
-    /* noop */
-  }
-  useGameStore.setState({ onboardingCompleted: false } as any);
+/** Bump this whenever replayTour is called so listeners can re-mount the flow. */
+let replayNonce = 0;
+const replayListeners = new Set<(nonce: number) => void>();
+
+export function subscribeReplay(listener: (nonce: number) => void): () => void {
+  replayListeners.add(listener);
+  return () => { replayListeners.delete(listener); };
 }
 
-/** Mark the tour as completed in both stores. Used by the floating coach card's
- * Got it / Skip / X buttons so closing doesn't depend on a parent callback. */
+export function getReplayNonce(): number {
+  return replayNonce;
+}
+
+/** Re-open the welcome tour from anywhere. Single source of truth = zustand;
+ * localStorage is kept in sync as a defensive fallback. */
+export function replayTour() {
+  try { window.localStorage.removeItem(ONBOARDING_DONE_KEY); } catch { /* noop */ }
+  useGameStore.setState({ onboardingCompleted: false } as any);
+  replayNonce += 1;
+  replayListeners.forEach((l) => { try { l(replayNonce); } catch { /* noop */ } });
+}
+
+/** Mark the tour as completed. Used by every exit button (Skip / Got it / X). */
 export function dismissTour() {
-  try {
-    window.localStorage.setItem(ONBOARDING_DONE_KEY, '1');
-  } catch {
-    /* noop */
-  }
+  try { window.localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* noop */ }
   useGameStore.setState({ onboardingCompleted: true } as any);
 }
