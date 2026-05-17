@@ -73,12 +73,14 @@ function InlineDialogButton({
   label,
   summary,
   title,
+  attention = false,
   children,
 }: {
   id?: string;
   label: string;
   summary: string;
   title: string;
+  attention?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -89,10 +91,12 @@ function InlineDialogButton({
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="h-8 text-xs px-2.5 gap-2 bg-white/[0.04] border-white/10"
+        className={`h-8 text-xs px-2.5 gap-2 bg-white/[0.04] border-white/10 ${attention ? 'ops-attention' : ''}`}
       >
         <span>{label}</span>
-        <span className="text-muted-foreground text-[10px]">{summary}</span>
+        <span className={attention ? 'text-destructive-foreground text-[10px] font-semibold' : 'text-muted-foreground text-[10px]'}>
+          {summary}
+        </span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -107,16 +111,24 @@ function InlineDialogButton({
 }
 
 export function OperationsInlineButton({ gameState }: { gameState: GameState }) {
+  const concernCount = gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0;
   const opsActive =
     (gameState.conveyancing?.length || 0) +
     (gameState.renovations?.length || 0) +
     ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
-    (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
+    concernCount;
+  const attention = concernCount > 0;
+  const summary = opsActive === 0
+    ? "All quiet"
+    : attention
+      ? `⚠ ${concernCount} concern${concernCount > 1 ? 's' : ''}`
+      : `${opsActive} active`;
   return (
     <InlineDialogButton
       id="section-ops"
       label="🔨 Operations"
-      summary={opsActive === 0 ? "All quiet" : `${opsActive} active`}
+      summary={summary}
+      attention={attention}
       title="Operations"
     >
       <OperationsCenter

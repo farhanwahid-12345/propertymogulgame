@@ -34,21 +34,8 @@ function OnboardingGate({
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
 
-  // Local "dismissed" flag is the single source of truth for visibility.
-  // Initialized from store + localStorage; flipped synchronously by onFinish
-  // so the coach card vanishes immediately on Got it / Skip / X — without
-  // depending on store-update or persist-middleware timing.
-  const [dismissed, setDismissed] = useState(() => {
-    if (onboardingCompleted) return true;
-    try { return window.localStorage.getItem('pm_onboarding_done') === '1'; } catch { return false; }
-  });
-
-  // If the store flips completed elsewhere (e.g. heal effect), close too.
-  useEffect(() => {
-    if (onboardingCompleted && !dismissed) setDismissed(true);
-  }, [onboardingCompleted, dismissed]);
-
-  const open = !dismissed && (!entityChosen || !onboardingCompleted);
+  // Single source of truth = zustand. Open when entity not chosen OR tour not completed.
+  const open = !entityChosen || !onboardingCompleted;
 
   return (
     <OnboardingFlow
@@ -58,7 +45,6 @@ function OnboardingGate({
       setActiveTab={setActiveTab}
       onEntityPick={(entity) => setEntityType(entity)}
       onFinish={() => {
-        setDismissed(true);
         try { window.localStorage.setItem('pm_onboarding_done', '1'); } catch { /* noop */ }
         useGameStore.setState({ onboardingCompleted: true } as any);
       }}
@@ -70,14 +56,6 @@ const Index = () => {
   useGameEngine();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
-
-  // Heal legacy saves: anyone who already chose an entity has effectively onboarded.
-  useEffect(() => {
-    const s = useGameStore.getState() as any;
-    if (s.entityChosen && !s.onboardingCompleted) {
-      useGameStore.setState({ onboardingCompleted: true } as any);
-    }
-  }, []);
 
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
@@ -155,11 +133,12 @@ const Index = () => {
                     getDebtForProperty={getDebtForProperty}
                     totalPortfolioIncome={totalPortfolioIncome}
                   />
-                  <OperationsInlineButton gameState={gameState} />
                   <LoansInlineButton gameState={gameState} />
                   <TaxInlineButton gameState={gameState} />
                 </>
               )}
+              {/* Operations is always visible — flashes when tenant concerns arrive. */}
+              <OperationsInlineButton gameState={gameState} />
             </div>
           </div>
 
