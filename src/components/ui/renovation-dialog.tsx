@@ -434,10 +434,16 @@ export function RenovationDialog({
                   const planningApproved = application?.status === 'approved';
                   const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
                   // Planning-gated renovations only need the planning fee to begin the process,
-                  // so we let the user select & submit even if they can't yet afford the build.
+                  // so we let the user select & submit even if they can't yet afford the build
+                  // OR a tenant is still in residence (works gated post-approval).
                   const needsPlanningStep = renovation.requiresPlanning && !planningApproved && !planningPending;
+                  const phase: 'planning' | 'works' = needsPlanningStep ? 'planning' : 'works';
+                  const ineligible = ineligibilityReason(renovation, phase);
                   const planningFeeForCard = renovation.planningFee ?? 250;
                   const canSubmitPlanning = needsPlanningStep && playerCash >= planningFeeForCard;
+                  // Soft warnings shown on planning-step cards (do not block selection).
+                  const planningTenantWarning = needsPlanningStep && hasTenant && (renovation.category === 'conversion' || renovation.requiresVacant);
+                  const planningCashWarning = needsPlanningStep && !affordable;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
                   const selectable = !blocked && (canSubmitPlanning || (planningApproved && affordable) || (!renovation.requiresPlanning && affordable));
 
