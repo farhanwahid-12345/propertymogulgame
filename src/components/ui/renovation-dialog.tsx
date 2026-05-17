@@ -523,7 +523,16 @@ export function RenovationDialog({
                           </div>
                         )}
 
-                        {/* Planning state banners */}
+                        {planningTenantWarning && !ineligible && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            ⓘ Tenant in residence — eviction required before works start. Planning can be submitted now.
+                          </div>
+                        )}
+                        {planningCashWarning && !ineligible && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            ⓘ Submit planning now (£{planningFeeForCard.toLocaleString()}); you'll need £{scaledCost(renovation).toLocaleString()} cash once approved.
+                          </div>
+                        )}
                         {planningPending && application && (
                           <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
                             📋 Planning application pending — decision in {Math.max(0, application.decisionMonth - monthsPlayed)} mo
