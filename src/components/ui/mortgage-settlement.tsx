@@ -62,6 +62,10 @@ export function MortgageSettlement({
 
   const hasMortgages = mortgageOptions.length > 0;
 
+  const selectedMortgageDetails = mortgages.find(m => m.propertyId === selectedMortgage);
+  const selectedOption = mortgageOptions.find(o => o.id === selectedMortgage);
+  const selectedIsPortfolio = !!selectedMortgageDetails && isPortfolio(selectedMortgageDetails);
+
   const paymentAmount = partialAmount ? parseFloat(partialAmount) : 0;
   // ERC: 2% within first 5 years (60 months @ 180s/month)
   const ERC_WINDOW_MS = 60 * 180 * 1000;
