@@ -848,6 +848,22 @@ export const useGameStore = create<GameState & GameActions>()(
         newTenants = satisfactionAdjustedTenants;
         newVoidPeriods = [...newVoidPeriods, ...earlyExitVoids];
 
+        // ── Proactive walkout warnings ──
+        // Surface a destructive toast (+ chime) when a sitting tenant's satisfaction
+        // drops under 25 and we haven't already warned about them recently.
+        newTenants = newTenants.map(t => {
+          if (t.satisfaction >= 25 || t.satisfaction <= 0) return t;
+          const lastWarn = (t as any).lastWalkoutWarningMonth ?? -Infinity;
+          if (newMonthNumber - lastWarn < 3) return t;
+          const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+          showToast(
+            "⚠️ Tenant at risk of leaving",
+            `${t.tenant.name}${property ? ` at ${property.name}` : ''} is critically unhappy (satisfaction ${Math.round(t.satisfaction)}). Address concerns or they may walk.`,
+            "destructive",
+          );
+          return { ...t, lastWalkoutWarningMonth: newMonthNumber } as any;
+        });
+
         // ── Tenant concerns: monthly generation + satisfaction decay + auto-resolution ──
         const CONCERN_TEMPLATES: Array<{ category: import('@/types/game').ConcernCategory; descriptions: string[]; baseCostPct: [number, number]; penalty: number }> = [
           { category: 'maintenance', descriptions: ['Boiler not heating properly', 'Leaking tap in kitchen', 'Cracked window seal'], baseCostPct: [0.0008, 0.003], penalty: 3 },
