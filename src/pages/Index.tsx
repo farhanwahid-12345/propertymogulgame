@@ -9,6 +9,7 @@ import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 import { OnboardingFlow } from "@/components/ui/onboarding-flow";
+import * as onboardingModule from "@/lib/onboarding";
 import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
