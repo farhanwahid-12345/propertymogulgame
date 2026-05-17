@@ -312,6 +312,16 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 </Card>
               )}
 
+              {rejectionReason && (
+                <div className="p-3 rounded-lg border border-red-500/50 bg-red-500/10 text-sm flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                  <div className="text-red-300">
+                    <strong className="text-red-200">Portfolio mortgage rejected.</strong>{' '}
+                    {rejectionReason}
+                  </div>
+                </div>
+              )}
+
               <Button 
                 className="w-full bg-purple-600 hover:bg-purple-700" 
                 onClick={handlePortfolioMortgage}
