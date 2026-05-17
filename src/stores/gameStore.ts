@@ -1822,7 +1822,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // ─── BUY PROPERTY ──────────────────────
-      buyProperty: (property, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment') => {
+      buyProperty: (property, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment', fixedTermYears = 0) => {
         const prev = get();
         if (prev.isBankrupt) { showToast("Bankrupt", "Cannot purchase while bankrupt!", "destructive"); return; }
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", "You already own this property.", "destructive"); return; }
