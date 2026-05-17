@@ -91,6 +91,8 @@ const Index = () => {
         planningApplications={(gameState as any).planningApplications || []}
         lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
         entityType={gameState.entityType}
+        currentMarketRate={gameState.currentMarketRate}
+        totalDebt={gameState.totalDebt}
       />
 
       <div className="container mx-auto px-4 py-6 space-y-5 pb-24 md:pb-6">
