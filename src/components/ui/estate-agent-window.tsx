@@ -55,7 +55,7 @@ interface EstateAgentWindowProps {
   onRejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   cash: number;
   availableProperties: Property[];
-  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
+  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   getMaxPropertiesForLevel: (level: number) => number;
   getAvailablePropertyTypes: (level: number) => string[];
   getMaxPropertyValue: (level: number) => number;
@@ -109,6 +109,7 @@ export function EstateAgentWindow({
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [fixedTermYears, setFixedTermYears] = useState<number>(0);
   
   // Buying negotiation state
   const [vendorResponse, setVendorResponse] = useState<'pending' | 'accepted' | 'countered' | 'rejected' | null>(null);
@@ -691,6 +692,20 @@ export function EstateAgentWindow({
                               </SelectContent>
                             </Select>
                           </div>
+                          <div className="space-y-2">
+                            <Label>Initial Fixed Term</Label>
+                            <Select value={String(fixedTermYears)} onValueChange={(v) => setFixedTermYears(Number(v))}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">SVR / Tracker</SelectItem>
+                                <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
+                                <SelectItem value="5">5-year fixed (−0.2%)</SelectItem>
+                                <SelectItem value="10">10-year fixed (+0.1%)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </>
                       )}
 
@@ -767,7 +782,8 @@ export function EstateAgentWindow({
                             mortgagePercentage[0],
                             selectedProvider,
                             termYears,
-                            mortgageType
+                            mortgageType,
+                            fixedTermYears,
                           );
                           setSelectedBuyProperty(null);
                           resetNegotiation();

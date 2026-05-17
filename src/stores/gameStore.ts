@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type {
   GameState, Property, Mortgage, PropertyTenant, VoidPeriod,
   PropertyListing, PropertyOffer, Renovation,
-  PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord,
+  PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord, TenantEvent,
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
   DepositDispute, PlanningApplication,
 } from '@/types/game';
@@ -59,8 +59,8 @@ interface GameActions {
   // Entity
   setEntityType: (type: EntityType) => void;
   // Property buying
-  buyProperty: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
-  buyPropertyAtPrice: (property: Property, purchasePrice: number, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
+  buyProperty: (property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
+  buyPropertyAtPrice: (property: Property, purchasePrice: number, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   // Property selling
   sellProperty: (property: Property, isAuction?: boolean) => void;
   handleEstateAgentSale: (propertyId: string, offer: any) => void;
@@ -96,7 +96,7 @@ interface GameActions {
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
   handleRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
-  handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
+  handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   // Loans
   applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
   settleLoan: (loanId: string) => void;
@@ -525,12 +525,16 @@ export const useGameStore = create<GameState & GameActions>()(
           newAuction = newAuction.filter(p => p.id !== conv.propertyId);
 
           if (conv.mortgageData) {
+            const fxYears = conv.mortgageData.fixedTermYears;
             newMortgages.push({
               id: `${conv.propertyId}_${Date.now()}`, propertyId: conv.propertyId,
               principal: conv.mortgageData.amount, monthlyPayment: conv.mortgageData.monthlyPayment,
               remainingBalance: conv.mortgageData.amount, interestRate: conv.mortgageData.interestRate,
               termYears: conv.mortgageData.termYears, mortgageType: conv.mortgageData.mortgageType,
               providerId: conv.mortgageData.providerId, startDate: Date.now(),
+              startMonth: newMonthNumber,
+              fixedTermYears: fxYears && fxYears > 0 ? fxYears : undefined,
+              fixedRate: fxYears && fxYears > 0 ? conv.mortgageData.interestRate : undefined,
             });
           }
           showToast("Conveyancing Complete! 🏠", `${conv.propertyName} is now yours!`);
@@ -571,8 +575,27 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Monthly income (skip conveyancing properties) ──
         const conveyancingPropertyIds = new Set([...activeConveyancing.map(c => c.propertyId), ...cancelledConveyancing.map(c => c.propertyId)]);
 
+        // Risk-weighted missed-rent roll: probability scales with tenant.defaultRisk.
+        // defaultRisk is ~1–60; convert to monthly miss probability with a 0.4 dampener.
+        const missedRentPropertyIds = new Set<string>();
+        const newDefaultEvents: TenantEvent[] = [];
+        prev.tenants.forEach(t => {
+          if (conveyancingPropertyIds.has(t.propertyId)) return;
+          const risk = (t.tenant as any).defaultRisk ?? 5;
+          const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          if (Math.random() < monthlyP) {
+            missedRentPropertyIds.add(t.propertyId);
+            const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+            newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
+            if (prop) {
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}.`, "destructive");
+            }
+          }
+        });
+
         const monthlyIncome = newOwnedProperties.reduce((total, property) => {
           if (conveyancingPropertyIds.has(property.id)) return total; // No rent during conveyancing
+          if (missedRentPropertyIds.has(property.id)) return total;   // Tenant defaulted this month
           const hasTenant = newTenants.some(t => t.propertyId === property.id);
           const isInVoid = newVoidPeriods.some(vp =>
             vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
@@ -1818,7 +1841,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // ─── BUY PROPERTY ──────────────────────
-      buyProperty: (property, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment') => {
+      buyProperty: (property, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment', fixedTermYears = 0) => {
         const prev = get();
         if (prev.isBankrupt) { showToast("Bankrupt", "Cannot purchase while bankrupt!", "destructive"); return; }
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", "You already own this property.", "destructive"); return; }
@@ -1847,13 +1870,14 @@ export const useGameStore = create<GameState & GameActions>()(
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+          const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
           const eligibility = calculateMortgageEligibility({
             creditScore: prev.creditScore,
             loanAmount: fromPennies(mortgageAmount),
             propertyValue: fromPennies(property.price),
             propertyMonthlyRent: fromPennies(property.monthlyIncome),
-            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
             providerMinCreditScore: provider.minCreditScore,
             providerMaxLTV: provider.maxLTV,
             providerId: provider.id,
@@ -1875,6 +1899,7 @@ export const useGameStore = create<GameState & GameActions>()(
             termYears, mortgageType,
             monthlyPayment: toPennies(eligibility.monthlyPayment),
             interestRate: eligibility.adjustedRate,
+            fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
           };
         }
 
@@ -1912,7 +1937,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      buyPropertyAtPrice: (property, purchasePrice, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment') => {
+      buyPropertyAtPrice: (property, purchasePrice, mortgagePercentage = 0, providerId, termYears = 25, mortgageType = 'repayment', fixedTermYears = 0) => {
         const prev = get();
         if (prev.isBankrupt) return;
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", `You already own ${property.name}!`, "destructive"); return; }
@@ -1935,13 +1960,14 @@ export const useGameStore = create<GameState & GameActions>()(
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+          const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
           const eligibility = calculateMortgageEligibility({
             creditScore: prev.creditScore,
             loanAmount: fromPennies(mortgageAmount),
             propertyValue: fromPennies(purchasePrice),
             propertyMonthlyRent: fromPennies(property.monthlyIncome),
-            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
             providerMinCreditScore: provider.minCreditScore,
             providerMaxLTV: provider.maxLTV,
             providerId: provider.id,
@@ -1963,6 +1989,7 @@ export const useGameStore = create<GameState & GameActions>()(
             termYears, mortgageType,
             monthlyPayment: toPennies(eligibility.monthlyPayment),
             interestRate: eligibility.adjustedRate,
+            fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
           };
         }
 
@@ -3129,7 +3156,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
-      handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType) => {
+      handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType, fixedTermYears = 0) => {
         const prev = get();
         if (prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)))) {
           return { ok: false, reason: "Properties already secured under a portfolio mortgage." };
@@ -3141,6 +3168,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
+        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
         const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
         const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
@@ -3152,7 +3180,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(loanAmount),
           propertyValue: fromPennies(totalValue), propertyMonthlyRent: fromPennies(totalRent),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: adjustedMaxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
@@ -3169,6 +3197,9 @@ export const useGameStore = create<GameState & GameActions>()(
           remainingBalance: loanAmount, interestRate: eligibility.adjustedRate,
           termYears, mortgageType, providerId: provider.id,
           collateralPropertyIds: [...selectedPropertyIds], startDate: Date.now(),
+          startMonth: prev.monthsPlayed,
+          fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
+          fixedRate: fixedTermYears > 0 ? eligibility.adjustedRate : undefined,
         };
         const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
         const cashDelta = loanAmount - totalCurrentMortgages;

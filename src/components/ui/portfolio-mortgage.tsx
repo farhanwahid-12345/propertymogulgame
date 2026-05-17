@@ -14,7 +14,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthly
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
   mortgageProviders: any[];
-  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only') => { ok: true } | { ok: false; reason: string };
+  onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
@@ -27,6 +27,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [fixedTermYears, setFixedTermYears] = useState<number>(0);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   const canUsePortfolioMortgage = ownedProperties.length >= 3;
@@ -57,7 +58,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
   const handlePortfolioMortgage = () => {
     if (selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0) return;
-    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType, fixedTermYears);
     if (result && result.ok === false) {
       setRejectionReason(result.reason);
       return;
@@ -70,7 +71,8 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   };
 
   const selectedProviderData = mortgageProviders.find((p: any) => p.id === selectedProvider);
-  const portfolioRate = selectedProviderData ? Math.max(0.01, selectedProviderData.baseRate + 0.005 + ratePenalty) : 0;
+  const fixedAdj = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
+  const portfolioRate = selectedProviderData ? Math.max(0.01, selectedProviderData.baseRate + 0.005 + ratePenalty + fixedAdj) : 0;
   const monthlyPayment = selectedProviderData ? calculateMonthlyPayment(
     loanAmount[0], portfolioRate, termYears, mortgageType
   ) : 0;
@@ -276,6 +278,21 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                   <SelectContent>
                     <SelectItem value="repayment">Repayment</SelectItem>
                     <SelectItem value="interest-only">Interest Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Initial Fixed Term</Label>
+                <Select value={String(fixedTermYears)} onValueChange={(v) => { setRejectionReason(null); setFixedTermYears(Number(v)); }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">SVR / Tracker (variable)</SelectItem>
+                    <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
+                    <SelectItem value="5">5-year fixed (−0.2%)</SelectItem>
+                    <SelectItem value="10">10-year fixed (+0.1%)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

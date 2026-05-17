@@ -42,6 +42,17 @@ export function generateRandomProperty(level: number): Property {
   const conditionRoll = Math.random();
   const condition = conditionRoll < 0.2 ? 'dilapidated' as const : conditionRoll < 0.85 ? 'standard' as const : 'premium' as const;
 
+  // EPC rating weighted by condition (UK housing stock distribution)
+  const epcRoll = Math.random();
+  let epcRating: 'A'|'B'|'C'|'D'|'E'|'F'|'G';
+  if (condition === 'premium') {
+    epcRating = epcRoll < 0.15 ? 'A' : epcRoll < 0.55 ? 'B' : epcRoll < 0.9 ? 'C' : 'D';
+  } else if (condition === 'dilapidated') {
+    epcRating = epcRoll < 0.05 ? 'D' : epcRoll < 0.45 ? 'E' : epcRoll < 0.85 ? 'F' : 'G';
+  } else {
+    epcRating = epcRoll < 0.1 ? 'B' : epcRoll < 0.45 ? 'C' : epcRoll < 0.85 ? 'D' : epcRoll < 0.97 ? 'E' : 'F';
+  }
+
   // Sqft generation by type
   let internalSqft: number, plotSqft: number;
   if (type === 'commercial') {
@@ -72,6 +83,7 @@ export function generateRandomProperty(level: number): Property {
     internalSqft,
     plotSqft,
     subtype: 'standard',
+    epcRating,
   };
 }
 
