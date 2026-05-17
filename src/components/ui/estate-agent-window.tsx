@@ -109,6 +109,7 @@ export function EstateAgentWindow({
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [termYears, setTermYears] = useState<number>(25);
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  const [fixedTermYears, setFixedTermYears] = useState<number>(0);
   
   // Buying negotiation state
   const [vendorResponse, setVendorResponse] = useState<'pending' | 'accepted' | 'countered' | 'rejected' | null>(null);
