@@ -203,7 +203,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 <Label>Portfolio Loan Amount: £{loanAmount[0].toLocaleString()}</Label>
                 <Slider
                   value={loanAmount}
-                  onValueChange={setLoanAmount}
+                  onValueChange={(v) => { setRejectionReason(null); setLoanAmount(v); }}
                   min={totalCurrentMortgages}
                   max={Math.floor(maxLoanAmount)}
                   step={5000}
