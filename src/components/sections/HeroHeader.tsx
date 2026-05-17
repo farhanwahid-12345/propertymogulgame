@@ -149,6 +149,14 @@ export function HeroHeader({
               )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
+              {!compact && (
+                <div
+                  className="glass rounded-full px-3 py-1 hidden md:flex items-center text-[11px] text-muted-foreground whitespace-nowrap"
+                  title={`Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
+                >
+                  📈 {(currentMarketRate * 100).toFixed(2)}% · Debt £{totalDebt.toLocaleString()} · M {monthsPlayed}
+                </div>
+              )}
               <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">
                 <GameClock
                   monthsPlayed={monthsPlayed}
