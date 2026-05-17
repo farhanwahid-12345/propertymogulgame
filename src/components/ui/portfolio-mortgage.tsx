@@ -252,7 +252,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
                 
                 <div>
                   <Label>Term (years)</Label>
-                  <Select value={termYears.toString()} onValueChange={(value) => setTermYears(Number(value))}>
+                  <Select value={termYears.toString()} onValueChange={(value) => { setRejectionReason(null); setTermYears(Number(value)); }}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
