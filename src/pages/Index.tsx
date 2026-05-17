@@ -117,8 +117,8 @@ const Index = () => {
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsContent value="market" className="mt-0">
-            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
-              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+            <div className="flex items-center gap-2 mt-2 min-w-0">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
                   🏪 Market
                 </TabsTrigger>
@@ -126,13 +126,17 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
+                <div className="flex justify-end">
+                  <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+                </div>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="bank" className="mt-0">
-            <div className="flex items-center justify-between gap-2 flex-wrap mt-2">
-              <TabsList className="glass border-0 bg-white/[0.06] h-9">
+            <div className="flex items-center gap-2 mt-2 min-w-0">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
                   🏪 Market
                 </TabsTrigger>
@@ -140,11 +144,15 @@ const Index = () => {
                   🏦 Bank
                 </TabsTrigger>
               </TabsList>
-              <BankingPanelActions
-                gameState={gameState}
-                getDebtForProperty={getDebtForProperty}
-                totalPortfolioIncome={totalPortfolioIncome}
-              />
+              <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar">
+                <div className="flex justify-end">
+                  <BankingPanelActions
+                    gameState={gameState}
+                    getDebtForProperty={getDebtForProperty}
+                    totalPortfolioIncome={totalPortfolioIncome}
+                  />
+                </div>
+              </div>
             </div>
             <BankingPanel
               gameState={gameState}
