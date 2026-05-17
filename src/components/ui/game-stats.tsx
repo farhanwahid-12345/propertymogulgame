@@ -1,47 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { TrendingUp, TrendingDown, AlertTriangle, Info, ChevronDown } from "lucide-react";
+import { Info } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide";
 import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { memo, useState } from "react";
 
-interface MarketSummaryBarProps {
-  currentMarketRate: number;
-  totalDebt: number;
-  monthsPlayed: number;
-  recentEventCount: number;
-  showDetails: boolean;
-}
-
-const MarketSummaryBar = memo(function MarketSummaryBar({
-  currentMarketRate,
-  totalDebt,
-  monthsPlayed,
-  recentEventCount,
-  showDetails,
-}: MarketSummaryBarProps) {
-  return (
-    <button
-      type="button"
-      className="glass w-full px-3 py-1.5 flex items-center justify-between text-xs cursor-pointer hover:bg-white/[0.16]"
-    >
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <TrendingUp className="h-3.5 w-3.5" />
-        Market: {(currentMarketRate * 100).toFixed(2)}% · Debt: £{totalDebt.toLocaleString()} · Month {monthsPlayed}
-        {recentEventCount > 0 && (
-          <Badge key={recentEventCount} variant="destructive" className="text-[10px] px-1.5 py-0">
-            {recentEventCount} events
-          </Badge>
-        )}
-      </span>
-      <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
-    </button>
-  );
-});
 
 interface EconomicEvent {
   id: string;
@@ -101,7 +66,6 @@ export function GameStats({
 }: GameStatsProps) {
   const netMonthlyIncome = totalMonthlyIncome - totalMonthlyExpenses;
   const experienceProgress = (experience / experienceToNext) * 100;
-  const [showDetails, setShowDetails] = useState(false);
 
   // DTI calculation
   const dtiRatio = totalMonthlyIncome > 0 
