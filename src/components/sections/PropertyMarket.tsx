@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, HelpCircle } from "lucide-react";
+import { useGameStore } from "@/stores/gameStore";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
