@@ -1,72 +1,53 @@
 ## Scope
 
-Five connected fixes from the annotated screenshots: tidy the Market/Bank toolbar, make the Tour button actually launch the tour, warn before bankruptcy + add a court → auction → bankruptcy escalation, let users start the planning step for renovations even when a tenant is in residence or they can't yet afford the build, and allow paying down a portfolio mortgage from the Pay Mortgage dialog.
+Three connected polish fixes from the annotated screenshot:
+
+1. The Got it / Skip / X buttons on the floating tour coach card don't dismiss it.
+2. The `Estate Agent / Auction House` (and the four Bank actions) wrap onto a second row below the Market/Bank tab toggle on ~768px wide viewports — they should sit on the same line as the tabs.
+3. The slim `Market: 3.50% · Debt £0 · Month 0` strip currently sits orphaned under the stats grid — move it into the hero header next to the clock so it stops eating a row.
 
 ---
 
-## 1. Market/Bank toolbar cleanup (screenshot items 1 & 2)
+## 1. Tour dismiss doesn't work
 
-**Problem.** The Market tab's action row (`Estate Agent · Auction House · Tour · Reset`) and the Bank tab's action row (`Pay Mortgage · Manage Mortgages · Credit & Banking · Portfolio Mortgage`) both eat a full row below the tabs. The slim `Market rate / Debt / Month` strip also sits on its own row. The user wants this consolidated.
-
-**Fix.**
-
-- **Move the market-rate strip into `HeroHeader`.** Add a compact pill (e.g. `📈 3.60% · Debt £0 · M 0`) to the right cluster of `HeroHeader`, between `GameClock` and `SpeedSelector`. Hidden on `compact` scroll state to avoid crowding. Source the values from `useGameStore` directly so we don't need to thread props through `Index.tsx`.
-- **Tighten the tabs row.** Keep `<TabsList>` on the left and the contextual action buttons on the right of the same row (already the layout); just shrink button paddings (`size="sm"`, `h-8`) so all four Bank actions and all four Market actions fit on one line at ≥1000px. On narrower widths they wrap naturally via the existing `flex-wrap`.
-- **Promote Tour + Reset out of the Market actions row** into an overflow menu in the header (small `⋯` button on the right of the hero cluster) so they're always reachable and stop competing with the primary `Estate Agent / Auction House` buttons. The menu items: Replay tour, Reset game, Sound toggle (moved from header), Pause (moved from header). Header keeps only Clock, Speed, Rate pill, Notifications, and the `⋯` menu.
-
-Net effect: one row for tabs+actions, one row for the hero strip, and the orphan rate strip disappears.
-
-## 2. Tour button does nothing (screenshot 1b)
-
-**Problem.** Clicking Tour calls `useGameStore.setState({ onboardingCompleted: false })`, but `OnboardingGate` also requires the `pm_onboarding_done` localStorage flag to be cleared — once that flag is set, the gate stays closed regardless of the zustand flip.
+**Root cause.** `OnboardingFlow.finish()` sets `pm_onboarding_done` in localStorage and calls `onFinish()`, which in `Index.tsx`'s `OnboardingGate` does `useGameStore.setState({ onboardingCompleted: true } as any)`. The gate's `open` formula is `!entityChosen || (!onboardingCompleted && !lsDone)`. The cast to `any` means `onboardingCompleted` isn't in the typed store shape — the persist middleware's sanitizers (`src/stores/sanitizers.ts`) likely strip it, so on rehydrate the zustand value goes back to `undefined`/falsy. The localStorage fallback would normally rescue it, but `lsDone` is computed once at render time from a non-reactive `window.localStorage.getItem` read, so when `finish()` writes the key after render starts the gate doesn't always re-evaluate before the next zustand-driven render — and a stuck save with `onboardingCompleted: false` keeps the gate open.
 
 **Fix.**
 
-- In the Tour button's onClick, also `window.localStorage.removeItem('pm_onboarding_done')` *and* set `onboardingCompleted: false`. Skip the entity step by leaving `entityChosen` as-is; the gate already uses `skipEntity` based on `entityChosen`.
-- Export a `replayTour()` helper from `onboarding-flow.tsx` (or a tiny `src/lib/onboarding.ts`) that does both — single source of truth so the settings/replay link and the new header overflow menu both call the same thing.
-- Verify the gate by re-reading `OnboardingGate` after the click: `open = !entityChosen || (!onboardingCompleted && !lsDone)`. With LS cleared and `onboardingCompleted=false`, gate opens at `tour-market`.
+- Add `onboardingCompleted: boolean` (and `entityChosen: boolean`) as first-class fields on the zustand store in `gameStore.ts` (default `false`), and whitelist them in the persist sanitizer so they survive reloads.
+- Expose typed setters `setOnboardingCompleted(done)` and use them from `OnboardingGate.onFinish` instead of the `as any` setState.
+- In `OnboardingFlow`, keep the localStorage write as a belt-and-braces fallback, and have `finish()` also flip the zustand flag directly (via the same `replayTour`-style helper, in reverse). That removes the dependency on the parent passing `onFinish` correctly.
+- In `OnboardingGate`, drop the `lsDone` shortcut entirely now that the zustand flag is reliable — `open = !entityChosen || !onboardingCompleted`. Re-reading the value via `useGameStore` makes it reactive automatically.
 
-## 3. Bankruptcy warning + court/bailiff escalation (screenshot item 3)
+Verification: after clicking Got it, Skip tour, or X, the coach card unmounts and reloading the page keeps it closed.
 
-**Problem.** When the player can't pay outgoings they currently slide straight into bankruptcy with no warning.
+## 2. Inline the Market / Bank action buttons with the tab row
 
-**Fix — three-stage escalation in `useGameEngine` monthly tick:**
+**Problem.** The current layout already wraps `<TabsList>` and the actions in a `flex items-center justify-between flex-wrap`, but at the user's 768px viewport the four Bank actions (and even the two Market ones once chrome/scrollbar is accounted for) overflow and wrap to a second row.
 
-1. **Warning stage** — when projected next-month cashflow (cash + overdraft headroom − monthly outgoings) goes negative and there is no live court order, raise a high-priority `Action Required` alert: "Outgoings exceed available funds — 2 months until court action". Stored as a new `arrears` record on the store (`arrearsMonth`, `monthsBehind`).
-2. **Court action stage (after 2 missed months)** — auto-list the most-leveraged property at auction at a forced reserve (90% of value). Surface as a `CourtAction` notification with a countdown; player can still settle by clearing arrears before the auction resolves.
-3. **Bankruptcy stage** — only if the forced auction completes and cash + proceeds still leave net worth < 0, trigger the existing post-bankruptcy `EntityOnboardingDialog` reset flow.
+**Fix in `Index.tsx` + `PropertyMarketActions` + `BankingPanelActions`.**
 
-State changes:
+- Shrink the action buttons further so all of them fit on one row at ≥720px:
+  - `BankingPanelActions`: already uses `[&_button]:h-8 [&_button]:text-xs [&_button]:px-2.5`. Drop button labels to icon + 1-word (e.g. `Pay`, `Manage`, `Credit`, `Portfolio`) on `<md` breakpoint via `hidden md:inline`. Keep full labels on `md+`.
+  - `PropertyMarketActions`: wrap its two buttons in the same `[&_button]:h-8 [&_button]:text-xs` shell so they match the Bank row's height/sizing exactly.
+- In `Index.tsx`, change the wrapper from `flex-wrap` to `flex-nowrap min-w-0` and let the action cluster `flex-1 justify-end` with `overflow-x-auto` as a safety valve on very narrow screens (mobile gets its own bottom nav anyway).
+- Tabs row stays as the single anchor row for both tabs — visually `[ Market | Bank ]  …………………  [ Estate Agent ] [ Auction House ]` (or the four Bank actions).
 
-```ts
-// src/types/game.ts
-interface ArrearsState { startMonth: number; monthsBehind: number; courtOrderMonth?: number; forcedAuctionPropertyId?: string; }
-```
+## 3. Move the market-rate strip into the hero header
 
-Engine wiring lives in `src/lib/engine/financials.ts` (compute) and `src/hooks/useGameEngine.ts` (apply each tick). UI surface is a new red banner inside the existing `⚠️ Action Required` `CollapsibleSection`.
-
-## 4. Renovation: allow planning step regardless of tenant / cash (screenshot item 4)
-
-**Problem.** `renovation-dialog.tsx` blocks conversions/extensions entirely when (a) tenant is in residence or (b) player can't afford the build cost. The planning application is months-long and refundable in spirit — it should be startable now.
-
-**Fix in `src/components/ui/renovation-dialog.tsx`:**
-
-- For `requiresPlanning && !planningApproved && !planningPending` rows, gate the button on **planning fee** only (already mostly true via `needsPlanningStep` / `planningFeeForCard`), not on full build cost or tenant presence.
-- Remove the `hasTenant` short-circuit in `ineligibilityReason` for conversions when we're at the planning step. Replace with a non-blocking inline warning on the card: "Tenant in residence — eviction required before works start. Planning can be submitted now." Show the same warning if cash < scaled build cost: "Submit planning now; you'll need £X to start the works once approved."
-- Once planning is `approved`, restore the existing tenant + cash gates for the actual `Renovate` action (so works still can't physically begin until the property is vacant and funded).
-
-No engine changes — `submitPlanningApplication` already exists and only debits the planning fee.
-
-## 5. Pay portfolio mortgage (screenshot item 5)
-
-**Problem.** `MortgageSettlement` filters by `mortgages.some(m => m.propertyId === property.id)`. Portfolio mortgages aren't keyed to a single `propertyId` in the way per-property mortgages are, so they never appear in the picker — even though the screenshot shows a £27k balance under "Loans".
+**Problem.** `MarketSummaryBar` inside `game-stats.tsx` renders a full-width row below the 4-stat grid, even when collapsed — wasting vertical space, especially with the new arrears banner competing for screen real estate.
 
 **Fix.**
 
-- Confirm the portfolio-mortgage record shape in `gameStore.ts` / the `Loans` panel (likely lives in `(state as any).loans` with `kind: 'business'` and `collateralPropertyIds: string[]`). Treat any loan/mortgage whose `kind === 'business'` *or* a mortgage flagged `isPortfolio: true` as eligible.
-- In `MortgageSettlement` build a unified picker list: `[...mortgages, ...portfolioMortgages]` with a label that reads "Portfolio mortgage · N properties" for the bundled ones. Selecting a portfolio entry feeds the same `onSettleMortgage` flow; pass a synthetic id (e.g. `portfolio:<loanId>`) so the store handler can branch.
-- Add a corresponding `settlePortfolioMortgage(loanId, amount)` action in `gameStore.ts` that debits cash and reduces the portfolio loan balance (and clears collateral on full payoff).
-- Update the Pay Mortgage button's `disabled` check to also count portfolio mortgages so it stays clickable when only a portfolio mortgage exists.
+- **Delete** the `<Collapsible>`/`MarketSummaryBar` block from `GameStats` (lines ~266–339 in `game-stats.tsx`) and keep its expanded contents (economic events history + recent tenant events) reachable via the existing `NotificationCentre` bell in the header (those events already surface there) so no information is lost.
+- **Add a compact rate pill** to `HeroHeader.tsx` between `GameClock` and `SpeedSelector`:
+  ```
+  📈 3.60% · Debt £0 · M 0
+  ```
+  Single line, `glass rounded-full px-3 py-1 text-xs`, hidden when `compact` (scrolled) and on `<sm` to avoid crowding. Source values directly from `useGameStore` (`currentMarketRate`, `totalDebt`, `monthsPlayed`) so no new props thread through.
+- Tooltip on hover shows the same trio with full labels; clicking it scrolls to `#section-tabs` so users still have a path to detail.
+
+Net effect on the user's 768px viewport: removes one full row from the page; the tabs+actions sit on one row, no orphan rate strip.
 
 ---
 
@@ -75,28 +56,25 @@ No engine changes — `submitPlanningApplication` already exists and only debits
 **Files touched**
 
 ```text
-src/components/sections/HeroHeader.tsx          # rate pill, overflow menu, move sound/pause/tour/reset
-src/components/sections/PropertyMarket.tsx      # drop Tour + Reset buttons (moved to header)
-src/components/sections/BankingPanel.tsx        # size="sm" on actions to fit one row
-src/components/ui/onboarding-flow.tsx           # export replayTour() helper that clears LS too
-src/lib/engine/financials.ts                    # arrears + court-action calc
-src/hooks/useGameEngine.ts                      # apply arrears/court stages per tick
-src/types/game.ts                               # ArrearsState
-src/stores/gameStore.ts                         # arrears state slice + settlePortfolioMortgage
-src/components/ui/mortgage-settlement.tsx       # include portfolio mortgages in picker
-src/components/ui/renovation-dialog.tsx         # decouple planning step from tenant + build cost
-src/pages/Index.tsx                             # arrears banner inside Action Required
+src/stores/gameStore.ts             # add typed entityChosen / onboardingCompleted + setters
+src/stores/sanitizers.ts            # whitelist new fields through persist
+src/components/ui/onboarding-flow.tsx  # finish() uses typed setter, exported helper
+src/lib/onboarding.ts               # mirror typed setter for replayTour
+src/pages/Index.tsx                 # OnboardingGate uses typed values; tab row flex-nowrap
+src/components/sections/HeroHeader.tsx     # rate pill
+src/components/sections/PropertyMarket.tsx # button sizing wrapper
+src/components/sections/BankingPanel.tsx   # responsive labels
+src/components/ui/game-stats.tsx    # delete MarketSummaryBar + collapsible
 ```
 
 **Edge cases**
 
-- Replay tour while a tour is already mid-flight: gate re-opens at `tour-market`, existing local `stage` state in `OnboardingFlow` resets on remount because `open` toggled false→true.
-- Header overflow menu on mobile: stays as the existing buttons in the `MobileBottomNav` overflow; only desktop chrome changes.
-- Forced auction reserve below outstanding debt: shortfall flows into the bankruptcy stage as today.
-- Portfolio mortgage partial payment that falls below the £X min portfolio loan threshold (if any) — clamp UI to refuse, or auto-close the loan and release collateral.
+- Legacy saves: existing players already have a `pm_onboarding_done` localStorage flag — on first load after this change, migrate it into the zustand `onboardingCompleted` field once, then it's authoritative.
+- Mobile (<sm): rate pill hidden; existing `MobileBottomNav` still surfaces tabs.
+- Very narrow desktop (<720px): action cluster falls back to `overflow-x-auto` rather than wrapping, so the visual one-row promise holds without clipping.
 
 ## Out of scope
 
-- No changes to mortgage interest rate logic or ICR rules.
-- No new property types or tenant traits.
-- No redesign of the Action Required section beyond adding the arrears row.
+- No changes to mortgage logic, tenant logic, or any game mechanics.
+- No redesign of `NotificationCentre`, the stats grid, or the hero artwork.
+- No new tour steps or copy changes inside the existing coach card.
