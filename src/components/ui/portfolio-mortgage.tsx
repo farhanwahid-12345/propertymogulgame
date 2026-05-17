@@ -58,7 +58,7 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
 
   const handlePortfolioMortgage = () => {
     if (selectedPropertyIds.length < 2 || !selectedProvider || loanAmount[0] <= 0) return;
-    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType);
+    const result = onPortfolioMortgage(selectedPropertyIds, loanAmount[0], selectedProvider, termYears, mortgageType, fixedTermYears);
     if (result && result.ok === false) {
       setRejectionReason(result.reason);
       return;
