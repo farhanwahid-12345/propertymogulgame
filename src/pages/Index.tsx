@@ -168,6 +168,38 @@ const Index = () => {
           }
           defaultOpenMobile={true}
         >
+          {(gameState as any).arrears && (
+            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 mb-3">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">⚖️</span>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-destructive">
+                    {(gameState as any).arrears.forcedAuctionPropertyId
+                      ? "Court Order — Forced Sale Scheduled"
+                      : (gameState as any).arrears.monthsBehind >= 2
+                        ? "Court Order Issued"
+                        : "Cashflow Warning — Arrears"}
+                  </h4>
+                  <p className="text-sm text-foreground/80 mt-1">
+                    {(gameState as any).arrears.forcedAuctionPropertyId ? (
+                      <>
+                        Bailiffs will auction{" "}
+                        <strong>
+                          {gameState.ownedProperties.find((p: any) => p.id === (gameState as any).arrears.forcedAuctionPropertyId)?.name || "a property"}
+                        </strong>{" "}
+                        at 90% of value next month. Settle arrears or refinance immediately to stop the sale.
+                      </>
+                    ) : (
+                      <>
+                        You've been cash-negative for {(gameState as any).arrears.monthsBehind} month(s). Raise rent, sell a property, or
+                        take a loan — another missed month triggers a court order and forced sale.
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <EvictionTimelineFeed
             pendingEvictions={gameState.pendingEvictions || []}
             ownedProperties={gameState.ownedProperties}
