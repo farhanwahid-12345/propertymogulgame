@@ -32,11 +32,11 @@ export function PropertyMarketActions({ gameState, totalPortfolioIncome }: Prope
         onRejectBuyerCounter={gameState.rejectBuyerCounter}
         cash={gameState.cash}
         availableProperties={gameState.availableProperties}
-        onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType) => {
+        onBuyProperty={(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears) => {
           if (offerAmount !== property.value) {
-            gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType);
+            gameState.buyPropertyAtPrice(property, offerAmount, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears);
           } else {
-            gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType);
+            gameState.buyProperty(property, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears);
           }
         }}
         getMaxPropertiesForLevel={gameState.getMaxPropertiesForLevel}
