@@ -13,7 +13,7 @@ import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
-import { BankingPanel, BankingPanelActions } from "@/components/sections/BankingPanel";
+import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInlineButton } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
