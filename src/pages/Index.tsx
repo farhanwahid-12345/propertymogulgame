@@ -33,7 +33,10 @@ function OnboardingGate({
 }) {
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
-  const open = !entityChosen || !onboardingCompleted;
+  const lsDone = (() => {
+    try { return window.localStorage.getItem('pm_onboarding_done') === '1'; } catch { return false; }
+  })();
+  const open = !entityChosen || (!onboardingCompleted && !lsDone);
   return (
     <OnboardingFlow
       open={open}
@@ -118,40 +121,35 @@ const Index = () => {
         />
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsContent value="market" className="mt-0">
-            <div className="flex items-center gap-2 mt-2 flex-wrap md:flex-nowrap min-w-0">
-              <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
-                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
-                  🏪 Market
-                </TabsTrigger>
-                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
-                  🏦 Bank
-                </TabsTrigger>
-              </TabsList>
-              <div className="ml-auto shrink-0 flex items-center">
+          <div id="section-market" className="flex items-center gap-2 mt-2 flex-wrap min-w-0">
+            <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0 w-auto">
+              <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs flex-none">
+                🏪 Market
+              </TabsTrigger>
+              <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
+                🏦 Bank
+              </TabsTrigger>
+            </TabsList>
+            <div className="ml-auto flex items-center flex-wrap gap-2 justify-end">
+              {activeTab === 'market' ? (
                 <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="bank" className="mt-0">
-            <div className="flex items-center gap-2 mt-2 flex-wrap md:flex-nowrap min-w-0">
-              <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0">
-                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs">
-                  🏪 Market
-                </TabsTrigger>
-                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs">
-                  🏦 Bank
-                </TabsTrigger>
-              </TabsList>
-              <div className="ml-auto shrink-0 flex items-center">
+              ) : (
                 <BankingPanelActions
                   gameState={gameState}
                   getDebtForProperty={getDebtForProperty}
                   totalPortfolioIncome={totalPortfolioIncome}
                 />
-              </div>
+              )}
             </div>
+          </div>
+
+          <TabsContent value="market" className="mt-2">
+            <div className="text-xs text-muted-foreground px-1">
+              Use the <strong>Estate Agent</strong> or <strong>Auction House</strong> buttons above to browse properties for sale and place offers.
+            </div>
+          </TabsContent>
+
+          <TabsContent value="bank" className="mt-0">
             <BankingPanel
               gameState={gameState}
               getDebtForProperty={getDebtForProperty}
