@@ -111,16 +111,24 @@ function InlineDialogButton({
 }
 
 export function OperationsInlineButton({ gameState }: { gameState: GameState }) {
+  const concernCount = gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0;
   const opsActive =
     (gameState.conveyancing?.length || 0) +
     (gameState.renovations?.length || 0) +
     ((gameState as any).planningApplications?.filter((a: any) => a.status === 'pending').length || 0) +
-    (gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0);
+    concernCount;
+  const attention = concernCount > 0;
+  const summary = opsActive === 0
+    ? "All quiet"
+    : attention
+      ? `⚠ ${concernCount} concern${concernCount > 1 ? 's' : ''}`
+      : `${opsActive} active`;
   return (
     <InlineDialogButton
       id="section-ops"
       label="🔨 Operations"
-      summary={opsActive === 0 ? "All quiet" : `${opsActive} active`}
+      summary={summary}
+      attention={attention}
       title="Operations"
     >
       <OperationsCenter
