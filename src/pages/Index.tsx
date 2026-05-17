@@ -33,9 +33,7 @@ function OnboardingGate({
 }) {
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
-  // localStorage fallback so a stuck zustand write can't re-open the modal.
-  const lsDone = typeof window !== 'undefined' && window.localStorage.getItem('pm_onboarding_done') === '1';
-  const open = !entityChosen || (!onboardingCompleted && !lsDone);
+  const open = !entityChosen || !onboardingCompleted;
   return (
     <OnboardingFlow
       open={open}

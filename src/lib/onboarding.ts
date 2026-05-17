@@ -16,3 +16,14 @@ export function replayTour() {
   }
   useGameStore.setState({ onboardingCompleted: false } as any);
 }
+
+/** Mark the tour as completed in both stores. Used by the floating coach card's
+ * Got it / Skip / X buttons so closing doesn't depend on a parent callback. */
+export function dismissTour() {
+  try {
+    window.localStorage.setItem(ONBOARDING_DONE_KEY, '1');
+  } catch {
+    /* noop */
+  }
+  useGameStore.setState({ onboardingCompleted: true } as any);
+}
