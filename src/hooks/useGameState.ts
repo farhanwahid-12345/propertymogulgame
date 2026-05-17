@@ -161,7 +161,7 @@ export function useGameState() {
 
   // ── Action wrappers (convert pounds → pennies for the store) ──
 
-  const buyProperty = useCallback((property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => {
+  const buyProperty = useCallback((property: Property, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => {
     const pennyProp = {
       ...property,
       price: toPennies(property.price),
@@ -171,10 +171,10 @@ export function useGameState() {
       marketValue: property.marketValue != null ? toPennies(property.marketValue) : undefined,
       baseRent: property.baseRent != null ? toPennies(property.baseRent) : undefined,
     };
-    store.buyProperty(pennyProp as any, mortgagePercentage, providerId, termYears, mortgageType);
+    store.buyProperty(pennyProp as any, mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears);
   }, [store.buyProperty]);
 
-  const buyPropertyAtPrice = useCallback((property: Property, purchasePrice: number, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => {
+  const buyPropertyAtPrice = useCallback((property: Property, purchasePrice: number, mortgagePercentage?: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => {
     const pennyProp = {
       ...property,
       price: toPennies(property.price),
@@ -184,7 +184,7 @@ export function useGameState() {
       marketValue: property.marketValue != null ? toPennies(property.marketValue) : undefined,
       baseRent: property.baseRent != null ? toPennies(property.baseRent) : undefined,
     };
-    store.buyPropertyAtPrice(pennyProp as any, toPennies(purchasePrice), mortgagePercentage, providerId, termYears, mortgageType);
+    store.buyPropertyAtPrice(pennyProp as any, toPennies(purchasePrice), mortgagePercentage, providerId, termYears, mortgageType, fixedTermYears);
   }, [store.buyPropertyAtPrice]);
 
   const sellProperty = useCallback((property: Property, isAuction?: boolean) => {
