@@ -55,7 +55,7 @@ interface EstateAgentWindowProps {
   onRejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   cash: number;
   availableProperties: Property[];
-  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only') => void;
+  onBuyProperty: (property: Property, offerAmount: number, mortgagePercentage: number, providerId?: string, termYears?: number, mortgageType?: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   getMaxPropertiesForLevel: (level: number) => number;
   getAvailablePropertyTypes: (level: number) => string[];
   getMaxPropertyValue: (level: number) => number;
