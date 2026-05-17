@@ -1,47 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { TrendingUp, TrendingDown, AlertTriangle, Info, ChevronDown } from "lucide-react";
+import { Info } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/ui/credit-improvement-guide";
 import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { memo, useState } from "react";
 
-interface MarketSummaryBarProps {
-  currentMarketRate: number;
-  totalDebt: number;
-  monthsPlayed: number;
-  recentEventCount: number;
-  showDetails: boolean;
-}
-
-const MarketSummaryBar = memo(function MarketSummaryBar({
-  currentMarketRate,
-  totalDebt,
-  monthsPlayed,
-  recentEventCount,
-  showDetails,
-}: MarketSummaryBarProps) {
-  return (
-    <button
-      type="button"
-      className="glass w-full px-3 py-1.5 flex items-center justify-between text-xs cursor-pointer hover:bg-white/[0.16]"
-    >
-      <span className="flex items-center gap-2 text-muted-foreground">
-        <TrendingUp className="h-3.5 w-3.5" />
-        Market: {(currentMarketRate * 100).toFixed(2)}% · Debt: £{totalDebt.toLocaleString()} · Month {monthsPlayed}
-        {recentEventCount > 0 && (
-          <Badge key={recentEventCount} variant="destructive" className="text-[10px] px-1.5 py-0">
-            {recentEventCount} events
-          </Badge>
-        )}
-      </span>
-      <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
-    </button>
-  );
-});
 
 interface EconomicEvent {
   id: string;
@@ -101,7 +66,6 @@ export function GameStats({
 }: GameStatsProps) {
   const netMonthlyIncome = totalMonthlyIncome - totalMonthlyExpenses;
   const experienceProgress = (experience / experienceToNext) * 100;
-  const [showDetails, setShowDetails] = useState(false);
 
   // DTI calculation
   const dtiRatio = totalMonthlyIncome > 0 
@@ -116,11 +80,9 @@ export function GameStats({
     return "text-danger";
   };
 
-  const recentTenantEvents = tenantEvents
-    .filter(event => event.month >= monthsPlayed - 3)
-    .slice(-5);
-
   const latestEconomicEvent = economicEvents.length > 0 ? economicEvents[economicEvents.length - 1] : null;
+  void tenantEvents;
+  void currentMarketRate;
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -263,80 +225,6 @@ export function GameStats({
       </div>
 
 
-      {/* Collapsible Market & Events */}
-      <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-        <CollapsibleTrigger asChild>
-          <div>
-            <MarketSummaryBar
-              currentMarketRate={currentMarketRate}
-              totalDebt={totalDebt}
-              monthsPlayed={monthsPlayed}
-              recentEventCount={recentTenantEvents.length}
-              showDetails={showDetails}
-            />
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="glass mt-2 p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Market Rate:</span>
-                <div className="font-semibold">{(currentMarketRate * 100).toFixed(2)}%</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Total Debt:</span>
-                <div className="font-semibold">£{totalDebt.toLocaleString()}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Months Played:</span>
-                <div className="font-semibold">{monthsPlayed}</div>
-              </div>
-            </div>
-
-            {/* Economic Events History */}
-            {economicEvents.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <div className="text-sm font-medium text-muted-foreground">📰 Economic Events</div>
-                {economicEvents.slice(-3).reverse().map((event) => (
-                  <div key={event.id} className={cn(
-                    "p-2 rounded-xl text-sm",
-                    event.type === 'recession' ? "bg-red-500/10" :
-                    event.type === 'rate_cut' ? "bg-green-500/10" :
-                    event.type === 'tech_boom' ? "bg-blue-500/10" :
-                    "bg-yellow-500/10"
-                  )}>
-                    <div className="font-medium text-foreground">{event.name}</div>
-                    <div className="text-xs text-muted-foreground">Month {event.month}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {recentTenantEvents.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <AlertTriangle className="h-4 w-4 text-[hsl(var(--stat-credit))]" />
-                  Recent Tenant Events
-                </div>
-                {recentTenantEvents.map((event, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-white/5 rounded-xl text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={event.type === 'damage' || event.type === 'default' ? 'destructive' : 'secondary'}
-                      >
-                        {event.type === 'damage' ? 'Property Damage' :
-                         event.type === 'default' ? 'Rent Default' : 'Early Exit'}
-                      </Badge>
-                      <span>Property {event.propertyId}</span>
-                    </div>
-                    <span className="font-semibold text-danger">-£{event.amount.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
     </div>
   );
 }

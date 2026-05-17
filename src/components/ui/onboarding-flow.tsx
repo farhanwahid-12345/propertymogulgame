@@ -14,6 +14,7 @@ import {
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { dismissTour, ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
 import type { EntityType } from "@/types/game";
 
 interface Props {
@@ -58,7 +59,7 @@ const TOUR_STEPS: TourStep[] = [
     body: "Evictions, deposit disputes and warnings appear under Action Required. Clear them before they drag your reputation down." },
 ];
 
-const LS_DONE_KEY = 'pm_onboarding_done';
+
 
 export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = false, setActiveTab }: Props) {
   const [stage, setStage] = useState<Stage>(skipEntity ? 'tour-market' : 'welcome');
@@ -84,7 +85,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   }, [stage, open, setActiveTab]);
 
   const finish = useCallback(() => {
-    try { window.localStorage.setItem(LS_DONE_KEY, '1'); } catch { /* noop */ }
+    dismissTour();
     onFinish();
   }, [onFinish]);
 
