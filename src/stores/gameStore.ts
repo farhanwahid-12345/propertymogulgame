@@ -2756,16 +2756,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
 
-        // Conversion-specific gates: must be vacant, and only one conversion per property.
+        // Conversion-specific gates: only one conversion per property.
+        // (Tenants ARE allowed during the LPA application — the physical
+        //  works are gated separately in `startRenovation`.)
         if (renovationType.category === 'conversion') {
-          if (prev.tenants.some(t => t.propertyId === propertyId)) {
-            showToast(
-              "Conversion Blocked",
-              "Vacate every unit (serve eviction notice) before applying to convert.",
-              "destructive",
-            );
-            return;
-          }
           if (property.subtype && property.subtype !== 'standard') {
             showToast("Already Converted", `This property has already been converted to ${property.subtype}.`, "destructive");
             return;
