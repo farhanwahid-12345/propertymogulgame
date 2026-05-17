@@ -1851,13 +1851,14 @@ export const useGameStore = create<GameState & GameActions>()(
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
+          const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
           const eligibility = calculateMortgageEligibility({
             creditScore: prev.creditScore,
             loanAmount: fromPennies(mortgageAmount),
             propertyValue: fromPennies(property.price),
             propertyMonthlyRent: fromPennies(property.monthlyIncome),
-            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE,
+            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
             providerMinCreditScore: provider.minCreditScore,
             providerMaxLTV: provider.maxLTV,
             providerId: provider.id,
@@ -1879,6 +1880,7 @@ export const useGameStore = create<GameState & GameActions>()(
             termYears, mortgageType,
             monthlyPayment: toPennies(eligibility.monthlyPayment),
             interestRate: eligibility.adjustedRate,
+            fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
           };
         }
 
