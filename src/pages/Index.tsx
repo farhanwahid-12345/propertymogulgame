@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/ui/game-stats";
 import { ListedProperties } from "@/components/ui/listed-properties";
-import { OperationsCenter } from "@/components/ui/operations-center";
+
 import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
