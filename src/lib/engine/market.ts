@@ -83,6 +83,7 @@ export function generateRandomProperty(level: number): Property {
     internalSqft,
     plotSqft,
     subtype: 'standard',
+    epcRating,
   };
 }
 
