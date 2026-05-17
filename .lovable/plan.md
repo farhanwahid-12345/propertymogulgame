@@ -1,76 +1,102 @@
-## Problem
+## Scope
 
-The 4-step intro tour ("Market → Bank → Operations → Action Required") feels broken:
+Five connected fixes from the annotated screenshots: tidy the Market/Bank toolbar, make the Tour button actually launch the tour, warn before bankruptcy + add a court → auction → bankruptcy escalation, let users start the planning step for renovations even when a tenant is in residence or they can't yet afford the build, and allow paying down a portfolio mortgage from the Pay Mortgage dialog.
 
-1. **"Got it" doesn't close the dialog reliably.** `Index.tsx` writes `onboardingCompleted: true` directly via `useGameStore.setState`, but the older `useEffect` hook (lines 44–48 with `[]` deps) and the entity-pick re-render path race against it, and there's no `onOpenChange` wired to the Dialog — so on some flows the modal stays mounted.
-2. **Skip tour / Back / Next look inert.** None of the buttons cause any visible change on the page behind the modal, so the user thinks they're broken even when state updates.
-3. **Tour content lies about the UI.** It tells the user to "switch to the Market tab", "Bank tab", "Operations tab", and "Action Required tab" — but the page only has two real tabs (`market`, `bank`). Operations and Action Required are `CollapsibleSection` blocks lower on the page. So "Next" never demonstrates the thing it just described.
+---
 
-## Fix
+## 1. Market/Bank toolbar cleanup (screenshot items 1 & 2)
 
-Turn the tour into a real guided walkthrough that drives the page behind it, and centralize the close path so "Got it" always works.
+**Problem.** The Market tab's action row (`Estate Agent · Auction House · Tour · Reset`) and the Bank tab's action row (`Pay Mortgage · Manage Mortgages · Credit & Banking · Portfolio Mortgage`) both eat a full row below the tabs. The slim `Market rate / Debt / Month` strip also sits on its own row. The user wants this consolidated.
 
-### 1. Single source of truth for closing the tour
+**Fix.**
 
-- Delete the legacy heal-effect in `Index.tsx` (lines 44–48). Replace with a one-shot selector inside `OnboardingGate` that calls `setState({ onboardingCompleted: true })` when `entityChosen && !onboardingCompleted` *and* the user has explicitly skipped/finished — never silently.
-- Wire `onOpenChange` on the underlying Dialog/Drawer in `OnboardingFlow` so any close attempt funnels through `onFinish`. Today the dialog is rendered controlled but ignores all dismiss intents.
-- Add a defensive fallback: `onFinish` also writes a `pm_onboarding_done` localStorage flag, and `OnboardingGate` treats that flag as equivalent to `onboardingCompleted=true` so a stuck zustand write can never re-open the modal.
+- **Move the market-rate strip into `HeroHeader`.** Add a compact pill (e.g. `📈 3.60% · Debt £0 · M 0`) to the right cluster of `HeroHeader`, between `GameClock` and `SpeedSelector`. Hidden on `compact` scroll state to avoid crowding. Source the values from `useGameStore` directly so we don't need to thread props through `Index.tsx`.
+- **Tighten the tabs row.** Keep `<TabsList>` on the left and the contextual action buttons on the right of the same row (already the layout); just shrink button paddings (`size="sm"`, `h-8`) so all four Bank actions and all four Market actions fit on one line at ≥1000px. On narrower widths they wrap naturally via the existing `flex-wrap`.
+- **Promote Tour + Reset out of the Market actions row** into an overflow menu in the header (small `⋯` button on the right of the hero cluster) so they're always reachable and stop competing with the primary `Estate Agent / Auction House` buttons. The menu items: Replay tour, Reset game, Sound toggle (moved from header), Pause (moved from header). Header keeps only Clock, Speed, Rate pill, Notifications, and the `⋯` menu.
 
-### 2. Make the buttons demonstrably do something
+Net effect: one row for tabs+actions, one row for the hero strip, and the orphan rate strip disappears.
 
-- Lift `activeTab` + a `scrollToId` callback up so `OnboardingFlow` can call them on every step transition.
-- Each tour step gets a `target` describing what to do when entering it:
-  - `tour-market`   → `setActiveTab('market')`, scroll to the market listings.
-  - `tour-bank`     → `setActiveTab('bank')`, scroll to `BankingPanel`.
-  - `tour-ops`      → `setActiveTab('market')`, scroll to `#section-operations` (the Operations `CollapsibleSection`, which needs an `id`).
-  - `tour-alerts`   → scroll to `#section-alerts` (already has the id).
-- On entering each step, also apply a transient `ring-2 ring-primary/60` outline to the target node for ~2.5s via a `data-tour-highlight` attribute toggled from `OnboardingFlow`. Removed on step change or unmount.
-- Reposition the dialog so the highlighted target is visible: switch desktop layout to a small bottom-right `Dialog` (`max-w-sm`, `bottom-6 right-6`) and keep the existing centred Drawer on mobile. This stops the modal from covering the very thing it's pointing at.
+## 2. Tour button does nothing (screenshot 1b)
 
-### 3. Honest tour copy
+**Problem.** Clicking Tour calls `useGameStore.setState({ onboardingCompleted: false })`, but `OnboardingGate` also requires the `pm_onboarding_done` localStorage flag to be cleared — once that flag is set, the gate stays closed regardless of the zustand flip.
 
-- Rewrite `TOUR_STEPS` so the descriptions match the real UI:
-  - Market step: estate agent + auction house listings on the Market tab.
-  - Bank step: mortgages, overdraft, loans, tax bill on the Bank tab.
-  - Operations step: conveyancing / renovations / planning *section* (not tab) on the Market tab.
-  - Action Required step: evictions + deposit disputes *section* near the bottom of the page.
-- Update icons to match (`Store`, `Landmark`, `ClipboardList`, `Bell` — already correct).
+**Fix.**
 
-### 4. "Come on at the start"
+- In the Tour button's onClick, also `window.localStorage.removeItem('pm_onboarding_done')` *and* set `onboardingCompleted: false`. Skip the entity step by leaving `entityChosen` as-is; the gate already uses `skipEntity` based on `entityChosen`.
+- Export a `replayTour()` helper from `onboarding-flow.tsx` (or a tiny `src/lib/onboarding.ts`) that does both — single source of truth so the settings/replay link and the new header overflow menu both call the same thing.
+- Verify the gate by re-reading `OnboardingGate` after the click: `open = !entityChosen || (!onboardingCompleted && !lsDone)`. With LS cleared and `onboardingCompleted=false`, gate opens at `tour-market`.
 
-- Confirm the gate triggers for the actual first-run condition: `entityChosen === false` from initial store state. The Replay-tour button in settings continues to call `setState({ onboardingCompleted: false })` and rely on `skipEntity={true}`.
-- Add a `aria-modal="false"` + non-blocking overlay variant so the page underneath stays interactive during the tour (matches "actually do something" — user can poke the highlighted tab while reading the tip).
+## 3. Bankruptcy warning + court/bailiff escalation (screenshot item 3)
 
-## Technical Details
+**Problem.** When the player can't pay outgoings they currently slide straight into bankruptcy with no warning.
 
-**Files touched:**
+**Fix — three-stage escalation in `useGameEngine` monthly tick:**
 
-```text
-src/pages/Index.tsx
-  - drop legacy heal useEffect
-  - add id="section-operations" and id="section-alerts" to the right CollapsibleSections
-  - pass {activeTab, setActiveTab, scrollToId} into <OnboardingGate />
+1. **Warning stage** — when projected next-month cashflow (cash + overdraft headroom − monthly outgoings) goes negative and there is no live court order, raise a high-priority `Action Required` alert: "Outgoings exceed available funds — 2 months until court action". Stored as a new `arrears` record on the store (`arrearsMonth`, `monthsBehind`).
+2. **Court action stage (after 2 missed months)** — auto-list the most-leveraged property at auction at a forced reserve (90% of value). Surface as a `CourtAction` notification with a countdown; player can still settle by clearing arrears before the auction resolves.
+3. **Bankruptcy stage** — only if the forced auction completes and cash + proceeds still leave net worth < 0, trigger the existing post-bankruptcy `EntityOnboardingDialog` reset flow.
 
-src/components/ui/onboarding-flow.tsx
-  - new props: activeTab, setActiveTab, scrollToId
-  - new useEffect on `stage` change: runs target.action() + highlights node
-  - rewrite TOUR_STEPS copy + add `target: { tab, scrollId }` field
-  - wire onOpenChange on the Dialog/Drawer → onFinish
-  - desktop: render as bottom-right floating panel (non-modal) instead of centred modal
-  - mobile: keep current Drawer
+State changes:
 
-src/index.css
-  - .tour-highlight { @apply ring-2 ring-primary/60 ring-offset-2 transition-shadow; }
+```ts
+// src/types/game.ts
+interface ArrearsState { startMonth: number; monthsBehind: number; courtOrderMonth?: number; forcedAuctionPropertyId?: string; }
 ```
 
-**Edge cases handled:**
+Engine wiring lives in `src/lib/engine/financials.ts` (compute) and `src/hooks/useGameEngine.ts` (apply each tick). UI surface is a new red banner inside the existing `⚠️ Action Required` `CollapsibleSection`.
 
-- Highlighted node not yet mounted (target tab not active) → first set tab, then `requestAnimationFrame` to scroll/highlight after the tab content paints.
-- Mobile: skip the bottom-right repositioning; keep Drawer; still drive tab + scroll.
-- Replay tour from settings: `skipEntity` already true, gate uses `onboardingCompleted=false` to reopen, all behaviour identical.
+## 4. Renovation: allow planning step regardless of tenant / cash (screenshot item 4)
 
-## Out of Scope
+**Problem.** `renovation-dialog.tsx` blocks conversions/extensions entirely when (a) tenant is in residence or (b) player can't afford the build cost. The planning application is months-long and refundable in spirit — it should be startable now.
 
-- No changes to entity-pick UX (Sole Trader vs LTD) — already working.
-- No changes to `EntityOnboardingDialog` (separate post-bankruptcy flow).
-- No mortgage / EPC / tenant-risk work — last loop's items remain shipped.
+**Fix in `src/components/ui/renovation-dialog.tsx`:**
+
+- For `requiresPlanning && !planningApproved && !planningPending` rows, gate the button on **planning fee** only (already mostly true via `needsPlanningStep` / `planningFeeForCard`), not on full build cost or tenant presence.
+- Remove the `hasTenant` short-circuit in `ineligibilityReason` for conversions when we're at the planning step. Replace with a non-blocking inline warning on the card: "Tenant in residence — eviction required before works start. Planning can be submitted now." Show the same warning if cash < scaled build cost: "Submit planning now; you'll need £X to start the works once approved."
+- Once planning is `approved`, restore the existing tenant + cash gates for the actual `Renovate` action (so works still can't physically begin until the property is vacant and funded).
+
+No engine changes — `submitPlanningApplication` already exists and only debits the planning fee.
+
+## 5. Pay portfolio mortgage (screenshot item 5)
+
+**Problem.** `MortgageSettlement` filters by `mortgages.some(m => m.propertyId === property.id)`. Portfolio mortgages aren't keyed to a single `propertyId` in the way per-property mortgages are, so they never appear in the picker — even though the screenshot shows a £27k balance under "Loans".
+
+**Fix.**
+
+- Confirm the portfolio-mortgage record shape in `gameStore.ts` / the `Loans` panel (likely lives in `(state as any).loans` with `kind: 'business'` and `collateralPropertyIds: string[]`). Treat any loan/mortgage whose `kind === 'business'` *or* a mortgage flagged `isPortfolio: true` as eligible.
+- In `MortgageSettlement` build a unified picker list: `[...mortgages, ...portfolioMortgages]` with a label that reads "Portfolio mortgage · N properties" for the bundled ones. Selecting a portfolio entry feeds the same `onSettleMortgage` flow; pass a synthetic id (e.g. `portfolio:<loanId>`) so the store handler can branch.
+- Add a corresponding `settlePortfolioMortgage(loanId, amount)` action in `gameStore.ts` that debits cash and reduces the portfolio loan balance (and clears collateral on full payoff).
+- Update the Pay Mortgage button's `disabled` check to also count portfolio mortgages so it stays clickable when only a portfolio mortgage exists.
+
+---
+
+## Technical details
+
+**Files touched**
+
+```text
+src/components/sections/HeroHeader.tsx          # rate pill, overflow menu, move sound/pause/tour/reset
+src/components/sections/PropertyMarket.tsx      # drop Tour + Reset buttons (moved to header)
+src/components/sections/BankingPanel.tsx        # size="sm" on actions to fit one row
+src/components/ui/onboarding-flow.tsx           # export replayTour() helper that clears LS too
+src/lib/engine/financials.ts                    # arrears + court-action calc
+src/hooks/useGameEngine.ts                      # apply arrears/court stages per tick
+src/types/game.ts                               # ArrearsState
+src/stores/gameStore.ts                         # arrears state slice + settlePortfolioMortgage
+src/components/ui/mortgage-settlement.tsx       # include portfolio mortgages in picker
+src/components/ui/renovation-dialog.tsx         # decouple planning step from tenant + build cost
+src/pages/Index.tsx                             # arrears banner inside Action Required
+```
+
+**Edge cases**
+
+- Replay tour while a tour is already mid-flight: gate re-opens at `tour-market`, existing local `stage` state in `OnboardingFlow` resets on remount because `open` toggled false→true.
+- Header overflow menu on mobile: stays as the existing buttons in the `MobileBottomNav` overflow; only desktop chrome changes.
+- Forced auction reserve below outstanding debt: shortfall flows into the bankruptcy stage as today.
+- Portfolio mortgage partial payment that falls below the £X min portfolio loan threshold (if any) — clamp UI to refuse, or auto-close the loan and release collateral.
+
+## Out of scope
+
+- No changes to mortgage interest rate logic or ICR rules.
+- No new property types or tenant traits.
+- No redesign of the Action Required section beyond adding the arrears row.

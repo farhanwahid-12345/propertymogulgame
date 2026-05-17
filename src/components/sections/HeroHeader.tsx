@@ -3,9 +3,17 @@ import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
 import { NotificationCentre } from "@/components/ui/notification-centre";
 import { Button } from "@/components/ui/button";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useGameStore } from "@/stores/gameStore";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
+import { replayTour } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import type {
   Conveyancing,
@@ -52,6 +60,7 @@ export function HeroHeader({
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
+  const resetGame = useGameStore((s) => s.resetGame);
   const reputation = useGameStore((s) => (s as any).landlordReputation ?? 50);
   const [compact, setCompact] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
@@ -181,6 +190,37 @@ export function HeroHeader({
                   lastCorporationTaxMonth={lastCorporationTaxMonth}
                   entityType={entityType}
                 />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-full h-8 w-8 p-0"
+                      aria-label="More options"
+                      title="More"
+                    >
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onClick={() => replayTour()}>
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      Replay tour
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (window.confirm("Reset the game? All progress will be lost.")) {
+                          resetGame();
+                        }
+                      }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset game
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>

@@ -359,10 +359,17 @@ export function RenovationDialog({
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
   const isCompleted = (renovation: RenovationType) => completedRenovationIds.includes(renovation.id);
 
-  /** Returns null if eligible, else a short reason string. */
-  const ineligibilityReason = (r: RenovationType): string | null => {
-    // Conversions structurally rebuild the property — must be vacant.
-    if (r.category === 'conversion' && hasTenant) {
+  /**
+   * Returns null if eligible, else a short reason string.
+   * `phase` is 'planning' when we're only deciding whether the user may submit a
+   * planning application (no physical works yet) and 'works' when we're about to
+   * actually start construction. Tenant-presence + build-cost gates apply only
+   * to 'works' — planning can be submitted while a tenant is in situ or before
+   * the player can afford the build.
+   */
+  const ineligibilityReason = (r: RenovationType, phase: 'planning' | 'works' = 'works'): string | null => {
+    // Conversions structurally rebuild the property — must be vacant when works begin.
+    if (phase === 'works' && r.category === 'conversion' && hasTenant) {
       return `Vacate every unit (serve eviction notice) before converting`;
     }
     if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
@@ -419,7 +426,6 @@ export function RenovationDialog({
                   const affordable = canAfford(renovation);
                   const inProgress = isInProgress(renovation);
                   const completed = isCompleted(renovation);
-                  const ineligible = ineligibilityReason(renovation);
 
                   // Planning state for this renovation
                   const application = renovation.requiresPlanning ? findApplication(renovation.id) : undefined;
@@ -427,10 +433,16 @@ export function RenovationDialog({
                   const planningApproved = application?.status === 'approved';
                   const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
                   // Planning-gated renovations only need the planning fee to begin the process,
-                  // so we let the user select & submit even if they can't yet afford the build.
+                  // so we let the user select & submit even if they can't yet afford the build
+                  // OR a tenant is still in residence (works gated post-approval).
                   const needsPlanningStep = renovation.requiresPlanning && !planningApproved && !planningPending;
+                  const phase: 'planning' | 'works' = needsPlanningStep ? 'planning' : 'works';
+                  const ineligible = ineligibilityReason(renovation, phase);
                   const planningFeeForCard = renovation.planningFee ?? 250;
                   const canSubmitPlanning = needsPlanningStep && playerCash >= planningFeeForCard;
+                  // Soft warnings shown on planning-step cards (do not block selection).
+                  const planningTenantWarning = needsPlanningStep && hasTenant && (renovation.category === 'conversion' || renovation.requiresVacant);
+                  const planningCashWarning = needsPlanningStep && !affordable;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
                   const selectable = !blocked && (canSubmitPlanning || (planningApproved && affordable) || (!renovation.requiresPlanning && affordable));
 
@@ -511,7 +523,16 @@ export function RenovationDialog({
                           </div>
                         )}
 
-                        {/* Planning state banners */}
+                        {planningTenantWarning && !ineligible && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            ⓘ Tenant in residence — eviction required before works start. Planning can be submitted now.
+                          </div>
+                        )}
+                        {planningCashWarning && !ineligible && !completed && (
+                          <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
+                            ⓘ Submit planning now (£{planningFeeForCard.toLocaleString()}); you'll need £{scaledCost(renovation).toLocaleString()} cash once approved.
+                          </div>
+                        )}
                         {planningPending && application && (
                           <div className="text-xs text-amber-300 border border-amber-400/30 bg-amber-400/5 rounded px-2 py-1">
                             📋 Planning application pending — decision in {Math.max(0, application.decisionMonth - monthsPlayed)} mo

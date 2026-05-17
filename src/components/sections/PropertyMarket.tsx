@@ -1,8 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
 import { AuctionHouse } from "@/components/ui/auction-house";
-import { RotateCcw, HelpCircle } from "lucide-react";
-import { useGameStore } from "@/stores/gameStore";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
@@ -63,24 +60,6 @@ export function PropertyMarketActions({ gameState, totalPortfolioIncome }: Prope
         onAuctionPropertySold={gameState.removeAuctionProperty}
         creditScore={gameState.creditScore}
       />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => useGameStore.setState({ onboardingCompleted: false } as any)}
-        className="glass glass-hover text-muted-foreground hover:text-foreground"
-        title="Replay the welcome tour"
-      >
-        <HelpCircle className="h-4 w-4 mr-2" />
-        Tour
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={gameState.resetGame}
-        className="glass glass-hover text-muted-foreground hover:text-foreground"
-      >
-        <RotateCcw className="h-4 w-4 mr-2" />
-        Reset
-      </Button>
     </div>
   );
 }

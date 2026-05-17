@@ -27,18 +27,18 @@ const MarketSummaryBar = memo(function MarketSummaryBar({
   return (
     <button
       type="button"
-      className="glass w-full p-3 flex items-center justify-between text-sm cursor-pointer hover:bg-white/[0.16]"
+      className="glass w-full px-3 py-1.5 flex items-center justify-between text-xs cursor-pointer hover:bg-white/[0.16]"
     >
       <span className="flex items-center gap-2 text-muted-foreground">
-        <TrendingUp className="h-4 w-4" />
-        Market: {(currentMarketRate * 100).toFixed(2)}% | Debt: £{totalDebt.toLocaleString()} | Month {monthsPlayed}
+        <TrendingUp className="h-3.5 w-3.5" />
+        Market: {(currentMarketRate * 100).toFixed(2)}% · Debt: £{totalDebt.toLocaleString()} · Month {monthsPlayed}
         {recentEventCount > 0 && (
-          <Badge key={recentEventCount} variant="destructive" className="text-xs px-1.5 py-0">
+          <Badge key={recentEventCount} variant="destructive" className="text-[10px] px-1.5 py-0">
             {recentEventCount} events
           </Badge>
         )}
       </span>
-      <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
+      <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", showDetails && "rotate-180")} />
     </button>
   );
 });

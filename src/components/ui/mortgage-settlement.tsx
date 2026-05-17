@@ -24,6 +24,8 @@ interface Mortgage {
   interestRate: number;
   providerId: string;
   startDate: number;
+  /** Present for portfolio mortgages — the bundle of properties used as collateral. */
+  collateralPropertyIds?: string[];
 }
 
 interface MortgageSettlementProps {
@@ -43,13 +45,26 @@ export function MortgageSettlement({
   const [partialAmount, setPartialAmount] = useState<string>("");
   const [isOpen, setIsOpen] = useState(false);
 
-  // Only show properties with mortgages
-  const propertiesWithMortgages = ownedProperties.filter(property => 
-    mortgages.some(mortgage => mortgage.propertyId === property.id)
-  );
+  // Build picker from mortgages directly so portfolio mortgages (whose synthetic
+  // propertyId doesn't match an owned property) are included too.
+  const isPortfolio = (m: Mortgage) =>
+    (m.collateralPropertyIds?.length ?? 0) > 1 || (m as any).id?.startsWith?.("portfolio_");
+
+  const propertyName = (id: string) => ownedProperties.find(p => p.id === id)?.name;
+
+  const mortgageOptions = mortgages.map((m) => {
+    if (isPortfolio(m)) {
+      const count = m.collateralPropertyIds?.length ?? 0;
+      return { id: m.propertyId, label: `Portfolio mortgage · ${count} properties`, mortgage: m };
+    }
+    return { id: m.propertyId, label: propertyName(m.propertyId) ?? "Property", mortgage: m };
+  });
+
+  const hasMortgages = mortgageOptions.length > 0;
 
   const selectedMortgageDetails = mortgages.find(m => m.propertyId === selectedMortgage);
-  const selectedMortgageProperty = ownedProperties.find(p => p.id === selectedMortgage);
+  const selectedOption = mortgageOptions.find(o => o.id === selectedMortgage);
+  const selectedIsPortfolio = !!selectedMortgageDetails && isPortfolio(selectedMortgageDetails);
 
   const paymentAmount = partialAmount ? parseFloat(partialAmount) : 0;
   // ERC: 2% within first 5 years (60 months @ 180s/month)
@@ -86,7 +101,7 @@ export function MortgageSettlement({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" disabled={propertiesWithMortgages.length === 0}>
+        <Button variant="outline" disabled={!hasMortgages}>
           <Building2 className="h-4 w-4 mr-2" />
           Pay Mortgage
         </Button>
@@ -102,39 +117,36 @@ export function MortgageSettlement({
             Make a partial or full payment on your mortgage.
           </div>
           
-          {propertiesWithMortgages.length === 0 ? (
+          {!hasMortgages ? (
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No properties with mortgages to settle</p>
+              <p className="text-muted-foreground">No mortgages to settle</p>
             </div>
           ) : (
             <>
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">
-                    Select property with mortgage to settle:
+                    Select mortgage to pay down:
                   </label>
                   <Select value={selectedMortgage} onValueChange={(value) => {
                     setSelectedMortgage(value);
                     setPartialAmount("");
                   }}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose property with mortgage..." />
+                      <SelectValue placeholder="Choose mortgage..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {propertiesWithMortgages.map((property) => {
-                        const mortgage = mortgages.find(m => m.propertyId === property.id);
-                        return (
-                          <SelectItem key={property.id} value={property.id}>
-                            <div className="flex justify-between items-center w-full">
-                              <span>{property.name}</span>
-                              <Badge variant="destructive" className="ml-2">
-                                £{mortgage?.remainingBalance.toLocaleString()} debt
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
+                      {mortgageOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          <div className="flex justify-between items-center w-full gap-2">
+                            <span>{opt.label}</span>
+                            <Badge variant="destructive" className="ml-2">
+                              £{opt.mortgage.remainingBalance.toLocaleString()} debt
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -178,9 +190,9 @@ export function MortgageSettlement({
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Property:</span>
+                        <span className="text-muted-foreground">{selectedIsPortfolio ? "Portfolio:" : "Property:"}</span>
                         <br />
-                        <span className="font-medium">{selectedMortgageProperty?.name}</span>
+                        <span className="font-medium">{selectedOption?.label}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Current Balance:</span>

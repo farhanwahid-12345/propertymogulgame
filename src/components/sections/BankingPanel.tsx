@@ -25,7 +25,7 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
     mortgageRemaining: getDebtForProperty(p.id),
   }));
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 [&_button]:h-8 [&_button]:text-xs [&_button]:px-2.5 [&_button_svg]:h-3.5 [&_button_svg]:w-3.5">
       <MortgageSettlement
         ownedProperties={gameState.ownedProperties}
         mortgages={gameState.mortgages}
