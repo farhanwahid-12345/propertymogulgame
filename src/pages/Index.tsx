@@ -131,14 +131,8 @@ const Index = () => {
               </TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center flex-wrap gap-2 justify-end">
-              {activeTab === 'market' ? (
+              {activeTab === 'market' && (
                 <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
-              ) : (
-                <BankingPanelActions
-                  gameState={gameState}
-                  getDebtForProperty={getDebtForProperty}
-                  totalPortfolioIncome={totalPortfolioIncome}
-                />
               )}
             </div>
           </div>
