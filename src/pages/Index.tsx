@@ -22,15 +22,31 @@ import { usePortfolioMetrics } from "@/hooks/usePortfolioMetrics";
 import { useConveyancingDisplay } from "@/hooks/useConveyancingDisplay";
 import type { EntityType } from "@/types/game";
 
-function OnboardingGate({ setEntityType }: { setEntityType: (e: EntityType) => void }) {
+function OnboardingGate({
+  setEntityType,
+  activeTab,
+  setActiveTab,
+}: {
+  setEntityType: (e: EntityType) => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}) {
   const entityChosen = useGameStore((s: any) => s.entityChosen);
   const onboardingCompleted = useGameStore((s: any) => s.onboardingCompleted);
+  // localStorage fallback so a stuck zustand write can't re-open the modal.
+  const lsDone = typeof window !== 'undefined' && window.localStorage.getItem('pm_onboarding_done') === '1';
+  const open = !entityChosen || (!onboardingCompleted && !lsDone);
   return (
     <OnboardingFlow
-      open={!entityChosen || !onboardingCompleted}
+      open={open}
       skipEntity={!!entityChosen}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       onEntityPick={(entity) => setEntityType(entity)}
-      onFinish={() => useGameStore.setState({ onboardingCompleted: true } as any)}
+      onFinish={() => {
+        try { window.localStorage.setItem('pm_onboarding_done', '1'); } catch { /* noop */ }
+        useGameStore.setState({ onboardingCompleted: true } as any);
+      }}
     />
   );
 }
@@ -240,7 +256,11 @@ const Index = () => {
         alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
       />
 
-      <OnboardingGate setEntityType={gameState.setEntityType} />
+      <OnboardingGate
+        setEntityType={gameState.setEntityType}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
 
 
       <PlanningApprovedDialog />

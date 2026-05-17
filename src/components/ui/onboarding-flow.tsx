@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ResponsiveDialog as Dialog,
   ResponsiveDialogContent as DialogContent,
@@ -11,19 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Building2, User, Check, Home, Users, Wrench, PiggyBank,
-  ArrowRight, Store, Landmark, ClipboardList, Bell,
+  ArrowRight, Store, Landmark, ClipboardList, Bell, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EntityType } from "@/types/game";
 
 interface Props {
   open: boolean;
-  /** Called when entity is picked. The tour continues after this. */
   onEntityPick: (entity: EntityType) => void;
-  /** Called when the tour is finished or skipped (sets onboardingCompleted). */
   onFinish: () => void;
-  /** If true, entity has already been chosen — jump straight to the tour (used for "Replay tour"). */
   skipEntity?: boolean;
+  /** Active page tab (e.g. "market" | "bank"). Used to drive the tour. */
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
 const STEPS = [
@@ -35,28 +35,66 @@ const STEPS = [
 
 type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-bank' | 'tour-ops' | 'tour-alerts';
 
-const TOUR_STEPS: { id: Stage; icon: typeof Store; title: string; body: string; index: number }[] = [
-  { id: 'tour-market', icon: Store,         title: "The Market", index: 1,
-    body: "Switch to the Market tab to view estate agent listings and the auction house. That's where you'll spend most of your first hour." },
-  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 2,
-    body: "The Bank tab gathers mortgages, overdraft, loans and your tax bill. Refinance equity here to fund your next deposit." },
-  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 3,
-    body: "Conveyancing, renovations and planning permission live in Operations. Open it to see what's in-flight and chase tenant concerns." },
-  { id: 'tour-alerts', icon: Bell,          title: "Action Required", index: 4,
-    body: "Evictions, deposit disputes and important warnings appear under Action Required. Clear them before they drag your reputation down." },
+interface TourStep {
+  id: Stage;
+  icon: typeof Store;
+  title: string;
+  body: string;
+  index: number;
+  /** Tab to switch to before scrolling/highlighting. */
+  tab?: string;
+  /** DOM id of the element to scroll into view and highlight. */
+  scrollId?: string;
+}
+
+const TOUR_STEPS: TourStep[] = [
+  { id: 'tour-market', icon: Store,         title: "The Market", index: 1, tab: 'market', scrollId: 'section-tabs',
+    body: "This is the Market tab — estate agent listings and the auction house. We've switched you here now so you can see what's for sale." },
+  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 2, tab: 'bank', scrollId: 'section-tabs',
+    body: "The Bank tab covers mortgages, overdraft, loans and your tax bill. Refinance equity here to fund your next deposit." },
+  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 3, tab: 'market', scrollId: 'section-ops',
+    body: "Conveyancing, renovations and planning permission live in Operations. Open it to track what's in-flight and chase tenant concerns." },
+  { id: 'tour-alerts', icon: Bell,          title: "Action Required", index: 4, tab: 'market', scrollId: 'section-alerts',
+    body: "Evictions, deposit disputes and warnings appear under Action Required. Clear them before they drag your reputation down." },
 ];
 
-export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = false }: Props) {
+const LS_DONE_KEY = 'pm_onboarding_done';
+
+export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = false, setActiveTab }: Props) {
   const [stage, setStage] = useState<Stage>(skipEntity ? 'tour-market' : 'welcome');
   const [picked, setPicked] = useState<EntityType | null>(null);
+
+  // Drive the page underneath when entering a tour step.
+  useEffect(() => {
+    if (!open) return;
+    const step = TOUR_STEPS.find(s => s.id === stage);
+    if (!step) return;
+    if (step.tab && setActiveTab) setActiveTab(step.tab);
+
+    // Wait a tick so the new tab content paints before we scroll/highlight.
+    const raf = requestAnimationFrame(() => {
+      if (!step.scrollId) return;
+      const el = document.getElementById(step.scrollId);
+      if (!el) return;
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* noop */ }
+      el.classList.add('tour-highlight');
+      window.setTimeout(() => el.classList.remove('tour-highlight'), 2500);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [stage, open, setActiveTab]);
+
+  const finish = useCallback(() => {
+    try { window.localStorage.setItem(LS_DONE_KEY, '1'); } catch { /* noop */ }
+    onFinish();
+  }, [onFinish]);
 
   if (!open) return null;
 
   // ── Welcome ──
   if (stage === 'welcome') {
     return (
-      <Dialog open={open}>
-        <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+        <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl">Welcome to Property Tycoon 🏘️</DialogTitle>
             <DialogDescription>
@@ -78,7 +116,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={onFinish}>Skip intro</Button>
+            <Button variant="ghost" onClick={finish}>Skip intro</Button>
             <Button onClick={() => setStage('entity')} className="w-full sm:w-auto">
               Get started <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -91,8 +129,8 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   // ── Entity pick ──
   if (stage === 'entity') {
     return (
-      <Dialog open={open}>
-        <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+        <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl">How will you trade?</DialogTitle>
             <DialogDescription>
@@ -141,7 +179,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={() => { if (picked) onEntityPick(picked); onFinish(); }} disabled={!picked}>
+            <Button variant="ghost" onClick={() => { if (picked) onEntityPick(picked); finish(); }} disabled={!picked}>
               Skip tour
             </Button>
             <div className="flex gap-2">
@@ -160,7 +198,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
     );
   }
 
-  // ── Tour steps ──
+  // ── Tour steps: non-blocking floating coach card ──
   const tourIndex = TOUR_STEPS.findIndex(s => s.id === stage);
   const tour = TOUR_STEPS[tourIndex];
   if (!tour) return null;
@@ -168,24 +206,35 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   const isLast = tourIndex === TOUR_STEPS.length - 1;
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <span className="rounded-lg bg-primary/15 p-1.5">
-              <Icon className="h-5 w-5 text-primary" />
-            </span>
-            {tour.title}
-            <span className="ml-auto text-xs text-muted-foreground font-normal">
-              {tour.index} / {TOUR_STEPS.length}
-            </span>
-          </DialogTitle>
-          <DialogDescription className="pt-2 text-sm leading-relaxed">
-            {tour.body}
-          </DialogDescription>
-        </DialogHeader>
+    <div
+      role="dialog"
+      aria-label={tour.title}
+      className={cn(
+        "fixed z-50 pointer-events-auto",
+        // Mobile: bottom sheet style; Desktop: bottom-right floating card
+        "left-3 right-3 bottom-3 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[22rem]",
+      )}
+    >
+      <div className="glass rounded-2xl border border-white/10 shadow-2xl p-4 bg-background/90 backdrop-blur-xl">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="rounded-lg bg-primary/15 p-1.5">
+            <Icon className="h-5 w-5 text-primary" />
+          </span>
+          <span className="font-semibold text-base">{tour.title}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{tour.index} / {TOUR_STEPS.length}</span>
+          <button
+            type="button"
+            aria-label="Close tour"
+            onClick={finish}
+            className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-        <div className="flex gap-1.5 my-2">
+        <p className="text-sm leading-relaxed text-muted-foreground">{tour.body}</p>
+
+        <div className="flex gap-1.5 my-3">
           {TOUR_STEPS.map((s, i) => (
             <div
               key={s.id}
@@ -197,25 +246,28 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
           ))}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={onFinish}>Skip tour</Button>
+        <div className="flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={finish}>Skip tour</Button>
           <div className="flex gap-2">
             {tourIndex > 0 && (
-              <Button variant="ghost" onClick={() => setStage(TOUR_STEPS[tourIndex - 1].id)}>
+              <Button variant="ghost" size="sm" onClick={() => setStage(TOUR_STEPS[tourIndex - 1].id)}>
                 Back
               </Button>
             )}
             <Button
+              size="sm"
               onClick={() => {
-                if (isLast) onFinish();
+                if (isLast) finish();
                 else setStage(TOUR_STEPS[tourIndex + 1].id);
               }}
             >
               {isLast ? <>Got it <Check className="h-4 w-4 ml-2" /></> : <>Next <ArrowRight className="h-4 w-4 ml-2" /></>}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }
+
+export { LS_DONE_KEY as ONBOARDING_DONE_KEY };
