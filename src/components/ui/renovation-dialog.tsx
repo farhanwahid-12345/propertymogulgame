@@ -359,10 +359,17 @@ export function RenovationDialog({
   const isInProgress = (renovation: RenovationType) => activeRenovations.includes(renovation.id);
   const isCompleted = (renovation: RenovationType) => completedRenovationIds.includes(renovation.id);
 
-  /** Returns null if eligible, else a short reason string. */
-  const ineligibilityReason = (r: RenovationType): string | null => {
-    // Conversions structurally rebuild the property — must be vacant.
-    if (r.category === 'conversion' && hasTenant) {
+  /**
+   * Returns null if eligible, else a short reason string.
+   * `phase` is 'planning' when we're only deciding whether the user may submit a
+   * planning application (no physical works yet) and 'works' when we're about to
+   * actually start construction. Tenant-presence + build-cost gates apply only
+   * to 'works' — planning can be submitted while a tenant is in situ or before
+   * the player can afford the build.
+   */
+  const ineligibilityReason = (r: RenovationType, phase: 'planning' | 'works' = 'works'): string | null => {
+    // Conversions structurally rebuild the property — must be vacant when works begin.
+    if (phase === 'works' && r.category === 'conversion' && hasTenant) {
       return `Vacate every unit (serve eviction notice) before converting`;
     }
     if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
