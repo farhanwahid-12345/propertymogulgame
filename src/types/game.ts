@@ -408,6 +408,22 @@ export interface GameState {
   loans: Loan[];
   // Planning approvals awaiting player acknowledgement (drives celebration dialog)
   pendingPlanningCelebrations: string[];
+  // Court / bailiff escalation when cashflow runs persistently negative
+  arrears?: ArrearsState | null;
+}
+
+/** Player arrears / forced-sale escalation state. */
+export interface ArrearsState {
+  /** Month the warning was first issued. */
+  startMonth: number;
+  /** Consecutive months the player has been cash-negative & over overdraft. */
+  monthsBehind: number;
+  /** Month a court order was granted (forced sale scheduled). */
+  courtOrderMonth?: number;
+  /** Property earmarked by bailiffs for forced auction. */
+  forcedAuctionPropertyId?: string;
+  /** Month the forced sale will execute (next monthEnd after court order). */
+  scheduledSaleMonth?: number;
 }
 
 /** A single tenant-departure event for the persistent activity log. */
