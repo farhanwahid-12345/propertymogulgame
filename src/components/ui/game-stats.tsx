@@ -80,11 +80,9 @@ export function GameStats({
     return "text-danger";
   };
 
-  const recentTenantEvents = tenantEvents
-    .filter(event => event.month >= monthsPlayed - 3)
-    .slice(-5);
-
   const latestEconomicEvent = economicEvents.length > 0 ? economicEvents[economicEvents.length - 1] : null;
+  void tenantEvents;
+  void currentMarketRate;
 
   return (
     <div className="space-y-3 animate-fade-in">
