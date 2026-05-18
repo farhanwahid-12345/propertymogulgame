@@ -16,6 +16,8 @@ interface Props {
   monthsPlayed?: number;
   /** Month index of last finalised tax bill (0 if none). */
   lastCorporationTaxMonth?: number;
+  /** Item 5: losses brought forward (pennies). Offsets future taxable profits. */
+  unusedLossesPennies?: number;
 }
 
 const fmt = (pennies: number) =>
@@ -30,6 +32,7 @@ export function TaxBreakdown({
   totalTaxPaidPennies,
   monthsPlayed = 0,
   lastCorporationTaxMonth = 0,
+  unusedLossesPennies = 0,
 }: Props) {
   const isLtd = entityType === 'ltd';
 
@@ -157,6 +160,14 @@ export function TaxBreakdown({
       <p className="text-[10px] text-muted-foreground italic">
         YTD updates each month as rent is collected — the projected figure smooths this out.
       </p>
+
+      {/* Item 5: losses brought forward */}
+      {unusedLossesPennies > 0 && (
+        <div className="text-xs flex items-center justify-between border-t border-white/10 pt-3">
+          <span className="text-muted-foreground">Losses brought forward (offset future profits)</span>
+          <span className="font-semibold text-emerald-300">{fmt(unusedLossesPennies)}</span>
+        </div>
+      )}
 
       {/* CGT (sole trader only) */}
       {!isLtd && (
