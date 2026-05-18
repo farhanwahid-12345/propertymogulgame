@@ -410,6 +410,9 @@ export interface GameState {
   pendingPlanningCelebrations: string[];
   // Court / bailiff escalation when cashflow runs persistently negative
   arrears?: ArrearsState | null;
+  /** Timestamp (Date.now()) of the most recent operations-significant event —
+   * drives the Operations button flash (item 3). */
+  opsFlashAt?: number;
 }
 
 /** Player arrears / forced-sale escalation state. */

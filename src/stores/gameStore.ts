@@ -181,6 +181,7 @@ function createInitialState(): GameState {
     loans: [],
     pendingPlanningCelebrations: [],
     arrears: null,
+    opsFlashAt: 0,
   };
 }
 
@@ -463,6 +464,11 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const currentTime = Date.now();
         const newMonthNumber = prev.monthsPlayed + 1;
+        // Item 3: bump when any operations-significant thing happens this tick
+        // (conveyancing complete, planning decision, renovation complete, missed rent,
+        // chain collapse). Read at the end into the final set().
+        let opsFlashAtNew = prev.opsFlashAt || 0;
+        const flashOps = () => { opsFlashAtNew = Date.now(); };
 
         // ── Process conveyancing ──
         let completedBuys: Conveyancing[] = [];
@@ -478,9 +484,11 @@ export const useGameStore = create<GameState & GameActions>()(
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
               showToast("⛓️ Chain Collapsed!", `${conv.propertyName} — the ${conv.status === 'buying' ? 'seller pulled out' : 'buyer pulled out'}. Transaction cancelled.`, "destructive");
+              flashOps();
             } else {
               if (conv.status === 'buying') completedBuys.push(conv);
               else completedSells.push(conv);
+              flashOps();
             }
           } else {
             activeConveyancing.push(conv);
@@ -589,7 +597,8 @@ export const useGameStore = create<GameState & GameActions>()(
             const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
             newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
             if (prop) {
-              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}.`, "destructive");
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}. Open Operations to see arrears.`, "destructive");
+              flashOps();
             }
           }
         });
@@ -1148,12 +1157,14 @@ export const useGameStore = create<GameState & GameActions>()(
                 "Planning Approved! ✅",
                 `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
               );
+              flashOps();
             } else {
               showToast(
                 "Planning Refused ❌",
                 `${app.renovationName} on ${propName} refused: ${app.refusalReason || 'planning grounds'}. 6-month cooldown before resubmission.`,
                 "destructive",
               );
+              flashOps();
               // Add 6-month cooldown lock so the player can't immediately resubmit
               newPropertyLocks.push({
                 propertyId: app.propertyId,
@@ -1730,6 +1741,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
+            // ops flash handled below in processMarketUpdate's set()
           }
         });
 
@@ -1880,6 +1892,7 @@ export const useGameStore = create<GameState & GameActions>()(
           business: driftLoanSpread(prev.currentLoanRates.business, LOAN_PRODUCTS.business.spreadMin, LOAN_PRODUCTS.business.spreadMax),
         };
 
+        const renovationsCompletedThisTick = completedRenovations.length > 0;
         set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
@@ -1890,7 +1903,12 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
-        }));
+          // Item 3: flash Operations button when a renovation finishes or a
+          // damage concern lands.
+          opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
+            ? Date.now()
+            : (s as any).opsFlashAt || 0,
+        } as any));
 
         // Toast AFTER state commit — guarantees the matching concern is in the feed
         // before the user sees the notification.
