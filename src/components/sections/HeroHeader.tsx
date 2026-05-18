@@ -43,6 +43,7 @@ interface HeroHeaderProps {
   entityType?: EntityType;
   currentMarketRate?: number;
   totalDebt?: number;
+  netMonthlyCashflow?: number;
 }
 
 export function HeroHeader({
@@ -61,6 +62,7 @@ export function HeroHeader({
   entityType,
   currentMarketRate = 0,
   totalDebt = 0,
+  netMonthlyCashflow = 0,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
