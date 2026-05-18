@@ -80,30 +80,14 @@ export function GameStats({
     return "text-danger";
   };
 
-  const latestEconomicEvent = economicEvents.length > 0 ? economicEvents[economicEvents.length - 1] : null;
+  // Macro events are surfaced via MacroEventModal popup (item 8) — no inline banner.
   void tenantEvents;
   void currentMarketRate;
+  void economicEvents;
+  void monthsPlayed;
 
   return (
     <div className="space-y-3 animate-fade-in">
-      {/* Latest Economic Event Banner */}
-      {latestEconomicEvent && latestEconomicEvent.month >= monthsPlayed - 2 && (
-        <div className={cn(
-          "glass p-3 border-l-4 animate-fade-in",
-          latestEconomicEvent.type === 'recession' ? "border-red-500 bg-red-500/10" :
-          latestEconomicEvent.type === 'rate_cut' ? "border-green-500 bg-green-500/10" :
-          latestEconomicEvent.type === 'tech_boom' ? "border-blue-500 bg-blue-500/10" :
-          "border-yellow-500 bg-yellow-500/10"
-        )}>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-sm text-foreground">{latestEconomicEvent.name}</div>
-              <div className="text-xs text-muted-foreground">{latestEconomicEvent.description}</div>
-            </div>
-            <Badge variant="outline" className="text-xs">Month {latestEconomicEvent.month}</Badge>
-          </div>
-        </div>
-      )}
 
       {/* Main Stats Bar */}
       <div className="glass p-4">
