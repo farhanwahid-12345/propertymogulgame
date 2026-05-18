@@ -464,6 +464,11 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const currentTime = Date.now();
         const newMonthNumber = prev.monthsPlayed + 1;
+        // Item 3: bump when any operations-significant thing happens this tick
+        // (conveyancing complete, planning decision, renovation complete, missed rent,
+        // chain collapse). Read at the end into the final set().
+        let opsFlashAtNew = prev.opsFlashAt || 0;
+        const flashOps = () => { opsFlashAtNew = Date.now(); };
 
         // ── Process conveyancing ──
         let completedBuys: Conveyancing[] = [];
