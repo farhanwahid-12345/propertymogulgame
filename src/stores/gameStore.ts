@@ -3463,18 +3463,45 @@ export const useGameStore = create<GameState & GameActions>()(
         showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
       },
 
-      settleLoan: (loanId: string) => {
+      settleLoan: (loanId: string, partialAmount?: number) => {
         const prev = get();
         const loan = ((prev as any).loans || []).find((l: any) => l.id === loanId);
         if (!loan) { showToast("Settle Failed", "Loan not found.", "destructive"); return; }
-        const debited = debit(prev, loan.remainingBalance);
-        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(loan.remainingBalance).toLocaleString()}.`, "destructive"); return; }
+        // Item 4: optional partial payment. Clamp to remainingBalance — if equal
+        // or undefined, settle the whole loan.
+        const requested = partialAmount && partialAmount > 0
+          ? Math.min(partialAmount, loan.remainingBalance)
+          : loan.remainingBalance;
+        const debited = debit(prev, requested);
+        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(requested).toLocaleString()}.`, "destructive"); return; }
+        const newBalance = loan.remainingBalance - requested;
+        const fullSettle = newBalance <= 0;
+        let updatedLoans;
+        if (fullSettle) {
+          updatedLoans = ((prev as any).loans || []).filter((l: any) => l.id !== loanId);
+        } else {
+          // Recompute monthly payment over remaining months, keeping rate & term.
+          const monthsElapsed = Math.max(0, prev.monthsPlayed - (loan.startMonth || prev.monthsPlayed));
+          const remainingMonths = Math.max(1, (loan.termMonths || 12) - monthsElapsed);
+          const monthlyRate = (loan.interestRate || 0) / 12;
+          const newMonthly = monthlyRate > 0
+            ? Math.round((newBalance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -remainingMonths)))
+            : Math.round(newBalance / remainingMonths);
+          updatedLoans = ((prev as any).loans || []).map((l: any) =>
+            l.id === loanId ? { ...l, remainingBalance: newBalance, monthlyPayment: newMonthly } : l
+          );
+        }
         set({
           cash: debited.cash, overdraftUsed: debited.overdraftUsed,
-          loans: ((prev as any).loans || []).filter((l: any) => l.id !== loanId),
-          creditScore: Math.min(850, prev.creditScore + 3),
+          loans: updatedLoans,
+          creditScore: Math.min(850, prev.creditScore + (fullSettle ? 3 : 1)),
         } as any);
-        showToast("Loan Settled ✓", `Repaid £${fromPennies(loan.remainingBalance).toLocaleString()} early.`);
+        showToast(
+          fullSettle ? "Loan Settled ✓" : "Partial Payment ✓",
+          fullSettle
+            ? `Repaid £${fromPennies(requested).toLocaleString()} early.`
+            : `Paid £${fromPennies(requested).toLocaleString()}; balance now £${fromPennies(newBalance).toLocaleString()}.`,
+        );
       },
 
 
