@@ -120,6 +120,7 @@ interface GameActions {
   // Pause
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
+  markEconomicEventsSeen: (ids: string[]) => void;
   // Game
   resetGame: () => void;
 }
