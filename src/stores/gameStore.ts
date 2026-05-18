@@ -183,6 +183,8 @@ function createInitialState(): GameState {
     pendingPlanningCelebrations: [],
     arrears: null,
     opsFlashAt: 0,
+    reputationLog: [],
+    seenEconomicEventIds: [],
   };
 }
 
@@ -366,6 +368,9 @@ function migrateState(persisted: any): GameState {
   }
   // Pause never persists as true — always start unpaused for safety
   persisted.isPaused = false;
+
+  if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
+  if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
