@@ -484,9 +484,11 @@ export const useGameStore = create<GameState & GameActions>()(
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
               showToast("⛓️ Chain Collapsed!", `${conv.propertyName} — the ${conv.status === 'buying' ? 'seller pulled out' : 'buyer pulled out'}. Transaction cancelled.`, "destructive");
+              flashOps();
             } else {
               if (conv.status === 'buying') completedBuys.push(conv);
               else completedSells.push(conv);
+              flashOps();
             }
           } else {
             activeConveyancing.push(conv);
@@ -595,7 +597,8 @@ export const useGameStore = create<GameState & GameActions>()(
             const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
             newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
             if (prop) {
-              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}.`, "destructive");
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}. Open Operations to see arrears.`, "destructive");
+              flashOps();
             }
           }
         });
