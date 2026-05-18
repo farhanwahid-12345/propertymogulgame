@@ -1346,15 +1346,8 @@ export const useGameStore = create<GameState & GameActions>()(
         let finalCash = Math.max(0, credited.cash);
         let finalOverdraftUsed = credited.overdraftUsed;
 
-        // Defensive: if any prior code path bypassed `credit()` and left cash
-        // sitting alongside drawn overdraft, sweep it now. Without this the
-        // net-worth display under-reports because overdraftUsed is subtracted
-        // even though the player effectively has the cash to clear it.
-        if (finalCash > 0 && finalOverdraftUsed > 0) {
-          const sweep = Math.min(finalCash, finalOverdraftUsed);
-          finalCash -= sweep;
-          finalOverdraftUsed -= sweep;
-        }
+        // No auto-sweep — overdraft is only repaid when the player explicitly
+        // does so via the Credit & Banking panel (item 9a).
 
         // Macro-economic events
         let nextEventMonth = prev.nextEconomicEventMonth;
@@ -1514,8 +1507,12 @@ export const useGameStore = create<GameState & GameActions>()(
         let newArrears: import('@/types/game').ArrearsState | null = prev.arrears ?? null;
         const overdraftHeadroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
         const projectedNet = monthlyIncome - totalExpenses;
-        const cashEffective = finalCash - finalOverdraftUsed;
-        const inDistress = cashEffective < 0 || (projectedNet < 0 && (finalCash + overdraftHeadroom) < Math.abs(projectedNet));
+        // Distress only when (a) cash is gone AND overdraft is exhausted, OR
+        // (b) the next month's projected shortfall can't be covered by cash +
+        // overdraft headroom. Holding cash while using overdraft is NOT distress.
+        const exhausted = finalCash <= 0 && overdraftHeadroom <= 0;
+        const projectedShortfall = projectedNet < 0 && (finalCash + overdraftHeadroom) < Math.abs(projectedNet);
+        const inDistress = exhausted || projectedShortfall;
 
         // 1. Execute any previously-scheduled forced sale
         if (newArrears?.forcedAuctionPropertyId && newArrears.scheduledSaleMonth && newMonthNumber >= newArrears.scheduledSaleMonth) {

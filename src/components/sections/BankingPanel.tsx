@@ -111,7 +111,12 @@ function InlineDialogButton({
 }
 
 export function OperationsInlineButton({ gameState }: { gameState: GameState }) {
-  const concernCount = gameState.tenantConcerns?.filter((c: any) => c && !c.resolvedMonth).length || 0;
+  // Item 11: only count concerns whose property is still owned — orphan
+  // concerns from sold/forced-sold properties were keeping the button flashing.
+  const ownedIds = new Set(gameState.ownedProperties.map((p: any) => p.id));
+  const concernCount = (gameState.tenantConcerns || []).filter(
+    (c: any) => c && !c.resolvedMonth && ownedIds.has(c.propertyId),
+  ).length;
   const opsActive =
     (gameState.conveyancing?.length || 0) +
     (gameState.renovations?.length || 0) +

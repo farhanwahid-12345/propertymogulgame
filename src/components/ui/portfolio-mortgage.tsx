@@ -35,10 +35,11 @@ export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfo
   const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
   const ratePenalty = getRatePenaltyForCreditScore(creditScore);
 
-  const eligibleProperties = ownedProperties.filter(prop => {
-    const equity = prop.value - (prop.mortgageRemaining || 0);
-    return equity > 0;
-  });
+  // Item 18: show ALL owned properties so the player can include anything they
+  // own (including properties already in another portfolio facility — those get
+  // settled and rolled into the new one server-side). We still soft-warn on the
+  // tile if there's no equity headroom, but never filter them out.
+  const eligibleProperties = ownedProperties;
 
   const selectedProperties = eligibleProperties.filter(prop => selectedPropertyIds.includes(prop.id));
   const totalPortfolioValue = selectedProperties.reduce((sum, prop) => sum + prop.value, 0);
