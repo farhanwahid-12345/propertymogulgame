@@ -1286,6 +1286,30 @@ export const useGameStore = create<GameState & GameActions>()(
           );
         }
 
+        // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
+        // months + £ owed. Paying tenants get arrears cleared. Throttle toast
+        // marker is stamped here so it persists across ticks.
+        newTenants = newTenants.map(t => {
+          const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+          if (missedTenantKeys.has(key)) {
+            const rentPennies = (t as any).rentPennies
+              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
+            const lastToast = t.lastDefaultToastMonth ?? -999;
+            const stamped = newMonthNumber - lastToast >= 3 ? newMonthNumber : (t.lastDefaultToastMonth ?? 0);
+            return {
+              ...t,
+              arrearsMonths: (t.arrearsMonths ?? 0) + 1,
+              arrearsPennies: (t.arrearsPennies ?? 0) + rentPennies,
+              lastDefaultToastMonth: stamped,
+            };
+          }
+          // Paying this month — clear arrears.
+          if (!conveyancingPropertyIds.has(t.propertyId) && (t.arrearsMonths ?? 0) > 0) {
+            return { ...t, arrearsMonths: 0, arrearsPennies: 0 };
+          }
+          return t;
+        });
+
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
         // ── Taxation (UK tax year ends 5 April → use month 3 in 0-indexed) ──
