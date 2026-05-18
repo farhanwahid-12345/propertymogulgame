@@ -20,15 +20,16 @@ export function debit(
   return { cash: 0, overdraftUsed: state.overdraftUsed + fromOverdraft, usedOverdraft: fromOverdraft };
 }
 
+/**
+ * Credit cash. Does NOT auto-repay overdraft — players control when to clear
+ * the overdraft via the Credit & Banking panel. (Item 9a — auto-clawback was
+ * surprising players who got loans or rent and saw their overdraft vanish.)
+ */
 export function credit(
   state: { cash: number; overdraftUsed: number },
   amount: number,
 ): { cash: number; overdraftUsed: number } {
   if (amount <= 0) return { cash: state.cash, overdraftUsed: state.overdraftUsed };
-  if (state.overdraftUsed > 0) {
-    const repay = Math.min(state.overdraftUsed, amount);
-    return { cash: state.cash + (amount - repay), overdraftUsed: state.overdraftUsed - repay };
-  }
   return { cash: state.cash + amount, overdraftUsed: state.overdraftUsed };
 }
 

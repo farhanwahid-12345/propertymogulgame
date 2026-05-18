@@ -171,13 +171,19 @@ export function MultiUnitSlots({
                       propertyId={propertyId}
                       propertyName={`${propertyName} · ${label} ${slotIndex + 1}`}
                       currentRent={slotRent || baseRentPerUnitPounds}
-                      marketRent={
-                        getMarketRentPounds({
+                      marketRent={(() => {
+                        // Market rent is for the *whole* property — divide by
+                        // unit count so a single room/flat compares like-for-like.
+                        const units = Math.max(1, slots.length);
+                        const whole = getMarketRentPounds({
                           value: propertyValue,
                           yield: propertyYield,
                           condition,
-                        }) || baseRentPerUnitPounds
-                      }
+                        });
+                        return whole > 0
+                          ? Math.round(whole / units)
+                          : baseRentPerUnitPounds;
+                      })()}
                       monthsSinceLastIncrease={999}
                       tenant={tenant}
                       tenantSatisfaction={slot.satisfaction ?? 80}
