@@ -1157,12 +1157,14 @@ export const useGameStore = create<GameState & GameActions>()(
                 "Planning Approved! ✅",
                 `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
               );
+              flashOps();
             } else {
               showToast(
                 "Planning Refused ❌",
                 `${app.renovationName} on ${propName} refused: ${app.refusalReason || 'planning grounds'}. 6-month cooldown before resubmission.`,
                 "destructive",
               );
+              flashOps();
               // Add 6-month cooldown lock so the player can't immediately resubmit
               newPropertyLocks.push({
                 propertyId: app.propertyId,
@@ -1739,6 +1741,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
+            flashOps();
           }
         });
 
