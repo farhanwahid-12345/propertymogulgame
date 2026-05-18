@@ -165,7 +165,7 @@ export function RentNegotiationDialog({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="p-2 rounded-md bg-muted/40 border border-border">
-                <div className="text-xs text-muted-foreground">Current rent</div>
+                <div className="text-xs text-muted-foreground">Current rent (paid)</div>
                 <div className="font-semibold">£{currentRent.toLocaleString()}/mo</div>
               </div>
               <div className="p-2 rounded-md bg-muted/40 border border-border">
@@ -173,6 +173,24 @@ export function RentNegotiationDialog({
                 <div className="font-semibold">£{Math.round(marketRent).toLocaleString()}/mo</div>
               </div>
             </div>
+            {marketRent > 0 && (() => {
+              const diffPct = ((currentRent - marketRent) / marketRent) * 100;
+              const below = diffPct < -2;
+              const above = diffPct > 2;
+              const cls = below
+                ? "bg-success/10 border-success/30 text-success"
+                : above
+                  ? "bg-amber-400/10 border-amber-400/30 text-amber-300"
+                  : "bg-muted/40 border-border text-muted-foreground";
+              const label = below
+                ? `↓ Below market by £${Math.round(marketRent - currentRent).toLocaleString()}/mo (${Math.abs(diffPct).toFixed(0)}%) — tenants likely to accept a raise.`
+                : above
+                  ? `↑ Above market by £${Math.round(currentRent - marketRent).toLocaleString()}/mo (${diffPct.toFixed(0)}%) — tenants and tribunal will resist increases.`
+                  : "At market rate.";
+              return (
+                <div className={`p-2 rounded-md border text-xs ${cls}`}>{label}</div>
+              );
+            })()}
 
             {yearlyCapBlocked ? (
               <div className="p-3 rounded-md bg-amber-400/10 border border-amber-400/30 text-xs text-amber-300 flex items-start gap-2">
