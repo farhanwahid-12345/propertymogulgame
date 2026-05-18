@@ -99,7 +99,7 @@ interface GameActions {
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   // Loans
   applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
-  settleLoan: (loanId: string) => void;
+  settleLoan: (loanId: string, partialAmount?: number) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
   setCash: (newCash: number) => void;
