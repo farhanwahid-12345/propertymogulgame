@@ -421,6 +421,10 @@ export interface GameState {
   /** Timestamp (Date.now()) of the most recent operations-significant event —
    * drives the Operations button flash (item 3). */
   opsFlashAt?: number;
+  /** Item 1: rolling log of reputation-affecting events (capped ~40 entries). */
+  reputationLog?: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }>;
+  /** Macro-event IDs already shown in the popup modal (item 8). */
+  seenEconomicEventIds?: string[];
 }
 
 /** Player arrears / forced-sale escalation state. */
