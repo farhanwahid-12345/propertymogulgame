@@ -101,9 +101,17 @@ export function PortfolioGrid({
           const pendingEvSlot0 = (gameState.pendingEvictions || []).find(
             (e: any) => e.propertyId === property.id && (e.slotIndex ?? 0) === 0
           );
-          const arrearsCount = (gameState.tenantEvents || []).filter(
-            (e: any) => e.propertyId === property.id && e.type === "default"
-          ).length;
+          // Item 2: prefer authoritative per-tenant arrearsMonths (clears on
+          // payment) over the append-only tenantEvents counter.
+          const liveArrearsMonths = Math.max(0, ...tenantRecs.map((t: any) => t.arrearsMonths ?? 0));
+          const arrearsCount = liveArrearsMonths > 0
+            ? liveArrearsMonths
+            : (gameState.tenantEvents || []).filter(
+                (e: any) => e.propertyId === property.id && e.type === "default"
+              ).length;
+          const arrearsPenniesTotal = tenantRecs.reduce(
+            (s: number, t: any) => s + (t.arrearsPennies ?? 0), 0
+          );
           const propertyApps = ((gameState as any).planningApplications || []).filter(
             (a: any) => a.propertyId === property.id
           );
