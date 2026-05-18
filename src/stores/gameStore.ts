@@ -120,6 +120,7 @@ interface GameActions {
   // Pause
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
+  markEconomicEventsSeen: (ids: string[]) => void;
   // Game
   resetGame: () => void;
 }
@@ -183,6 +184,8 @@ function createInitialState(): GameState {
     pendingPlanningCelebrations: [],
     arrears: null,
     opsFlashAt: 0,
+    reputationLog: [],
+    seenEconomicEventIds: [],
   };
 }
 
@@ -366,6 +369,9 @@ function migrateState(persisted: any): GameState {
   }
   // Pause never persists as true — always start unpaused for safety
   persisted.isPaused = false;
+
+  if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
+  if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
@@ -837,6 +843,7 @@ export const useGameStore = create<GameState & GameActions>()(
         let walkoutDepositRefund = 0;
         const walkoutDisputes: DepositDispute[] = [];
         let reputationDelta = 0;
+        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
           const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && Math.random() < 0.05;
@@ -883,7 +890,13 @@ export const useGameStore = create<GameState & GameActions>()(
             month: newMonthNumber,
             detail: `Satisfaction ${Math.round(t.satisfaction)}/100${withheld > 0 ? ` — £${fromPennies(withheld).toLocaleString()} withheld` : ''}`,
           });
-          reputationDelta -= guaranteedExit ? 4 : 2;
+          const d = guaranteedExit ? -4 : -2;
+          reputationDelta += d;
+          reputationLogEntries.push({
+            id: `rep_walk_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random()*1e6)}`,
+            month: newMonthNumber, reason: `${t.tenant.name} walked out of ${property?.name || 'a property'}`,
+            delta: d, category: 'walkout',
+          });
           return false;
         });
         newTenants = satisfactionAdjustedTenants;
@@ -1131,8 +1144,18 @@ export const useGameStore = create<GameState & GameActions>()(
             month: newMonthNumber,
             detail: ev.ground.replace(/_/g, ' '),
           });
-          // Reputation: antisocial removal earns goodwill; other grounds dent reputation
-          reputationDelta += ev.ground === 'antisocial_behaviour' ? 1 : -3;
+          {
+            const d = ev.ground === 'antisocial_behaviour' ? 1 : -3;
+            reputationDelta += d;
+            reputationLogEntries.push({
+              id: `rep_evict_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random()*1e6)}`,
+              month: newMonthNumber,
+              reason: ev.ground === 'antisocial_behaviour'
+                ? `Removed anti-social tenant from ${property?.name || 'a property'}`
+                : `Evicted ${tenantRec.tenant.name} (${ev.ground.replace(/_/g,' ')})`,
+              delta: d, category: 'eviction',
+            });
+          }
 
           // Anti-abuse locks (12 months) — scoped to the evicted slot only.
           if (ev.ground === 'landlord_sale') {
@@ -1690,6 +1713,7 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
+          reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
           opsFlashAt: opsFlashAtNew,
         } as any));
       },
@@ -3825,6 +3849,14 @@ export const useGameStore = create<GameState & GameActions>()(
 
       setPaused: (paused: boolean) => {
         set({ isPaused: !!paused });
+      },
+
+      markEconomicEventsSeen: (ids: string[]) => {
+        if (!ids || ids.length === 0) return;
+        const s = get() as any;
+        const prevSeen: string[] = Array.isArray(s.seenEconomicEventIds) ? s.seenEconomicEventIds : [];
+        const next = Array.from(new Set([...prevSeen, ...ids])).slice(-50);
+        set({ seenEconomicEventIds: next } as any);
       },
 
     }),

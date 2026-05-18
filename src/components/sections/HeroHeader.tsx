@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
 import { NotificationCentre } from "@/components/ui/notification-centre";
+import { ReputationBadge } from "@/components/ui/reputation-badge";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ interface HeroHeaderProps {
   entityType?: EntityType;
   currentMarketRate?: number;
   totalDebt?: number;
+  netMonthlyCashflow?: number;
 }
 
 export function HeroHeader({
@@ -61,11 +63,13 @@ export function HeroHeader({
   entityType,
   currentMarketRate = 0,
   totalDebt = 0,
+  netMonthlyCashflow = 0,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
   const reputation = useGameStore((s) => (s as any).landlordReputation ?? 50);
+  const reputationLog = useGameStore((s) => ((s as any).reputationLog || []) as Array<{ id: string; month: number; reason: string; delta: number; category: string }>);
   const [compact, setCompact] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
@@ -139,22 +143,25 @@ export function HeroHeader({
               {!compact && (
                 <p className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                   <span>Build your empire, one house at a time!</span>
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-[10px] font-medium"
-                    title={`Landlord reputation: ${Math.round(reputation)}/100`}
-                  >
-                    ⭐ {Math.round(reputation)}
-                  </span>
+                  <ReputationBadge reputation={reputation} log={reputationLog} />
                 </p>
               )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
               {!compact && (
                 <div
-                  className="glass rounded-full px-3 py-1 hidden md:flex items-center text-[11px] text-muted-foreground whitespace-nowrap"
-                  title={`Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
+                  className="glass rounded-full px-3 py-1 hidden md:flex items-center gap-2 text-[11px] text-muted-foreground whitespace-nowrap"
+                  title={`Cash flow £${netMonthlyCashflow.toLocaleString()}/mo · Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
                 >
-                  📈 {(currentMarketRate * 100).toFixed(2)}% · Debt £{totalDebt.toLocaleString()} · M {monthsPlayed}
+                  <span className={cn(netMonthlyCashflow >= 0 ? "text-success" : "text-danger", "font-semibold")}>
+                    {netMonthlyCashflow >= 0 ? "📈" : "📉"} £{netMonthlyCashflow.toLocaleString()}/mo
+                  </span>
+                  <span className="opacity-60">·</span>
+                  <span>{(currentMarketRate * 100).toFixed(2)}%</span>
+                  <span className="opacity-60">·</span>
+                  <span>Debt £{totalDebt.toLocaleString()}</span>
+                  <span className="opacity-60">·</span>
+                  <span>M {monthsPlayed}</span>
                 </div>
               )}
               <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">

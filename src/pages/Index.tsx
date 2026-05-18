@@ -11,6 +11,7 @@ import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 import { OnboardingFlow } from "@/components/ui/onboarding-flow";
 import * as onboardingModule from "@/lib/onboarding";
 import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
+import { MacroEventModal } from "@/components/ui/macro-event-modal";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -111,6 +112,7 @@ const Index = () => {
         entityType={gameState.entityType}
         currentMarketRate={gameState.currentMarketRate}
         totalDebt={gameState.totalDebt}
+        netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
       />
 
       <div className="container mx-auto px-4 py-6 space-y-5 pb-24 md:pb-6">
@@ -174,18 +176,20 @@ const Index = () => {
           <TabsContent value="bank" className="mt-0" />
         </Tabs>
 
-        <CollapsibleSection
-          id="section-alerts"
-          title="⚠️ Action Required"
-          badge={
-            (gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0) > 0 ? (
-              <Badge variant="destructive" className="text-[10px]">
-                {(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0)}
-              </Badge>
-            ) : null
-          }
-          defaultOpenMobile={true}
-        >
+        {/* min-h prevents reflow when badges/alerts appear/disappear (item 10) */}
+        <div className="min-h-[68px]">
+          <CollapsibleSection
+            id="section-alerts"
+            title="⚠️ Action Required"
+            badge={
+              (gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0) > 0 ? (
+                <Badge variant="destructive" className="text-[10px]">
+                  {(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0) + ((gameState as any).arrears ? 1 : 0)}
+                </Badge>
+              ) : null
+            }
+            defaultOpenMobile={true}
+          >
           {(gameState as any).arrears && (
             <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 mb-3">
               <div className="flex items-start gap-3">
@@ -229,7 +233,8 @@ const Index = () => {
             onDispute={gameState.disputeDeposit}
             onDismiss={gameState.dismissDispute}
           />
-        </CollapsibleSection>
+          </CollapsibleSection>
+        </div>
 
 
 
@@ -277,6 +282,7 @@ const Index = () => {
 
 
       <PlanningApprovedDialog />
+      <MacroEventModal />
     </div>
   );
 };
