@@ -113,6 +113,15 @@
     0%, 100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.55); }
     50%      { box-shadow: 0 0 0 8px hsl(var(--destructive) / 0); }
   }
+  .ops-flash {
+    animation: ops-flash-pulse 1.0s ease-in-out 4;
+    border-color: hsl(var(--primary) / 0.75) !important;
+    background: hsl(var(--primary) / 0.15) !important;
+  }
+  @keyframes ops-flash-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55); }
+    50%      { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
+  }
 }
 
 @layer utilities {
