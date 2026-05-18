@@ -233,7 +233,8 @@ const Index = () => {
             onDispute={gameState.disputeDeposit}
             onDismiss={gameState.dismissDispute}
           />
-        </CollapsibleSection>
+          </CollapsibleSection>
+        </div>
 
 
 
@@ -281,6 +282,7 @@ const Index = () => {
 
 
       <PlanningApprovedDialog />
+      <MacroEventModal />
     </div>
   );
 };
