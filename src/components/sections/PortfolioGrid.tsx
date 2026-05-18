@@ -180,6 +180,7 @@ export function PortfolioGrid({
                   : undefined
               }
               rentArrearsCount={arrearsCount}
+              arrearsPenniesTotal={arrearsPenniesTotal}
               applyRentIncrease={gameState.applyRentIncrease}
               planningApplications={propertyApps}
               planningHistory={(gameState as any).planningApplications || []}
