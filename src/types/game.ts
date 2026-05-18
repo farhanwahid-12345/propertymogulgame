@@ -399,6 +399,8 @@ export interface GameState {
   // Tax
   taxRecords: TaxRecord[];
   totalTaxPaid: number; // pennies - lifetime
+  /** Item 5: UK loss carry-forward — losses (pennies) brought forward to offset future taxable profits. */
+  unusedLosses?: number;
   // Tenant concerns
   tenantConcerns: TenantConcern[];
   // Renters' Rights — eviction notice queue & post-eviction property locks
