@@ -181,6 +181,7 @@ function createInitialState(): GameState {
     loans: [],
     pendingPlanningCelebrations: [],
     arrears: null,
+    opsFlashAt: 0,
   };
 }
 
