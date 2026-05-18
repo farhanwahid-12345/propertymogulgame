@@ -587,17 +587,24 @@ export const useGameStore = create<GameState & GameActions>()(
         // Risk-weighted missed-rent roll: probability scales with tenant.defaultRisk.
         // defaultRisk is ~1–60; convert to monthly miss probability with a 0.4 dampener.
         const missedRentPropertyIds = new Set<string>();
+        const missedTenantKeys = new Set<string>();
         const newDefaultEvents: TenantEvent[] = [];
         prev.tenants.forEach(t => {
           if (conveyancingPropertyIds.has(t.propertyId)) return;
           const risk = (t.tenant as any).defaultRisk ?? 5;
           const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
           if (Math.random() < monthlyP) {
+            const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+            missedTenantKeys.add(key);
             missedRentPropertyIds.add(t.propertyId);
             const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
             newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
-            if (prop) {
-              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}. Open Operations to see arrears.`, "destructive");
+            // Item 2: throttle toasts to max 1 per ~3 months per tenant.
+            const lastToast = t.lastDefaultToastMonth ?? -999;
+            if (prop && newMonthNumber - lastToast >= 3) {
+              const arrearsAfter = (t.arrearsMonths ?? 0) + 1;
+              const evictHint = arrearsAfter >= 2 ? " — Section 8 eviction now available." : "";
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed rent at ${prop.name} (${arrearsAfter}mo arrears).${evictHint}`, "destructive");
               flashOps();
             }
           }
