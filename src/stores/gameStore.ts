@@ -1741,7 +1741,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
-            flashOps();
+            // ops flash handled below in processMarketUpdate's set()
           }
         });
 
