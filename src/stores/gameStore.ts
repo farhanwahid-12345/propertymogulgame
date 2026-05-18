@@ -1741,6 +1741,16 @@ export const useGameStore = create<GameState & GameActions>()(
               ? updatedProperties[idx].monthlyIncome
               : updatedProperties[idx].monthlyIncome + actualRentGain;
 
+            // Item 15: extensions add internal sqft (and a touch of plot sqft).
+            // Only credited on a non-zero outcome (botched works produce no usable space).
+            const sqftAdded = (renovation.type as any).sqftAdded as number | undefined;
+            const sqftUpdate = sqftAdded && valueMult > 0
+              ? {
+                  internalSqft: (updatedProperties[idx].internalSqft || 0) + sqftAdded,
+                  plotSqft: updatedProperties[idx].plotSqft || 0, // plot unchanged for extensions; conservatories use existing plot
+                }
+              : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
@@ -1757,6 +1767,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 [renovation.type.id]: prev.monthsPlayed,
                 ...(renovation.type.category === 'conversion' ? { __lastConversion: prev.monthsPlayed } : {}),
               },
+              ...sqftUpdate,
               ...subtypeUpdate,
               ...subtypeUnitsUpdate,
               ...conditionUpdate,
