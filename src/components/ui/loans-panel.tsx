@@ -242,8 +242,3 @@ function LoanRow({ loan, onSettle }: { loan: any; onSettle: (amt?: number) => vo
     </div>
   );
 }
-        )}
-      </CardContent>
-    </Card>
-  );
-}
