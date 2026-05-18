@@ -238,7 +238,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 500,
-    baseApprovalProb: 0.78,
+    baseApprovalProb: 0.82,
   },
   {
     id: "convert_flats",
