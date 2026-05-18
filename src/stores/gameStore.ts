@@ -3850,6 +3850,14 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ isPaused: !!paused });
       },
 
+      markEconomicEventsSeen: (ids: string[]) => {
+        if (!ids || ids.length === 0) return;
+        const s = get() as any;
+        const prevSeen: string[] = Array.isArray(s.seenEconomicEventIds) ? s.seenEconomicEventIds : [];
+        const next = Array.from(new Set([...prevSeen, ...ids])).slice(-50);
+        set({ seenEconomicEventIds: next } as any);
+      },
+
     }),
     {
       name: 'propertyTycoonSave',
