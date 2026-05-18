@@ -153,10 +153,18 @@ export function HeroHeader({
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
               {!compact && (
                 <div
-                  className="glass rounded-full px-3 py-1 hidden md:flex items-center text-[11px] text-muted-foreground whitespace-nowrap"
-                  title={`Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
+                  className="glass rounded-full px-3 py-1 hidden md:flex items-center gap-2 text-[11px] text-muted-foreground whitespace-nowrap"
+                  title={`Cash flow £${netMonthlyCashflow.toLocaleString()}/mo · Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
                 >
-                  📈 {(currentMarketRate * 100).toFixed(2)}% · Debt £{totalDebt.toLocaleString()} · M {monthsPlayed}
+                  <span className={cn(netMonthlyCashflow >= 0 ? "text-success" : "text-danger", "font-semibold")}>
+                    {netMonthlyCashflow >= 0 ? "📈" : "📉"} £{netMonthlyCashflow.toLocaleString()}/mo
+                  </span>
+                  <span className="opacity-60">·</span>
+                  <span>{(currentMarketRate * 100).toFixed(2)}%</span>
+                  <span className="opacity-60">·</span>
+                  <span>Debt £{totalDebt.toLocaleString()}</span>
+                  <span className="opacity-60">·</span>
+                  <span>M {monthsPlayed}</span>
                 </div>
               )}
               <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">
