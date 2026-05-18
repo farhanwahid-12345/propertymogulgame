@@ -99,7 +99,7 @@ interface GameActions {
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   // Loans
   applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
-  settleLoan: (loanId: string) => void;
+  settleLoan: (loanId: string, partialAmount?: number) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
   setCash: (newCash: number) => void;
@@ -587,17 +587,24 @@ export const useGameStore = create<GameState & GameActions>()(
         // Risk-weighted missed-rent roll: probability scales with tenant.defaultRisk.
         // defaultRisk is ~1–60; convert to monthly miss probability with a 0.4 dampener.
         const missedRentPropertyIds = new Set<string>();
+        const missedTenantKeys = new Set<string>();
         const newDefaultEvents: TenantEvent[] = [];
         prev.tenants.forEach(t => {
           if (conveyancingPropertyIds.has(t.propertyId)) return;
           const risk = (t.tenant as any).defaultRisk ?? 5;
           const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
           if (Math.random() < monthlyP) {
+            const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+            missedTenantKeys.add(key);
             missedRentPropertyIds.add(t.propertyId);
             const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
             newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
-            if (prop) {
-              showToast("Missed Rent ⚠️", `${t.tenant.name} missed this month's rent at ${prop.name}. Open Operations to see arrears.`, "destructive");
+            // Item 2: throttle toasts to max 1 per ~3 months per tenant.
+            const lastToast = t.lastDefaultToastMonth ?? -999;
+            if (prop && newMonthNumber - lastToast >= 3) {
+              const arrearsAfter = (t.arrearsMonths ?? 0) + 1;
+              const evictHint = arrearsAfter >= 2 ? " — Section 8 eviction now available." : "";
+              showToast("Missed Rent ⚠️", `${t.tenant.name} missed rent at ${prop.name} (${arrearsAfter}mo arrears).${evictHint}`, "destructive");
               flashOps();
             }
           }
@@ -1278,6 +1285,30 @@ export const useGameStore = create<GameState & GameActions>()(
             `${commercialReviewCount} commercial lease${commercialReviewCount === 1 ? '' : 's'} reviewed to market rate (+${(commercialUplift * 100).toFixed(1)}%).`
           );
         }
+
+        // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
+        // months + £ owed. Paying tenants get arrears cleared. Throttle toast
+        // marker is stamped here so it persists across ticks.
+        newTenants = newTenants.map(t => {
+          const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+          if (missedTenantKeys.has(key)) {
+            const rentPennies = (t as any).rentPennies
+              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
+            const lastToast = t.lastDefaultToastMonth ?? -999;
+            const stamped = newMonthNumber - lastToast >= 3 ? newMonthNumber : (t.lastDefaultToastMonth ?? 0);
+            return {
+              ...t,
+              arrearsMonths: (t.arrearsMonths ?? 0) + 1,
+              arrearsPennies: (t.arrearsPennies ?? 0) + rentPennies,
+              lastDefaultToastMonth: stamped,
+            };
+          }
+          // Paying this month — clear arrears.
+          if (!conveyancingPropertyIds.has(t.propertyId) && (t.arrearsMonths ?? 0) > 0) {
+            return { ...t, arrearsMonths: 0, arrearsPennies: 0 };
+          }
+          return t;
+        });
 
         const newProviderRates = fluctuateProviderRates(prev.mortgageProviderRates);
 
@@ -3432,18 +3463,45 @@ export const useGameStore = create<GameState & GameActions>()(
         showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
       },
 
-      settleLoan: (loanId: string) => {
+      settleLoan: (loanId: string, partialAmount?: number) => {
         const prev = get();
         const loan = ((prev as any).loans || []).find((l: any) => l.id === loanId);
         if (!loan) { showToast("Settle Failed", "Loan not found.", "destructive"); return; }
-        const debited = debit(prev, loan.remainingBalance);
-        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(loan.remainingBalance).toLocaleString()}.`, "destructive"); return; }
+        // Item 4: optional partial payment. Clamp to remainingBalance — if equal
+        // or undefined, settle the whole loan.
+        const requested = partialAmount && partialAmount > 0
+          ? Math.min(partialAmount, loan.remainingBalance)
+          : loan.remainingBalance;
+        const debited = debit(prev, requested);
+        if (!debited) { showToast("Insufficient Cash", `Need £${fromPennies(requested).toLocaleString()}.`, "destructive"); return; }
+        const newBalance = loan.remainingBalance - requested;
+        const fullSettle = newBalance <= 0;
+        let updatedLoans;
+        if (fullSettle) {
+          updatedLoans = ((prev as any).loans || []).filter((l: any) => l.id !== loanId);
+        } else {
+          // Recompute monthly payment over remaining months, keeping rate & term.
+          const monthsElapsed = Math.max(0, prev.monthsPlayed - (loan.startMonth || prev.monthsPlayed));
+          const remainingMonths = Math.max(1, (loan.termMonths || 12) - monthsElapsed);
+          const monthlyRate = (loan.interestRate || 0) / 12;
+          const newMonthly = monthlyRate > 0
+            ? Math.round((newBalance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -remainingMonths)))
+            : Math.round(newBalance / remainingMonths);
+          updatedLoans = ((prev as any).loans || []).map((l: any) =>
+            l.id === loanId ? { ...l, remainingBalance: newBalance, monthlyPayment: newMonthly } : l
+          );
+        }
         set({
           cash: debited.cash, overdraftUsed: debited.overdraftUsed,
-          loans: ((prev as any).loans || []).filter((l: any) => l.id !== loanId),
-          creditScore: Math.min(850, prev.creditScore + 3),
+          loans: updatedLoans,
+          creditScore: Math.min(850, prev.creditScore + (fullSettle ? 3 : 1)),
         } as any);
-        showToast("Loan Settled ✓", `Repaid £${fromPennies(loan.remainingBalance).toLocaleString()} early.`);
+        showToast(
+          fullSettle ? "Loan Settled ✓" : "Partial Payment ✓",
+          fullSettle
+            ? `Repaid £${fromPennies(requested).toLocaleString()} early.`
+            : `Paid £${fromPennies(requested).toLocaleString()}; balance now £${fromPennies(newBalance).toLocaleString()}.`,
+        );
       },
 
 

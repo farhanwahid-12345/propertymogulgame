@@ -190,24 +190,55 @@ export function LoansPanel() {
           <p className="text-sm text-muted-foreground">No active loans.</p>
         ) : (
           loans.map((l: any) => (
-            <div key={l.id} className="flex items-center justify-between rounded-md border border-border/50 p-2 text-sm">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">{l.kind}</Badge>
-                  <span className="font-medium">{formatPounds(l.remainingBalance)}</span>
-                  <span className="text-xs text-muted-foreground">@ {(l.interestRate * 100).toFixed(2)}%</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatPounds(l.monthlyPayment)}/mo · {l.termMonths}mo term
-                </div>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => (store as any).settleLoan(l.id)}>
-                Settle
-              </Button>
-            </div>
+            <LoanRow key={l.id} loan={l} onSettle={(amt) => (store as any).settleLoan(l.id, amt)} />
           ))
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function LoanRow({ loan, onSettle }: { loan: any; onSettle: (amt?: number) => void }) {
+  const [payStr, setPayStr] = useState("");
+  const payPounds = Math.max(0, Number(payStr) || 0);
+  const payPennies = toPennies(payPounds);
+  const canPartial = payPennies > 0 && payPennies < loan.remainingBalance;
+  return (
+    <div className="rounded-md border border-border/50 p-2 text-sm space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="capitalize">{loan.kind}</Badge>
+            <span className="font-medium">{formatPounds(loan.remainingBalance)}</span>
+            <span className="text-xs text-muted-foreground">@ {(loan.interestRate * 100).toFixed(2)}%</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {formatPounds(loan.monthlyPayment)}/mo · {loan.termMonths}mo term
+          </div>
+        </div>
+        <Button size="sm" variant="ghost" onClick={() => onSettle()}>
+          Settle in full
+        </Button>
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          placeholder="Pay amount (£)"
+          value={payStr}
+          onChange={(e) => setPayStr(e.target.value)}
+          min={0}
+          step={100}
+          className="h-8 text-xs"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!canPartial}
+          onClick={() => { onSettle(payPennies); setPayStr(""); }}
+        >
+          Pay
+        </Button>
+      </div>
+    </div>
   );
 }
