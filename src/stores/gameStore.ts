@@ -1712,6 +1712,7 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
+          reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
           opsFlashAt: opsFlashAtNew,
         } as any));
       },
