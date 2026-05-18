@@ -1631,6 +1631,7 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
+          opsFlashAt: opsFlashAtNew,
         } as any));
       },
 
@@ -3273,18 +3274,30 @@ export const useGameStore = create<GameState & GameActions>()(
 
       handlePortfolioMortgage: (selectedPropertyIds, loanAmount, providerId, termYears, mortgageType, fixedTermYears = 0) => {
         const prev = get();
-        if (prev.mortgages.some(m => m.collateralPropertyIds?.some(id => selectedPropertyIds.includes(id)))) {
-          return { ok: false, reason: "Properties already secured under a portfolio mortgage." };
-        }
+        // Item 6: instead of rejecting properties already inside another
+        // portfolio facility, settle that facility and roll them into the new
+        // one. Collect any overlapping portfolio mortgages now so we can
+        // add their balances to the settlement total and drop them from the
+        // surviving mortgages list further down.
+        const overlappingPortfolioMortgages = prev.mortgages.filter(m =>
+          m.collateralPropertyIds && m.collateralPropertyIds.some(id => selectedPropertyIds.includes(id))
+        );
+        const overlappingPortfolioIds = new Set(overlappingPortfolioMortgages.map(m => m.id));
         const selectedProps = prev.ownedProperties.filter(p => selectedPropertyIds.includes(p.id));
         const totalValue = selectedProps.reduce((s, p) => s + p.value, 0);
         const totalRent = selectedProps.reduce((s, p) => s + p.monthlyIncome, 0);
-        const totalCurrentMortgages = prev.mortgages.filter(m => selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.remainingBalance, 0);
+        const singleMortgageBalances = prev.mortgages
+          .filter(m => selectedPropertyIds.includes(m.propertyId) && !overlappingPortfolioIds.has(m.id))
+          .reduce((s, m) => s + m.remainingBalance, 0);
+        const overlappingPortfolioBalance = overlappingPortfolioMortgages.reduce((s, m) => s + m.remainingBalance, 0);
+        const totalCurrentMortgages = singleMortgageBalances + overlappingPortfolioBalance;
 
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
         const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
-        const existingPayments = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId)).reduce((s, m) => s + m.monthlyPayment, 0);
+        const existingPayments = prev.mortgages
+          .filter(m => !selectedPropertyIds.includes(m.propertyId) && !overlappingPortfolioIds.has(m.id))
+          .reduce((s, m) => s + m.monthlyPayment, 0);
         const otherIncome = prev.ownedProperties.filter(p => !selectedPropertyIds.includes(p.id)).reduce((t, p) => t + p.monthlyIncome, 0);
 
         let adjustedMaxLTV = provider.maxLTV;
@@ -3316,7 +3329,9 @@ export const useGameStore = create<GameState & GameActions>()(
           fixedTermYears: fixedTermYears > 0 ? fixedTermYears : undefined,
           fixedRate: fixedTermYears > 0 ? eligibility.adjustedRate : undefined,
         };
-        const remainingMortgages = prev.mortgages.filter(m => !selectedPropertyIds.includes(m.propertyId));
+        const remainingMortgages = prev.mortgages.filter(m =>
+          !selectedPropertyIds.includes(m.propertyId) && !overlappingPortfolioIds.has(m.id)
+        );
         const cashDelta = loanAmount - totalCurrentMortgages;
         let pmCashUpdate: { cash: number; overdraftUsed: number };
         if (cashDelta >= 0) {
@@ -3330,7 +3345,10 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         set({ cash: pmCashUpdate.cash, overdraftUsed: pmCashUpdate.overdraftUsed, mortgages: [...remainingMortgages, portfolioMortgage] });
         const cashOut = Math.max(0, cashDelta);
-        showToast("Portfolio mortgage secured 🏦", `Settled £${fromPennies(totalCurrentMortgages).toLocaleString()} of existing debt · £${fromPennies(cashOut).toLocaleString()} cash released.`);
+        const rolloverNote = overlappingPortfolioMortgages.length > 0
+          ? ` (rolled over ${overlappingPortfolioMortgages.length} existing portfolio facility)`
+          : '';
+        showToast("Portfolio mortgage secured 🏦", `Settled £${fromPennies(totalCurrentMortgages).toLocaleString()} of existing debt · £${fromPennies(cashOut).toLocaleString()} cash released${rolloverNote}.`);
         return { ok: true };
       },
 

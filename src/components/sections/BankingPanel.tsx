@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
 import { MortgageManagement } from "@/components/ui/mortgage-management";
 import { CreditOverdraft } from "@/components/ui/credit-overdraft";
@@ -74,6 +74,7 @@ function InlineDialogButton({
   summary,
   title,
   attention = false,
+  flash = false,
   children,
 }: {
   id?: string;
@@ -81,6 +82,7 @@ function InlineDialogButton({
   summary: string;
   title: string;
   attention?: boolean;
+  flash?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -91,7 +93,7 @@ function InlineDialogButton({
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className={`h-8 text-xs px-2.5 gap-2 bg-white/[0.04] border-white/10 ${attention ? 'ops-attention' : ''}`}
+        className={`h-8 text-xs px-2.5 gap-2 bg-white/[0.04] border-white/10 ${attention ? 'ops-attention' : ''} ${flash && !attention ? 'ops-flash' : ''}`}
       >
         <span>{label}</span>
         <span className={attention ? 'text-destructive-foreground text-[10px] font-semibold' : 'text-muted-foreground text-[10px]'}>
@@ -128,12 +130,26 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
     : attention
       ? `⚠ ${concernCount} concern${concernCount > 1 ? 's' : ''}`
       : `${opsActive} active`;
+  // Item 3: visual flash whenever opsFlashAt bumps (conveyancing complete,
+  // planning decision, renovation complete, missed rent, damage, chain collapse).
+  const opsFlashAt = (gameState as any).opsFlashAt || 0;
+  const seenRef = useRef<number>(opsFlashAt);
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (opsFlashAt > seenRef.current) {
+      seenRef.current = opsFlashAt;
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 4200);
+      return () => clearTimeout(t);
+    }
+  }, [opsFlashAt]);
   return (
     <InlineDialogButton
       id="section-ops"
       label="🔨 Operations"
       summary={summary}
       attention={attention}
+      flash={flash}
       title="Operations"
     >
       <OperationsCenter
