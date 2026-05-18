@@ -774,6 +774,25 @@ export function RenovationDialog({
                   £{(propertyValue + scaledValue(selectedRenovation)).toLocaleString()}
                 </span>
               </div>
+              {selectedRenovation.sqftAdded ? (
+                <div>
+                  <span className="text-muted-foreground">Floor area:</span>
+                  <br />
+                  <span className="font-semibold text-success">
+                    +{selectedRenovation.sqftAdded} sqft
+                    {internalSqft ? ` → ${(internalSqft + selectedRenovation.sqftAdded).toLocaleString()} sqft` : ''}
+                  </span>
+                </div>
+              ) : null}
+              {isFlats(selectedRenovation) || isHmo(selectedRenovation) ? (
+                <div>
+                  <span className="text-muted-foreground">Units:</span>
+                  <br />
+                  <span className="font-semibold text-success">
+                    {previewUnits(selectedRenovation)} {isFlats(selectedRenovation) ? 'flats' : 'rooms'}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
