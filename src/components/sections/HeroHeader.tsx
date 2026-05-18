@@ -68,6 +68,7 @@ export function HeroHeader({
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
   const reputation = useGameStore((s) => (s as any).landlordReputation ?? 50);
+  const reputationLog = useGameStore((s) => ((s as any).reputationLog || []) as Array<{ id: string; month: number; reason: string; delta: number; category: string }>);
   const [compact, setCompact] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
