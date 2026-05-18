@@ -1571,7 +1571,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // Final bankruptcy gate: post-forced-sale net worth still negative
-        if (!isBankrupt && netWorthFinal < 0 && updatedOwnedProperties.length === 0 && cashEffective < 0) {
+        if (!isBankrupt && netWorthFinal < 0 && updatedOwnedProperties.length === 0 && exhausted) {
           isBankrupt = true;
         }
         if (isBankrupt && !prev.isBankrupt) {
