@@ -1892,6 +1892,7 @@ export const useGameStore = create<GameState & GameActions>()(
           business: driftLoanSpread(prev.currentLoanRates.business, LOAN_PRODUCTS.business.spreadMin, LOAN_PRODUCTS.business.spreadMax),
         };
 
+        const renovationsCompletedThisTick = completedRenovations.length > 0;
         set(s => ({
           ownedProperties: updatedProperties,
           renovations: activeRenovations,
@@ -1902,7 +1903,12 @@ export const useGameStore = create<GameState & GameActions>()(
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
-        }));
+          // Item 3: flash Operations button when a renovation finishes or a
+          // damage concern lands.
+          opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
+            ? Date.now()
+            : (s as any).opsFlashAt || 0,
+        } as any));
 
         // Toast AFTER state commit — guarantees the matching concern is in the feed
         // before the user sees the notification.
