@@ -72,6 +72,8 @@ interface PropertyCardProps {
   cancelEviction?: (propertyId: string, slotIndex?: number) => void;
   pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour'; effectiveMonth: number; servedMonth: number };
   rentArrearsCount?: number;
+  /** Item 2: total £ in arrears across slots (pennies). Used for the arrears pill. */
+  arrearsPenniesTotal?: number;
   /** Tenant satisfaction passed for negotiation acceptance probability. */
   applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number, slotIndex?: number) => void;
   /** Per-slot tenant data for HMOs / converted flats. When set, single-tenant block is replaced with multi-unit panel. */
@@ -151,6 +153,7 @@ export const PropertyCard = memo(function PropertyCard({
   cancelEviction,
   pendingEviction,
   rentArrearsCount = 0,
+  arrearsPenniesTotal = 0,
   applyRentIncrease,
   multiUnitSlots,
 }: PropertyCardProps) {
@@ -274,7 +277,7 @@ export const PropertyCard = memo(function PropertyCard({
         </div>
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
         {/* Sqft + concern chips row */}
-        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant) && (
+        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {property.internalSqft && (
               <span className="text-[10px] text-muted-foreground">
@@ -301,6 +304,15 @@ export const PropertyCard = memo(function PropertyCard({
             {activeConcernCount > 0 && (
               <Badge variant="outline" className="text-[10px] border-red-400/40 text-red-400">
                 🛠️ {activeConcernCount} concern{activeConcernCount > 1 ? 's' : ''}
+              </Badge>
+            )}
+            {rentArrearsCount > 0 && (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10"
+                title={rentArrearsCount >= 2 ? 'Section 8 eviction available' : 'Tenant has missed rent'}
+              >
+                💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
               </Badge>
             )}
           </div>
