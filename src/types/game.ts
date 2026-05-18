@@ -182,6 +182,12 @@ export interface PropertyTenant {
   lastWalkoutWarningMonth?: number;
   /** Commercial leases only — monthsPlayed of the most recent triennial rent review. */
   lastRentReviewMonth?: number;
+  /** Item 2: months of unpaid rent owed by this tenant. Increments on miss, resets on payment. */
+  arrearsMonths?: number;
+  /** Item 2: total cumulative rent owed (pennies). */
+  arrearsPennies?: number;
+  /** Item 2: monthsPlayed snapshot of the last missed-rent toast for this tenant — throttles spam to ~1 per 2-3 months. */
+  lastDefaultToastMonth?: number;
 }
 
 export interface PendingEviction {
