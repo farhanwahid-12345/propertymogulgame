@@ -172,6 +172,7 @@ function createInitialState(): GameState {
     tenantEvents: [],
     taxRecords: [],
     totalTaxPaid: 0,
+    unusedLosses: 0,
     tenantConcerns: [],
     pendingEvictions: [],
     propertyLocks: [],
@@ -1334,30 +1335,56 @@ export const useGameStore = create<GameState & GameActions>()(
         let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
         let newTaxRecords = [...prev.taxRecords];
         let newTotalTaxPaid = prev.totalTaxPaid;
+        let newUnusedLosses = (prev as any).unusedLosses ?? 0;
 
         if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
           if (prev.entityType === 'sole_trader') {
             // Sole trader: rental income MINUS deductible expenses (NOT mortgage
             // interest — Section 24 turns interest into a 20% tax credit only).
+            // Item 5: offset taxable rental profit with brought-forward losses.
+            const grossTaxable = Math.max(0, accumulatedGrossRent - accumulatedDeductibleExpenses);
+            const offsetUsed = Math.min(newUnusedLosses, grossTaxable);
+            const adjustedRentalIncome = accumulatedGrossRent - offsetUsed;
             const { effectiveTax, section24Credit, tax } = calculateIncomeTax(
-              accumulatedGrossRent,
+              adjustedRentalIncome,
               accumulatedMortgageInterest,
               accumulatedDeductibleExpenses,
             );
             taxPaid = effectiveTax;
-            // Surfaced via Activity feed (taxRecords) — toast removed because it
-            // was overlapping open dialogs (Renovation, Tenant, etc.).
-            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Year ${currentTaxYear} income tax — £${fromPennies(taxPaid).toLocaleString()} (gross £${fromPennies(tax).toLocaleString()} − §24 credit £${fromPennies(section24Credit).toLocaleString()})` });
+            newUnusedLosses -= offsetUsed;
+            // If gross profit was negative (rare for sole traders), accumulate as new loss.
+            const grossLoss = Math.max(0, accumulatedDeductibleExpenses - accumulatedGrossRent);
+            if (grossLoss > 0) newUnusedLosses += grossLoss;
+            const lossNote = offsetUsed > 0
+              ? ` (loss b/f £${fromPennies(offsetUsed).toLocaleString()} used)`
+              : grossLoss > 0
+                ? ` (loss £${fromPennies(grossLoss).toLocaleString()} carried forward)`
+                : '';
+            newTaxRecords.push({ month: newMonthNumber, type: 'income_tax', amount: taxPaid, description: `Year ${currentTaxYear} income tax — £${fromPennies(taxPaid).toLocaleString()} (gross £${fromPennies(tax).toLocaleString()} − §24 credit £${fromPennies(section24Credit).toLocaleString()})${lossNote}` });
           } else {
-            // LTD: mortgage interest IS deductible — pass it through so it isn't
-            // double-counted (cash already reflects mortgage *payments*, not just interest).
-            taxPaid = calculateCorporationTax(
-              accumulatedGrossRent,
-              accumulatedMortgageInterest,
-              accumulatedDeductibleExpenses,
-            );
-            // Surfaced via Activity feed (taxRecords) — toast removed.
-            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Year ${currentTaxYear} corporation tax — £${fromPennies(taxPaid).toLocaleString()} on profit £${fromPennies(Math.max(0, accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses)).toLocaleString()}` });
+            // LTD: mortgage interest IS deductible. Item 5: pre-tax profit can
+            // be negative → carry losses forward; positive → offset losses first.
+            const preTaxProfit = accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses;
+            let offsetUsed = 0;
+            if (preTaxProfit > 0) {
+              offsetUsed = Math.min(newUnusedLosses, preTaxProfit);
+              newUnusedLosses -= offsetUsed;
+              taxPaid = calculateCorporationTax(
+                accumulatedGrossRent - offsetUsed,
+                accumulatedMortgageInterest,
+                accumulatedDeductibleExpenses,
+              );
+            } else if (preTaxProfit < 0) {
+              newUnusedLosses += -preTaxProfit;
+              taxPaid = 0;
+            }
+            const taxableAfter = Math.max(0, preTaxProfit - offsetUsed);
+            const lossNote = offsetUsed > 0
+              ? ` (loss b/f £${fromPennies(offsetUsed).toLocaleString()} used)`
+              : preTaxProfit < 0
+                ? ` (loss £${fromPennies(-preTaxProfit).toLocaleString()} carried forward)`
+                : '';
+            newTaxRecords.push({ month: newMonthNumber, type: 'corporation_tax', amount: taxPaid, description: `Year ${currentTaxYear} corporation tax — £${fromPennies(taxPaid).toLocaleString()} on profit £${fromPennies(taxableAfter).toLocaleString()}${lossNote}` });
           }
 
           newTotalTaxPaid += taxPaid;
@@ -1648,6 +1675,7 @@ export const useGameStore = create<GameState & GameActions>()(
           propertyListings: newPropertyListings,
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
+          unusedLosses: newUnusedLosses,
           // Merge with current store state — preserves any concerns added
           // by an interleaved processMarketUpdate (e.g. damage events).
           tenantConcerns: mergeConcernsById(s.tenantConcerns, updatedConcerns),
@@ -1741,6 +1769,16 @@ export const useGameStore = create<GameState & GameActions>()(
               ? updatedProperties[idx].monthlyIncome
               : updatedProperties[idx].monthlyIncome + actualRentGain;
 
+            // Item 15: extensions add internal sqft (and a touch of plot sqft).
+            // Only credited on a non-zero outcome (botched works produce no usable space).
+            const sqftAdded = (renovation.type as any).sqftAdded as number | undefined;
+            const sqftUpdate = sqftAdded && valueMult > 0
+              ? {
+                  internalSqft: (updatedProperties[idx].internalSqft || 0) + sqftAdded,
+                  plotSqft: updatedProperties[idx].plotSqft || 0, // plot unchanged for extensions; conservatories use existing plot
+                }
+              : {};
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
@@ -1757,6 +1795,7 @@ export const useGameStore = create<GameState & GameActions>()(
                 [renovation.type.id]: prev.monthsPlayed,
                 ...(renovation.type.category === 'conversion' ? { __lastConversion: prev.monthsPlayed } : {}),
               },
+              ...sqftUpdate,
               ...subtypeUpdate,
               ...subtypeUnitsUpdate,
               ...conditionUpdate,

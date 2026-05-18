@@ -48,16 +48,18 @@ export function computePlanningApprovalProbability(
   const ceiling = getCeilingPrice({ neighborhood: inputs.neighborhood, type: inputs.propertyType });
   const modifiers: ApprovalProbabilityModifier[] = [];
 
-  // Over-development penalty — value already pushing area ceiling
+  // Over-development penalty — value already pushing area ceiling.
+  // Item 14: halved from -0.10 → -0.05.
   if (ceiling > 0 && inputs.propertyValuePounds > 0.7 * ceiling) {
-    modifiers.push({ label: 'Over-developed for area', delta: -0.10 });
+    modifiers.push({ label: 'Over-developed for area', delta: -0.05 });
   }
 
-  // Conservative area / luxury type — stricter on conversions & extensions
+  // Conservative area / luxury type — stricter on conversions & extensions.
+  // Item 14: halved from -0.10 → -0.05.
   const conservative =
     inputs.propertyType === 'luxury' || CONSERVATIVE_AREAS.has(inputs.neighborhood);
   if (conservative && (inputs.renovationCategory === 'conversion' || inputs.renovationCategory === 'extension')) {
-    modifiers.push({ label: 'Conservative neighborhood', delta: -0.10 });
+    modifiers.push({ label: 'Conservative neighborhood', delta: -0.05 });
   }
 
   // Track-record adjustment, capped ±10%

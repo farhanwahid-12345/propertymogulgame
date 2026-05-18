@@ -47,6 +47,8 @@ export interface RenovationType {
   planningFee?: number;
   /** Base approval probability before modifiers (0..1). */
   baseApprovalProb?: number;
+  /** Item 15: sqft added to internalSqft when the renovation completes (extensions only). */
+  sqftAdded?: number;
 }
 
 interface RenovationDialogProps {
@@ -148,7 +150,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     rentIncrease: 425,
     valueIncrease: 33000,
     duration: 90,
-    description: "Convert loft space into additional bedroom",
+    description: "Convert loft space into additional bedroom (+200 sqft).",
     icon: Plus,
     category: "extension",
     minInternalSqft: 700,
@@ -157,7 +159,8 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.85,
+    baseApprovalProb: 0.88,
+    sqftAdded: 200,
   },
   {
     id: "rear_extension",
@@ -166,7 +169,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     rentIncrease: 550,
     valueIncrease: 46000,
     duration: 120,
-    description: "Add extra room to rear of property",
+    description: "Add an extra room to the rear of the property (+250 sqft).",
     icon: Plus,
     category: "extension",
     minPlotSqft: 2200,
@@ -175,7 +178,28 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 250,
-    baseApprovalProb: 0.80,
+    baseApprovalProb: 0.82,
+    sqftAdded: 250,
+  },
+  {
+    id: "double_height_extension",
+    name: "Double-Height Extension",
+    cost: 45000,
+    rentIncrease: 1045,
+    valueIncrease: 87400,
+    duration: 180,
+    description: "Two-story rear extension — adds ground + first-floor rooms (+475 sqft).",
+    icon: Plus,
+    category: "extension",
+    minPlotSqft: 2400,
+    minInternalSqft: 850,
+    allowedTypes: ["residential", "luxury"],
+    requiresVacant: true,
+    requiresPlanning: true,
+    planningWaitMonths: 3,
+    planningFee: 400,
+    baseApprovalProb: 0.72,
+    sqftAdded: 475,
   },
   {
     id: "conservatory",
@@ -184,7 +208,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     rentIncrease: 300,
     valueIncrease: 23000,
     duration: 60,
-    description: "Glass conservatory extension",
+    description: "Glass conservatory extension (+120 sqft).",
     icon: Plus,
     category: "extension",
     minPlotSqft: 1800,
@@ -194,6 +218,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     planningWaitMonths: 2,
     planningFee: 250,
     baseApprovalProb: 0.92,
+    sqftAdded: 120,
   },
   {
     id: "convert_hmo",
@@ -213,7 +238,7 @@ const RENOVATION_OPTIONS: RenovationType[] = [
     requiresPlanning: true,
     planningWaitMonths: 2,
     planningFee: 500,
-    baseApprovalProb: 0.78,
+    baseApprovalProb: 0.82,
   },
   {
     id: "convert_flats",
@@ -749,6 +774,25 @@ export function RenovationDialog({
                   £{(propertyValue + scaledValue(selectedRenovation)).toLocaleString()}
                 </span>
               </div>
+              {selectedRenovation.sqftAdded ? (
+                <div>
+                  <span className="text-muted-foreground">Floor area:</span>
+                  <br />
+                  <span className="font-semibold text-success">
+                    +{selectedRenovation.sqftAdded} sqft
+                    {internalSqft ? ` → ${(internalSqft + selectedRenovation.sqftAdded).toLocaleString()} sqft` : ''}
+                  </span>
+                </div>
+              ) : null}
+              {isFlats(selectedRenovation) || isHmo(selectedRenovation) ? (
+                <div>
+                  <span className="text-muted-foreground">Units:</span>
+                  <br />
+                  <span className="font-semibold text-success">
+                    {previewUnits(selectedRenovation)} {isFlats(selectedRenovation) ? 'flats' : 'rooms'}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
