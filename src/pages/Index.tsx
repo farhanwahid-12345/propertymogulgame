@@ -115,7 +115,7 @@ const Index = () => {
         netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
       />
 
-      <div className="container mx-auto px-4 py-6 space-y-5 pb-24 md:pb-6">
+      <div className="container mx-auto px-4 py-4 space-y-3 pb-24 md:pb-6">
 
         <GameStats
           cash={gameState.cash}

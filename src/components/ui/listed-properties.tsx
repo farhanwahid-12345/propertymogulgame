@@ -1,11 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PropertyOffers } from "@/components/ui/property-offers";
 import { useState } from "react";
-import { Clock, TrendingUp, Target, X, Ban } from "lucide-react";
+import { Clock, Target, X, Ban } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +46,7 @@ interface PropertyListing {
   listingDate: number;
   isAuction: boolean;
   daysUntilSale: number;
+  askingPrice?: number;
   offers?: PropertyOffer[];
   lastOfferCheck?: number;
   autoAcceptThreshold?: number;
@@ -64,173 +65,143 @@ export function ListedProperties({ propertyListings, ownedProperties, onAcceptOf
   const [editingThreshold, setEditingThreshold] = useState<string | null>(null);
   const [thresholdValue, setThresholdValue] = useState<string>("");
 
-  if (propertyListings.length === 0) {
-    return null;
-  }
+  if (propertyListings.length === 0) return null;
 
   const handleSetThreshold = (propertyId: string) => {
     const value = parseFloat(thresholdValue);
-    if (!isNaN(value) && value > 0) {
-      onSetAutoAcceptThreshold(propertyId, value);
-    } else {
-      onSetAutoAcceptThreshold(propertyId, undefined);
-    }
+    onSetAutoAcceptThreshold(propertyId, !isNaN(value) && value > 0 ? value : undefined);
     setEditingThreshold(null);
     setThresholdValue("");
   };
 
-  const handleRemoveThreshold = (propertyId: string) => {
-    onSetAutoAcceptThreshold(propertyId, undefined);
-  };
-
   return (
     <>
-      <Card className="bg-white/95 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl flex items-center gap-2">
-            <TrendingUp className="h-6 w-6" />
-            Properties Listed for Sale
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {propertyListings.map((listing) => {
-              const property = ownedProperties.find(p => p.id === listing.propertyId);
-              if (!property) return null;
+      <div className="space-y-2">
+        {propertyListings.map((listing) => {
+          const property = ownedProperties.find(p => p.id === listing.propertyId);
+          if (!property) return null;
 
-              const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
-              const offerCount = listing.offers?.length || 0;
-              const isEditingThis = editingThreshold === listing.propertyId;
+          const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
+          const offerCount = listing.offers?.length || 0;
+          const isEditingThis = editingThreshold === listing.propertyId;
+          const asking = listing.askingPrice || property.value;
+          const market = property.value;
+          const deltaPct = market > 0 ? ((asking - market) / market) * 100 : 0;
+          const deltaTone =
+            deltaPct > 10 ? "text-danger border-danger/30"
+            : deltaPct > 3 ? "text-yellow-400 border-yellow-400/30"
+            : deltaPct < -3 ? "text-success border-success/30"
+            : "text-muted-foreground border-white/15";
+          const deltaLabel =
+            Math.abs(deltaPct) < 0.5 ? "At market"
+            : `${deltaPct > 0 ? "+" : ""}${deltaPct.toFixed(1)}% ${deltaPct > 0 ? "above" : "below"} market`;
 
-              return (
-                <Card key={listing.propertyId} className="border-2">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-lg">{property.name}</h4>
-                        <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          <Badge variant="outline">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {listing.isAuction ? `${listing.daysUntilSale} days to auction` : `${daysOnMarket} days on market`}
-                          </Badge>
-                          {offerCount > 0 && (
-                            <Badge variant="default">
-                              {offerCount} offer{offerCount > 1 ? 's' : ''}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Auto-Accept Threshold Section */}
-                        <div className="mt-3 pt-3 border-t">
-                          {listing.autoAcceptThreshold ? (
-                            <div className="flex items-center gap-2">
-                              <Target className="h-4 w-4 text-green-600" />
-                              <span className="text-sm font-medium text-green-600">
-                                Auto-accept at £{listing.autoAcceptThreshold.toLocaleString()}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0"
-                                onClick={() => handleRemoveThreshold(listing.propertyId)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : isEditingThis ? (
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs">Auto-accept offers at:</Label>
-                              <Input
-                                type="number"
-                                placeholder="Enter amount"
-                                value={thresholdValue}
-                                onChange={(e) => setThresholdValue(e.target.value)}
-                                className="h-8 w-32"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleSetThreshold(listing.propertyId)}
-                                className="h-8"
-                              >
-                                Set
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setEditingThreshold(null);
-                                  setThresholdValue("");
-                                }}
-                                className="h-8"
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingThreshold(listing.propertyId);
-                                setThresholdValue(property.value.toString());
-                              }}
-                              className="h-8"
-                            >
-                              <Target className="h-3 w-3 mr-1" />
-                              Set Auto-Accept
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right space-y-2">
-                        <div>
-                          <div className="text-sm text-muted-foreground">Listed Price</div>
-                          <div className="text-xl font-bold">£{property.value.toLocaleString()}</div>
-                        </div>
-                        {offerCount > 0 && (
-                          <Button 
-                            size="sm"
-                            onClick={() => setSelectedProperty({ property, listing })}
-                            className="w-full"
-                          >
-                            View {offerCount} Offer{offerCount > 1 ? 's' : ''}
-                          </Button>
-                        )}
-                        {onWithdrawListing && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline" className="w-full">
-                                <Ban className="h-3 w-3 mr-1" />
-                                Withdraw
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Withdraw {property.name} from sale?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Cancels the listing and drops all pending offers. Solicitor + estate-agent fees of <strong>£750</strong> apply
-                                  (or <strong>£1,500</strong> if a buyer is already in conveyancing — counts as a chain collapse).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep listed</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onWithdrawListing(listing.propertyId)}>
-                                  Withdraw
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+          return (
+            <div key={listing.propertyId} className="glass p-3 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <h4 className="font-semibold text-foreground truncate">{property.name}</h4>
+                  <span className="text-xs text-muted-foreground truncate">{property.neighborhood}</span>
+                </div>
+                <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] h-5 border-white/15 text-muted-foreground">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {listing.isAuction ? `${listing.daysUntilSale}d to auction` : `${daysOnMarket}d listed`}
+                  </Badge>
+                  {offerCount > 0 && (
+                    <Badge className="text-[10px] h-5 bg-primary/20 text-primary border-0">
+                      {offerCount} offer{offerCount > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className={cn("text-[10px] h-5", deltaTone)}>
+                    {deltaLabel}
+                  </Badge>
+                  {listing.autoAcceptThreshold ? (
+                    <Badge variant="outline" className="text-[10px] h-5 text-success border-success/30">
+                      <Target className="h-3 w-3 mr-1" />
+                      Auto £{listing.autoAcceptThreshold.toLocaleString()}
+                      <button
+                        onClick={() => onSetAutoAcceptThreshold(listing.propertyId, undefined)}
+                        className="ml-1 hover:text-foreground"
+                        aria-label="Remove auto-accept"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ) : !isEditingThis ? (
+                    <button
+                      onClick={() => {
+                        setEditingThreshold(listing.propertyId);
+                        setThresholdValue(asking.toString());
+                      }}
+                      className="text-[10px] h-5 px-1.5 rounded border border-white/15 text-muted-foreground hover:text-foreground hover:border-white/30 inline-flex items-center"
+                    >
+                      <Target className="h-3 w-3 mr-1" />
+                      Set auto-accept
+                    </button>
+                  ) : null}
+                </div>
+                {isEditingThis && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Label className="text-xs text-muted-foreground">Auto-accept at £</Label>
+                    <Input
+                      type="number"
+                      value={thresholdValue}
+                      onChange={(e) => setThresholdValue(e.target.value)}
+                      className="h-7 w-28 text-xs"
+                    />
+                    <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleSetThreshold(listing.propertyId)}>Set</Button>
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingThreshold(null); setThresholdValue(""); }}>Cancel</Button>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Listed</div>
+                  <div className="text-lg font-bold text-foreground leading-tight">£{asking.toLocaleString()}</div>
+                  <div className="text-[10px] text-muted-foreground">Market £{market.toLocaleString()}</div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {offerCount > 0 && (
+                    <Button
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setSelectedProperty({ property, listing })}
+                    >
+                      View {offerCount}
+                    </Button>
+                  )}
+                  {onWithdrawListing && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs">
+                          <Ban className="h-3 w-3 mr-1" />
+                          Withdraw
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Withdraw {property.name} from sale?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Cancels the listing and drops all pending offers. Solicitor + estate-agent fees of <strong>£750</strong> apply
+                            (or <strong>£1,500</strong> if a buyer is already in conveyancing — counts as a chain collapse).
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep listed</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => onWithdrawListing(listing.propertyId)}>
+                            Withdraw
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {selectedProperty && (
         <PropertyOffers

@@ -1852,19 +1852,46 @@ export const useGameStore = create<GameState & GameActions>()(
           let lastCheck = listing.lastOfferCheck || listing.listingDate;
 
           if (!listing.isAuction && property && daysSinceLastCheck >= 3) {
-            const numNew = Math.random() > 0.5 ? 2 : 1;
+            // Asking-vs-market ratio drives buyer interest and offer band.
+            // < market = busy, lots of competitive offers.
+            // 5–15% over market = slow trickle, lower offers.
+            // > 15% over market = stalling, sparse + lowball offers.
+            const asking = listing.askingPrice || property.value;
+            const market = property.value;
+            const askRatio = asking / Math.max(1, market);
+
+            let numNew: number;
+            let bandLow: number;  // % of asking
+            let bandHigh: number;
+            let bidWarChance: number;
+            if (askRatio <= 1.0) {
+              numNew = Math.random() > 0.4 ? 2 : 1;
+              bandLow = 0.92; bandHigh = 1.02; bidWarChance = 0.12;
+            } else if (askRatio <= 1.15) {
+              numNew = Math.random() > 0.6 ? 2 : 1;
+              bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.04;
+            } else {
+              // Stalling territory: usually 0, occasional lowball.
+              numNew = Math.random() > 0.75 ? 1 : 0;
+              bandLow = 0.72; bandHigh = 0.84; bidWarChance = 0;
+            }
+            // Time pressure: after ~30 days, buyers sense desperation and shave a bit.
+            const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.003));
+
             const buyerNames = [
               "Mr & Mrs Johnson", "Sarah Matthews", "David Chen", "Emma Wilson",
               "The Thompson Family", "Investment Properties Ltd", "Michael Brown",
               "Liverpool Capital Group", "First Time Buyer", "Retirement Home Buyer"
             ];
             for (let i = 0; i < numNew; i++) {
-              const priceMultiplier = 0.85 + (Math.random() * 0.2);
-              const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.002));
+              const isBidWar = Math.random() < bidWarChance;
+              const pct = isBidWar
+                ? 1.03 + Math.random() * 0.08  // 1.03× – 1.11× of asking
+                : bandLow + Math.random() * (bandHigh - bandLow);
               const offer: PropertyOffer = {
                 id: `offer-${Date.now()}-${i}`,
                 buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
-                amount: Math.floor(property.value * priceMultiplier * timeAdj),
+                amount: Math.floor(asking * pct * timeAdj),
                 daysOnMarket, isChainFree: Math.random() > 0.6,
                 mortgageApproved: Math.random() > 0.3, timestamp: currentTime,
                 status: 'pending', negotiationRound: 0,
