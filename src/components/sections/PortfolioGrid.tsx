@@ -30,43 +30,40 @@ export function PortfolioGrid({
   }
 
   return (
-    <div className="glass p-5 animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-          Your Empire 🏰
-          <Badge variant="secondary" className="text-xs">
-            {gameState.ownedProperties.length}
-            {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
-          </Badge>
-        </h2>
-        {portfolioLTV > 0 && (
-          <Badge
-            variant="outline"
-            className={
-              portfolioLTV > 80
-                ? "text-danger border-danger/30"
-                : portfolioLTV > 60
-                ? "text-yellow-400 border-yellow-400/30"
-                : "text-success border-success/30"
-            }
-          >
-            Portfolio LTV: {portfolioLTV.toFixed(1)}%
-          </Badge>
-        )}
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="glass p-3 text-center">
-          <div className="text-xs text-muted-foreground">Total Value</div>
-          <div className="text-lg font-bold text-foreground">£{totalPortfolioValue.toLocaleString()}</div>
+    <div className="glass p-4 animate-fade-in">
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            Your Empire 🏰
+            <Badge variant="secondary" className="text-xs">
+              {gameState.ownedProperties.length}
+              {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
+            </Badge>
+          </h2>
         </div>
-        <div className="glass p-3 text-center">
-          <div className="text-xs text-muted-foreground">Monthly Income</div>
-          <div className="text-lg font-bold text-success">£{totalPortfolioIncome.toLocaleString()}</div>
-        </div>
-        <div className="glass p-3 text-center">
-          <div className="text-xs text-muted-foreground">Avg Yield</div>
-          <div className="text-lg font-bold text-[hsl(var(--stat-credit))]">{avgYield}%</div>
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-muted-foreground">Value</span>
+          <span className="font-semibold text-foreground">£{totalPortfolioValue.toLocaleString()}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground">Income</span>
+          <span className="font-semibold text-success">£{totalPortfolioIncome.toLocaleString()}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-muted-foreground">Yield</span>
+          <span className="font-semibold text-[hsl(var(--stat-credit))]">{avgYield}%</span>
+          {portfolioLTV > 0 && (
+            <Badge
+              variant="outline"
+              className={
+                portfolioLTV > 80
+                  ? "text-danger border-danger/30 ml-1"
+                  : portfolioLTV > 60
+                  ? "text-yellow-400 border-yellow-400/30 ml-1"
+                  : "text-success border-success/30 ml-1"
+              }
+            >
+              LTV {portfolioLTV.toFixed(1)}%
+            </Badge>
+          )}
         </div>
       </div>
 
