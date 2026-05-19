@@ -1,67 +1,65 @@
-# Property Card & Sales UX Improvements
+## Two improvements: tax warnings & tenant-arrears recovery
 
-Four related polish items from the screenshots. All frontend/presentation work plus a small tweak to how listing prices and AI offers are generated.
+### 1. Tax warning — one month before collection
 
----
+**Problem:** Tax is silently debited every April. Players hit overdraft or arrears without warning.
 
-## 1. Remove "List for Sale" from the property card
+**Approach:** In `gameStore.ts` month-end (`processMonthEnd`), detect "one month before April" (`newMonthNumber % 12 === 2`) and `currentTaxYear > lastTaxYear`. Compute the *projected* tax bill from current accumulators using the same `calculateIncomeTax` / `calculateCorporationTax` helpers in `src/lib/engine/taxation.ts` (no new logic, just call them on the running yearly totals).
 
-**File:** `src/components/ui/property-card.tsx` (~line 682–689)
+Surface the warning in three places:
+- **Toast** ("Tax due next month") with the projected £ amount and current available funds (cash + overdraft headroom).
+- **Notification Centre upcoming-row** — already wired via `buildUpcomingRows` in `src/lib/upcomingEvents.ts`, but extend the row when `monthsAway <= 1` to include the projected amount and a colour-coded "Shortfall £X" badge if cash + overdraft headroom < bill.
+- **HeroHeader chip** — small amber `Tax due 1mo: £X` pill next to the existing net-cashflow chip, only when within the warning window.
 
-- Delete the red `List for Sale` button at the bottom of the owned-property card.
-- Keep `onSell` prop (still used for auction routing elsewhere) but no longer wire it here.
-- Selling is reached via **Bank → Estate Agent → Sell Properties** tab (already exists) and the Auction House. Add a tiny inline hint under the action row: *"Sell via Estate Agent or Auction House"* so users aren't lost.
+If the player can't cover it (`cash + overdraftHeadroom < projected`), the toast CTA links to the Bank tab (mortgages / loans / overdraft increase) so they can pre-emptively raise funds. Reuse `showToast` from `storeHelpers.ts`.
 
-## 2. Listed-Properties panel — contrast, position, and accurate listing price
+Store changes (minimal):
+- Add `projectedTaxPennies?: number` and `projectedTaxStampedMonth?: number` to root state so the warning persists across reloads within the warning month and isn't recomputed every tick.
 
-**File:** `src/components/ui/listed-properties.tsx`, plus listing creation path.
+### 2. Tenant arrears → court / debt-recovery option
 
-Visual:
-- Replace `bg-white/95 backdrop-blur-sm` with the project's `glass` token so it matches the dark theme. Remove the inner white nested `Card`s — use the same `glass p-4` block style as `PortfolioGrid` for each row.
-- Tighten vertical rhythm: drop `CardHeader` padding, shrink title to `text-lg`, remove the redundant outer `Card` wrapper. Goal: each listing row is ~96px instead of ~200px.
-- Render the panel **above** the Empire grid (it already is in `Index.tsx`) but remove the surrounding free space by collapsing the section padding in `CollapsibleSection` when empty isn't the case — verify no large gap between Action-Required and the listing block.
+**Problem:** Arrears just sit. Player can serve Section 8 eviction but can't pursue the debt for cost recovery. And if a tenant resumes paying after a missed month, current logic immediately clears arrears (line 1331 of `gameStore.ts`) — that's wrong; arrears should only clear when the back-rent is also paid.
 
-Pricing accuracy (item 2b):
-- Today the panel shows `property.value` (market value). When a user lists at a higher asking price it isn't stored.
-- Extend the listing record with `askingPricePennies` (set at list time from the user's chosen price, fallback to `value`). Surface it via the store's listing creation action.
-- Display "Listed price: £X" prominently and a smaller "Market value: £Y" below with a Δ% badge (green/amber/red) so the gap is obvious.
+**Two parts:**
 
-## 3. More dynamic sale offers (item 2c, 2d)
+**2a. Fix arrears-clearing bug**
+- In `processMonthEnd` arrears bookkeeping (~line 1316), do **not** clear `arrearsMonths` / `arrearsPennies` just because the tenant paid this month's rent.
+- Add a new field `arrearsPaidThisMonthPennies` (transient, computed) — the tenant pays *current rent + a slice of back-rent* equal to up to 50% of monthly rent until cleared. Only zero out arrears when `arrearsPennies <= 0`.
+- Add an amber "Arrears: £X owed (paying back)" pill state on `property-card.tsx` distinct from the existing red "In arrears" pill.
 
-**File:** `src/components/ui/property-offers.tsx` + store offer-generation path.
+**2b. Send to debt-recovery (court)**
+- New action `sendArrearsToCourt(tenantKey)` on the store. Only available when `arrearsMonths >= 2`.
+- Upfront court filing fee: £325 (`debit` via `storeHelpers`).
+- Creates a `DebtRecoveryCase` record (new type in `types/game.ts`):
+  ```
+  { id, tenantName, propertyId, originalArrearsPennies, filedMonth,
+    status: 'in_court' | 'recovered' | 'unrecoverable',
+    recoveryFeePct: 0.25 }
+  ```
+- Engine resolves 6–12 months later with weighted outcomes:
+  - 55% **recovered**: pay player `originalArrears × (1 − 0.25)` (25% agency fee).
+  - 30% **partial**: 30–70% recovered, same 25% fee on what's collected.
+  - 15% **unrecoverable**: tenant judgment-proof, fee lost.
+- Reputation +1 / credit score +5 on full recovery (small bump).
+- New UI panel slot inside Operations Center: "Debt Recovery" list with status badges and expected resolution month. Reuse existing `glass`/badge primitives.
 
-Today: offers are generated client-side on dialog open from `property.value` with a flat 0.85–1.05 band; the user can never counter, and offers never come back after declining.
+**2c. UX wiring**
+- On `property-card.tsx` arrears pill: when `arrearsMonths >= 2`, add a small "Send to court" link that opens a confirmation `Dialog` showing fee, expected recovery range, and timeline.
+- Operations Center gets a new collapsible section "Debt recovery (N active)".
+- When recovered, fire a toast and push an entry into the activity feed (`ui/activity-feed.tsx` already has `category` enum — add `'debt_recovery'`).
 
-Changes:
-- Move offer generation into the engine (already partially there via `propertyListings.offers`). When the user declines, mark that offer as `declined` and after 1–2 in-game weeks roll a **counter-offer** at a slightly higher price (e.g. +2–4%) with a configurable cap.
-- Introduce variance based on `askingPricePennies` vs `marketValue`:
-  - Asking ≤ market: offers cluster 92–102% of asking, occasional bidding war (>105%).
-  - Asking 5–15% over market: offers cluster 88–98% of asking; lower volume.
-  - Asking >15% over market: stalling — offer count drops sharply, occasional lowball at 75–82%.
-- Add a **Counter** button to each offer in `PropertyOffers` (next to Accept) that opens a small price input. Counter dispatches to the store, marks the offer pending, then resolves after 1 week with accept/reject/new-counter (60/30/10 split, weighted by gap to market).
-- For auctions: widen the random outcome distribution. Today reserve + AI bidding lands close to value. Update `src/lib/engine/auction.ts` AI bid curve to occasionally cap out early (sells at 60–80% of value) and occasionally over-heat (sells at 115–140% of value) to mimic real auction variance.
+### Files to touch
+- `src/stores/gameStore.ts` — projected-tax preview, arrears clearing fix, `sendArrearsToCourt` action, court resolution in month-end.
+- `src/lib/engine/taxation.ts` — export a `projectAnnualTax(state)` helper.
+- `src/lib/upcomingEvents.ts` — include projected tax in upcoming rows when ≤1 month away.
+- `src/types/game.ts` — `DebtRecoveryCase` type, `debtRecoveryCases: []` slice; add `arrearsRepaymentPennies?` field if needed.
+- `src/components/sections/HeroHeader.tsx` — tax-warning chip.
+- `src/components/ui/property-card.tsx` — amber "paying back" arrears pill + "Send to court" link.
+- `src/components/ui/operations-center.tsx` — new debt-recovery section.
+- `src/components/ui/activity-feed.tsx` — new category.
+- `src/components/ui/notification-centre.tsx` — projected-tax row styling.
+- New: `src/components/ui/debt-recovery-dialog.tsx`.
 
-## 4. Tighten Empire dead-space (image 3)
-
-**File:** `src/components/sections/PortfolioGrid.tsx` and `src/pages/Index.tsx`.
-
-- Remove the large `glass p-5` wrapper padding → `p-4`, and drop the 3-stat row's `mb-5` to `mb-3`.
-- Collapse the heading row spacing: `mb-4` → `mb-2`, smaller `h2` (`text-lg`).
-- Move the 3-stat summary (Total Value / Monthly Income / Avg Yield) into a single horizontal strip *above* the heading, removing the second stack of stats that currently doubles up with `GameStats`.
-- In `Index.tsx` reduce `space-y-5` → `space-y-3` for the main container so all sections sit tighter.
-
----
-
-## Technical notes
-
-- New listing field `askingPricePennies` requires a save-migration bump (default to existing `value * 100` for legacy saves).
-- New offer field `status: 'pending' | 'declined' | 'countered'` and `expiresAtMonth` for counter timing.
-- Auction tuning lives in `src/lib/engine/auction.ts`; expose a tunable `AUCTION_VOLATILITY` constant in `src/lib/engine/constants.ts`.
-- All visual changes must use existing semantic tokens (`glass`, `text-foreground`, `text-success`, `text-danger`, etc.). No raw hex.
-- Keep `onSell` prop on `PropertyCard` for backward compatibility; just unused at render. Sell entry point lives in `EstateAgentWindow` already.
-
-## Out of scope
-
-- No backend/store schema changes beyond the two listing fields above.
-- No new dependencies.
-- Reputation, taxation, planning, mortgages — already complete in prior batches.
+### Out of scope
+- No backend changes. No new dependencies. Existing semantic tokens only (no raw hex).
+- Existing eviction / Section 8 flow untouched — debt recovery is a separate financial track and can run in parallel with an eviction.
