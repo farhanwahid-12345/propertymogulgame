@@ -105,6 +105,10 @@ interface PropertyCardProps {
   inPlanningCooldown?: boolean;
   /** True when ANY slot of the property is occupied — used to gate conversions. */
   hasAnyTenant?: boolean;
+  /** True if a debt-recovery case is already in court for this property's tenant. */
+  hasActiveDebtRecovery?: boolean;
+  /** File a county-court claim for back-rent (£325 fee). */
+  onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
 }
 
 const PropertyTypeIcon = {
