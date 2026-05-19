@@ -184,6 +184,8 @@ export function PortfolioGrid({
               inPlanningCooldown={inPlanningCooldown}
               multiUnitSlots={multiUnitSlots}
               hasAnyTenant={tenantRecs.length > 0}
+              hasActiveDebtRecovery={((gameState as any).debtRecoveryCases || []).some((c: any) => c.propertyId === property.id && c.status === 'in_court')}
+              onSendToCourt={(gameState as any).sendArrearsToCourt}
             />
           );
         })}
