@@ -410,6 +410,9 @@ export function useGameState() {
     tenantConcerns: store.tenantConcerns || [],
     planningApplications: Array.isArray((store as any).planningApplications) ? (store as any).planningApplications : [],
     tenantHistory: Array.isArray((store as any).tenantHistory) ? (store as any).tenantHistory : [],
+    debtRecoveryCases: Array.isArray((store as any).debtRecoveryCases) ? (store as any).debtRecoveryCases : [],
+    sendArrearsToCourt: (store as any).sendArrearsToCourt,
+    projectedTaxPennies: (store as any).projectedTaxPennies ?? 0,
 
     // Derived values
     netWorth: netWorth - totalDebt,
