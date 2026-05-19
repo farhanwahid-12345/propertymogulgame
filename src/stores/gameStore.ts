@@ -188,6 +188,9 @@ function createInitialState(): GameState {
     opsFlashAt: 0,
     reputationLog: [],
     seenEconomicEventIds: [],
+    debtRecoveryCases: [],
+    projectedTaxPennies: 0,
+    projectedTaxStampedMonth: 0,
   };
 }
 
