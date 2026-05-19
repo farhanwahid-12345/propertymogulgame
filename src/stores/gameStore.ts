@@ -121,6 +121,8 @@ interface GameActions {
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
   markEconomicEventsSeen: (ids: string[]) => void;
+  // Debt recovery
+  sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
   // Game
   resetGame: () => void;
 }
