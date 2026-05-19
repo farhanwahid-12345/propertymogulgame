@@ -38,24 +38,44 @@ export function simulateAuctionSale(input: SimulateAuctionInput): SimulateAuctio
 
   // Bidder pool size scales with how reasonable the reserve looks.
   let bidderCount: number;
-  if (ratio < 0.85) bidderCount = randInt(6, 10);          // hot
-  else if (ratio < 1.05) bidderCount = randInt(3, 6);      // normal
-  else if (ratio < 1.20) bidderCount = randInt(1, 3);      // cool
+  if (ratio < 0.80) bidderCount = randInt(6, 12);          // hot — bargain reserve attracts crowd
+  else if (ratio < 1.00) bidderCount = randInt(3, 7);      // normal
+  else if (ratio < 1.20) bidderCount = randInt(1, 4);      // cool
   else bidderCount = randInt(0, 1);                         // cold
 
   if (bidderCount === 0) {
     return { sold: false, hammerPrice: 0, bidderCount: 0, topValuation: 0 };
   }
 
-  // Each bidder has a private valuation centered on fair value.
+  // Pick a "mood" for the room — cold (cautious), normal, or hot (bidding war).
+  // This widens outcome distribution: ~15% of auctions sell well below fair,
+  // ~15% sell well above (over-heat), the rest land in a realistic mid-band.
+  const moodRoll = Math.random();
+  let moodCenter: number;
+  let moodSpread: number;
+  if (moodRoll < 0.15) {
+    // Cold day — buyers are stingy. Sells cheap if it sells at all.
+    moodCenter = 0.72;
+    moodSpread = 0.18; // 0.63× – 0.81×
+  } else if (moodRoll < 0.85) {
+    // Normal — realistic spread around fair value.
+    moodCenter = 0.98;
+    moodSpread = 0.28; // 0.84× – 1.12×
+  } else {
+    // Hot — bidding war, runs well above fair value.
+    moodCenter = 1.22;
+    moodSpread = 0.30; // 1.07× – 1.37×
+  }
+
+  // Each bidder has a private valuation drawn from today's mood.
   const valuations: number[] = [];
   for (let i = 0; i < bidderCount; i++) {
-    const mult = 0.9 + Math.random() * 0.25; // 0.9× – 1.15×
+    const mult = (moodCenter - moodSpread / 2) + Math.random() * moodSpread;
     valuations.push(Math.round(fair * mult));
   }
   valuations.sort((a, b) => b - a);
   const topValuation = valuations[0];
-  const secondValuation = valuations[1] ?? Math.round(topValuation * 0.92);
+  const secondValuation = valuations[1] ?? Math.round(topValuation * 0.9);
 
   if (topValuation < reserve) {
     return { sold: false, hammerPrice: 0, bidderCount, topValuation };

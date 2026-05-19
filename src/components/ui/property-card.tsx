@@ -679,14 +679,9 @@ export const PropertyCard = memo(function PropertyCard({
                     monthsRemaining={(property as any).furnishingMonthsRemaining}
                     hasTenant={!!currentTenant}
                   />
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleAction(() => onSell?.(property, false))}
-                    disabled={isLoading}
-                  >
-                    List for Sale
-                  </Button>
+                  <div className="col-span-full text-[11px] text-muted-foreground text-center pt-1">
+                    To sell, use the <strong className="text-foreground/80">Estate Agent</strong> or <strong className="text-foreground/80">Auction House</strong> above.
+                  </div>
                 </div>
               </>
             )}
