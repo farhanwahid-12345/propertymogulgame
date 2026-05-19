@@ -35,7 +35,7 @@ import {
 import {
   calculateIncomeTax, calculateCorporationTax, calculateCGT,
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
-  getConditionValueUplift,
+  getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
