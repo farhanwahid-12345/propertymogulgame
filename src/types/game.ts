@@ -425,6 +425,29 @@ export interface GameState {
   reputationLog?: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }>;
   /** Macro-event IDs already shown in the popup modal (item 8). */
   seenEconomicEventIds?: string[];
+  /** Active and historic debt-recovery court cases against ex/current tenants. */
+  debtRecoveryCases?: DebtRecoveryCase[];
+  /** Pennies of projected annual tax due next month — stamped one month before April. */
+  projectedTaxPennies?: number;
+  /** monthsPlayed snapshot when the projected tax warning was issued (de-dupes toast). */
+  projectedTaxStampedMonth?: number;
+}
+
+/** A debt-recovery / county-court case filed against a tenant in arrears. */
+export interface DebtRecoveryCase {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  /** Pennies the tenant owed at filing (snapshot — arrears may be cleared after filing). */
+  originalArrearsPennies: number;
+  filedMonth: number;
+  resolveMonth: number;
+  status: 'in_court' | 'recovered' | 'partial' | 'unrecoverable';
+  /** Pennies actually recovered AFTER agency fee. Set on resolution. */
+  netRecoveredPennies?: number;
+  /** Fee taken by debt-recovery agency (decimal, e.g. 0.25). */
+  recoveryFeePct: number;
 }
 
 /** Player arrears / forced-sale escalation state. */
@@ -459,4 +482,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;

@@ -105,6 +105,10 @@ interface PropertyCardProps {
   inPlanningCooldown?: boolean;
   /** True when ANY slot of the property is occupied — used to gate conversions. */
   hasAnyTenant?: boolean;
+  /** True if a debt-recovery case is already in court for this property's tenant. */
+  hasActiveDebtRecovery?: boolean;
+  /** File a county-court claim for back-rent (£325 fee). */
+  onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
 }
 
 const PropertyTypeIcon = {
@@ -156,6 +160,8 @@ export const PropertyCard = memo(function PropertyCard({
   arrearsPenniesTotal = 0,
   applyRentIncrease,
   multiUnitSlots,
+  hasActiveDebtRecovery = false,
+  onSendToCourt,
 }: PropertyCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
@@ -314,6 +320,25 @@ export const PropertyCard = memo(function PropertyCard({
               >
                 💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
               </Badge>
+            )}
+            {hasActiveDebtRecovery && (
+              <Badge variant="outline" className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10" title="Debt-recovery case in court">
+                ⚖️ In court
+              </Badge>
+            )}
+            {rentArrearsCount >= 2 && !hasActiveDebtRecovery && onSendToCourt && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10"
+                onClick={() => {
+                  if (window.confirm(`File a county-court claim against the tenant?\n\n• Filing fee: £325\n• Resolution: 6–12 months\n• Agency keeps 25% of recovered amount\n\nThis clears arrears off the books while the case is in progress.`)) {
+                    onSendToCourt(property.id, 0);
+                  }
+                }}
+              >
+                ⚖️ Send to court
+              </Button>
             )}
           </div>
         )}

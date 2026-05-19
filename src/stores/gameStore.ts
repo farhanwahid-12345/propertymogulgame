@@ -35,7 +35,7 @@ import {
 import {
   calculateIncomeTax, calculateCorporationTax, calculateCGT,
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
-  getConditionValueUplift,
+  getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
@@ -121,6 +121,8 @@ interface GameActions {
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
   markEconomicEventsSeen: (ids: string[]) => void;
+  // Debt recovery
+  sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
   // Game
   resetGame: () => void;
 }
@@ -186,6 +188,9 @@ function createInitialState(): GameState {
     opsFlashAt: 0,
     reputationLog: [],
     seenEconomicEventIds: [],
+    debtRecoveryCases: [],
+    projectedTaxPennies: 0,
+    projectedTaxStampedMonth: 0,
   };
 }
 
@@ -372,13 +377,16 @@ function migrateState(persisted: any): GameState {
 
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
+  if (!Array.isArray(persisted.debtRecoveryCases)) persisted.debtRecoveryCases = [];
+  if (typeof persisted.projectedTaxPennies !== 'number') persisted.projectedTaxPennies = 0;
+  if (typeof persisted.projectedTaxStampedMonth !== 'number') persisted.projectedTaxStampedMonth = 0;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
     'tenants', 'voidPeriods', 'renovations', 'pendingDamages', 'annualRepairCosts',
     'damageHistory', 'conveyancing', 'mortgages', 'economicEvents', 'tenantEvents',
     'taxRecords', 'tenantConcerns', 'pendingEvictions', 'propertyLocks', 'depositDisputes',
-    'planningApplications', 'tenantHistory', 'loans',
+    'planningApplications', 'tenantHistory', 'loans', 'debtRecoveryCases',
   ];
 
   arrayKeys.forEach((key) => {
@@ -1311,8 +1319,10 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
-        // months + £ owed. Paying tenants get arrears cleared. Throttle toast
-        // marker is stamped here so it persists across ticks.
+        // months + £ owed. Tenants who pay this month additionally pay back a
+        // slice (≤50% of monthly rent) of their arrears. Arrears only clear
+        // when fully repaid — paying current rent alone is NOT enough.
+        let arrearsRepaidThisMonth = 0;
         newTenants = newTenants.map(t => {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
           if (missedTenantKeys.has(key)) {
@@ -1327,9 +1337,19 @@ export const useGameStore = create<GameState & GameActions>()(
               lastDefaultToastMonth: stamped,
             };
           }
-          // Paying this month — clear arrears.
-          if (!conveyancingPropertyIds.has(t.propertyId) && (t.arrearsMonths ?? 0) > 0) {
-            return { ...t, arrearsMonths: 0, arrearsPennies: 0 };
+          // Paying this month — chip away at arrears (up to 50% of monthly rent).
+          const owed = t.arrearsPennies ?? 0;
+          if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
+            const rentPennies = (t as any).rentPennies
+              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
+            const repay = Math.min(owed, Math.floor(rentPennies * 0.5));
+            arrearsRepaidThisMonth += repay;
+            const newOwed = owed - repay;
+            return {
+              ...t,
+              arrearsPennies: newOwed,
+              arrearsMonths: newOwed <= 0 ? 0 : (t.arrearsMonths ?? 0),
+            };
           }
           return t;
         });
@@ -1433,7 +1453,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashAfterCredit = -shortfall + taken;
           postOutflowOverdraft = prev.overdraftUsed + taken;
         }
-        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
+        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
         const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
         let finalCash = Math.max(0, credited.cash);
         let finalOverdraftUsed = credited.overdraftUsed;
@@ -1670,6 +1690,73 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("💀 BANKRUPTCY!", "Court ordered insolvency — game over.", "destructive");
         }
 
+        // ── Tax projection warning — fire one month before April collection ──
+        let newProjectedTaxPennies = (prev as any).projectedTaxPennies ?? 0;
+        let newProjectedTaxStampedMonth = (prev as any).projectedTaxStampedMonth ?? 0;
+        const monthIdx = newMonthNumber % 12;
+        if (monthIdx === 2 && currentTaxYear > lastTaxYear && finalYearlyGrossRent > 0) {
+          const projected = projectAnnualTax(
+            prev.entityType,
+            finalYearlyGrossRent,
+            finalYearlyMortgageInterest,
+            finalYearlyDeductibleExpenses,
+            newUnusedLosses,
+          );
+          if (projected > 0 && newProjectedTaxStampedMonth !== newMonthNumber) {
+            newProjectedTaxPennies = projected;
+            newProjectedTaxStampedMonth = newMonthNumber;
+            const headroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
+            const shortfall = Math.max(0, projected - (finalCash + headroom));
+            const taxLabel = prev.entityType === 'sole_trader' ? 'Self-assessment tax' : 'Corporation tax';
+            showToast(
+              shortfall > 0 ? "⚠️ Tax due next month" : "🧾 Tax due next month",
+              shortfall > 0
+                ? `${taxLabel} ~£${fromPennies(projected).toLocaleString()}. Shortfall £${fromPennies(shortfall).toLocaleString()} — raise funds via Bank tab.`
+                : `${taxLabel} ~£${fromPennies(projected).toLocaleString()} will be collected next month.`,
+              shortfall > 0 ? "destructive" : undefined,
+            );
+          }
+        } else if (monthIdx === 4) {
+          // Tax was collected this April — clear the projection stamp.
+          newProjectedTaxPennies = 0;
+        }
+
+        // ── Debt-recovery case resolution ──
+        const prevCases = ((prev as any).debtRecoveryCases || []) as import('@/types/game').DebtRecoveryCase[];
+        const resolvedCases: import('@/types/game').DebtRecoveryCase[] = [];
+        const updatedCases = prevCases.map(c => {
+          if (c.status !== 'in_court' || newMonthNumber < c.resolveMonth) return c;
+          const predetermined = ((c as any)._predeterminedStatus || 'recovered') as 'recovered' | 'partial' | 'unrecoverable';
+          let recoveredGross = 0;
+          if (predetermined === 'recovered') recoveredGross = c.originalArrearsPennies;
+          else if (predetermined === 'partial') recoveredGross = Math.floor(c.originalArrearsPennies * (0.3 + Math.random() * 0.4));
+          const net = Math.floor(recoveredGross * (1 - c.recoveryFeePct));
+          if (net > 0) {
+            const credited = credit({ cash: finalCash, overdraftUsed: finalOverdraftUsed }, net);
+            finalCash = credited.cash;
+            finalOverdraftUsed = credited.overdraftUsed;
+          }
+          const updated: import('@/types/game').DebtRecoveryCase = { ...c, status: predetermined, netRecoveredPennies: net };
+          resolvedCases.push(updated);
+          if (predetermined === 'unrecoverable') {
+            showToast("⚖️ Debt unrecoverable", `Tenant ${c.tenantName} is judgment-proof — £${fromPennies(c.originalArrearsPennies).toLocaleString()} written off.`, "destructive");
+          } else {
+            showToast(
+              predetermined === 'recovered' ? "⚖️ Debt recovered" : "⚖️ Partial recovery",
+              `Recovered £${fromPennies(net).toLocaleString()} from ${c.tenantName} (after 25% agency fee).`,
+              'success' as any,
+            );
+          }
+          return updated;
+        });
+        // Keep last 30 resolved cases; preserve all active.
+        const trimmedCases = [
+          ...updatedCases.filter(c => c.status === 'in_court'),
+          ...updatedCases.filter(c => c.status !== 'in_court').slice(-30),
+        ];
+
+
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
@@ -1715,6 +1802,9 @@ export const useGameStore = create<GameState & GameActions>()(
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
           reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
           opsFlashAt: opsFlashAtNew,
+          debtRecoveryCases: trimmedCases,
+          projectedTaxPennies: newProjectedTaxPennies,
+          projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         } as any));
       },
 
@@ -3884,6 +3974,67 @@ export const useGameStore = create<GameState & GameActions>()(
         const prevSeen: string[] = Array.isArray(s.seenEconomicEventIds) ? s.seenEconomicEventIds : [];
         const next = Array.from(new Set([...prevSeen, ...ids])).slice(-50);
         set({ seenEconomicEventIds: next } as any);
+      },
+
+      sendArrearsToCourt: (propertyId: string, slotIndex: number = 0) => {
+        const s = get();
+        const tenant = s.tenants.find(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+        const prop = s.ownedProperties.find(p => p.id === propertyId);
+        if (!tenant || !prop) {
+          showToast("Cannot file claim", "Tenant or property not found.", "destructive");
+          return;
+        }
+        const arrearsMonths = tenant.arrearsMonths ?? 0;
+        const arrearsPennies = tenant.arrearsPennies ?? 0;
+        if (arrearsMonths < 2 || arrearsPennies <= 0) {
+          showToast("Not eligible", "Tenant needs at least 2 months of arrears to file in court.", "destructive");
+          return;
+        }
+        const existing = (s.debtRecoveryCases || []).find(c => c.propertyId === propertyId && c.tenantName === tenant.tenant.name && c.status === 'in_court');
+        if (existing) {
+          showToast("Already filed", "A court case is already in progress for this tenant.", "destructive");
+          return;
+        }
+        const FILING_FEE = 32500; // £325
+        const debited = debit(s, FILING_FEE);
+        if (!debited) {
+          showToast("Insufficient funds", "You need £325 (incl. overdraft) to file the claim.", "destructive");
+          return;
+        }
+        // Pre-roll outcome at filing time so the player can't reload-scum.
+        const roll = Math.random();
+        const status: 'recovered' | 'partial' | 'unrecoverable' =
+          roll < 0.55 ? 'recovered' : roll < 0.85 ? 'partial' : 'unrecoverable';
+        const resolveMonth = s.monthsPlayed + 6 + Math.floor(Math.random() * 7); // 6–12 months
+        const newCase: import('@/types/game').DebtRecoveryCase = {
+          id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${Math.random().toString(36).slice(2, 6)}`,
+          propertyId,
+          propertyName: prop.name,
+          tenantName: tenant.tenant.name,
+          originalArrearsPennies: arrearsPennies,
+          filedMonth: s.monthsPlayed,
+          resolveMonth,
+          status: 'in_court' as const,
+          recoveryFeePct: 0.25,
+        };
+        // Stash the pre-rolled outcome on the case for the resolver — we hide it from UI by
+        // attaching a private field. Use namespaced key to avoid type pollution.
+        (newCase as any)._predeterminedStatus = status;
+
+        // Clear the tenant's arrears on the books — the debt is now being chased by the agency.
+        const newTenants = s.tenants.map(t =>
+          t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+            ? { ...t, arrearsMonths: 0, arrearsPennies: 0 }
+            : t,
+        );
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          tenants: newTenants,
+          debtRecoveryCases: [...(s.debtRecoveryCases || []), newCase],
+          opsFlashAt: Date.now(),
+        } as any);
+        showToast("⚖️ Claim filed", `£325 filing fee paid. Expect a decision in 6–12 months for ${tenant.tenant.name} (£${fromPennies(arrearsPennies).toLocaleString()} owed).`);
       },
 
     }),

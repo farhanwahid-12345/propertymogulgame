@@ -131,6 +131,30 @@ export function getConditionRentMultiplier(condition: string): number {
     default: return 1.0;
   }
 }
+/**
+ * Project the annual tax bill (pennies) given the current year's running
+ * accumulators. Used to warn the player one month before tax is collected.
+ */
+export function projectAnnualTax(
+  entityType: EntityType,
+  yearlyGrossRent: number,
+  yearlyMortgageInterest: number,
+  yearlyDeductibleExpenses: number,
+  unusedLosses: number = 0,
+): number {
+  if (yearlyGrossRent <= 0) return 0;
+  if (entityType === 'sole_trader') {
+    const grossTaxable = Math.max(0, yearlyGrossRent - yearlyDeductibleExpenses);
+    const offsetUsed = Math.min(unusedLosses, grossTaxable);
+    const adjusted = yearlyGrossRent - offsetUsed;
+    return calculateIncomeTax(adjusted, yearlyMortgageInterest, yearlyDeductibleExpenses).effectiveTax;
+  }
+  const preTax = yearlyGrossRent - yearlyMortgageInterest - yearlyDeductibleExpenses;
+  if (preTax <= 0) return 0;
+  const offsetUsed = Math.min(unusedLosses, preTax);
+  return calculateCorporationTax(yearlyGrossRent - offsetUsed, yearlyMortgageInterest, yearlyDeductibleExpenses);
+}
+
 
 // Depreciation: months until condition degrades
 export function getDepreciationMonths(condition: string): number {
