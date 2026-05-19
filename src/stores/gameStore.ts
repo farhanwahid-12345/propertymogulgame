@@ -1453,7 +1453,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashAfterCredit = -shortfall + taken;
           postOutflowOverdraft = prev.overdraftUsed + taken;
         }
-        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund;
+        const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
         const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
         let finalCash = Math.max(0, credited.cash);
         let finalOverdraftUsed = credited.overdraftUsed;
