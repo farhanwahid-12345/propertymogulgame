@@ -1319,8 +1319,10 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
-        // months + £ owed. Paying tenants get arrears cleared. Throttle toast
-        // marker is stamped here so it persists across ticks.
+        // months + £ owed. Tenants who pay this month additionally pay back a
+        // slice (≤50% of monthly rent) of their arrears. Arrears only clear
+        // when fully repaid — paying current rent alone is NOT enough.
+        let arrearsRepaidThisMonth = 0;
         newTenants = newTenants.map(t => {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
           if (missedTenantKeys.has(key)) {
@@ -1335,9 +1337,19 @@ export const useGameStore = create<GameState & GameActions>()(
               lastDefaultToastMonth: stamped,
             };
           }
-          // Paying this month — clear arrears.
-          if (!conveyancingPropertyIds.has(t.propertyId) && (t.arrearsMonths ?? 0) > 0) {
-            return { ...t, arrearsMonths: 0, arrearsPennies: 0 };
+          // Paying this month — chip away at arrears (up to 50% of monthly rent).
+          const owed = t.arrearsPennies ?? 0;
+          if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
+            const rentPennies = (t as any).rentPennies
+              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
+            const repay = Math.min(owed, Math.floor(rentPennies * 0.5));
+            arrearsRepaidThisMonth += repay;
+            const newOwed = owed - repay;
+            return {
+              ...t,
+              arrearsPennies: newOwed,
+              arrearsMonths: newOwed <= 0 ? 0 : (t.arrearsMonths ?? 0),
+            };
           }
           return t;
         });
