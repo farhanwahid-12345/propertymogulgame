@@ -1,57 +1,67 @@
-## Goal
-Work through the 18 improvements in `Lovable_Improvements.pdf`, grouped by area so related code is touched once.
+# Property Card & Sales UX Improvements
 
-## Grouped work
+Four related polish items from the screenshots. All frontend/presentation work plus a small tweak to how listing prices and AI offers are generated.
 
-### A. Tenant behaviour & arrears (items 2, 9)
-- Surface non-payment / anti-social events as **toasts + Operations badge** (not just silent feed entries) and trigger them at a realistic cadence (max 1 event per tenant per ~2–3 months).
-- Track arrears per tenant: deduct missed rent from owed balance, expose `arrearsMonths` and `arrearsAmount` on property card (red pill with £ owed and # months).
-- Auto-prompt eviction eligibility (2+ months arrears = Section 8 ground 8) with a CTA in the Operations centre + Action Required panel.
-- Fix the arrears engine: only put the player into arrears when **cash + overdraft headroom** cannot cover the shortfall. Today it ignores cash on hand for the in-progress month.
-- Overdraft auto-repay: only repay when cash > total balance + buffer **and** the user has opted in. Default: never auto-repay. Add a toggle in Bank → Credit & Banking.
+---
 
-### B. Operations button polish (items 3, 11)
-- Flash/ping on **any** new operation event: renovation complete, conveyancing complete, planning decision, tenant concern, eviction eligible.
-- Stop the false flash: clear `hasUnseenConcerns` when the panel opens AND when the underlying concern list is empty. Today it stays "dirty" because the flag isn't reset after auto-resolution.
+## 1. Remove "List for Sale" from the property card
 
-### C. Mortgages & loans (items 4, 6)
-- **Partial loan payments**: add a "Pay amount" input next to "Pay off in full" on each active loan and on mortgage settlement; recompute amortisation/term.
-- **Portfolio remortgage**: when a property is already inside an existing portfolio mortgage and the user opens Portfolio Mortgage, allow it to be selected. On confirm, settle the previous portfolio facility and roll those properties into the new one (no "already secured" rejection).
-- **Portfolio selection bug (18)**: remove the silent filter that hides properties already used as collateral. Show all owned properties; explain inline if any are conflicted, but still selectable when remortgaging.
+**File:** `src/components/ui/property-card.tsx` (~line 682–689)
 
-### D. Tax (item 5)
-- Implement UK loss carry-forward: track `unusedLosses` per entity, offset against future rental profits (sole trader: future property income only; LTD: future trading profits). Surface in Tax breakdown ("Losses brought forward: £X, used £Y").
+- Delete the red `List for Sale` button at the bottom of the owned-property card.
+- Keep `onSell` prop (still used for auction routing elsewhere) but no longer wire it here.
+- Selling is reached via **Bank → Estate Agent → Sell Properties** tab (already exists) and the Auction House. Add a tiny inline hint under the action row: *"Sell via Estate Agent or Auction House"* so users aren't lost.
 
-### E. Reputation (item 1)
-- Replace static reputation with dynamic score driven by: evictions served, won/lost tribunal cases, deposit disputes lost, tenant satisfaction average, length of tenancies, S13 outcomes, maintenance response time. Decays back to neutral over time. Display as a trend (▲/▼) with breakdown tooltip.
+## 2. Listed-Properties panel — contrast, position, and accurate listing price
 
-### F. Planning & renovations (items 7, 13, 14, 15, 16)
-- **7**: Allow planning applications on tenanted properties for extensions/loft conversions. Keep the block only for **unit-count-changing conversions** (HMO/flats), and even then offer "Apply now, build after vacancy" instead of a hard refusal.
-- **13**: Scale renovation cost AND uplift with property value & sqft properly; rebalance ROI so high-end refurbs remain marginally profitable (target 10–25% ROI band regardless of tier). Fix the prediction so headline ROI matches actual booked uplift.
-- **14**: Raise base planning approval rate (~80% straightforward extension, ~65% conversion) and reduce neighbour-objection penalty.
-- **15**: Extensions add sqft (single-storey: +X based on plot size; HMO: +1 room scaling sqft; conversion-to-flats: split sqft into N units). Display "+Y sqft / +N units" inside the renovation submenu before confirming. Cap by plot size (derive plot from current sqft × multiplier).
-- **16**: Add "Double-height extension" option — ~1.8× cost of single-storey, ~1.9× sqft, slightly lower approval odds.
+**File:** `src/components/ui/listed-properties.tsx`, plus listing creation path.
 
-### G. Section 13 dialog (item 17)
-- Audit `Current rent` and `Local market` values: ensure current rent = tenant's actual paid rent (not headline listing), and `Local market` = engine's per-property market rate (today they can be reversed when market rent < current rent, as in screenshot). Add an explicit "Below market" / "Above market" indicator.
+Visual:
+- Replace `bg-white/95 backdrop-blur-sm` with the project's `glass` token so it matches the dark theme. Remove the inner white nested `Card`s — use the same `glass p-4` block style as `PortfolioGrid` for each row.
+- Tighten vertical rhythm: drop `CardHeader` padding, shrink title to `text-lg`, remove the redundant outer `Card` wrapper. Goal: each listing row is ~96px instead of ~200px.
+- Render the panel **above** the Empire grid (it already is in `Index.tsx`) but remove the surrounding free space by collapsing the section padding in `CollapsibleSection` when empty isn't the case — verify no large gap between Action-Required and the listing block.
 
-### H. UI / layout polish (items 8, 10, 12)
-- **8 (macro events)**: Show macro events as a **modal popup** when they fire (dismissable), and continue listing in the activity feed. Replace the inline yellow banner.
-- **10**: Lock the Action-Required / portfolio summary row position; it currently reflows when the alert badge appears/disappears. Use stable min-height containers.
-- **12**: Move the "Cash Flow / Debt / Month" compact stats from the inline hero strip into the top header (next to the clock). Shrink hero on desktop accordingly.
+Pricing accuracy (item 2b):
+- Today the panel shows `property.value` (market value). When a user lists at a higher asking price it isn't stored.
+- Extend the listing record with `askingPricePennies` (set at list time from the user's chosen price, fallback to `value`). Surface it via the store's listing creation action.
+- Display "Listed price: £X" prominently and a smaller "Market value: £Y" below with a Δ% badge (green/amber/red) so the gap is obvious.
+
+## 3. More dynamic sale offers (item 2c, 2d)
+
+**File:** `src/components/ui/property-offers.tsx` + store offer-generation path.
+
+Today: offers are generated client-side on dialog open from `property.value` with a flat 0.85–1.05 band; the user can never counter, and offers never come back after declining.
+
+Changes:
+- Move offer generation into the engine (already partially there via `propertyListings.offers`). When the user declines, mark that offer as `declined` and after 1–2 in-game weeks roll a **counter-offer** at a slightly higher price (e.g. +2–4%) with a configurable cap.
+- Introduce variance based on `askingPricePennies` vs `marketValue`:
+  - Asking ≤ market: offers cluster 92–102% of asking, occasional bidding war (>105%).
+  - Asking 5–15% over market: offers cluster 88–98% of asking; lower volume.
+  - Asking >15% over market: stalling — offer count drops sharply, occasional lowball at 75–82%.
+- Add a **Counter** button to each offer in `PropertyOffers` (next to Accept) that opens a small price input. Counter dispatches to the store, marks the offer pending, then resolves after 1 week with accept/reject/new-counter (60/30/10 split, weighted by gap to market).
+- For auctions: widen the random outcome distribution. Today reserve + AI bidding lands close to value. Update `src/lib/engine/auction.ts` AI bid curve to occasionally cap out early (sells at 60–80% of value) and occasionally over-heat (sells at 115–140% of value) to mimic real auction variance.
+
+## 4. Tighten Empire dead-space (image 3)
+
+**File:** `src/components/sections/PortfolioGrid.tsx` and `src/pages/Index.tsx`.
+
+- Remove the large `glass p-5` wrapper padding → `p-4`, and drop the 3-stat row's `mb-5` to `mb-3`.
+- Collapse the heading row spacing: `mb-4` → `mb-2`, smaller `h2` (`text-lg`).
+- Move the 3-stat summary (Total Value / Monthly Income / Avg Yield) into a single horizontal strip *above* the heading, removing the second stack of stats that currently doubles up with `GameStats`.
+- In `Index.tsx` reduce `space-y-5` → `space-y-3` for the main container so all sections sit tighter.
+
+---
 
 ## Technical notes
-- Engine changes land in `src/lib/engine/` (taxation, financials, renovation, planning) — keep pure.
-- Store: add `unusedLosses`, `overdraftAutoRepay`, per-tenant `arrearsMonths`, `reputationScore` & breakdown to `gameStore` slices.
-- UI: new components for arrears pill (in `property-card.tsx`), macro-event modal, partial loan/mortgage payment inputs, dynamic reputation tooltip.
-- Operations flash: refactor `useOperationsAlerts` hook to a single derived signal `{flash: boolean, reason}` reset on panel open.
-- Save migration bump (current version + 1) with safe defaults for new fields.
 
-## Order of execution
-1. Bug fixes first (9 arrears/overdraft, 11 false flash, 10 layout shift, 17 S13 values, 18 portfolio selection) — quick wins, prevent further confusion.
-2. Mechanic upgrades (2 arrears UX, 3 ops flash, 4 partial payments, 6 portfolio remortgage, 7 planning on tenanted).
-3. Economy rebalance (13 reno scaling, 14 approval rates, 15 sqft, 16 double-height, 5 loss carry-forward).
-4. Polish (1 reputation, 8 macro popup, 12 header compaction).
+- New listing field `askingPricePennies` requires a save-migration bump (default to existing `value * 100` for legacy saves).
+- New offer field `status: 'pending' | 'declined' | 'countered'` and `expiresAtMonth` for counter timing.
+- Auction tuning lives in `src/lib/engine/auction.ts`; expose a tunable `AUCTION_VOLATILITY` constant in `src/lib/engine/constants.ts`.
+- All visual changes must use existing semantic tokens (`glass`, `text-foreground`, `text-success`, `text-danger`, etc.). No raw hex.
+- Keep `onSell` prop on `PropertyCard` for backward compatibility; just unused at render. Sell entry point lives in `EstateAgentWindow` already.
 
 ## Out of scope
-- No auth/backend changes. No new third-party libs.
+
+- No backend/store schema changes beyond the two listing fields above.
+- No new dependencies.
+- Reputation, taxation, planning, mortgages — already complete in prior batches.
