@@ -3894,6 +3894,67 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ seenEconomicEventIds: next } as any);
       },
 
+      sendArrearsToCourt: (propertyId: string, slotIndex: number = 0) => {
+        const s = get();
+        const tenant = s.tenants.find(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+        const prop = s.ownedProperties.find(p => p.id === propertyId);
+        if (!tenant || !prop) {
+          showToast("Cannot file claim", "Tenant or property not found.", "destructive");
+          return;
+        }
+        const arrearsMonths = tenant.arrearsMonths ?? 0;
+        const arrearsPennies = tenant.arrearsPennies ?? 0;
+        if (arrearsMonths < 2 || arrearsPennies <= 0) {
+          showToast("Not eligible", "Tenant needs at least 2 months of arrears to file in court.", "destructive");
+          return;
+        }
+        const existing = (s.debtRecoveryCases || []).find(c => c.propertyId === propertyId && c.tenantName === tenant.tenant.name && c.status === 'in_court');
+        if (existing) {
+          showToast("Already filed", "A court case is already in progress for this tenant.", "destructive");
+          return;
+        }
+        const FILING_FEE = 32500; // £325
+        const debited = debit(s, FILING_FEE);
+        if (!debited) {
+          showToast("Insufficient funds", "You need £325 (incl. overdraft) to file the claim.", "destructive");
+          return;
+        }
+        // Pre-roll outcome at filing time so the player can't reload-scum.
+        const roll = Math.random();
+        const status: 'recovered' | 'partial' | 'unrecoverable' =
+          roll < 0.55 ? 'recovered' : roll < 0.85 ? 'partial' : 'unrecoverable';
+        const resolveMonth = s.monthsPlayed + 6 + Math.floor(Math.random() * 7); // 6–12 months
+        const newCase: import('@/types/game').DebtRecoveryCase = {
+          id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${Math.random().toString(36).slice(2, 6)}`,
+          propertyId,
+          propertyName: prop.name,
+          tenantName: tenant.tenant.name,
+          originalArrearsPennies: arrearsPennies,
+          filedMonth: s.monthsPlayed,
+          resolveMonth,
+          status: 'in_court' as const,
+          recoveryFeePct: 0.25,
+        };
+        // Stash the pre-rolled outcome on the case for the resolver — we hide it from UI by
+        // attaching a private field. Use namespaced key to avoid type pollution.
+        (newCase as any)._predeterminedStatus = status;
+
+        // Clear the tenant's arrears on the books — the debt is now being chased by the agency.
+        const newTenants = s.tenants.map(t =>
+          t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+            ? { ...t, arrearsMonths: 0, arrearsPennies: 0 }
+            : t,
+        );
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          tenants: newTenants,
+          debtRecoveryCases: [...(s.debtRecoveryCases || []), newCase],
+          opsFlashAt: Date.now(),
+        } as any);
+        showToast("⚖️ Claim filed", `£325 filing fee paid. Expect a decision in 6–12 months for ${tenant.tenant.name} (£${fromPennies(arrearsPennies).toLocaleString()} owed).`);
+      },
+
     }),
     {
       name: 'propertyTycoonSave',
