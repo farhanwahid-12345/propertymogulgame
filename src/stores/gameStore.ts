@@ -1690,6 +1690,73 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("💀 BANKRUPTCY!", "Court ordered insolvency — game over.", "destructive");
         }
 
+        // ── Tax projection warning — fire one month before April collection ──
+        let newProjectedTaxPennies = (prev as any).projectedTaxPennies ?? 0;
+        let newProjectedTaxStampedMonth = (prev as any).projectedTaxStampedMonth ?? 0;
+        const monthIdx = newMonthNumber % 12;
+        if (monthIdx === 2 && currentTaxYear > lastTaxYear && finalYearlyGrossRent > 0) {
+          const projected = projectAnnualTax(
+            prev.entityType,
+            finalYearlyGrossRent,
+            finalYearlyMortgageInterest,
+            finalYearlyDeductibleExpenses,
+            newUnusedLosses,
+          );
+          if (projected > 0 && newProjectedTaxStampedMonth !== newMonthNumber) {
+            newProjectedTaxPennies = projected;
+            newProjectedTaxStampedMonth = newMonthNumber;
+            const headroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
+            const shortfall = Math.max(0, projected - (finalCash + headroom));
+            const taxLabel = prev.entityType === 'sole_trader' ? 'Self-assessment tax' : 'Corporation tax';
+            showToast(
+              shortfall > 0 ? "⚠️ Tax due next month" : "🧾 Tax due next month",
+              shortfall > 0
+                ? `${taxLabel} ~£${fromPennies(projected).toLocaleString()}. Shortfall £${fromPennies(shortfall).toLocaleString()} — raise funds via Bank tab.`
+                : `${taxLabel} ~£${fromPennies(projected).toLocaleString()} will be collected next month.`,
+              shortfall > 0 ? "destructive" : undefined,
+            );
+          }
+        } else if (monthIdx === 4) {
+          // Tax was collected this April — clear the projection stamp.
+          newProjectedTaxPennies = 0;
+        }
+
+        // ── Debt-recovery case resolution ──
+        const prevCases = ((prev as any).debtRecoveryCases || []) as import('@/types/game').DebtRecoveryCase[];
+        const resolvedCases: import('@/types/game').DebtRecoveryCase[] = [];
+        const updatedCases = prevCases.map(c => {
+          if (c.status !== 'in_court' || newMonthNumber < c.resolveMonth) return c;
+          const predetermined = ((c as any)._predeterminedStatus || 'recovered') as 'recovered' | 'partial' | 'unrecoverable';
+          let recoveredGross = 0;
+          if (predetermined === 'recovered') recoveredGross = c.originalArrearsPennies;
+          else if (predetermined === 'partial') recoveredGross = Math.floor(c.originalArrearsPennies * (0.3 + Math.random() * 0.4));
+          const net = Math.floor(recoveredGross * (1 - c.recoveryFeePct));
+          if (net > 0) {
+            const credited = credit({ cash: finalCash, overdraftUsed: finalOverdraftUsed }, net);
+            finalCash = credited.cash;
+            finalOverdraftUsed = credited.overdraftUsed;
+          }
+          const updated: import('@/types/game').DebtRecoveryCase = { ...c, status: predetermined, netRecoveredPennies: net };
+          resolvedCases.push(updated);
+          if (predetermined === 'unrecoverable') {
+            showToast("⚖️ Debt unrecoverable", `Tenant ${c.tenantName} is judgment-proof — £${fromPennies(c.originalArrearsPennies).toLocaleString()} written off.`, "destructive");
+          } else {
+            showToast(
+              predetermined === 'recovered' ? "⚖️ Debt recovered" : "⚖️ Partial recovery",
+              `Recovered £${fromPennies(net).toLocaleString()} from ${c.tenantName} (after 25% agency fee).`,
+              'success' as any,
+            );
+          }
+          return updated;
+        });
+        // Keep last 30 resolved cases; preserve all active.
+        const trimmedCases = [
+          ...updatedCases.filter(c => c.status === 'in_court'),
+          ...updatedCases.filter(c => c.status !== 'in_court').slice(-30),
+        ];
+
+
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
