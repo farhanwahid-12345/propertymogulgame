@@ -39,7 +39,8 @@ import {
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
-import { computePlanningApprovalProbability } from '@/lib/engine/planning';
+import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
+import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
 // ─── Helpers ──────────────────────────────────────────────
 import { showToast, debit, credit, calcDeposit } from './storeHelpers';
