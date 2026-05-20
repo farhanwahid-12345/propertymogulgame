@@ -28,14 +28,6 @@ interface Props {
   condition?: 'standard' | 'premium' | 'dilapidated';
 }
 
-interface Props {
-  propertyId: string;
-  propertyName: string;
-  internalSqft?: number;
-  currentTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
-  monthsRemaining?: number;
-  hasTenant: boolean;
-}
 
 const TIERS = [
   { id: 'unfurnished',     label: 'Unfurnished',     emoji: '🪑', costPerSqft: 0,  rentBoost: '0%',  blurb: 'Broadest tenant pool. No furniture risk.' },
