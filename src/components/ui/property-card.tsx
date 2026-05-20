@@ -244,12 +244,13 @@ export const PropertyCard = memo(function PropertyCard({
 
   return (
     <Card className={cn(
-      "glass border-t-4 transition-all duration-300 hover:scale-[1.02] flex flex-col h-full",
+      "glass border-t-4 transition-all duration-300 hover:scale-[1.02] flex flex-col",
       typeBorderColor[propertyType],
       typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg">{typeEmoji[propertyType]}</span>
@@ -344,7 +345,7 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-4 flex-1 flex flex-col">
+      <CardContent className="space-y-3 pb-3">
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Price:</span>
@@ -503,7 +504,7 @@ export const PropertyCard = memo(function PropertyCard({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-2 mt-auto">
+                <div className="grid grid-cols-1 gap-2">
                   {multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
                     <MultiUnitSlots
                       propertyId={property.id}
@@ -647,8 +648,12 @@ export const PropertyCard = memo(function PropertyCard({
                               value: property.value,
                               yield: property.yield,
                               condition: property.condition as any,
+                              subtype: property.subtype,
+                              subtypeUnits: property.subtypeUnits,
+                              completedRenovationIds: property.completedRenovationIds,
                             }) || property.monthlyIncome
                           }
+
                           monthsSinceLastIncrease={
                             property.lastRentIncrease !== undefined
                               ? Math.max(0, (monthsPlayed ?? 0) - property.lastRentIncrease)
@@ -704,9 +709,10 @@ export const PropertyCard = memo(function PropertyCard({
                     monthsRemaining={(property as any).furnishingMonthsRemaining}
                     hasTenant={!!currentTenant}
                   />
-                  <div className="col-span-full text-[11px] text-muted-foreground text-center pt-1">
-                    To sell, use the <strong className="text-foreground/80">Estate Agent</strong> or <strong className="text-foreground/80">Auction House</strong> above.
+                  <div className="col-span-full text-[10px] text-muted-foreground text-center">
+                    To sell: use <strong className="text-foreground/80">Estate Agent</strong> or <strong className="text-foreground/80">Auction House</strong>
                   </div>
+
                 </div>
               </>
             )}

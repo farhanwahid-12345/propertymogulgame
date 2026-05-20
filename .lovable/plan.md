@@ -1,65 +1,70 @@
-## Two improvements: tax warnings & tenant-arrears recovery
+## Five improvements: dead space, multi-reno batch, market rent realism, planning sequencing, 9-property cap
 
-### 1. Tax warning — one month before collection
+### 1. Property card & "Your Empire" dead space (Item 1 a/b)
 
-**Problem:** Tax is silently debited every April. Players hit overdraft or arrears without warning.
+**Problem:** Both the property card footer and the "Your Empire" summary row have a tall empty band below the controls.
 
-**Approach:** In `gameStore.ts` month-end (`processMonthEnd`), detect "one month before April" (`newMonthNumber % 12 === 2`) and `currentTaxYear > lastTaxYear`. Compute the *projected* tax bill from current accumulators using the same `calculateIncomeTax` / `calculateCorporationTax` helpers in `src/lib/engine/taxation.ts` (no new logic, just call them on the running yearly totals).
+**Fix:**
+- `src/components/ui/property-card.tsx` — audit the bottom region: remove the spacer flex grow, drop redundant `mt-auto` / `pb-N`, and collapse the empty CardContent slot when no tenant / no actions present. Move "Sell only via Estate Agent…" hint inline next to the action row instead of stacked below.
+- `src/components/sections/PortfolioGrid.tsx` — already a one-line summary; reduce `p-4` → `p-3`, drop `mb-3` to `mb-2`, and `gap-4` → `gap-3` on the grid. Remove the redundant header wrapper div that adds vertical padding.
 
-Surface the warning in three places:
-- **Toast** ("Tax due next month") with the projected £ amount and current available funds (cash + overdraft headroom).
-- **Notification Centre upcoming-row** — already wired via `buildUpcomingRows` in `src/lib/upcomingEvents.ts`, but extend the row when `monthsAway <= 1` to include the projected amount and a colour-coded "Shortfall £X" badge if cash + overdraft headroom < bill.
-- **HeroHeader chip** — small amber `Tax due 1mo: £X` pill next to the existing net-cashflow chip, only when within the warning window.
+### 2. Multi-renovation batch selection (Item 2)
 
-If the player can't cover it (`cash + overdraftHeadroom < projected`), the toast CTA links to the Bank tab (mortgages / loans / overdraft increase) so they can pre-emptively raise funds. Reuse `showToast` from `storeHelpers.ts`.
+**Problem:** Renovations must be applied one at a time; players want to queue multiple, see the combined cost / ROI, and pay once.
 
-Store changes (minimal):
-- Add `projectedTaxPennies?: number` and `projectedTaxStampedMonth?: number` to root state so the warning persists across reloads within the warning month and isn't recomputed every tick.
+**Approach:** Introduce a selection mode inside `renovation-dialog.tsx`.
+- Add `selectedIds: Set<string>` local state. Each renovation row gets a checkbox (only enabled if the renovation is currently eligible — passes all gating: cash, condition, planning, vacancy, one-shot, mutual-exclusivity).
+- A sticky footer panel shows: combined cost (sum of scaled costs), combined monthly rent uplift, combined value uplift (with ceiling-diminishing returns applied to the *sum* against the same ceiling), expected ROI (using `RENOVATION_EXPECTED_MULTIPLIER` per item), and longest duration (renos run in parallel, so duration = max).
+- New action `startRenovationBatch(propertyId, renovations: RenovationType[])` on the store. It iterates and calls the existing `startRenovation` path per item inside one state mutation (single debit, single toast). Planning-gated items still need an `applyForPlanning` step — surface that in the dialog by greying out the checkbox with a "Needs planning first" badge.
+- Mutual exclusivity: only one conversion can be selected; selecting kitchen_upgrade disables conflicting variants. Reuse existing eligibility helpers.
+- Bundle discount (subtle): when ≥3 items selected, apply a 5% cost discount (shared scaffolding / contractor savings). Mention in the footer chip.
 
-### 2. Tenant arrears → court / debt-recovery option
+### 3. Local market rent reflects renovations / extensions / conversions (Item 3)
 
-**Problem:** Arrears just sit. Player can serve Section 8 eviction but can't pursue the debt for cost recovery. And if a tenant resumes paying after a missed month, current logic immediately clears arrears (line 1331 of `gameStore.ts`) — that's wrong; arrears should only clear when the back-rent is also paid.
+**Problem:** `getMarketRentPounds` blends only `value` + `condition`. After a conversion (HMO/flats) or extension, the property has materially higher rent potential, but the Section 13 tribunal market reference doesn't move. The negotiation dialog then looks unrealistic ("market £X" same as before the works).
 
-**Two parts:**
+**Fix in `src/lib/engine/market.ts`:**
+- Extend `getMarketRentPounds` signature to optionally accept `subtype`, `subtypeUnits`, `internalSqft`, `completedRenovationIds`.
+- Apply a subtype-aware yield bump:
+  - `hmo` → +1.5% on conditionYield, plus a small per-room multiplier (`1 + 0.04 × (units − 1)` capped at 1.32).
+  - `flats` → +1.0% conditionYield, `1 + 0.06 × (units − 1)` cap 1.4.
+  - `multi-let` → +0.5%, flat.
+- Apply a fit-out premium when premium-tier upgrades completed (kitchen / bathroom / heating / glazing): each adds +1.5% to qualityMult, additive, cap at +6%.
+- Extensions feed through indirectly: `value` already rises post-extension, so the value × yield product moves naturally; no extra term needed.
+- Update callers (`rent-negotiation-dialog`, `property-card`, anywhere that calls `getMarketRentPounds`) to pass the new fields.
 
-**2a. Fix arrears-clearing bug**
-- In `processMonthEnd` arrears bookkeeping (~line 1316), do **not** clear `arrearsMonths` / `arrearsPennies` just because the tenant paid this month's rent.
-- Add a new field `arrearsPaidThisMonthPennies` (transient, computed) — the tenant pays *current rent + a slice of back-rent* equal to up to 50% of monthly rent until cleared. Only zero out arrears when `arrearsPennies <= 0`.
-- Add an amber "Arrears: £X owed (paying back)" pill state on `property-card.tsx` distinct from the existing red "In arrears" pill.
+### 4. Extension → conversion sequencing (Item 4)
 
-**2b. Send to debt-recovery (court)**
-- New action `sendArrearsToCourt(tenantKey)` on the store. Only available when `arrearsMonths >= 2`.
-- Upfront court filing fee: £325 (`debit` via `storeHelpers`).
-- Creates a `DebtRecoveryCase` record (new type in `types/game.ts`):
-  ```
-  { id, tenantName, propertyId, originalArrearsPennies, filedMonth,
-    status: 'in_court' | 'recovered' | 'unrecoverable',
-    recoveryFeePct: 0.25 }
-  ```
-- Engine resolves 6–12 months later with weighted outcomes:
-  - 55% **recovered**: pay player `originalArrears × (1 − 0.25)` (25% agency fee).
-  - 30% **partial**: 30–70% recovered, same 25% fee on what's collected.
-  - 15% **unrecoverable**: tenant judgment-proof, fee lost.
-- Reputation +1 / credit score +5 on full recovery (small bump).
-- New UI panel slot inside Operations Center: "Debt Recovery" list with status badges and expected resolution month. Reuse existing `glass`/badge primitives.
+**Problem:** Currently a conversion (e.g. terrace → 4-bed HMO) uses the property's *current* internalSqft. If the player has *planning approved* for an extension but hasn't built it, they're forced to either build the extension first OR convert based on the smaller footprint — they can't get credit for the granted sqft.
 
-**2c. UX wiring**
-- On `property-card.tsx` arrears pill: when `arrearsMonths >= 2`, add a small "Send to court" link that opens a confirmation `Dialog` showing fee, expected recovery range, and timeline.
-- Operations Center gets a new collapsible section "Debt recovery (N active)".
-- When recovered, fire a toast and push an entry into the activity feed (`ui/activity-feed.tsx` already has `category` enum — add `'debt_recovery'`).
+**Fix:** Two-part change.
+- **(a) Recognise approved-but-not-built sqft.** In `renovation-dialog.tsx` eligibility / preview, compute `effectiveInternalSqft = internalSqft + Σ(sqftAdded for planningApplications where status==='approved' and not yet started)`. Use this for: minInternalSqft gate, room/unit count preview, value uplift scaling, market-rent preview.
+- **(b) Combined "extension + conversion" workflow.** When a conversion is selected via the new batch flow (Item 2) AND an approved extension exists for the same property, allow them to be queued together. Engine processes the extension `completionMonth` first, then the conversion fires on the same or following month, sharing 15% of the conversion cost as a "concurrent works" discount.
+- **(c) If planning is approved but NOT yet built and conversion is started solo,** the conversion may start using the bigger footprint, but the engine then auto-schedules the extension construction as a prerequisite step (consumes the same approval, debits its cost, blocks tenants for `max(extension.duration, conversion.duration)`).
+- Update `src/stores/gameStore.ts` conversion path (~line 1832) to read `effectiveInternalSqft` and to consume the linked planning approval.
+
+### 5. Ownership cap at 9 properties (Item 5)
+
+**Problem:** Current cap is 8 — user wants 9.
+
+**Fix:** Single-line change in `src/lib/engine/financials.ts`:
+```ts
+export function getMaxPropertiesForLevel(_level: number): number { return 9; }
+```
+Update the "Inventory Guarantee" mental model accordingly (8 listings still fine), and confirm the limit toast in `gameStore.ts` lines 2177 / 2272 reads from the helper (it does — no further change). Update the memory note for ownership-limit afterwards.
 
 ### Files to touch
-- `src/stores/gameStore.ts` — projected-tax preview, arrears clearing fix, `sendArrearsToCourt` action, court resolution in month-end.
-- `src/lib/engine/taxation.ts` — export a `projectAnnualTax(state)` helper.
-- `src/lib/upcomingEvents.ts` — include projected tax in upcoming rows when ≤1 month away.
-- `src/types/game.ts` — `DebtRecoveryCase` type, `debtRecoveryCases: []` slice; add `arrearsRepaymentPennies?` field if needed.
-- `src/components/sections/HeroHeader.tsx` — tax-warning chip.
-- `src/components/ui/property-card.tsx` — amber "paying back" arrears pill + "Send to court" link.
-- `src/components/ui/operations-center.tsx` — new debt-recovery section.
-- `src/components/ui/activity-feed.tsx` — new category.
-- `src/components/ui/notification-centre.tsx` — projected-tax row styling.
-- New: `src/components/ui/debt-recovery-dialog.tsx`.
+
+- `src/components/ui/property-card.tsx` — strip dead space, inline footer hint.
+- `src/components/sections/PortfolioGrid.tsx` — tighten paddings/gaps.
+- `src/components/ui/renovation-dialog.tsx` — batch checkboxes, sticky combined-ROI footer, effective sqft preview.
+- `src/stores/gameStore.ts` — new `startRenovationBatch` action; conversion path uses effective sqft + consumes planning approval; bundle discount.
+- `src/lib/engine/market.ts` — extend `getMarketRentPounds` for subtype/units/upgrades.
+- `src/lib/engine/financials.ts` — bump cap to 9.
+- Memory update afterwards: `mem://game-mechanics/property-management/ownership-limit` (8 → 9).
 
 ### Out of scope
-- No backend changes. No new dependencies. Existing semantic tokens only (no raw hex).
-- Existing eviction / Section 8 flow untouched — debt recovery is a separate financial track and can run in parallel with an eviction.
+
+- No backend changes. No new dependencies. Existing semantic tokens only.
+- Existing Section 13 negotiation flow logic untouched — it just sees a more realistic market-rent figure.
+- Single-renovation flow remains available; batch is an opt-in checkbox mode.

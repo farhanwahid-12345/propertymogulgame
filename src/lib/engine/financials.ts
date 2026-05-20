@@ -80,7 +80,7 @@ export function getPropertyValueRangeForLevel(level: number): { min: number; max
   return { min: toPennies(min), max: toPennies(max) };
 }
 
-export function getMaxPropertiesForLevel(_level: number): number { return 8; }
+export function getMaxPropertiesForLevel(_level: number): number { return 9; }
 
 export function getAvailablePropertyTypes(level: number): string[] {
   if (level >= 5) return ['all'];

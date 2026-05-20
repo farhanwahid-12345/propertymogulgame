@@ -81,6 +81,7 @@ interface RenovationDialogProps {
   inPlanningCooldown?: boolean;
 }
 
+
 const RENOVATION_OPTIONS: RenovationType[] = [
   // Maintenance
   {
@@ -309,20 +310,35 @@ export function RenovationDialog({
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [conversionUnits, setConversionUnits] = useState<number>(4);
+  const [batchMode, setBatchMode] = useState<boolean>(false);
+  const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
-  // Conversion units: bounds depend on internalSqft
+  // Item 4a: effective internal sqft includes approved-but-not-built extensions.
+  const approvedSqftPending = (planningApplications || [])
+    .filter(a => a.status === 'approved')
+    .reduce((sum, a) => {
+      const r = RENOVATION_OPTIONS.find(o => o.id === a.renovationTypeId);
+      if (!r || !r.sqftAdded) return sum;
+      // Skip if already in progress or completed
+      if (activeRenovations.includes(r.id) || completedRenovationIds.includes(r.id)) return sum;
+      return sum + (r.sqftAdded || 0);
+    }, 0);
+  const effectiveInternalSqft = (internalSqft || 0) + approvedSqftPending;
+
+  // Conversion units: bounds depend on internalSqft (use effective so approved extensions count)
   const isConversion = (r: RenovationType | null) => !!r && r.category === 'conversion';
   const isHmo = (r: RenovationType | null) => !!r && r.id === 'convert_hmo';
   const isFlats = (r: RenovationType | null) => !!r && r.id === 'convert_flats';
-  const sqft = internalSqft || 900;
+  const sqft = effectiveInternalSqft || 900;
   const maxHmoUnits = Math.max(3, Math.min(8, Math.floor(sqft / 180)));
   const maxFlatUnits = Math.max(2, Math.min(5, Math.floor(sqft / 550)));
   const minUnits = (r: RenovationType | null) => isFlats(r) ? 2 : 3;
   const maxUnits = (r: RenovationType | null) => isFlats(r) ? maxFlatUnits : isHmo(r) ? maxHmoUnits : 1;
   const defaultUnits = (r: RenovationType | null) => isFlats(r) ? 2 : isHmo(r) ? 4 : 1;
 
+
   // All headline costs/rent/value uplifts are scaled to this property's profile
-  const scaleInputs = { internalSqft, propertyValue };
+  const scaleInputs = { internalSqft: effectiveInternalSqft || internalSqft, propertyValue };
   // Conversion multiplier for given option + units. For non-conversion = 1.
   const conversionMult = (r: RenovationType | null, units: number): number => {
     if (!isConversion(r)) return 1;
@@ -403,12 +419,13 @@ export function RenovationDialog({
     if (r.minPropertyValue && propertyValue < r.minPropertyValue) {
       return `Needs value ≥ £${r.minPropertyValue.toLocaleString()}`;
     }
-    if (r.minInternalSqft && internalSqft !== undefined && internalSqft < r.minInternalSqft) {
-      return `Needs ${r.minInternalSqft}+ sqft int (have ${internalSqft})`;
+    if (r.minInternalSqft && internalSqft !== undefined && effectiveInternalSqft < r.minInternalSqft) {
+      return `Needs ${r.minInternalSqft}+ sqft int (have ${effectiveInternalSqft})`;
     }
     if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
       return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
     }
+
     // Already-converted: hide ANY further conversion option.
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
       return `Already converted to ${currentSubtype}`;
@@ -437,8 +454,27 @@ export function RenovationDialog({
       
       <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Property Renovations</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>Property Renovations</DialogTitle>
+            <Button
+              variant={batchMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setBatchMode(!batchMode);
+                setBatchSelected(new Set());
+                setSelectedRenovation(null);
+              }}
+            >
+              {batchMode ? `✓ Batch mode (${batchSelected.size})` : "Enable batch mode"}
+            </Button>
+          </div>
+          {batchMode && (
+            <p className="text-xs text-muted-foreground">
+              Click cards to add/remove. Combined cost & ROI shown below. 5% discount on 3+ items.
+            </p>
+          )}
         </DialogHeader>
+
         
         <div className="space-y-6">
           {Object.entries(groupedRenovations).map(([category, renovations]) => (
@@ -489,18 +525,37 @@ export function RenovationDialog({
                   const valueHigh = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 1.4 : 1.0));
                   const expectedValueUp = Math.round(cappedValueUp * expectedMult);
 
+                  const inBatch = batchSelected.has(renovation.id);
+                  const batchConversionConflict = batchMode && renovation.category === 'conversion'
+                    && !inBatch
+                    && Array.from(batchSelected).some(id => {
+                      const o = RENOVATION_OPTIONS.find(x => x.id === id);
+                      return o?.category === 'conversion';
+                    });
+                  const batchPlanningBlock = batchMode && renovation.requiresPlanning && !planningApproved;
+
                   return (
                     <Card
                       key={renovation.id}
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
-                        isSelected && "ring-2 ring-primary",
+                        isSelected && !batchMode && "ring-2 ring-primary",
+                        inBatch && "ring-2 ring-success",
                         !selectable && !completed && "opacity-60",
                         blocked && "opacity-40 pointer-events-none",
+                        (batchConversionConflict || batchPlanningBlock) && batchMode && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
                       onClick={() => {
                         if (!selectable) return;
+                        if (batchMode) {
+                          if (batchPlanningBlock || batchConversionConflict) return;
+                          const next = new Set(batchSelected);
+                          if (next.has(renovation.id)) next.delete(renovation.id);
+                          else next.add(renovation.id);
+                          setBatchSelected(next);
+                          return;
+                        }
                         setSelectedRenovation(renovation);
                         if (renovation.category === 'conversion') {
                           setConversionUnits(defaultUnits(renovation));
@@ -510,9 +565,16 @@ export function RenovationDialog({
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
+                            {batchMode && (
+                              <span className={cn(
+                                "h-4 w-4 rounded border flex items-center justify-center text-[10px] shrink-0",
+                                inBatch ? "bg-success border-success text-success-foreground" : "border-muted-foreground/40"
+                              )}>{inBatch ? '✓' : ''}</span>
+                            )}
                             <Icon className="h-5 w-5 shrink-0" />
                             <CardTitle className="text-base">{renovation.name}</CardTitle>
                           </div>
+
                           <div className="flex flex-col items-end gap-1">
                             {completed ? (
                               <Badge className="bg-success/20 text-success border-success/30 text-xs">
@@ -796,7 +858,49 @@ export function RenovationDialog({
             </div>
           </div>
         )}
-        
+
+        {batchMode && batchSelected.size > 0 && (() => {
+          const items = Array.from(batchSelected)
+            .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
+            .filter(Boolean) as RenovationType[];
+          const rawCost = items.reduce((s, r) => s + scaledCost(r), 0);
+          const discount = items.length >= 3 ? 0.05 : 0;
+          const combinedCost = Math.round(rawCost * (1 - discount) / 50) * 50;
+          const combinedRent = items.reduce((s, r) => s + scaledRent(r), 0);
+          const rawValue = items.reduce((s, r) => s + scaledValue(r), 0);
+          const { uplift: combinedValue } = ceilingPrice > 0
+            ? applyCeilingDiminishingReturns(rawValue, propertyValue, ceilingPrice)
+            : { uplift: rawValue };
+          const expectedValue = Math.round(combinedValue * RENOVATION_EXPECTED_MULTIPLIER);
+          const maxDuration = Math.max(0, ...items.map(r => r.duration));
+          const sqftAdded = items.reduce((s, r) => s + (r.sqftAdded || 0), 0);
+          const annualRent = combinedRent * 12 * 0.85;
+          const fiveYr = ((expectedValue + combinedRent * 60 * 0.85 - combinedCost) / Math.max(1, combinedCost)) * 100;
+          return (
+            <div className="bg-muted p-4 rounded-lg mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Batch summary · {items.length} renovation{items.length > 1 ? 's' : ''}</h4>
+                {discount > 0 && (
+                  <Badge className="bg-success/20 text-success border-success/30 text-xs">
+                    Bundle discount −5%
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div><span className="text-muted-foreground text-xs">Combined cost</span><br/><span className={cn("font-semibold", playerCash >= combinedCost ? "text-foreground" : "text-danger")}>£{combinedCost.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Rent uplift / mo</span><br/><span className="font-semibold text-success">+£{combinedRent.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Value uplift (exp.)</span><br/><span className="font-semibold text-success">+£{expectedValue.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Longest duration</span><br/><span className="font-semibold">{maxDuration}d</span></div>
+                <div><span className="text-muted-foreground text-xs">Annual rent (85% occ)</span><br/><span className="font-semibold">£{Math.round(annualRent).toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">5-yr total ROI</span><br/><span className={cn("font-semibold", fiveYr >= 20 ? "text-success" : fiveYr >= 0 ? "text-amber-300" : "text-danger")}>{fiveYr >= 0 ? '+' : ''}{fiveYr.toFixed(1)}%</span></div>
+                {sqftAdded > 0 && (
+                  <div><span className="text-muted-foreground text-xs">Floor area</span><br/><span className="font-semibold text-success">+{sqftAdded} sqft</span></div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             Available Cash: £{playerCash.toLocaleString()}
@@ -805,7 +909,33 @@ export function RenovationDialog({
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            {(() => {
+            {batchMode ? (() => {
+              const items = Array.from(batchSelected)
+                .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
+                .filter(Boolean) as RenovationType[];
+              if (items.length === 0) return <Button disabled>Select renovations</Button>;
+              const rawCost = items.reduce((s, r) => s + scaledCost(r), 0);
+              const discount = items.length >= 3 ? 0.05 : 0;
+              const combinedCost = Math.round(rawCost * (1 - discount) / 50) * 50;
+              const disabled = playerCash < combinedCost;
+              return (
+                <Button
+                  disabled={disabled}
+                  onClick={() => {
+                    items.forEach(r => {
+                      const baseCost = scaledCost(r);
+                      const discounted = Math.round(baseCost * (1 - discount) / 50) * 50;
+                      onRenovate(propertyId, { ...r, cost: discounted });
+                    });
+                    setBatchSelected(new Set());
+                    setBatchMode(false);
+                    setIsOpen(false);
+                  }}
+                >
+                  Start {items.length} renovation{items.length > 1 ? 's' : ''} · £{combinedCost.toLocaleString()}
+                </Button>
+              );
+            })() : (() => {
               if (!selectedRenovation) {
                 return <Button disabled>Start Renovation</Button>;
               }
@@ -827,6 +957,7 @@ export function RenovationDialog({
             })()}
           </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );

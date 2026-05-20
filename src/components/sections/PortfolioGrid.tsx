@@ -30,17 +30,15 @@ export function PortfolioGrid({
   }
 
   return (
-    <div className="glass p-4 animate-fade-in">
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-            Your Empire 🏰
-            <Badge variant="secondary" className="text-xs">
-              {gameState.ownedProperties.length}
-              {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
-            </Badge>
-          </h2>
-        </div>
+    <div className="glass p-3 animate-fade-in">
+      <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+          Your Empire 🏰
+          <Badge variant="secondary" className="text-xs">
+            {gameState.ownedProperties.length}
+            {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
+          </Badge>
+        </h2>
         <div className="flex items-center gap-2 flex-wrap text-xs">
           <span className="text-muted-foreground">Value</span>
           <span className="font-semibold text-foreground">£{totalPortfolioValue.toLocaleString()}</span>
@@ -67,7 +65,8 @@ export function PortfolioGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+
         {conveyancingBuyProperties.map((property) => {
           const conv = (gameState.conveyancing || []).find((c) => c.propertyId === property.id);
           return (
