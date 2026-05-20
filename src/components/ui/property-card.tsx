@@ -708,7 +708,10 @@ export const PropertyCard = memo(function PropertyCard({
                     currentTier={(property as any).furnishingTier}
                     monthsRemaining={(property as any).furnishingMonthsRemaining}
                     hasTenant={!!currentTenant}
+                    baseRent={(property as any).baseRent || property.monthlyIncome}
+                    condition={property.condition as any}
                   />
+
                   <div className="col-span-full text-[10px] text-muted-foreground text-center">
                     To sell: use <strong className="text-foreground/80">Estate Agent</strong> or <strong className="text-foreground/80">Auction House</strong>
                   </div>
