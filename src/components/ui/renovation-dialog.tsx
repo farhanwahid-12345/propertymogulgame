@@ -992,15 +992,41 @@ export function RenovationDialog({
                 .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
                 .filter(Boolean) as RenovationType[];
               if (items.length === 0) return <Button disabled>Select renovations</Button>;
-              const rawCost = items.reduce((s, r) => s + scaledCost(r), 0);
-              const discount = items.length >= 3 ? 0.05 : 0;
+              const planningItems = items.filter(r => {
+                const app = findApplication(r.id);
+                return r.requiresPlanning && app?.status !== 'approved';
+              });
+              const worksItems = items.filter(r => !planningItems.includes(r));
+              if (planningItems.length > 0) {
+                const rawFee = planningItems.reduce((s, r) => s + (r.planningFee ?? 250), 0);
+                const planningDiscount = planningItems.length >= 2 ? 0.10 : 0;
+                const feeTotal = Math.round(rawFee * (1 - planningDiscount));
+                const disabled = playerCash < feeTotal;
+                return (
+                  <Button
+                    disabled={disabled}
+                    onClick={() => {
+                      const submitBatch = (useGameStoreSingleton.getState() as any).submitBatchPlanningApplications;
+                      submitBatch?.(propertyId, planningItems);
+                      setBatchSelected(new Set());
+                      setBatchMode(false);
+                      setIsOpen(false);
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    Submit {planningItems.length} planning application{planningItems.length > 1 ? 's' : ''} · £{feeTotal.toLocaleString()}
+                  </Button>
+                );
+              }
+              const rawCost = worksItems.reduce((s, r) => s + scaledCost(r), 0);
+              const discount = worksItems.length >= 3 ? 0.05 : 0;
               const combinedCost = Math.round(rawCost * (1 - discount) / 50) * 50;
               const disabled = playerCash < combinedCost;
               return (
                 <Button
                   disabled={disabled}
                   onClick={() => {
-                    items.forEach(r => {
+                    worksItems.forEach(r => {
                       const baseCost = scaledCost(r);
                       const discounted = Math.round(baseCost * (1 - discount) / 50) * 50;
                       onRenovate(propertyId, { ...r, cost: discounted });
@@ -1010,7 +1036,7 @@ export function RenovationDialog({
                     setIsOpen(false);
                   }}
                 >
-                  Start {items.length} renovation{items.length > 1 ? 's' : ''} · £{combinedCost.toLocaleString()}
+                  Start {worksItems.length} renovation{worksItems.length > 1 ? 's' : ''} · £{combinedCost.toLocaleString()}
                 </Button>
               );
             })() : (() => {
