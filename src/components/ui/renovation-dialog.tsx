@@ -532,7 +532,10 @@ export function RenovationDialog({
                       const o = RENOVATION_OPTIONS.find(x => x.id === id);
                       return o?.category === 'conversion';
                     });
-                  const batchPlanningBlock = batchMode && renovation.requiresPlanning && !planningApproved;
+                  // In batch mode we ALLOW planning-required renos so the player can submit
+                  // multiple LPA applications in one go. We only block when there's already
+                  // a pending application or the property is in cooldown.
+                  const batchPlanningBlock = batchMode && renovation.requiresPlanning && (planningPending || blockedByCooldown);
 
                   return (
                     <Card
