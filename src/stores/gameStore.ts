@@ -2454,6 +2454,16 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", `${property.name} is currently in conveyancing.`, "destructive"); return;
         }
+        const consent = evaluatePortfolioSaleConsent(
+          { id: property.id, value: property.value, monthlyIncome: property.monthlyIncome },
+          askingPrice,
+          prev.mortgages,
+          prev.ownedProperties.map(p => ({ id: p.id, value: p.value, monthlyIncome: p.monthlyIncome })),
+        );
+        if (!consent.ok) {
+          showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
+          return;
+        }
         const listing: PropertyListing = {
           propertyId, listingDate: Date.now(), isAuction: false,
           daysUntilSale: 30, askingPrice, offers: [], lastOfferCheck: Date.now(),
