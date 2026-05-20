@@ -14,7 +14,7 @@ import {
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dismissTour, ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
+import { ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
 import type { EntityType } from "@/types/game";
 
 interface Props {
