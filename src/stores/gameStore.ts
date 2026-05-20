@@ -1283,8 +1283,10 @@ export const useGameStore = create<GameState & GameActions>()(
         }, 0);
         // Active renovations are capital already spent — include as WIP asset
         const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
+        // Furniture as depreciating asset (matches useGameState calc).
+        const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p as any), 0);
         // Subtract drawn overdraft so leveling-up doesn't ignore borrowed money.
-        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP - prev.overdraftUsed;
+        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth - prev.overdraftUsed;
         let newLevel = prev.level;
         while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
         if (newLevel > prev.level) {
