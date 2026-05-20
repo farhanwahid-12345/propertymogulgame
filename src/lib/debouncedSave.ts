@@ -3,14 +3,25 @@
  * Implements PersistStorage<S> — getItem returns StorageValue (parsed),
  * setItem receives StorageValue (pre-parsed by Zustand).
  * Flushes pending writes on page unload to prevent data loss.
+ *
+ * Also exposes a module-level `flushPersistedSave()` so critical state changes
+ * (e.g. dismissing the tutorial) can force-write immediately, preventing a
+ * stale pending tick from clobbering them.
  */
+
+let activeFlush: (() => void) | null = null;
+
+export function flushPersistedSave() {
+  try { activeFlush?.(); } catch { /* noop */ }
+}
+
 export function createDebouncedStorage(delayMs: number = 2000) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pendingName: string | null = null;
   let pendingValue: string | null = null;
 
   function flush() {
-    if (timer) clearTimeout(timer);
+    if (timer) { clearTimeout(timer); timer = null; }
     if (pendingName !== null && pendingValue !== null) {
       try {
         localStorage.setItem(pendingName, pendingValue);
@@ -21,6 +32,9 @@ export function createDebouncedStorage(delayMs: number = 2000) {
       pendingValue = null;
     }
   }
+
+  // Register as the latest active flusher so flushPersistedSave() hits us.
+  activeFlush = flush;
 
   // Flush on page unload so saves are never lost
   if (typeof window !== 'undefined') {
@@ -49,7 +63,7 @@ export function createDebouncedStorage(delayMs: number = 2000) {
       timer = setTimeout(flush, delayMs);
     },
     removeItem(name: string): void {
-      if (timer) clearTimeout(timer);
+      if (timer) { clearTimeout(timer); timer = null; }
       pendingName = null;
       pendingValue = null;
       localStorage.removeItem(name);
