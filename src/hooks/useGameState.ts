@@ -115,10 +115,16 @@ export function useGameState() {
   // worth doesn't artificially dip while renovations are underway.
   const renovationsRaw = Array.isArray(store.renovations) ? store.renovations : [];
   const renovationWIP = renovationsRaw.reduce((sum: number, r: any) => sum + (r.type?.cost || 0), 0);
-  // Net worth = cash + in-flight buying escrow + renovation WIP + Σ property value − Σ mortgage debt − overdraft drawn.
+  // Furniture is a depreciating asset (straight-line over 60 months) — count
+  // the remaining undepreciated value so net worth reflects what was spent.
+  const furnitureValue = ownedPropertiesRaw.reduce(
+    (sum: number, p: any) => sum + fromPennies(getFurnitureValuePennies(p)),
+    0,
+  );
+  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ mortgage debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps.
-  const netWorth = cash + inflightBuyCapital + renovationWIP + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
+  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
   const nowTs = Date.now();
   const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
   const conveyancingPropertyIds = new Set(
