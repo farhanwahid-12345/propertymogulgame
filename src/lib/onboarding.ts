@@ -26,12 +26,23 @@ export function replayTour() {
   replayListeners.forEach((l) => { try { l(replayNonce); } catch { /* noop */ } });
 }
 
-/** Mark the tour as completed. Used by every exit button (Skip / Got it / X). */
+/** Mark the tour as completed. Used by every exit button (Skip / Got it / X).
+ * Refuses to complete onboarding while no trading entity has been chosen —
+ * the entity picker is mandatory and must not be bypassed. */
 export function dismissTour() {
+  const state = useGameStore.getState() as any;
+  if (!state.entityChosen) return;
   try { window.localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* noop */ }
   useGameStore.setState({ onboardingCompleted: true } as any);
   // Force the zustand persist write through immediately so a debounced tick
   // can't overwrite the dismissed flag with stale state.
+  flushPersistedSave();
+}
+
+/** Clear all tutorial persistence — used by resetGame so a fresh game can
+ * show the entity picker again without requiring a hard refresh. */
+export function clearOnboardingPersistence() {
+  try { window.localStorage.removeItem(ONBOARDING_DONE_KEY); } catch { /* noop */ }
   flushPersistedSave();
 }
 
