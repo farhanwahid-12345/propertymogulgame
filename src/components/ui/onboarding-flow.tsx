@@ -85,8 +85,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   }, [stage, open, setActiveTab]);
 
   const finish = useCallback(() => {
-    // Mark completed in the store FIRST (single source of truth) before notifying parent.
-    dismissTour();
+    // Parent handles persistence (dismissTour) — single write path.
     onFinish();
   }, [onFinish]);
 
@@ -95,8 +94,9 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   // ── Welcome ──
   if (stage === 'welcome') {
     return (
-      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) setStage('entity'); }}>
         <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
+
           <DialogHeader>
             <DialogTitle className="text-xl">Welcome to Property Tycoon 🏘️</DialogTitle>
             <DialogDescription>
