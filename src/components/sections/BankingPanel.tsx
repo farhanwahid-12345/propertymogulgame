@@ -205,6 +205,8 @@ export function TaxInlineButton({ gameState }: { gameState: GameState }) {
         monthsPlayed={gameState.monthsPlayed}
         lastCorporationTaxMonth={(gameState as any).lastCorporationTaxMonth || 0}
         unusedLossesPennies={(gameState as any).unusedLosses || 0}
+        lossesAppliedThisYearPennies={(gameState as any).lossesAppliedThisYear || 0}
+        lossesGeneratedThisYearPennies={(gameState as any).lossesGeneratedThisYear || 0}
       />
     </InlineDialogButton>
   );

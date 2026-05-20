@@ -18,6 +18,10 @@ interface Props {
   lastCorporationTaxMonth?: number;
   /** Item 5: losses brought forward (pennies). Offsets future taxable profits. */
   unusedLossesPennies?: number;
+  /** Losses applied within the current tax year (pennies). */
+  lossesAppliedThisYearPennies?: number;
+  /** Losses generated within the current tax year (pennies). */
+  lossesGeneratedThisYearPennies?: number;
 }
 
 const fmt = (pennies: number) =>
@@ -33,6 +37,8 @@ export function TaxBreakdown({
   monthsPlayed = 0,
   lastCorporationTaxMonth = 0,
   unusedLossesPennies = 0,
+  lossesAppliedThisYearPennies = 0,
+  lossesGeneratedThisYearPennies = 0,
 }: Props) {
   const isLtd = entityType === 'ltd';
 
@@ -161,11 +167,18 @@ export function TaxBreakdown({
         YTD updates each month as rent is collected — the projected figure smooths this out.
       </p>
 
-      {/* Item 5: losses brought forward */}
-      {unusedLossesPennies > 0 && (
-        <div className="text-xs flex items-center justify-between border-t border-white/10 pt-3">
-          <span className="text-muted-foreground">Losses brought forward (offset future profits)</span>
-          <span className="font-semibold text-emerald-300">{fmt(unusedLossesPennies)}</span>
+      {/* Item 5: losses brought forward — full relief block */}
+      {(unusedLossesPennies > 0 || lossesAppliedThisYearPennies > 0 || lossesGeneratedThisYearPennies > 0) && (
+        <div className="text-xs space-y-1 border-t border-white/10 pt-3">
+          <div className="text-muted-foreground font-medium flex items-center justify-between">
+            <span>Loss relief (carried forward)</span>
+            <span className="font-semibold text-emerald-300">{fmt(unusedLossesPennies)}</span>
+          </div>
+          <BandRow label="Applied this tax year" value={`− ${fmt(lossesAppliedThisYearPennies)}`} positive />
+          <BandRow label="Generated this tax year" value={`+ ${fmt(lossesGeneratedThisYearPennies)}`} />
+          <p className="text-[10px] text-muted-foreground italic">
+            UK rental losses can be carried forward indefinitely to offset future rental profits.
+          </p>
         </div>
       )}
 
