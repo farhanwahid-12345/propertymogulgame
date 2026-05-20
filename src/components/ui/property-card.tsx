@@ -648,8 +648,12 @@ export const PropertyCard = memo(function PropertyCard({
                               value: property.value,
                               yield: property.yield,
                               condition: property.condition as any,
+                              subtype: property.subtype,
+                              subtypeUnits: property.subtypeUnits,
+                              completedRenovationIds: property.completedRenovationIds,
                             }) || property.monthlyIncome
                           }
+
                           monthsSinceLastIncrease={
                             property.lastRentIncrease !== undefined
                               ? Math.max(0, (monthsPlayed ?? 0) - property.lastRentIncrease)
