@@ -16,6 +16,7 @@ import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCe
 import { computePlanningApprovalProbability } from "@/lib/engine/planning";
 import { getCeilingPrice } from "@/lib/engine/constants";
 import { Slider } from "@/components/ui/slider";
+import { useGameStore } from "@/stores/gameStore";
 
 export interface RenovationType {
   id: string;
@@ -1006,7 +1007,7 @@ export function RenovationDialog({
                   <Button
                     disabled={disabled}
                     onClick={() => {
-                      const submitBatch = (useGameStoreSingleton.getState() as any).submitBatchPlanningApplications;
+                      const submitBatch = (useGameStore.getState() as any).submitBatchPlanningApplications;
                       submitBatch?.(propertyId, planningItems);
                       setBatchSelected(new Set());
                       setBatchMode(false);
