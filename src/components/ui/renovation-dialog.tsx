@@ -419,12 +419,13 @@ export function RenovationDialog({
     if (r.minPropertyValue && propertyValue < r.minPropertyValue) {
       return `Needs value ≥ £${r.minPropertyValue.toLocaleString()}`;
     }
-    if (r.minInternalSqft && internalSqft !== undefined && internalSqft < r.minInternalSqft) {
-      return `Needs ${r.minInternalSqft}+ sqft int (have ${internalSqft})`;
+    if (r.minInternalSqft && internalSqft !== undefined && effectiveInternalSqft < r.minInternalSqft) {
+      return `Needs ${r.minInternalSqft}+ sqft int (have ${effectiveInternalSqft})`;
     }
     if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
       return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
     }
+
     // Already-converted: hide ANY further conversion option.
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
       return `Already converted to ${currentSubtype}`;
