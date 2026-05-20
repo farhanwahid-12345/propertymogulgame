@@ -1399,10 +1399,11 @@ export const useGameStore = create<GameState & GameActions>()(
             );
             taxPaid = effectiveTax;
             newUnusedLosses -= offsetUsed;
-            newLossesApplied += offsetUsed;
+            newLossesApplied = offsetUsed;
             // If gross profit was negative (rare for sole traders), accumulate as new loss.
             const grossLoss = Math.max(0, accumulatedDeductibleExpenses - accumulatedGrossRent);
-            if (grossLoss > 0) { newUnusedLosses += grossLoss; newLossesGenerated += grossLoss; }
+            newLossesGenerated = grossLoss;
+            if (grossLoss > 0) { newUnusedLosses += grossLoss; }
             const lossNote = offsetUsed > 0
               ? ` (loss b/f £${fromPennies(offsetUsed).toLocaleString()} used)`
               : grossLoss > 0
@@ -1417,7 +1418,8 @@ export const useGameStore = create<GameState & GameActions>()(
             if (preTaxProfit > 0) {
               offsetUsed = Math.min(newUnusedLosses, preTaxProfit);
               newUnusedLosses -= offsetUsed;
-              newLossesApplied += offsetUsed;
+              newLossesApplied = offsetUsed;
+              newLossesGenerated = 0;
               taxPaid = calculateCorporationTax(
                 accumulatedGrossRent - offsetUsed,
                 accumulatedMortgageInterest,
@@ -1425,7 +1427,8 @@ export const useGameStore = create<GameState & GameActions>()(
               );
             } else if (preTaxProfit < 0) {
               newUnusedLosses += -preTaxProfit;
-              newLossesGenerated += -preTaxProfit;
+              newLossesGenerated = -preTaxProfit;
+              newLossesApplied = 0;
               taxPaid = 0;
             }
             const taxableAfter = Math.max(0, preTaxProfit - offsetUsed);
