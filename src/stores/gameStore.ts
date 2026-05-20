@@ -1230,6 +1230,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Resolve pending planning applications whose decision month has arrived ──
         let newPlanningApplications = [...(prev.planningApplications || [])];
         const newlyApprovedPlanningIds: string[] = [];
+        const newlyRefusedPlanningIds: string[] = [];
         newPlanningApplications = newPlanningApplications.map(app => {
           if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
             const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
@@ -1243,6 +1244,7 @@ export const useGameStore = create<GameState & GameActions>()(
               );
               flashOps();
             } else {
+              newlyRefusedPlanningIds.push(app.id);
               showToast(
                 "Planning Refused ❌",
                 `${app.renovationName} on ${propName} refused: ${app.refusalReason || 'planning grounds'}. 6-month cooldown before resubmission.`,
@@ -1260,9 +1262,14 @@ export const useGameStore = create<GameState & GameActions>()(
           }
           return app;
         });
-        // Drop refused applications that have been visible for 1+ month (acknowledged via toast)
+        // Drop refused applications only after the player has acknowledged them
+        // via the refusal dialog (id removed from pendingPlanningRefusals).
+        const refusalQueue = new Set<string>([
+          ...((prev as any).pendingPlanningRefusals || []),
+          ...newlyRefusedPlanningIds,
+        ]);
         newPlanningApplications = newPlanningApplications.filter(app => {
-          if (app.status === 'refused' && newMonthNumber - app.decisionMonth >= 2) return false;
+          if (app.status === 'refused' && !refusalQueue.has(app.id)) return false;
           return true;
         });
 
