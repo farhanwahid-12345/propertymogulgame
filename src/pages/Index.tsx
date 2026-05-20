@@ -38,7 +38,9 @@ function OnboardingGate({
 
   // Local "dismissed" flag = instant close for the tour. Entity picker is never
   // dismissible — players must pick a trading entity before the game runs.
-  const [dismissed, setDismissed] = useState<boolean>(() => !!entityChosen && !!onboardingCompleted);
+  const [dismissed, setDismissed] = useState<boolean>(
+    () => !!entityChosen && (!!onboardingCompleted || onboardingModule.isTourDismissedInStorage()),
+  );
   const [replayNonce, setReplayNonce] = useState<number>(() => onboardingModule.getReplayNonce());
 
   // Mirror store → local dismissed, but only once an entity is chosen, so the
@@ -46,6 +48,16 @@ function OnboardingGate({
   // entity picker on a freshly-reset game.
   useEffect(() => {
     if (entityChosen && onboardingCompleted) setDismissed(true);
+  }, [entityChosen, onboardingCompleted]);
+
+  // Defensive: if localStorage records a dismissal but the store somehow lost
+  // it (stale debounced save overwrite, etc.), repair the store. Only kicks in
+  // once entity is chosen so it never bypasses the first-time entity picker.
+  useEffect(() => {
+    if (entityChosen && !onboardingCompleted && onboardingModule.isTourDismissedInStorage()) {
+      setDismissed(true);
+      useGameStore.setState({ onboardingCompleted: true } as any);
+    }
   }, [entityChosen, onboardingCompleted]);
 
   // Subscribe to explicit replay requests — reopen and reset dismissal.

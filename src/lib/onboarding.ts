@@ -1,4 +1,5 @@
 import { useGameStore } from "@/stores/gameStore";
+import { flushPersistedSave } from "@/lib/debouncedSave";
 
 export const ONBOARDING_DONE_KEY = "pm_onboarding_done";
 
@@ -20,6 +21,7 @@ export function getReplayNonce(): number {
 export function replayTour() {
   try { window.localStorage.removeItem(ONBOARDING_DONE_KEY); } catch { /* noop */ }
   useGameStore.setState({ onboardingCompleted: false } as any);
+  flushPersistedSave();
   replayNonce += 1;
   replayListeners.forEach((l) => { try { l(replayNonce); } catch { /* noop */ } });
 }
@@ -28,4 +30,14 @@ export function replayTour() {
 export function dismissTour() {
   try { window.localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* noop */ }
   useGameStore.setState({ onboardingCompleted: true } as any);
+  // Force the zustand persist write through immediately so a debounced tick
+  // can't overwrite the dismissed flag with stale state.
+  flushPersistedSave();
+}
+
+/** Defensive read for the OnboardingGate — true if the user previously
+ * dismissed the tour according to localStorage. */
+export function isTourDismissedInStorage(): boolean {
+  try { return window.localStorage.getItem(ONBOARDING_DONE_KEY) === '1'; }
+  catch { return false; }
 }
