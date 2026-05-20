@@ -33,9 +33,12 @@ interface PropertyOffersProps {
   onAcceptOffer: (property: Property, offer: PropertyOffer) => void;
   daysOnMarket: number;
   existingOffers?: PropertyOffer[];
+  /** Listing asking price (pounds). Falls back to market value if absent. */
+  askingPrice?: number;
 }
 
-export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysOnMarket, existingOffers }: PropertyOffersProps) {
+export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysOnMarket, existingOffers, askingPrice }: PropertyOffersProps) {
+  const asking = askingPrice ?? property.value;
   // Generate realistic offers based on time on market
   const generateOffers = (daysOnMarket: number): PropertyOffer[] => {
     const offers: PropertyOffer[] = [];
