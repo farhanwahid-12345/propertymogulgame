@@ -131,7 +131,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   // ── Entity pick ──
   if (stage === 'entity') {
     return (
-      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+      <Dialog open={open} onOpenChange={() => { /* entity choice is mandatory; ignore close */ }}>
         <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl">How will you trade?</DialogTitle>
