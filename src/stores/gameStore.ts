@@ -3162,44 +3162,119 @@ export const useGameStore = create<GameState & GameActions>()(
         // Convert "days" duration into in-game months (~30 days/month).
         const monthsToComplete = Math.max(1, Math.round(renovationType.duration / 30));
         const startMonth = prev.monthsPlayed;
-        const completionMonth = startMonth + monthsToComplete;
+
+        // ─── Item 4(c): auto-queue prerequisite extensions ──────────────
+        // If this is a conversion AND the property has approved-but-unbuilt
+        // extensions, start them in lockstep so the conversion physically
+        // lands on the larger footprint it was sized against.
+        const prerequisiteExtensions: Array<{ renoType: RenovationType; scaledCost: number; scaledRent: number; scaledValue: number; costPennies: number; months: number }> = [];
+        if (renovationType.category === 'conversion' && property) {
+          const activeAndCompleted = new Set([...activeRenoIds, ...completedRenoIds]);
+          const approvedExtensionApps = (prev.planningApplications || []).filter(a =>
+            a.propertyId === propertyId && a.status === 'approved',
+          );
+          for (const app of approvedExtensionApps) {
+            const opt = RENOVATION_OPTIONS.find(o => o.id === app.renovationTypeId);
+            if (!opt || opt.category !== 'extension') continue;
+            if (activeAndCompleted.has(opt.id)) continue;
+            // Scale extension against the property's CURRENT internalSqft so we
+            // don't double-count its own sqft addition.
+            const extScale = { internalSqft: property.internalSqft, propertyValue: fromPennies(property.value) };
+            const extCostPounds = scaleRenovationCost(opt.cost, extScale);
+            const extRent = scaleRenovationRent(opt.rentIncrease, extScale);
+            const extValue = scaleRenovationValue(opt.valueIncrease, extScale);
+            const extCostPennies = toPennies(extCostPounds);
+            const extMonths = Math.max(1, Math.round(opt.duration / 30));
+            prerequisiteExtensions.push({ renoType: opt, scaledCost: extCostPounds, scaledRent: extRent, scaledValue: extValue, costPennies: extCostPennies, months: extMonths });
+          }
+        }
+
+        // Debit prerequisite costs in addition to the main renovation.
+        const extraCostPennies = prerequisiteExtensions.reduce((s, e) => s + e.costPennies, 0);
+        let cashAfter = debited.cash;
+        let overdraftAfter = debited.overdraftUsed;
+        let extraOverdraftUsed = 0;
+        if (extraCostPennies > 0) {
+          const extraDebited = debit({ ...prev, cash: cashAfter, overdraftUsed: overdraftAfter }, extraCostPennies);
+          if (!extraDebited) {
+            showToast(
+              "Insufficient Funds",
+              `Conversion needs an extra £${fromPennies(extraCostPennies).toLocaleString()} to also build the approved extension(s).`,
+              "destructive",
+            );
+            return;
+          }
+          cashAfter = extraDebited.cash;
+          overdraftAfter = extraDebited.overdraftUsed;
+          extraOverdraftUsed = extraDebited.usedOverdraft;
+        }
+
+        // The conversion can't physically complete before its prerequisite
+        // extension(s); align completion to the longest pole.
+        const longestPrereqMonths = prerequisiteExtensions.reduce((m, e) => Math.max(m, e.months), 0);
+        const effectiveConversionMonths = Math.max(monthsToComplete, longestPrereqMonths);
+        const completionMonth = startMonth + effectiveConversionMonths;
         const renovation: Renovation = {
           id: `${propertyId}_${renovationType.id}_${Date.now()}`, propertyId,
           type: scaledRenovationType, startDate: Date.now(),
-          completionDate: Date.now() + (monthsToComplete * 180 * 1000),
+          completionDate: Date.now() + (effectiveConversionMonths * 180 * 1000),
           startMonth,
           completionMonth,
         };
-        const overdraftNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
-        showToast("Renovation Started!", `${renovationType.name} begun.${overdraftNote}`);
-        // Consume the matching planning approval (if any) so the player can't reuse it.
-        const consumedPlanning = renovationType.requiresPlanning
-          ? (prev.planningApplications || []).filter(
-              a => !(a.propertyId === propertyId && a.renovationTypeId === renovationType.id && a.status === 'approved'),
-            )
-          : prev.planningApplications;
+        const extensionRenovations: Renovation[] = prerequisiteExtensions.map((e, i) => ({
+          id: `${propertyId}_${e.renoType.id}_${Date.now()}_${i}`,
+          propertyId,
+          type: { ...e.renoType, cost: e.scaledCost, rentIncrease: e.scaledRent, valueIncrease: e.scaledValue },
+          startDate: Date.now(),
+          completionDate: Date.now() + (e.months * 180 * 1000),
+          startMonth,
+          completionMonth: startMonth + e.months,
+        }));
+
+        const totalOverdraft = debited.usedOverdraft + extraOverdraftUsed;
+        const overdraftNote = totalOverdraft > 0 ? ` (£${fromPennies(totalOverdraft).toLocaleString()} via overdraft)` : '';
+        const prereqNote = prerequisiteExtensions.length > 0
+          ? ` Bundled with ${prerequisiteExtensions.map(e => e.renoType.name).join(', ')}.`
+          : '';
+        showToast("Renovation Started!", `${renovationType.name} begun.${prereqNote}${overdraftNote}`);
+
+        // Consume planning approvals: the main renovation's (if it needed one)
+        // AND every prerequisite extension's approval.
+        const consumedExtIds = new Set(prerequisiteExtensions.map(e => e.renoType.id));
+        const consumedPlanning = (prev.planningApplications || []).filter(a => {
+          if (a.propertyId !== propertyId) return true;
+          if (a.status !== 'approved') return true;
+          if (renovationType.requiresPlanning && a.renovationTypeId === renovationType.id) return false;
+          if (consumedExtIds.has(a.renovationTypeId)) return false;
+          return true;
+        });
+
         // Track cumulative renovation spend, splitting capital vs revenue:
         //   • Revenue (maintenance/improvement) → adds to yearly deductible expenses now
         //   • Capital (extension/conversion)    → adds to property.capitalImprovementsPennies for CGT later
         const isRevenue = isDeductibleRevenueRenovation(renovationType.category);
+        const mainCapital = isRevenue ? 0 : costPennies;
+        const mainRevenue = isRevenue ? costPennies : 0;
+        const extCapital = prerequisiteExtensions.reduce((s, e) =>
+          s + (isDeductibleRevenueRenovation(e.renoType.category) ? 0 : e.costPennies), 0);
+        const extRevenue = prerequisiteExtensions.reduce((s, e) =>
+          s + (isDeductibleRevenueRenovation(e.renoType.category) ? e.costPennies : 0), 0);
+        const totalSpend = costPennies + extraCostPennies;
+        const totalCapital = mainCapital + extCapital;
         const updatedOwned = prev.ownedProperties.map(p =>
           p.id === propertyId
             ? {
                 ...p,
-                totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + costPennies,
-                capitalImprovementsPennies: isRevenue
-                  ? (p.capitalImprovementsPennies || 0)
-                  : (p.capitalImprovementsPennies || 0) + costPennies,
+                totalRenovationSpendPennies: (p.totalRenovationSpendPennies || 0) + totalSpend,
+                capitalImprovementsPennies: (p.capitalImprovementsPennies || 0) + totalCapital,
               }
             : p,
         );
-        const newDeductibleExpenses = isRevenue
-          ? (prev.yearlyDeductibleExpenses || 0) + costPennies
-          : (prev.yearlyDeductibleExpenses || 0);
+        const newDeductibleExpenses = (prev.yearlyDeductibleExpenses || 0) + mainRevenue + extRevenue;
         set({
-          cash: debited.cash,
-          overdraftUsed: debited.overdraftUsed,
-          renovations: [...prev.renovations, renovation],
+          cash: cashAfter,
+          overdraftUsed: overdraftAfter,
+          renovations: [...prev.renovations, renovation, ...extensionRenovations],
           planningApplications: consumedPlanning,
           ownedProperties: updatedOwned,
           yearlyDeductibleExpenses: newDeductibleExpenses,
