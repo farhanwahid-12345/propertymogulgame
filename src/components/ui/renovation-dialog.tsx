@@ -454,8 +454,27 @@ export function RenovationDialog({
       
       <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Property Renovations</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>Property Renovations</DialogTitle>
+            <Button
+              variant={batchMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setBatchMode(!batchMode);
+                setBatchSelected(new Set());
+                setSelectedRenovation(null);
+              }}
+            >
+              {batchMode ? `✓ Batch mode (${batchSelected.size})` : "Enable batch mode"}
+            </Button>
+          </div>
+          {batchMode && (
+            <p className="text-xs text-muted-foreground">
+              Click cards to add/remove. Combined cost & ROI shown below. 5% discount on 3+ items.
+            </p>
+          )}
         </DialogHeader>
+
         
         <div className="space-y-6">
           {Object.entries(groupedRenovations).map(([category, renovations]) => (
