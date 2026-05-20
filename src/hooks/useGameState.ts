@@ -17,7 +17,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import { Property } from "@/components/ui/property-card";
 import { COUNCIL_TAX_BAND_D, MORTGAGE_PROVIDERS } from "@/lib/engine/constants";
-import { calculateDTI, getMaxPropertiesForLevel, getAvailablePropertyTypes, getMaxPropertyValue } from "@/lib/engine/financials";
+import { calculateDTI, getMaxPropertiesForLevel, getAvailablePropertyTypes, getMaxPropertyValue, getFurnitureValuePennies } from "@/lib/engine/financials";
 import { deriveSqft } from "@/lib/engine/market";
 import type { Tenant } from "@/components/ui/tenant-selector";
 
