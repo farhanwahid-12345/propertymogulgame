@@ -338,7 +338,7 @@ export function RenovationDialog({
 
 
   // All headline costs/rent/value uplifts are scaled to this property's profile
-  const scaleInputs = { internalSqft, propertyValue };
+  const scaleInputs = { internalSqft: effectiveInternalSqft || internalSqft, propertyValue };
   // Conversion multiplier for given option + units. For non-conversion = 1.
   const conversionMult = (r: RenovationType | null, units: number): number => {
     if (!isConversion(r)) return 1;
