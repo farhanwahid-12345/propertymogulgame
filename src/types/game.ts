@@ -401,6 +401,10 @@ export interface GameState {
   totalTaxPaid: number; // pennies - lifetime
   /** Item 5: UK loss carry-forward — losses (pennies) brought forward to offset future taxable profits. */
   unusedLosses?: number;
+  /** Pennies of losses applied within the current tax year (reset each April). */
+  lossesAppliedThisYear?: number;
+  /** Pennies of losses generated within the current tax year (reset each April). */
+  lossesGeneratedThisYear?: number;
   // Tenant concerns
   tenantConcerns: TenantConcern[];
   // Renters' Rights — eviction notice queue & post-eviction property locks
@@ -482,4 +486,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;

@@ -176,6 +176,8 @@ function createInitialState(): GameState {
     taxRecords: [],
     totalTaxPaid: 0,
     unusedLosses: 0,
+    lossesAppliedThisYear: 0,
+    lossesGeneratedThisYear: 0,
     tenantConcerns: [],
     pendingEvictions: [],
     propertyLocks: [],
