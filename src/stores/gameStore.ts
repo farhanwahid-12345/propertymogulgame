@@ -1703,7 +1703,8 @@ export const useGameStore = create<GameState & GameActions>()(
           const m = finalMortgages.find(mt => mt.propertyId === p.id);
           return t + p.value - (m?.remainingBalance || 0);
         }, 0);
-        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP;
+        const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p as any), 0);
+        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal;
 
         let isBankrupt = false;
         if (inDistress) {
