@@ -80,7 +80,7 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
   };
 
   const getBadgeVariant = (offer: PropertyOffer) => {
-    const percentage = (offer.amount / property.value) * 100;
+    const percentage = (offer.amount / asking) * 100;
     if (percentage >= 95) return "default";
     if (percentage >= 90) return "secondary";
     return "outline";
@@ -105,7 +105,8 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
                   <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold">£{property.value.toLocaleString()}</div>
+                  <div className="font-semibold">£{asking.toLocaleString()}</div>
+                  <div className="text-[10px] text-muted-foreground">Asking · Market £{property.value.toLocaleString()}</div>
                   <Badge variant="outline" className="mt-1">
                     <Clock className="h-3 w-3 mr-1" />
                     {daysOnMarket} days on market
@@ -143,7 +144,7 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>Offered {offer.daysOnMarket} days ago</span>
                           <span>
-                            {((offer.amount / property.value) * 100).toFixed(1)}% of asking price
+                            {((offer.amount / asking) * 100).toFixed(1)}% of asking price
                           </span>
                         </div>
                       </div>
@@ -154,8 +155,8 @@ export function PropertyOffers({ property, isOpen, onClose, onAcceptOffer, daysO
                             £{offer.amount.toLocaleString()}
                           </div>
                           <Badge variant={getBadgeVariant(offer)}>
-                            {offer.amount >= property.value ? "Full Price" : 
-                             offer.amount >= property.value * 0.95 ? "Strong Offer" : "Below Asking"}
+                            {offer.amount >= asking ? "Full Price" : 
+                             offer.amount >= asking * 0.95 ? "Strong Offer" : "Below Asking"}
                           </Badge>
                         </div>
                         

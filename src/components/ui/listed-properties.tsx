@@ -211,6 +211,7 @@ export function ListedProperties({ propertyListings, ownedProperties, onAcceptOf
           onAcceptOffer={onAcceptOffer}
           daysOnMarket={Math.floor((Date.now() - selectedProperty.listing.listingDate) / (1000 * 60 * 60 * 24))}
           existingOffers={selectedProperty.listing.offers}
+          askingPrice={selectedProperty.listing.askingPrice}
         />
       )}
     </>
