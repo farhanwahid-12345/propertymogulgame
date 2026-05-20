@@ -577,7 +577,45 @@ export const useGameStore = create<GameState & GameActions>()(
           const salePrice = conv.salePrice || 0;
           const fees = conv.isAuction ? Math.round(salePrice * AUCTION_SELLER_FEE) : Math.round(salePrice * ESTATE_AGENT_RATE);
           const mortgage = newMortgages.find(m => m.propertyId === conv.propertyId);
-          const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0);
+
+          // ─── Portfolio mortgage redemption ───────────────────────────
+          // If this property collateralises a portfolio mortgage, the lender
+          // takes a proportional redemption slice from sale proceeds and
+          // drops the property from the collateral list.
+          let portfolioRedemption = 0;
+          const portfolioIdx = newMortgages.findIndex(
+            m => m.collateralPropertyIds && m.collateralPropertyIds.includes(conv.propertyId),
+          );
+          if (portfolioIdx >= 0) {
+            const pm = newMortgages[portfolioIdx];
+            const collateralProps = (pm.collateralPropertyIds || [])
+              .map(id => newOwnedProperties.find(p => p.id === id))
+              .filter((p): p is typeof newOwnedProperties[number] => !!p);
+            const totalCollateralValue = collateralProps.reduce((s, p) => s + p.value, 0);
+            const propBeingSold = collateralProps.find(p => p.id === conv.propertyId);
+            if (totalCollateralValue > 0 && propBeingSold) {
+              portfolioRedemption = Math.min(
+                pm.remainingBalance,
+                Math.floor(pm.remainingBalance * (propBeingSold.value / totalCollateralValue)),
+              );
+              const newBalance = pm.remainingBalance - portfolioRedemption;
+              const newCollateralIds = (pm.collateralPropertyIds || []).filter(id => id !== conv.propertyId);
+              if (newBalance <= 0 || newCollateralIds.length === 0) {
+                // Mortgage cleared — remove it entirely.
+                newMortgages = newMortgages.filter((_, i) => i !== portfolioIdx);
+              } else {
+                const scale = newBalance / pm.remainingBalance;
+                newMortgages = newMortgages.map((m, i) => i === portfolioIdx ? {
+                  ...m,
+                  remainingBalance: newBalance,
+                  monthlyPayment: Math.floor(m.monthlyPayment * scale),
+                  collateralPropertyIds: newCollateralIds,
+                } : m);
+              }
+            }
+          }
+
+          const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0) - portfolioRedemption;
 
           // CGT for sole traders — capital improvement spend (extensions/
           // conversions) increases the cost base, reducing the taxable gain.
@@ -595,7 +633,10 @@ export const useGameStore = create<GameState & GameActions>()(
           newVoidPeriods = newVoidPeriods.filter(vp => vp.propertyId !== conv.propertyId);
           newPropertyListings = newPropertyListings.filter(l => l.propertyId !== conv.propertyId);
 
-          showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}`);
+          const redemptionNote = portfolioRedemption > 0
+            ? ` · £${fromPennies(portfolioRedemption).toLocaleString()} redeemed to portfolio lender`
+            : '';
+          showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}${redemptionNote}`);
           playGavel();
         });
 
