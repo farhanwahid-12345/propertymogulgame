@@ -1,34 +1,41 @@
 ## Goal
-Stop the tutorial from getting stuck/reappearing, while preserving the required first-time choice between Sole Trader and Limited Company and keeping “Replay tour” working.
+Two fixes for the dashboard:
+1. Remove the dead vertical gap above the "Your Empire" portfolio grid so cards sit directly under the tabs row.
+2. Treat installed furnishings as a depreciating asset in net worth.
 
-## Root cause to fix
-The entity picker and tour completion are currently mixed together. Some close/skip paths mark the tour as completed before an entity is chosen, while the gate still forces onboarding open because `entityChosen` remains false. That creates a broken in-memory state that a refresh repairs from persisted storage.
+## 1. Dead space above Your Empire
 
-## Implementation plan
+The gap comes from three stacked elements that all stay rendered even when empty:
+- `Tabs` always reserves vertical space for the Market tab's helper text.
+- The `min-h-[68px]` wrapper around the Action Required section reserves ~68px even when there are no alerts.
+- The Listed Properties collapsible still takes a header row when empty.
 
-1. **Separate entity choice from tour dismissal**
-   - In `OnboardingFlow`, closing/skipping the welcome screen before entity selection should move to the entity picker, not dismiss the whole onboarding flow.
-   - The dialog close handler should only finish the tour when `skipEntity` is true or the flow is already in tour steps.
-   - Keep the entity picker mandatory: no path should set `onboardingCompleted: true` while `entityChosen` is false.
+Changes in `src/pages/Index.tsx`:
+- Drop the always-rendered helper paragraph inside `TabsContent value="market"` (or render only when the player has no estate-agent action yet) so the tab content collapses to zero height after onboarding.
+- Replace the `min-h-[68px]` wrapper with conditional rendering: only mount the Action Required section when there is at least one entry (pending eviction, deposit dispute, or arrears). Keep the original `CollapsibleSection` intact for when alerts exist.
+- Only render the Listed Properties `CollapsibleSection` when `propertyListings.length > 0`.
+- Tighten the container's `space-y-3` interaction with the now-removable wrappers so the Portfolio grid moves up immediately.
 
-2. **Make choosing an entity atomic**
-   - Add a helper in `src/lib/onboarding.ts` for completing onboarding after an entity is selected.
-   - Ensure `setEntityType(...)` and tour dismissal cannot race each other: the entity choice is applied first, then onboarding completion is persisted immediately.
-   - Remove duplicate `dismissTour()` calls between `OnboardingFlow.finish()` and `OnboardingGate.onFinish()` so completion writes happen once.
+No styling changes to the portfolio cards themselves — this is purely about removing empty siblings above them.
 
-3. **Harden the gate against impossible state**
-   - Update `OnboardingGate` so the fallback localStorage dismissal can only suppress the tour, never the entity picker.
-   - If storage says the tour is done but the store says `entityChosen: false`, always show the entity picker and reset the flow to that stage.
-   - If `entityChosen: true` and localStorage says dismissed, repair `onboardingCompleted: true` and flush persistence.
+## 2. Furniture counted in net worth (with depreciation)
 
-4. **Reset and replay behavior**
-   - `resetGame()` should clear the tutorial localStorage marker as part of starting a fresh game, so the new player can choose Sole Trader/Limited Company again without relying on refresh.
-   - `Replay tour` should reopen the tour without changing the already-chosen entity.
+Furniture is currently a sunk cost: `furnishProperty` debits cash, sets `furnishingTier` + `furnishingMonthsRemaining` (60-month life), but the value never appears as an asset and silently disappears.
 
-5. **Verify the exact bug path**
-   - Check these flows in the preview:
-     - Fresh/reset game: welcome opens, entity buttons are selectable, no refresh needed.
-     - Skip intro/close before entity selection: goes to entity picker, does not get stuck.
-     - Pick Sole Trader/Limited Company: game continues and tutorial does not reappear.
-     - Refresh after choosing: no tutorial unless Replay tour is clicked.
-     - Reset game: entity picker appears again and works immediately.
+Approach: treat furniture as a separate depreciating asset, linear straight-line over the 60-month life, derived from the current tier and remaining months. No new persisted fields needed.
+
+Changes:
+- `src/lib/engine/financials.ts` (new small helper): `getFurnitureValuePennies(property)` returns `costPerSqft(tier) * internalSqft * (monthsRemaining / 60) * 100`, using the same per-sqft costs as `furnishProperty` (`part_furnished = £8`, `fully_furnished = £18`). Returns 0 when unfurnished or months remaining is 0/undefined.
+- `src/hooks/useGameState.ts`: add `furnitureValue = Σ getFurnitureValuePennies(property) → pounds` over `ownedPropertiesRaw` and include it in the `netWorth` calculation alongside `renovationWIP` and property value.
+- `src/stores/gameStore.ts` (`triggerLevelUp` / level-up net worth recomputation around line 1287, and bankruptcy net-worth recomputation around line 1699 and 1704): include the same furniture asset so the store-side net worth tracks the UI value and level-ups/bankruptcy thresholds stay consistent.
+- Verify the monthly depreciation step in `processMonthEnd` (around line 791–799) still ticks `furnishingMonthsRemaining` down — net worth naturally falls each month as a result.
+
+### Notes
+- No new state field is added; the depreciation curve is fully derived from `furnishingTier` + `furnishingMonthsRemaining` already on each property.
+- Furniture value never exceeds the original install cost and reaches £0 the month it reverts to `unfurnished`.
+- The cashflow breakdown and rent multipliers are untouched.
+
+## Verification
+- Empty dashboard (no alerts, no listings): Portfolio sits right under the tabs row, no visible gap.
+- Furnish a property: net worth jumps by less than the cash cost (because new furniture is valued at its undepreciated cost minus the implicit first-month tick), then declines a fixed amount each month until it hits zero at month 60.
+- Selling/conveyancing of an unfurnished property is unaffected.

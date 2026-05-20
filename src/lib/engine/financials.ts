@@ -99,3 +99,32 @@ export function getRequiredNetWorth(level: number): number {
   if (level === 2) return toPennies(250_000);
   return toPennies(250_000) * Math.pow(2, level - 2);
 }
+
+/** Per-sqft furnishing install cost (pounds). Mirrors `furnishProperty`. */
+export function getFurnishingCostPerSqft(
+  tier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
+): number {
+  if (tier === 'fully_furnished') return 18;
+  if (tier === 'part_furnished') return 8;
+  return 0;
+}
+
+/** Current depreciated furniture value for a property, in pennies.
+ * Straight-line over a 60-month life. £0 when unfurnished or fully depreciated. */
+export function getFurnitureValuePennies(property: {
+  internalSqft?: number;
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  furnishingMonthsRemaining?: number;
+}): number {
+  const tier = property.furnishingTier;
+  const monthsRemaining = property.furnishingMonthsRemaining;
+  if (!tier || tier === 'unfurnished') return 0;
+  if (!monthsRemaining || monthsRemaining <= 0) return 0;
+  const sqft = property.internalSqft || 800;
+  const costPerSqft = getFurnishingCostPerSqft(tier);
+  if (costPerSqft <= 0) return 0;
+  const installCostPennies = toPennies(sqft * costPerSqft);
+  const remainingFraction = Math.min(1, Math.max(0, monthsRemaining / 60));
+  return Math.floor(installCostPennies * remainingFraction);
+}
+
