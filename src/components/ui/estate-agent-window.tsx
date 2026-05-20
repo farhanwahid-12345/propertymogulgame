@@ -518,13 +518,14 @@ export function EstateAgentWindow({
               </div>
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {affordableProperties.slice(0, 12).map((property) => (
-                <Card 
+            <p className="text-[10px] text-muted-foreground italic px-1">*Actual rent varies by tenant</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {affordableProperties.slice(0, 20).map((property) => (
+                <Card
                   key={property.id}
-                  className={`cursor-pointer transition-all ${
-                    selectedBuyProperty?.id === property.id 
-                      ? 'ring-2 ring-primary' 
+                  className={`cursor-pointer transition-all p-3 space-y-1 ${
+                    selectedBuyProperty?.id === property.id
+                      ? 'ring-2 ring-primary'
                       : 'hover:shadow-lg'
                   }`}
                   onClick={() => {
@@ -533,35 +534,28 @@ export function EstateAgentWindow({
                     resetNegotiation();
                   }}
                 >
-                  <CardHeader>
-                    <CardTitle className="text-lg">{property.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm">Price:</span>
-                        <span className="font-bold">£{property.value.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">Type:</span>
-                        <span className="text-sm font-medium">{property.type}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">Avg Yield:</span>
-                        <Badge variant="secondary" className="text-sm">
-                          {property.yield ? `${property.yield.toFixed(1)}%` : 'N/A'}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm">Base Rent:</span>
-                        <span className="text-sm text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        *Actual rent varies by tenant
-                      </p>
-                    </div>
-                  </CardContent>
+                  <div>
+                    <div className="text-sm font-semibold leading-tight">{property.name}</div>
+                    <div className="text-[11px] text-muted-foreground leading-tight">{property.neighborhood}</div>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Price</span>
+                    <span className="font-bold">£{property.value.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Type</span>
+                    <span className="font-medium capitalize">{property.type}</span>
+                  </div>
+                  <div className="flex justify-between text-xs items-center">
+                    <span className="text-muted-foreground">Avg Yield</span>
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                      {property.yield ? `${property.yield.toFixed(1)}%` : 'N/A'}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Base Rent</span>
+                    <span className="text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
+                  </div>
                 </Card>
               ))}
             </div>
