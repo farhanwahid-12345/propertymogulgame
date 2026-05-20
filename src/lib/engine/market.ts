@@ -116,19 +116,41 @@ export function getMarketRentPounds(p: {
   value: number; // pounds
   yield?: number; // %
   condition?: 'premium' | 'standard' | 'dilapidated';
+  subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  subtypeUnits?: number;
+  completedRenovationIds?: string[];
 }): number {
   if (!p.value || p.value <= 0) return 0;
-  const conditionYield =
+  let conditionYield =
     p.condition === 'dilapidated' ? 0.085 :
     p.condition === 'premium'     ? 0.065 :
                                     0.075;
+  // Subtype-aware yield bump (HMO/flats command higher gross yield)
+  if (p.subtype === 'hmo') conditionYield += 0.015;
+  else if (p.subtype === 'flats') conditionYield += 0.010;
+  else if (p.subtype === 'multi-let') conditionYield += 0.005;
+
   const ownYield = (typeof p.yield === 'number' ? p.yield : 7) / 100;
-  // Blend: keep some of the property's individuality, anchor to condition norms
   const blended = ownYield * 0.4 + conditionYield * 0.6;
-  // Quality premium: refurbished stock commands more than yield alone implies
-  const qualityMult =
+
+  // Quality premium
+  let qualityMult =
     p.condition === 'premium'     ? 1.12 :
     p.condition === 'dilapidated' ? 0.92 :
                                     1.0;
-  return Math.round((p.value * blended * qualityMult) / 12);
+  // Fit-out premium: each premium-tier upgrade adds 1.5% to qualityMult, cap +6%
+  const PREMIUM_RENOS = ['kitchen_upgrade', 'bathroom_renovation', 'central_heating', 'double_glazing'];
+  if (p.completedRenovationIds && p.completedRenovationIds.length) {
+    const done = PREMIUM_RENOS.filter(id => p.completedRenovationIds!.includes(id)).length;
+    qualityMult += Math.min(0.06, done * 0.015);
+  }
+
+  // Per-unit multiplier for multi-unit subtypes
+  let unitMult = 1;
+  const units = Math.max(1, p.subtypeUnits ?? 1);
+  if (p.subtype === 'hmo') unitMult = Math.min(1.32, 1 + 0.04 * (units - 1));
+  else if (p.subtype === 'flats') unitMult = Math.min(1.4, 1 + 0.06 * (units - 1));
+
+  return Math.round((p.value * blended * qualityMult * unitMult) / 12);
 }
+
