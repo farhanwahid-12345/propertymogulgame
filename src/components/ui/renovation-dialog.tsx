@@ -858,7 +858,49 @@ export function RenovationDialog({
             </div>
           </div>
         )}
-        
+
+        {batchMode && batchSelected.size > 0 && (() => {
+          const items = Array.from(batchSelected)
+            .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
+            .filter(Boolean) as RenovationType[];
+          const rawCost = items.reduce((s, r) => s + scaledCost(r), 0);
+          const discount = items.length >= 3 ? 0.05 : 0;
+          const combinedCost = Math.round(rawCost * (1 - discount) / 50) * 50;
+          const combinedRent = items.reduce((s, r) => s + scaledRent(r), 0);
+          const rawValue = items.reduce((s, r) => s + scaledValue(r), 0);
+          const { uplift: combinedValue } = ceilingPrice > 0
+            ? applyCeilingDiminishingReturns(rawValue, propertyValue, ceilingPrice)
+            : { uplift: rawValue };
+          const expectedValue = Math.round(combinedValue * RENOVATION_EXPECTED_MULTIPLIER);
+          const maxDuration = Math.max(0, ...items.map(r => r.duration));
+          const sqftAdded = items.reduce((s, r) => s + (r.sqftAdded || 0), 0);
+          const annualRent = combinedRent * 12 * 0.85;
+          const fiveYr = ((expectedValue + combinedRent * 60 * 0.85 - combinedCost) / Math.max(1, combinedCost)) * 100;
+          return (
+            <div className="bg-muted p-4 rounded-lg mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Batch summary · {items.length} renovation{items.length > 1 ? 's' : ''}</h4>
+                {discount > 0 && (
+                  <Badge className="bg-success/20 text-success border-success/30 text-xs">
+                    Bundle discount −5%
+                  </Badge>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div><span className="text-muted-foreground text-xs">Combined cost</span><br/><span className={cn("font-semibold", playerCash >= combinedCost ? "text-foreground" : "text-danger")}>£{combinedCost.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Rent uplift / mo</span><br/><span className="font-semibold text-success">+£{combinedRent.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Value uplift (exp.)</span><br/><span className="font-semibold text-success">+£{expectedValue.toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">Longest duration</span><br/><span className="font-semibold">{maxDuration}d</span></div>
+                <div><span className="text-muted-foreground text-xs">Annual rent (85% occ)</span><br/><span className="font-semibold">£{Math.round(annualRent).toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground text-xs">5-yr total ROI</span><br/><span className={cn("font-semibold", fiveYr >= 20 ? "text-success" : fiveYr >= 0 ? "text-amber-300" : "text-danger")}>{fiveYr >= 0 ? '+' : ''}{fiveYr.toFixed(1)}%</span></div>
+                {sqftAdded > 0 && (
+                  <div><span className="text-muted-foreground text-xs">Floor area</span><br/><span className="font-semibold text-success">+{sqftAdded} sqft</span></div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="flex justify-between items-center pt-4 border-t">
           <div className="text-sm text-muted-foreground">
             Available Cash: £{playerCash.toLocaleString()}
@@ -867,7 +909,33 @@ export function RenovationDialog({
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            {(() => {
+            {batchMode ? (() => {
+              const items = Array.from(batchSelected)
+                .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
+                .filter(Boolean) as RenovationType[];
+              if (items.length === 0) return <Button disabled>Select renovations</Button>;
+              const rawCost = items.reduce((s, r) => s + scaledCost(r), 0);
+              const discount = items.length >= 3 ? 0.05 : 0;
+              const combinedCost = Math.round(rawCost * (1 - discount) / 50) * 50;
+              const disabled = playerCash < combinedCost;
+              return (
+                <Button
+                  disabled={disabled}
+                  onClick={() => {
+                    items.forEach(r => {
+                      const baseCost = scaledCost(r);
+                      const discounted = Math.round(baseCost * (1 - discount) / 50) * 50;
+                      onRenovate(propertyId, { ...r, cost: discounted });
+                    });
+                    setBatchSelected(new Set());
+                    setBatchMode(false);
+                    setIsOpen(false);
+                  }}
+                >
+                  Start {items.length} renovation{items.length > 1 ? 's' : ''} · £{combinedCost.toLocaleString()}
+                </Button>
+              );
+            })() : (() => {
               if (!selectedRenovation) {
                 return <Button disabled>Start Renovation</Button>;
               }
@@ -889,6 +957,7 @@ export function RenovationDialog({
             })()}
           </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );
