@@ -3408,6 +3408,114 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
+      submitBatchPlanningApplications: (propertyId, renovationTypes) => {
+        const items = (renovationTypes || []).filter(r => r && r.requiresPlanning);
+        if (items.length === 0) return;
+        if (items.length === 1) {
+          (get() as any).submitPlanningApplication(propertyId, items[0]);
+          return;
+        }
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
+
+        // Cooldown / already-submitted gates
+        const cooldown = (prev.propertyLocks || []).find(
+          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+        );
+        if (cooldown) {
+          showToast("Planning Cooldown", `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
+          return;
+        }
+        const history = prev.planningApplications || [];
+        const filtered = items.filter(r => !history.some(
+          a => a.propertyId === propertyId && a.renovationTypeId === r.id && a.status === 'pending',
+        ));
+        if (filtered.length === 0) {
+          showToast("Already Submitted", "Applications already pending for these works.", "destructive");
+          return;
+        }
+
+        // Extension sqft inside the batch — used to size any conversion against
+        // the post-extension footprint.
+        const batchExtensionSqft = filtered
+          .filter(r => r.category === 'extension')
+          .reduce((s, r) => s + (r.sqftAdded || 0), 0);
+
+        // Combined fee with a 10% bundle discount
+        const rawFeePounds = filtered.reduce((s, r) => s + (r.planningFee ?? 250), 0);
+        const discount = filtered.length >= 2 ? 0.10 : 0;
+        const totalFeePounds = Math.round(rawFeePounds * (1 - discount));
+        const totalFeePennies = toPennies(totalFeePounds);
+        const debited = totalFeePennies > 0 ? debit(prev, totalFeePennies) : { cash: prev.cash, overdraftUsed: prev.overdraftUsed, usedOverdraft: 0 };
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${totalFeePounds.toLocaleString()} for combined planning fees.`, "destructive");
+          return;
+        }
+
+        const approvalsCount = history.filter(a => a.status === 'approved').length;
+        const refusalsCount = history.filter(a => a.status === 'refused').length;
+        const valuePounds = fromPennies(property.value);
+        const refusalReasons = [
+          'Over-development for the area — would harm street character.',
+          'Loss of family housing stock conflicts with the Local Plan.',
+          'Insufficient parking provision for proposed unit count.',
+          'Daylight/sunlight impact on neighbouring properties.',
+          'Inadequate amenity space for proposed occupancy.',
+        ];
+
+        const newApps: PlanningApplication[] = filtered.map((r, i) => {
+          const { prob } = computePlanningApprovalProbability({
+            baseProb: r.baseApprovalProb,
+            propertyValuePounds: valuePounds,
+            neighborhood: property.neighborhood,
+            propertyType: property.type,
+            renovationCategory: r.category,
+            approvalsCount,
+            refusalsCount,
+          });
+          const approved = Math.random() < prob;
+          const refusalReason = approved ? undefined : refusalReasons[Math.floor(Math.random() * refusalReasons.length)];
+          const waitMonths = Math.max(1, r.planningWaitMonths ?? 2);
+          // Conversions in this batch get sized against current sqft + any extension sqft also in the batch.
+          const sizingSqft = r.category === 'conversion'
+            ? (property.internalSqft || 0) + batchExtensionSqft
+            : property.internalSqft;
+          return {
+            id: `pp_${propertyId}_${r.id}_${Date.now()}_${i}`,
+            propertyId,
+            renovationTypeId: r.id,
+            renovationCostPennies: toPennies(scaleRenovationCost(r.cost, {
+              internalSqft: sizingSqft,
+              propertyValue: valuePounds,
+            })),
+            renovationName: r.name,
+            submittedMonth: prev.monthsPlayed,
+            decisionMonth: prev.monthsPlayed + waitMonths,
+            status: 'pending',
+            feePaid: Math.round(toPennies(r.planningFee ?? 250) * (1 - discount)),
+            approvalProb: prob,
+            approved,
+            refusalReason,
+          } as PlanningApplication;
+        });
+
+        const maxWait = Math.max(...filtered.map(r => r.planningWaitMonths ?? 2));
+        const savedPounds = rawFeePounds - totalFeePounds;
+        const discountNote = savedPounds > 0 ? ` (−£${savedPounds.toLocaleString()} bundle discount)` : '';
+        showToast(
+          "Batch Planning Submitted 📋",
+          `${filtered.length} applications on ${property.name} — decisions in up to ${maxWait} mo. Fee £${totalFeePounds.toLocaleString()}${discountNote}.`,
+        );
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          planningApplications: [...history, ...newApps],
+        });
+      },
+
+
       acknowledgePlanningDecision: (applicationId) => {
         const prev = get();
         const app = (prev.planningApplications || []).find(a => a.id === applicationId);
