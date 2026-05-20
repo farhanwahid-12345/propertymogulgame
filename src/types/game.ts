@@ -420,6 +420,8 @@ export interface GameState {
   loans: Loan[];
   // Planning approvals awaiting player acknowledgement (drives celebration dialog)
   pendingPlanningCelebrations: string[];
+  // Planning refusals awaiting player acknowledgement (drives refusal dialog)
+  pendingPlanningRefusals: string[];
   // Court / bailiff escalation when cashflow runs persistently negative
   arrears?: ArrearsState | null;
   /** Timestamp (Date.now()) of the most recent operations-significant event —

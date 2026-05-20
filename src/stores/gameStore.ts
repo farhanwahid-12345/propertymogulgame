@@ -187,6 +187,7 @@ function createInitialState(): GameState {
     tenantHistory: [],
     loans: [],
     pendingPlanningCelebrations: [],
+    pendingPlanningRefusals: [],
     arrears: null,
     opsFlashAt: 0,
     reputationLog: [],
