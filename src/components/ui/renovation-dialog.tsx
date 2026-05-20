@@ -81,6 +81,7 @@ interface RenovationDialogProps {
   inPlanningCooldown?: boolean;
 }
 
+
 const RENOVATION_OPTIONS: RenovationType[] = [
   // Maintenance
   {
