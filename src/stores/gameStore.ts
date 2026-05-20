@@ -2368,6 +2368,18 @@ export const useGameStore = create<GameState & GameActions>()(
 
       // ─── SELL / LISTINGS ────────────────────
       sellProperty: (property, isAuction = false) => {
+        const prev = get();
+        const projected = property.value; // auction reserve uses market value as the proxy
+        const consent = evaluatePortfolioSaleConsent(
+          { id: property.id, value: toPennies(property.value), monthlyIncome: toPennies(property.monthlyIncome) },
+          toPennies(projected),
+          prev.mortgages,
+          prev.ownedProperties.map(p => ({ id: p.id, value: p.value, monthlyIncome: p.monthlyIncome })),
+        );
+        if (!consent.ok) {
+          showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
+          return;
+        }
         const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60);
         const listing: PropertyListing = {
           propertyId: property.id, listingDate: Date.now(), isAuction,
