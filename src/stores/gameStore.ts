@@ -4110,6 +4110,9 @@ export const useGameStore = create<GameState & GameActions>()(
       resetGame: () => {
         const fresh = createInitialState();
         set(fresh);
+        // Clear the tutorial localStorage marker so the entity picker can show
+        // again on a fresh game without requiring a hard refresh.
+        try { window.localStorage.removeItem('pm_onboarding_done'); } catch { /* noop */ }
         showToast("Game Reset", "Started fresh with £100K!");
       },
 

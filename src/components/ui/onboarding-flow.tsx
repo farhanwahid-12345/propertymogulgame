@@ -14,7 +14,7 @@ import {
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dismissTour, ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
+import { ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
 import type { EntityType } from "@/types/game";
 
 interface Props {
@@ -85,8 +85,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   }, [stage, open, setActiveTab]);
 
   const finish = useCallback(() => {
-    // Mark completed in the store FIRST (single source of truth) before notifying parent.
-    dismissTour();
+    // Parent handles persistence (dismissTour) — single write path.
     onFinish();
   }, [onFinish]);
 
@@ -95,8 +94,9 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   // ── Welcome ──
   if (stage === 'welcome') {
     return (
-      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) setStage('entity'); }}>
         <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
+
           <DialogHeader>
             <DialogTitle className="text-xl">Welcome to Property Tycoon 🏘️</DialogTitle>
             <DialogDescription>
@@ -118,7 +118,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={finish}>Skip intro</Button>
+            <Button variant="ghost" onClick={() => setStage('entity')}>Skip intro</Button>
             <Button onClick={() => setStage('entity')} className="w-full sm:w-auto">
               Get started <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -131,7 +131,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   // ── Entity pick ──
   if (stage === 'entity') {
     return (
-      <Dialog open={open} onOpenChange={(o) => { if (!o) finish(); }}>
+      <Dialog open={open} onOpenChange={() => { /* entity choice is mandatory; ignore close */ }}>
         <DialogContent className="max-w-2xl" onPointerDownOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-xl">How will you trade?</DialogTitle>

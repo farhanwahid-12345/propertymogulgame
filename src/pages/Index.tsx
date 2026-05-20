@@ -38,21 +38,23 @@ function OnboardingGate({
 
   // Local "dismissed" flag = instant close for the tour. Entity picker is never
   // dismissible — players must pick a trading entity before the game runs.
+  // The localStorage fallback can only suppress the tour AFTER an entity is chosen.
   const [dismissed, setDismissed] = useState<boolean>(
     () => !!entityChosen && (!!onboardingCompleted || onboardingModule.isTourDismissedInStorage()),
   );
   const [replayNonce, setReplayNonce] = useState<number>(() => onboardingModule.getReplayNonce());
 
-  // Mirror store → local dismissed, but only once an entity is chosen, so the
-  // grandfathered onboardingCompleted=true on legacy saves can't suppress the
-  // entity picker on a freshly-reset game.
+  // Mirror store → local dismissed, but only once an entity is chosen.
   useEffect(() => {
     if (entityChosen && onboardingCompleted) setDismissed(true);
+    // If entity is NOT chosen, force dismissed=false so the entity picker
+    // always shows on a fresh/reset game even if a stale LS flag is around.
+    if (!entityChosen) setDismissed(false);
   }, [entityChosen, onboardingCompleted]);
 
-  // Defensive: if localStorage records a dismissal but the store somehow lost
-  // it (stale debounced save overwrite, etc.), repair the store. Only kicks in
-  // once entity is chosen so it never bypasses the first-time entity picker.
+  // Defensive: if localStorage records a dismissal AND entity is chosen but the
+  // store somehow lost onboardingCompleted (stale debounced save overwrite),
+  // repair the store.
   useEffect(() => {
     if (entityChosen && !onboardingCompleted && onboardingModule.isTourDismissedInStorage()) {
       setDismissed(true);
