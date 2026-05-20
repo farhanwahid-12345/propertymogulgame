@@ -1862,6 +1862,10 @@ export const useGameStore = create<GameState & GameActions>()(
             ...((s as any).pendingPlanningCelebrations || []),
             ...newlyApprovedPlanningIds,
           ],
+          pendingPlanningRefusals: [
+            ...((s as any).pendingPlanningRefusals || []),
+            ...newlyRefusedPlanningIds,
+          ],
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
           landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
@@ -3418,6 +3422,24 @@ export const useGameStore = create<GameState & GameActions>()(
 
       clearPlanningCelebrations: () => {
         set({ pendingPlanningCelebrations: [] } as any);
+      },
+
+      dismissPlanningRefusal: (applicationId: string) => {
+        const prev = get() as any;
+        const list: string[] = prev.pendingPlanningRefusals || [];
+        set({
+          pendingPlanningRefusals: list.filter(id => id !== applicationId),
+          planningApplications: (prev.planningApplications || []).filter((a: any) => a.id !== applicationId),
+        } as any);
+      },
+
+      clearPlanningRefusals: () => {
+        const prev = get() as any;
+        const ids = new Set<string>(prev.pendingPlanningRefusals || []);
+        set({
+          pendingPlanningRefusals: [],
+          planningApplications: (prev.planningApplications || []).filter((a: any) => !ids.has(a.id)),
+        } as any);
       },
 
 
