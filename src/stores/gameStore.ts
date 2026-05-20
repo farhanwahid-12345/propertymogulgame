@@ -2369,10 +2369,10 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── SELL / LISTINGS ────────────────────
       sellProperty: (property, isAuction = false) => {
         const prev = get();
-        const projected = property.value; // auction reserve uses market value as the proxy
+        // property here is already in pennies (wrapped by useGameState).
         const consent = evaluatePortfolioSaleConsent(
-          { id: property.id, value: toPennies(property.value), monthlyIncome: toPennies(property.monthlyIncome) },
-          toPennies(projected),
+          { id: property.id, value: property.value, monthlyIncome: property.monthlyIncome },
+          property.value,
           prev.mortgages,
           prev.ownedProperties.map(p => ({ id: p.id, value: p.value, monthlyIncome: p.monthlyIncome })),
         );
