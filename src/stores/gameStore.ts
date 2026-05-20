@@ -1796,6 +1796,8 @@ export const useGameStore = create<GameState & GameActions>()(
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
           unusedLosses: newUnusedLosses,
+          lossesAppliedThisYear: newLossesApplied,
+          lossesGeneratedThisYear: newLossesGenerated,
           // Merge with current store state — preserves any concerns added
           // by an interleaved processMarketUpdate (e.g. damage events).
           tenantConcerns: mergeConcernsById(s.tenantConcerns, updatedConcerns),
