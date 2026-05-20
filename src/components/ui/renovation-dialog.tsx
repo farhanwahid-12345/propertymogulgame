@@ -310,17 +310,32 @@ export function RenovationDialog({
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [conversionUnits, setConversionUnits] = useState<number>(4);
+  const [batchMode, setBatchMode] = useState<boolean>(false);
+  const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
-  // Conversion units: bounds depend on internalSqft
+  // Item 4a: effective internal sqft includes approved-but-not-built extensions.
+  const approvedSqftPending = (planningApplications || [])
+    .filter(a => a.status === 'approved')
+    .reduce((sum, a) => {
+      const r = RENOVATION_OPTIONS.find(o => o.id === a.renovationTypeId);
+      if (!r || !r.sqftAdded) return sum;
+      // Skip if already in progress or completed
+      if (activeRenovations.includes(r.id) || completedRenovationIds.includes(r.id)) return sum;
+      return sum + (r.sqftAdded || 0);
+    }, 0);
+  const effectiveInternalSqft = (internalSqft || 0) + approvedSqftPending;
+
+  // Conversion units: bounds depend on internalSqft (use effective so approved extensions count)
   const isConversion = (r: RenovationType | null) => !!r && r.category === 'conversion';
   const isHmo = (r: RenovationType | null) => !!r && r.id === 'convert_hmo';
   const isFlats = (r: RenovationType | null) => !!r && r.id === 'convert_flats';
-  const sqft = internalSqft || 900;
+  const sqft = effectiveInternalSqft || 900;
   const maxHmoUnits = Math.max(3, Math.min(8, Math.floor(sqft / 180)));
   const maxFlatUnits = Math.max(2, Math.min(5, Math.floor(sqft / 550)));
   const minUnits = (r: RenovationType | null) => isFlats(r) ? 2 : 3;
   const maxUnits = (r: RenovationType | null) => isFlats(r) ? maxFlatUnits : isHmo(r) ? maxHmoUnits : 1;
   const defaultUnits = (r: RenovationType | null) => isFlats(r) ? 2 : isHmo(r) ? 4 : 1;
+
 
   // All headline costs/rent/value uplifts are scaled to this property's profile
   const scaleInputs = { internalSqft, propertyValue };
