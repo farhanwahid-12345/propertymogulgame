@@ -8,7 +8,7 @@ import type {
   DepositDispute, PlanningApplication,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
-import type { RenovationType } from '@/components/ui/renovation-dialog';
+import { RENOVATION_OPTIONS, type RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
 import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
@@ -3133,8 +3133,15 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         // Scale headline cost & uplifts by property size/value so renovating a
         // luxury 2,500 sqft house costs more (and pays more) than a tiny terrace.
+        // Item 4: include approved-but-unbuilt extension sqft so a conversion
+        // sized against an approved extension gets the right cost/rent/value.
+        const activeRenoIds = prev.renovations.filter(r => r.propertyId === propertyId).map(r => r.type.id);
+        const completedRenoIds = (property?.completedRenovationIds || []);
+        const effectiveSqft = property
+          ? getEffectiveInternalSqft(property.internalSqft, prev.planningApplications, propertyId, RENOVATION_OPTIONS, activeRenoIds, completedRenoIds)
+          : undefined;
         const scaleInputs = property
-          ? { internalSqft: property.internalSqft, propertyValue: fromPennies(property.value) }
+          ? { internalSqft: effectiveSqft, propertyValue: fromPennies(property.value) }
           : { propertyValue: fromPennies(renovationType.cost) * 5 };
         const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
         const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
