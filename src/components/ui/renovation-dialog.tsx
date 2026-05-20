@@ -525,18 +525,37 @@ export function RenovationDialog({
                   const valueHigh = Math.round(cappedValueUp * (renovation.category === 'conversion' ? 1.4 : 1.0));
                   const expectedValueUp = Math.round(cappedValueUp * expectedMult);
 
+                  const inBatch = batchSelected.has(renovation.id);
+                  const batchConversionConflict = batchMode && renovation.category === 'conversion'
+                    && !inBatch
+                    && Array.from(batchSelected).some(id => {
+                      const o = RENOVATION_OPTIONS.find(x => x.id === id);
+                      return o?.category === 'conversion';
+                    });
+                  const batchPlanningBlock = batchMode && renovation.requiresPlanning && !planningApproved;
+
                   return (
                     <Card
                       key={renovation.id}
                       className={cn(
                         "cursor-pointer transition-all hover:shadow-md",
-                        isSelected && "ring-2 ring-primary",
+                        isSelected && !batchMode && "ring-2 ring-primary",
+                        inBatch && "ring-2 ring-success",
                         !selectable && !completed && "opacity-60",
                         blocked && "opacity-40 pointer-events-none",
+                        (batchConversionConflict || batchPlanningBlock) && batchMode && "opacity-40 pointer-events-none",
                         CategoryColors[renovation.category]
                       )}
                       onClick={() => {
                         if (!selectable) return;
+                        if (batchMode) {
+                          if (batchPlanningBlock || batchConversionConflict) return;
+                          const next = new Set(batchSelected);
+                          if (next.has(renovation.id)) next.delete(renovation.id);
+                          else next.add(renovation.id);
+                          setBatchSelected(next);
+                          return;
+                        }
                         setSelectedRenovation(renovation);
                         if (renovation.category === 'conversion') {
                           setConversionUnits(defaultUnits(renovation));
@@ -546,9 +565,16 @@ export function RenovationDialog({
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
+                            {batchMode && (
+                              <span className={cn(
+                                "h-4 w-4 rounded border flex items-center justify-center text-[10px] shrink-0",
+                                inBatch ? "bg-success border-success text-success-foreground" : "border-muted-foreground/40"
+                              )}>{inBatch ? '✓' : ''}</span>
+                            )}
                             <Icon className="h-5 w-5 shrink-0" />
                             <CardTitle className="text-base">{renovation.name}</CardTitle>
                           </div>
+
                           <div className="flex flex-col items-end gap-1">
                             {completed ? (
                               <Badge className="bg-success/20 text-success border-success/30 text-xs">
