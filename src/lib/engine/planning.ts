@@ -77,3 +77,31 @@ export function computePlanningApprovalProbability(
 
   return { prob, base, modifiers };
 }
+
+/**
+ * Effective internal sqft for a property = current internalSqft + sqft from any
+ * extension renovations whose planning permission is APPROVED but not yet built
+ * (i.e. not in active renovations and not completed). Used by the renovation
+ * dialog AND the store's startRenovation path so a conversion sized against an
+ * approved-but-unbuilt extension gets the right cost/rent/value uplift.
+ */
+export function getEffectiveInternalSqft(
+  internalSqft: number | undefined,
+  planningApplications: Array<{ propertyId: string; renovationTypeId: string; status: string }> | undefined,
+  propertyId: string,
+  renovationOptions: Array<{ id: string; sqftAdded?: number }>,
+  activeRenovationIds: string[] = [],
+  completedRenovationIds: string[] = [],
+): number {
+  const base = internalSqft || 0;
+  if (!planningApplications) return base;
+  const pending = planningApplications
+    .filter(a => a.propertyId === propertyId && a.status === 'approved')
+    .reduce((sum, a) => {
+      const r = renovationOptions.find(o => o.id === a.renovationTypeId);
+      if (!r || !r.sqftAdded) return sum;
+      if (activeRenovationIds.includes(r.id) || completedRenovationIds.includes(r.id)) return sum;
+      return sum + (r.sqftAdded || 0);
+    }, 0);
+  return base + pending;
+}

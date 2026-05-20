@@ -8,7 +8,7 @@ import type {
   DepositDispute, PlanningApplication,
 } from '@/types/game';
 import type { Tenant } from '@/components/ui/tenant-selector';
-import type { RenovationType } from '@/components/ui/renovation-dialog';
+import { RENOVATION_OPTIONS, type RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
 import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
@@ -39,7 +39,8 @@ import {
 } from '@/lib/engine/taxation';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
-import { computePlanningApprovalProbability } from '@/lib/engine/planning';
+import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
+import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
 // ─── Helpers ──────────────────────────────────────────────
 import { showToast, debit, credit, calcDeposit } from './storeHelpers';
@@ -176,6 +177,8 @@ function createInitialState(): GameState {
     taxRecords: [],
     totalTaxPaid: 0,
     unusedLosses: 0,
+    lossesAppliedThisYear: 0,
+    lossesGeneratedThisYear: 0,
     tenantConcerns: [],
     pendingEvictions: [],
     propertyLocks: [],
@@ -574,7 +577,45 @@ export const useGameStore = create<GameState & GameActions>()(
           const salePrice = conv.salePrice || 0;
           const fees = conv.isAuction ? Math.round(salePrice * AUCTION_SELLER_FEE) : Math.round(salePrice * ESTATE_AGENT_RATE);
           const mortgage = newMortgages.find(m => m.propertyId === conv.propertyId);
-          const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0);
+
+          // ─── Portfolio mortgage redemption ───────────────────────────
+          // If this property collateralises a portfolio mortgage, the lender
+          // takes a proportional redemption slice from sale proceeds and
+          // drops the property from the collateral list.
+          let portfolioRedemption = 0;
+          const portfolioIdx = newMortgages.findIndex(
+            m => m.collateralPropertyIds && m.collateralPropertyIds.includes(conv.propertyId),
+          );
+          if (portfolioIdx >= 0) {
+            const pm = newMortgages[portfolioIdx];
+            const collateralProps = (pm.collateralPropertyIds || [])
+              .map(id => newOwnedProperties.find(p => p.id === id))
+              .filter((p): p is typeof newOwnedProperties[number] => !!p);
+            const totalCollateralValue = collateralProps.reduce((s, p) => s + p.value, 0);
+            const propBeingSold = collateralProps.find(p => p.id === conv.propertyId);
+            if (totalCollateralValue > 0 && propBeingSold) {
+              portfolioRedemption = Math.min(
+                pm.remainingBalance,
+                Math.floor(pm.remainingBalance * (propBeingSold.value / totalCollateralValue)),
+              );
+              const newBalance = pm.remainingBalance - portfolioRedemption;
+              const newCollateralIds = (pm.collateralPropertyIds || []).filter(id => id !== conv.propertyId);
+              if (newBalance <= 0 || newCollateralIds.length === 0) {
+                // Mortgage cleared — remove it entirely.
+                newMortgages = newMortgages.filter((_, i) => i !== portfolioIdx);
+              } else {
+                const scale = newBalance / pm.remainingBalance;
+                newMortgages = newMortgages.map((m, i) => i === portfolioIdx ? {
+                  ...m,
+                  remainingBalance: newBalance,
+                  monthlyPayment: Math.floor(m.monthlyPayment * scale),
+                  collateralPropertyIds: newCollateralIds,
+                } : m);
+              }
+            }
+          }
+
+          const net = salePrice - fees - SOLICITOR_FEES - (mortgage?.remainingBalance || 0) - portfolioRedemption;
 
           // CGT for sole traders — capital improvement spend (extensions/
           // conversions) increases the cost base, reducing the taxable gain.
@@ -592,7 +633,10 @@ export const useGameStore = create<GameState & GameActions>()(
           newVoidPeriods = newVoidPeriods.filter(vp => vp.propertyId !== conv.propertyId);
           newPropertyListings = newPropertyListings.filter(l => l.propertyId !== conv.propertyId);
 
-          showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}`);
+          const redemptionNote = portfolioRedemption > 0
+            ? ` · £${fromPennies(portfolioRedemption).toLocaleString()} redeemed to portfolio lender`
+            : '';
+          showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}${redemptionNote}`);
           playGavel();
         });
 
@@ -1379,6 +1423,8 @@ export const useGameStore = create<GameState & GameActions>()(
         let newTaxRecords = [...prev.taxRecords];
         let newTotalTaxPaid = prev.totalTaxPaid;
         let newUnusedLosses = (prev as any).unusedLosses ?? 0;
+        let newLossesApplied = (prev as any).lossesAppliedThisYear ?? 0;
+        let newLossesGenerated = (prev as any).lossesGeneratedThisYear ?? 0;
 
         if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
           if (prev.entityType === 'sole_trader') {
@@ -1395,9 +1441,11 @@ export const useGameStore = create<GameState & GameActions>()(
             );
             taxPaid = effectiveTax;
             newUnusedLosses -= offsetUsed;
+            newLossesApplied = offsetUsed;
             // If gross profit was negative (rare for sole traders), accumulate as new loss.
             const grossLoss = Math.max(0, accumulatedDeductibleExpenses - accumulatedGrossRent);
-            if (grossLoss > 0) newUnusedLosses += grossLoss;
+            newLossesGenerated = grossLoss;
+            if (grossLoss > 0) { newUnusedLosses += grossLoss; }
             const lossNote = offsetUsed > 0
               ? ` (loss b/f £${fromPennies(offsetUsed).toLocaleString()} used)`
               : grossLoss > 0
@@ -1412,6 +1460,8 @@ export const useGameStore = create<GameState & GameActions>()(
             if (preTaxProfit > 0) {
               offsetUsed = Math.min(newUnusedLosses, preTaxProfit);
               newUnusedLosses -= offsetUsed;
+              newLossesApplied = offsetUsed;
+              newLossesGenerated = 0;
               taxPaid = calculateCorporationTax(
                 accumulatedGrossRent - offsetUsed,
                 accumulatedMortgageInterest,
@@ -1419,6 +1469,8 @@ export const useGameStore = create<GameState & GameActions>()(
               );
             } else if (preTaxProfit < 0) {
               newUnusedLosses += -preTaxProfit;
+              newLossesGenerated = -preTaxProfit;
+              newLossesApplied = 0;
               taxPaid = 0;
             }
             const taxableAfter = Math.max(0, preTaxProfit - offsetUsed);
@@ -1786,6 +1838,8 @@ export const useGameStore = create<GameState & GameActions>()(
           taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
           totalTaxPaid: newTotalTaxPaid,
           unusedLosses: newUnusedLosses,
+          lossesAppliedThisYear: newLossesApplied,
+          lossesGeneratedThisYear: newLossesGenerated,
           // Merge with current store state — preserves any concerns added
           // by an interleaved processMarketUpdate (e.g. damage events).
           tenantConcerns: mergeConcernsById(s.tenantConcerns, updatedConcerns),
@@ -2355,6 +2409,18 @@ export const useGameStore = create<GameState & GameActions>()(
 
       // ─── SELL / LISTINGS ────────────────────
       sellProperty: (property, isAuction = false) => {
+        const prev = get();
+        // property here is already in pennies (wrapped by useGameState).
+        const consent = evaluatePortfolioSaleConsent(
+          { id: property.id, value: property.value, monthlyIncome: property.monthlyIncome },
+          property.value,
+          prev.mortgages,
+          prev.ownedProperties.map(p => ({ id: p.id, value: p.value, monthlyIncome: p.monthlyIncome })),
+        );
+        if (!consent.ok) {
+          showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
+          return;
+        }
         const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60);
         const listing: PropertyListing = {
           propertyId: property.id, listingDate: Date.now(), isAuction,
@@ -2428,6 +2494,16 @@ export const useGameStore = create<GameState & GameActions>()(
         // Check not in conveyancing
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", `${property.name} is currently in conveyancing.`, "destructive"); return;
+        }
+        const consent = evaluatePortfolioSaleConsent(
+          { id: property.id, value: property.value, monthlyIncome: property.monthlyIncome },
+          askingPrice,
+          prev.mortgages,
+          prev.ownedProperties.map(p => ({ id: p.id, value: p.value, monthlyIncome: p.monthlyIncome })),
+        );
+        if (!consent.ok) {
+          showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
+          return;
         }
         const listing: PropertyListing = {
           propertyId, listingDate: Date.now(), isAuction: false,
@@ -3057,8 +3133,15 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         // Scale headline cost & uplifts by property size/value so renovating a
         // luxury 2,500 sqft house costs more (and pays more) than a tiny terrace.
+        // Item 4: include approved-but-unbuilt extension sqft so a conversion
+        // sized against an approved extension gets the right cost/rent/value.
+        const activeRenoIds = prev.renovations.filter(r => r.propertyId === propertyId).map(r => r.type.id);
+        const completedRenoIds = (property?.completedRenovationIds || []);
+        const effectiveSqft = property
+          ? getEffectiveInternalSqft(property.internalSqft, prev.planningApplications, propertyId, RENOVATION_OPTIONS, activeRenoIds, completedRenoIds)
+          : undefined;
         const scaleInputs = property
-          ? { internalSqft: property.internalSqft, propertyValue: fromPennies(property.value) }
+          ? { internalSqft: effectiveSqft, propertyValue: fromPennies(property.value) }
           : { propertyValue: fromPennies(renovationType.cost) * 5 };
         const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
         const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
