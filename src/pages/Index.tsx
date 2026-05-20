@@ -11,6 +11,7 @@ import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
 import { OnboardingFlow } from "@/components/ui/onboarding-flow";
 import * as onboardingModule from "@/lib/onboarding";
 import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
+import { PlanningRefusedDialog } from "@/components/ui/planning-refused-dialog";
 import { MacroEventModal } from "@/components/ui/macro-event-modal";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
@@ -295,6 +296,7 @@ const Index = () => {
 
 
       <PlanningApprovedDialog />
+      <PlanningRefusedDialog />
       <MacroEventModal />
     </div>
   );
