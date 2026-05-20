@@ -37,7 +37,7 @@ import {
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
   getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
-import { calcTenantRent } from '@/lib/tenantRent';
+import { calcTenantRent, getFurnishingRentMultiplier, getConditionRentMultiplierShared } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
@@ -3611,25 +3611,34 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} to furnish (even with overdraft).`, "destructive");
             return;
           }
+          const newMonthlyIncome = Math.floor(
+            (property.baseRent || property.monthlyIncome) *
+              getFurnishingRentMultiplier(tier) *
+              getConditionRentMultiplierShared(property.condition),
+          );
           set({
             cash: debited.cash,
             overdraftUsed: debited.overdraftUsed,
             ownedProperties: prev.ownedProperties.map(p =>
               p.id === propertyId
-                ? { ...p, furnishingTier: tier, furnishingMonthsRemaining: 60 }
+                ? { ...p, furnishingTier: tier, furnishingMonthsRemaining: 60, monthlyIncome: newMonthlyIncome }
                 : p
             ),
           });
-          showToast("Furnishings Installed 🛋️", `${property.name} now ${tier.replace('_', ' ')}. Cost £${fromPennies(cost).toLocaleString()}.`);
+          showToast("Furnishings Installed 🛋️", `${property.name} now ${tier.replace('_', ' ')}. Advertised rent £${newMonthlyIncome.toLocaleString()}/mo. Cost £${fromPennies(cost).toLocaleString()}.`);
         } else {
+          const newMonthlyIncome = Math.floor(
+            (property.baseRent || property.monthlyIncome) *
+              getConditionRentMultiplierShared(property.condition),
+          );
           set({
             ownedProperties: prev.ownedProperties.map(p =>
               p.id === propertyId
-                ? { ...p, furnishingTier: 'unfurnished', furnishingMonthsRemaining: undefined }
+                ? { ...p, furnishingTier: 'unfurnished', furnishingMonthsRemaining: undefined, monthlyIncome: newMonthlyIncome }
                 : p
             ),
           });
-          showToast("Furnishings Removed", `${property.name} reverted to unfurnished.`);
+          showToast("Furnishings Removed", `${property.name} reverted to unfurnished. Advertised rent £${newMonthlyIncome.toLocaleString()}/mo.`);
         }
       },
 
