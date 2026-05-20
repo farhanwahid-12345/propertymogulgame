@@ -92,7 +92,10 @@ interface GameActions {
   furnishProperty: (propertyId: string, tier: 'unfurnished' | 'part_furnished' | 'fully_furnished') => void;
   // Planning permission
   submitPlanningApplication: (propertyId: string, renovationType: RenovationType) => void;
+  submitBatchPlanningApplications: (propertyId: string, renovationTypes: RenovationType[]) => void;
   acknowledgePlanningDecision: (applicationId: string) => void;
+  dismissPlanningRefusal: (applicationId: string) => void;
+  clearPlanningRefusals: () => void;
   // Mortgages
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
