@@ -37,7 +37,7 @@ import {
   getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
   getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
-import { calcTenantRent } from '@/lib/tenantRent';
+import { calcTenantRent, getFurnishingRentMultiplier, getConditionRentMultiplierShared } from '@/lib/tenantRent';
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
@@ -92,7 +92,10 @@ interface GameActions {
   furnishProperty: (propertyId: string, tier: 'unfurnished' | 'part_furnished' | 'fully_furnished') => void;
   // Planning permission
   submitPlanningApplication: (propertyId: string, renovationType: RenovationType) => void;
+  submitBatchPlanningApplications: (propertyId: string, renovationTypes: RenovationType[]) => void;
   acknowledgePlanningDecision: (applicationId: string) => void;
+  dismissPlanningRefusal: (applicationId: string) => void;
+  clearPlanningRefusals: () => void;
   // Mortgages
   settleMortgage: (mortgagePropertyId: string, useCash?: boolean, settlementPropertyId?: string, partialAmount?: number) => void;
   remortgageProperty: (propertyId: string, newLoanAmount: number, providerId: string) => void;
@@ -187,6 +190,7 @@ function createInitialState(): GameState {
     tenantHistory: [],
     loans: [],
     pendingPlanningCelebrations: [],
+    pendingPlanningRefusals: [],
     arrears: null,
     opsFlashAt: 0,
     reputationLog: [],
@@ -1229,6 +1233,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // ── Resolve pending planning applications whose decision month has arrived ──
         let newPlanningApplications = [...(prev.planningApplications || [])];
         const newlyApprovedPlanningIds: string[] = [];
+        const newlyRefusedPlanningIds: string[] = [];
         newPlanningApplications = newPlanningApplications.map(app => {
           if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
             const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
@@ -1242,6 +1247,7 @@ export const useGameStore = create<GameState & GameActions>()(
               );
               flashOps();
             } else {
+              newlyRefusedPlanningIds.push(app.id);
               showToast(
                 "Planning Refused ❌",
                 `${app.renovationName} on ${propName} refused: ${app.refusalReason || 'planning grounds'}. 6-month cooldown before resubmission.`,
@@ -1259,9 +1265,14 @@ export const useGameStore = create<GameState & GameActions>()(
           }
           return app;
         });
-        // Drop refused applications that have been visible for 1+ month (acknowledged via toast)
+        // Drop refused applications only after the player has acknowledged them
+        // via the refusal dialog (id removed from pendingPlanningRefusals).
+        const refusalQueue = new Set<string>([
+          ...((prev as any).pendingPlanningRefusals || []),
+          ...newlyRefusedPlanningIds,
+        ]);
         newPlanningApplications = newPlanningApplications.filter(app => {
-          if (app.status === 'refused' && newMonthNumber - app.decisionMonth >= 2) return false;
+          if (app.status === 'refused' && !refusalQueue.has(app.id)) return false;
           return true;
         });
 
@@ -1853,6 +1864,10 @@ export const useGameStore = create<GameState & GameActions>()(
           pendingPlanningCelebrations: [
             ...((s as any).pendingPlanningCelebrations || []),
             ...newlyApprovedPlanningIds,
+          ],
+          pendingPlanningRefusals: [
+            ...((s as any).pendingPlanningRefusals || []),
+            ...newlyRefusedPlanningIds,
           ],
           tenantHistory: newTenantHistory.slice(-100),
           loans: updatedLoans,
@@ -3393,6 +3408,114 @@ export const useGameStore = create<GameState & GameActions>()(
         });
       },
 
+      submitBatchPlanningApplications: (propertyId, renovationTypes) => {
+        const items = (renovationTypes || []).filter(r => r && r.requiresPlanning);
+        if (items.length === 0) return;
+        if (items.length === 1) {
+          (get() as any).submitPlanningApplication(propertyId, items[0]);
+          return;
+        }
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
+
+        // Cooldown / already-submitted gates
+        const cooldown = (prev.propertyLocks || []).find(
+          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+        );
+        if (cooldown) {
+          showToast("Planning Cooldown", `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
+          return;
+        }
+        const history = prev.planningApplications || [];
+        const filtered = items.filter(r => !history.some(
+          a => a.propertyId === propertyId && a.renovationTypeId === r.id && a.status === 'pending',
+        ));
+        if (filtered.length === 0) {
+          showToast("Already Submitted", "Applications already pending for these works.", "destructive");
+          return;
+        }
+
+        // Extension sqft inside the batch — used to size any conversion against
+        // the post-extension footprint.
+        const batchExtensionSqft = filtered
+          .filter(r => r.category === 'extension')
+          .reduce((s, r) => s + (r.sqftAdded || 0), 0);
+
+        // Combined fee with a 10% bundle discount
+        const rawFeePounds = filtered.reduce((s, r) => s + (r.planningFee ?? 250), 0);
+        const discount = filtered.length >= 2 ? 0.10 : 0;
+        const totalFeePounds = Math.round(rawFeePounds * (1 - discount));
+        const totalFeePennies = toPennies(totalFeePounds);
+        const debited = totalFeePennies > 0 ? debit(prev, totalFeePennies) : { cash: prev.cash, overdraftUsed: prev.overdraftUsed, usedOverdraft: 0 };
+        if (!debited) {
+          showToast("Insufficient Funds", `Need £${totalFeePounds.toLocaleString()} for combined planning fees.`, "destructive");
+          return;
+        }
+
+        const approvalsCount = history.filter(a => a.status === 'approved').length;
+        const refusalsCount = history.filter(a => a.status === 'refused').length;
+        const valuePounds = fromPennies(property.value);
+        const refusalReasons = [
+          'Over-development for the area — would harm street character.',
+          'Loss of family housing stock conflicts with the Local Plan.',
+          'Insufficient parking provision for proposed unit count.',
+          'Daylight/sunlight impact on neighbouring properties.',
+          'Inadequate amenity space for proposed occupancy.',
+        ];
+
+        const newApps: PlanningApplication[] = filtered.map((r, i) => {
+          const { prob } = computePlanningApprovalProbability({
+            baseProb: r.baseApprovalProb,
+            propertyValuePounds: valuePounds,
+            neighborhood: property.neighborhood,
+            propertyType: property.type,
+            renovationCategory: r.category,
+            approvalsCount,
+            refusalsCount,
+          });
+          const approved = Math.random() < prob;
+          const refusalReason = approved ? undefined : refusalReasons[Math.floor(Math.random() * refusalReasons.length)];
+          const waitMonths = Math.max(1, r.planningWaitMonths ?? 2);
+          // Conversions in this batch get sized against current sqft + any extension sqft also in the batch.
+          const sizingSqft = r.category === 'conversion'
+            ? (property.internalSqft || 0) + batchExtensionSqft
+            : property.internalSqft;
+          return {
+            id: `pp_${propertyId}_${r.id}_${Date.now()}_${i}`,
+            propertyId,
+            renovationTypeId: r.id,
+            renovationCostPennies: toPennies(scaleRenovationCost(r.cost, {
+              internalSqft: sizingSqft,
+              propertyValue: valuePounds,
+            })),
+            renovationName: r.name,
+            submittedMonth: prev.monthsPlayed,
+            decisionMonth: prev.monthsPlayed + waitMonths,
+            status: 'pending',
+            feePaid: Math.round(toPennies(r.planningFee ?? 250) * (1 - discount)),
+            approvalProb: prob,
+            approved,
+            refusalReason,
+          } as PlanningApplication;
+        });
+
+        const maxWait = Math.max(...filtered.map(r => r.planningWaitMonths ?? 2));
+        const savedPounds = rawFeePounds - totalFeePounds;
+        const discountNote = savedPounds > 0 ? ` (−£${savedPounds.toLocaleString()} bundle discount)` : '';
+        showToast(
+          "Batch Planning Submitted 📋",
+          `${filtered.length} applications on ${property.name} — decisions in up to ${maxWait} mo. Fee £${totalFeePounds.toLocaleString()}${discountNote}.`,
+        );
+
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          planningApplications: [...history, ...newApps],
+        });
+      },
+
+
       acknowledgePlanningDecision: (applicationId) => {
         const prev = get();
         const app = (prev.planningApplications || []).find(a => a.id === applicationId);
@@ -3410,6 +3533,24 @@ export const useGameStore = create<GameState & GameActions>()(
 
       clearPlanningCelebrations: () => {
         set({ pendingPlanningCelebrations: [] } as any);
+      },
+
+      dismissPlanningRefusal: (applicationId: string) => {
+        const prev = get() as any;
+        const list: string[] = prev.pendingPlanningRefusals || [];
+        set({
+          pendingPlanningRefusals: list.filter(id => id !== applicationId),
+          planningApplications: (prev.planningApplications || []).filter((a: any) => a.id !== applicationId),
+        } as any);
+      },
+
+      clearPlanningRefusals: () => {
+        const prev = get() as any;
+        const ids = new Set<string>(prev.pendingPlanningRefusals || []);
+        set({
+          pendingPlanningRefusals: [],
+          planningApplications: (prev.planningApplications || []).filter((a: any) => !ids.has(a.id)),
+        } as any);
       },
 
 
@@ -3470,25 +3611,34 @@ export const useGameStore = create<GameState & GameActions>()(
             showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} to furnish (even with overdraft).`, "destructive");
             return;
           }
+          const newMonthlyIncome = Math.floor(
+            (property.baseRent || property.monthlyIncome) *
+              getFurnishingRentMultiplier(tier) *
+              getConditionRentMultiplierShared(property.condition),
+          );
           set({
             cash: debited.cash,
             overdraftUsed: debited.overdraftUsed,
             ownedProperties: prev.ownedProperties.map(p =>
               p.id === propertyId
-                ? { ...p, furnishingTier: tier, furnishingMonthsRemaining: 60 }
+                ? { ...p, furnishingTier: tier, furnishingMonthsRemaining: 60, monthlyIncome: newMonthlyIncome }
                 : p
             ),
           });
-          showToast("Furnishings Installed 🛋️", `${property.name} now ${tier.replace('_', ' ')}. Cost £${fromPennies(cost).toLocaleString()}.`);
+          showToast("Furnishings Installed 🛋️", `${property.name} now ${tier.replace('_', ' ')}. Advertised rent £${newMonthlyIncome.toLocaleString()}/mo. Cost £${fromPennies(cost).toLocaleString()}.`);
         } else {
+          const newMonthlyIncome = Math.floor(
+            (property.baseRent || property.monthlyIncome) *
+              getConditionRentMultiplierShared(property.condition),
+          );
           set({
             ownedProperties: prev.ownedProperties.map(p =>
               p.id === propertyId
-                ? { ...p, furnishingTier: 'unfurnished', furnishingMonthsRemaining: undefined }
+                ? { ...p, furnishingTier: 'unfurnished', furnishingMonthsRemaining: undefined, monthlyIncome: newMonthlyIncome }
                 : p
             ),
           });
-          showToast("Furnishings Removed", `${property.name} reverted to unfurnished.`);
+          showToast("Furnishings Removed", `${property.name} reverted to unfurnished. Advertised rent £${newMonthlyIncome.toLocaleString()}/mo.`);
         }
       },
 

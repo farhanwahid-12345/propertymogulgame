@@ -1,41 +1,63 @@
-## Goal
-Two fixes for the dashboard:
-1. Remove the dead vertical gap above the "Your Empire" portfolio grid so cards sit directly under the tabs row.
-2. Treat installed furnishings as a depreciating asset in net worth.
+Four scoped fixes/improvements covering planning UX, furnishing economics, the buy grid, and the renovation dialog's batch mode.
 
-## 1. Dead space above Your Empire
+---
 
-The gap comes from three stacked elements that all stay rendered even when empty:
-- `Tabs` always reserves vertical space for the Market tab's helper text.
-- The `min-h-[68px]` wrapper around the Action Required section reserves ~68px even when there are no alerts.
-- The Listed Properties collapsible still takes a header row when empty.
+## 1. Pop-up when planning permission is refused
 
-Changes in `src/pages/Index.tsx`:
-- Drop the always-rendered helper paragraph inside `TabsContent value="market"` (or render only when the player has no estate-agent action yet) so the tab content collapses to zero height after onboarding.
-- Replace the `min-h-[68px]` wrapper with conditional rendering: only mount the Action Required section when there is at least one entry (pending eviction, deposit dispute, or arrears). Keep the original `CollapsibleSection` intact for when alerts exist.
-- Only render the Listed Properties `CollapsibleSection` when `propertyListings.length > 0`.
-- Tighten the container's `space-y-3` interaction with the now-removable wrappers so the Portfolio grid moves up immediately.
+Currently a refusal only fires a destructive toast. Mirror the existing `PlanningApprovedDialog` pattern with a sibling refusal dialog so the player can't miss it.
 
-No styling changes to the portfolio cards themselves — this is purely about removing empty siblings above them.
+- **`src/types/game.ts`** — add `pendingPlanningRefusals: string[]`.
+- **`src/stores/gameStore.ts`**
+  - Initial state: `pendingPlanningRefusals: []`.
+  - In the monthly planning resolution (lines ~1244-1257), when `app.approved === false`, push `app.id` into `pendingPlanningRefusals` (alongside the existing toast + cooldown lock).
+  - Bump the "drop refused after 2 months" filter so refused apps stay in `planningApplications` until the celebration dialog acknowledges them (drop only when no longer in `pendingPlanningRefusals`). Avoid the race that currently deletes the app before the dialog can read it.
+  - Add `dismissPlanningRefusal(id)` and `clearPlanningRefusals()` actions parallel to the existing approval ones.
+- **`src/components/ui/planning-refused-dialog.tsx`** (new) — copy `PlanningApprovedDialog` structure: red `AlertTriangle` icon, lists each refused app with `propName`, `renovationName`, `refusalReason`, and a "6-month cooldown — next resubmit in N mo" badge derived from the matching `propertyLocks` entry. Single "Dismiss" / "Dismiss all" buttons.
+- **`src/pages/Index.tsx`** — render `<PlanningRefusedDialog />` next to `<PlanningApprovedDialog />`.
 
-## 2. Furniture counted in net worth (with depreciation)
+## 2. Furnishing actually raises the advertised rent
 
-Furniture is currently a sunk cost: `furnishProperty` debits cash, sets `furnishingTier` + `furnishingMonthsRemaining` (60-month life), but the value never appears as an asset and silently disappears.
+`furnishProperty` updates `furnishingTier` but never touches `monthlyIncome` / `baseRent`, so the property card shows the same rent as before. The multiplier in `tenantRent.ts` only kicks in when a tenant is later selected, and even then it multiplies `baseRent` (which is unchanged), so the "+5% / +12%" promised in the dialog never shows on the card.
 
-Approach: treat furniture as a separate depreciating asset, linear straight-line over the 60-month life, derived from the current tier and remaining months. No new persisted fields needed.
+- **`src/stores/gameStore.ts` `furnishProperty`**: after updating `furnishingTier`, recompute `monthlyIncome` from the canonical `baseRent`:
+  - `newMonthly = floor(baseRent * getFurnishingRentMultiplier(tier) * getConditionRentMultiplierShared(condition))`.
+  - `baseRent` stays untouched so `calcTenantRent` keeps using one multiplier (no double-counting when a tenant is later picked — the existing tenant path uses `baseRent`, not `monthlyIncome`).
+  - On the `unfurnished` revert branch, set `monthlyIncome = floor(baseRent * condition multiplier)`.
+- **`src/components/ui/furnishing-dialog.tsx`**: surface the new effective rent in the per-tier card (small "New advertised rent £X/mo" line under the % badge) so the promise matches the visible number.
 
-Changes:
-- `src/lib/engine/financials.ts` (new small helper): `getFurnitureValuePennies(property)` returns `costPerSqft(tier) * internalSqft * (monthsRemaining / 60) * 100`, using the same per-sqft costs as `furnishProperty` (`part_furnished = £8`, `fully_furnished = £18`). Returns 0 when unfurnished or months remaining is 0/undefined.
-- `src/hooks/useGameState.ts`: add `furnitureValue = Σ getFurnitureValuePennies(property) → pounds` over `ownedPropertiesRaw` and include it in the `netWorth` calculation alongside `renovationWIP` and property value.
-- `src/stores/gameStore.ts` (`triggerLevelUp` / level-up net worth recomputation around line 1287, and bankruptcy net-worth recomputation around line 1699 and 1704): include the same furniture asset so the store-side net worth tracks the UI value and level-ups/bankruptcy thresholds stay consistent.
-- Verify the monthly depreciation step in `processMonthEnd` (around line 791–799) still ticks `furnishingMonthsRemaining` down — net worth naturally falls each month as a result.
+## 3. Shrink the Estate Agent buy-cards by ~half
 
-### Notes
-- No new state field is added; the depreciation curve is fully derived from `furnishingTier` + `furnishingMonthsRemaining` already on each property.
-- Furniture value never exceeds the original install cost and reaches £0 the month it reverts to `unfurnished`.
-- The cashflow breakdown and rent multipliers are untouched.
+- **`src/components/ui/estate-agent-window.tsx`** (lines ~521-567):
+  - Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`.
+  - Replace `CardHeader` + `CardContent` with a single compact body: `p-3 space-y-1`, `text-base` title, `text-[11px]` neighborhood, tighter rows using `text-xs`.
+  - Drop the "*Actual rent varies by tenant" footnote inside each card (it's the same on all of them — move to a single line above the grid).
+  - Bump `affordableProperties.slice(0, 12)` to `slice(0, 20)` since cards are smaller.
+  - Selection ring (`ring-2 ring-primary`) preserved.
 
-## Verification
-- Empty dashboard (no alerts, no listings): Portfolio sits right under the tabs row, no visible gap.
-- Furnish a property: net worth jumps by less than the cash cost (because new furniture is valued at its undepreciated cost minus the implicit first-month tick), then declines a fixed amount each month until it hits zero at month 60.
-- Selling/conveyancing of an unfurnished property is unaffected.
+## 4. Batch mode in the renovate tab supports planning + extension-aware conversion sizing
+
+Today batch mode hides any renovation that still needs planning (`batchPlanningBlock`). Allow batching planning submissions, combine them into one decision, and feed extension `sqftAdded` into any conversion in the same batch so the conversion is priced/rented/valued against the post-extension footprint.
+
+- **`src/components/ui/renovation-dialog.tsx`**
+  - Remove `batchPlanningBlock`; planning-required renos become selectable in batch mode unless they have a pending app or are in cooldown.
+  - When the batch contains both an extension (with `sqftAdded`) and a conversion, derive an `extensionSqftInBatch` and recompute the conversion's `scaledCost / scaledRent / scaledValue` against `effectiveInternalSqft + extensionSqftInBatch`. Show this uplift in the batch summary footer ("Conversion sized for {newSqft} sqft").
+  - Combined planning fee = sum of each item's `planningFee`. Apply a 10% planning-bundle discount when the batch has ≥2 planning items (separate from the 5% works discount).
+  - Combined approval probability: compute each item's prob via `computePlanningApprovalProbability` (extension-affected conversion uses post-extension sqft only for cost/rent/value, not for prob), then show a "combined chance" = product of individual probs. Render per-item % too so the player understands the weakest link.
+  - CTA logic in the bottom button:
+    - If every selected item already has an approval (or doesn't need one) → "Start N renovations · £X" (existing flow).
+    - Else if at least one needs planning → "Submit N planning applications · £X" which calls a new store action `submitBatchPlanningApplications(propertyId, renovationTypes[])`.
+- **`src/stores/gameStore.ts`** — add `submitBatchPlanningApplications`: thin wrapper that iterates `submitPlanningApplication` but
+  - debits a single combined fee with the 10% discount,
+  - for any conversion in the batch, scales its `renovationCostPennies` (stored on the app) using a `scaleInputs` whose `internalSqft` includes the batch's extension `sqftAdded` — so when the player later starts the conversion it already accounts for the bigger footprint,
+  - shows one consolidated "Batch planning submitted — N decisions in ~M mo" toast.
+- Existing auto-queue of approved extensions inside `startRenovation` (lines 3169-3242) already handles the build-side bundling, so no changes there.
+
+---
+
+## Technical notes
+
+- `monthlyIncome` recompute in `furnishProperty` is gated by the existing tenant/conveyancing checks, so it only ever runs on a vacant, settled property.
+- The refusal dialog reads `propertyLocks` for the "next resubmit in N mo" copy; no new field needed.
+- The batched approval-prob product is a display aid; the engine still rolls each application independently in `submitPlanningApplication`, preserving the per-item outcome and refusal-reason fidelity.
+- Batch UI changes stay inside the renovation dialog; the store gains one new action.
+- No schema/migration impact; the new `pendingPlanningRefusals` slice initializes to `[]` for existing saves via the same lazy-init pattern used by `pendingPlanningCelebrations`.

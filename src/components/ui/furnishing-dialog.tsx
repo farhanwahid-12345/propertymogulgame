@@ -13,6 +13,7 @@ import { Sofa, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnishingRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
 
 interface Props {
   propertyId: string;
@@ -21,7 +22,12 @@ interface Props {
   currentTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   monthsRemaining?: number;
   hasTenant: boolean;
+  /** Canonical pre-multiplier rent (pounds). Used to preview each tier's advertised rent. */
+  baseRent?: number;
+  /** Property condition — affects displayed advertised rent. */
+  condition?: 'standard' | 'premium' | 'dilapidated';
 }
+
 
 const TIERS = [
   { id: 'unfurnished',     label: 'Unfurnished',     emoji: '🪑', costPerSqft: 0,  rentBoost: '0%',  blurb: 'Broadest tenant pool. No furniture risk.' },
@@ -29,10 +35,11 @@ const TIERS = [
   { id: 'fully_furnished', label: 'Fully Furnished', emoji: '🛋️', costPerSqft: 18, rentBoost: '+12%',blurb: 'Premium fit-out. Attracts higher-end tenants.' },
 ] as const;
 
-export function FurnishingDialog({ propertyId, propertyName, internalSqft = 800, currentTier = 'unfurnished', monthsRemaining, hasTenant }: Props) {
+export function FurnishingDialog({ propertyId, propertyName, internalSqft = 800, currentTier = 'unfurnished', monthsRemaining, hasTenant, baseRent, condition }: Props) {
   const [open, setOpen] = useState(false);
   const cashPounds = useGameStore(s => Math.floor(s.cash / 100));
   const furnishProperty = useGameStore(s => (s as any).furnishProperty);
+  const conditionMult = getConditionRentMultiplierShared(condition);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -67,6 +74,9 @@ export function FurnishingDialog({ propertyId, propertyName, internalSqft = 800,
             const cost = Math.round(t.costPerSqft * internalSqft);
             const isCurrent = currentTier === t.id;
             const canAfford = cashPounds >= cost;
+            const previewRent = baseRent
+              ? Math.floor(baseRent * getFurnishingRentMultiplier(t.id as any) * conditionMult)
+              : null;
             return (
               <button
                 key={t.id}
@@ -92,6 +102,11 @@ export function FurnishingDialog({ propertyId, propertyName, internalSqft = 800,
                     {cost > 0 ? `£${cost.toLocaleString()}` : 'Free'}
                   </span>
                 </div>
+                {previewRent !== null && (
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    Advertised rent £{previewRent.toLocaleString()}/mo
+                  </div>
+                )}
               </button>
             );
           })}
