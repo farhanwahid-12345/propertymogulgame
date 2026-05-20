@@ -118,7 +118,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
           </div>
 
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={finish}>Skip intro</Button>
+            <Button variant="ghost" onClick={() => setStage('entity')}>Skip intro</Button>
             <Button onClick={() => setStage('entity')} className="w-full sm:w-auto">
               Get started <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
