@@ -179,7 +179,10 @@ export function MultiUnitSlots({
                           value: propertyValue,
                           yield: propertyYield,
                           condition,
+                          subtype,
+                          subtypeUnits: units,
                         });
+
                         return whole > 0
                           ? Math.round(whole / units)
                           : baseRentPerUnitPounds;
