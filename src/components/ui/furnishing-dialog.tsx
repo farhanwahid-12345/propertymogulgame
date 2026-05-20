@@ -13,6 +13,20 @@ import { Sofa, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnishingRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
+
+interface Props {
+  propertyId: string;
+  propertyName: string;
+  internalSqft?: number;
+  currentTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  monthsRemaining?: number;
+  hasTenant: boolean;
+  /** Canonical pre-multiplier rent (pounds). Used to preview each tier's advertised rent. */
+  baseRent?: number;
+  /** Property condition — affects displayed advertised rent. */
+  condition?: 'standard' | 'premium' | 'dilapidated';
+}
 
 interface Props {
   propertyId: string;
