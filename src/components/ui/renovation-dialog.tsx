@@ -505,7 +505,11 @@ export function RenovationDialog({
                   const planningTenantWarning = needsPlanningStep && hasTenant && (renovation.category === 'conversion' || renovation.requiresVacant);
                   const planningCashWarning = needsPlanningStep && !affordable;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
-                  const selectable = !blocked && (canSubmitPlanning || (planningApproved && affordable) || (!renovation.requiresPlanning && affordable));
+                  const batchSelectable = batchMode && !blocked &&
+                    (renovation.requiresPlanning ? (planningApproved ? affordable : true) : affordable);
+                  const selectable = batchMode
+                    ? batchSelectable
+                    : !blocked && (canSubmitPlanning || (planningApproved && affordable) || (!renovation.requiresPlanning && affordable));
 
                   // Scaled cost/uplifts for THIS property's size & value
                   const cost = scaledCost(renovation);
