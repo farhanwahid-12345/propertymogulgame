@@ -290,7 +290,7 @@ export const PropertyCard = memo(function PropertyCard({
         </div>
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
         {/* Sqft + concern chips row */}
-        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0) && (
+        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0 || (property.furnishingTier && property.furnishingTier !== 'unfurnished')) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {property.internalSqft && (
               <span className="text-[10px] text-muted-foreground">
