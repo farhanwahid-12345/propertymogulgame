@@ -527,6 +527,7 @@ export const PropertyCard = memo(function PropertyCard({
                       evictTenant={evictTenant}
                       cancelEviction={cancelEviction}
                       applyRentIncrease={applyRentIncrease}
+                      furnishingTier={(property as any).furnishingTier}
                     />
                   ) : (
                     onSelectTenant && (
