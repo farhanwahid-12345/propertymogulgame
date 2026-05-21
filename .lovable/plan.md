@@ -1,72 +1,67 @@
-Four scoped fixes covering tenant-rent preview + furniture economics, conveyancing net-worth math, advertised-yield consistency, and renovation-dialog eligibility/cooldown scope.
+Four scoped fixes from the screenshot annotations.
 
 ---
 
-## 1. Furnishing actually raises rent on tenant select + furniture is a sellable asset + pre-furnished stock
+## 1. Show current rate & bank on refinance menus (individual + portfolio)
 
-**1a. Preview rent in tenant selector matches what the tenant pays**
-- `src/components/ui/tenant-selector.tsx` line 345: `calcTenantRent(displayBaseRent, tenant, condition)` is missing the `furnishingTier` argument. The store-side `selectTenant` (`gameStore.ts:2742`) already passes it, so the tenant *pays* the boosted rent — only the dialog preview is wrong.
-- Add a `furnishingTier` prop on `TenantSelectorProps`, thread it through from `property-card.tsx` (which already knows the property), and pass it into `calcTenantRent`.
-- Update the "Base rent" copy to display `displayBaseRent × furnishingMult × conditionMult` so the listed base + the per-tenant card both reflect the furnishing bump.
+Each refinanceable property tile currently shows name, neighborhood, value and outstanding balance — but not the existing mortgage's lender or interest rate, so players can't tell if a refinance saves money.
 
-**1b. Furniture is already in net worth — surface it on the property card and uplift sale price**
-- `getFurnitureValuePennies` already counts in `useGameState` net worth. Add a small "Furniture: £X (Y mo left)" chip on `property-card.tsx` next to the furnishing badge so the asset is visible.
-- When listing a furnished property for sale (`gameStore.listPropertyForSale` + the auto-suggested asking price in `estate-agent-window.tsx`'s list-property dialog), add `furnitureValuePennies` to the suggested asking-price floor and the "Suggested price" label.
-- On completed sell conveyancing (`gameStore.ts` ~line 580-640), nothing extra is needed — sale proceeds already reflect whatever buyer paid. The change is purely advisory pricing so the player can recoup the furniture.
+- **`src/components/ui/mortgage-refinance.tsx`** (property selection card lines 116–143):
+  - Add a `mortgages` and `mortgageProviders` lookup. Find the existing mortgage by `propertyId`, resolve provider name from `providerId`, and render a third line: `Lender · {rate}% · {repayment|interest-only} · {termRemaining}y left`.
+  - Color-code the new "Refinance Options" detail card (lines 161–181) to compare side-by-side: old rate vs new rate, old monthly vs new monthly, with a green/red delta.
+- **`src/components/ui/portfolio-mortgage.tsx`** (property selection lines 148–175):
+  - Same enrichment per tile — show existing lender + rate so the player can see what each property is currently financed at before bundling it into a portfolio facility.
+  - Add a "Currently financed by" summary row above the loan slider listing distinct lenders across the selected set and their weighted-average rate.
+- Both dialogs already receive `ownedProperties`; add `mortgages` and `mortgageProviders` props (portfolio-mortgage already has providers). Update the two call sites in `BankingPanel.tsx` to pass `gameState.mortgages`.
 
-**1c. Estate-agent inventory occasionally lists pre-furnished stock**
-- `src/lib/engine/market.ts` `generateRandomProperty`: ~15% chance to roll `part_furnished`, ~7% chance `fully_furnished` (else unfurnished). When furnished:
-  - Set `furnishingTier` and `furnishingMonthsRemaining` between 18 and 54 months (representing existing wear).
-  - Bump listed `price` and `value` by the depreciated furniture value (so the agent asks more).
-  - Bump `monthlyIncome` by `getFurnishingRentMultiplier(tier)` so the advertised rent and yield card show the furnished premium.
-- On purchase completion (`gameStore.ts` ~line 540-553), preserve the incoming `furnishingTier` / `furnishingMonthsRemaining` on the owned property (currently those fields are copied via `...prop` spread — verify and keep).
+## 2. Compact property cards so first row fits in one viewport
 
-## 2. Mortgage-aware net worth (no "free money" after buy completes)
+At 1001×734 the current cards (lines 248–956 of `property-card.tsx`) stack price + market value + equity + monthly cashflow + tenant block + actions — single card is ~600px tall, so the first row of three doesn't fit above the fold.
 
-`src/hooks/useGameState.ts` line 127 computes:
+- **`src/components/ui/property-card.tsx`**:
+  - Collapse the financial block (Price / Market Value / Renovation Spend / Total Invested / Equity / Profit-Loss) into a single dense 3-column grid: `Value · Rent · Equity`. Move the rest behind a "Details" expand toggle (reusing the existing `CollapsibleSection`).
+  - Hide the "Monthly Costs" breakdown by default; surface only `Net £X/mo` chip with a hover-card for the breakdown (mortgage / insurance / maintenance / council tax).
+  - Tenant block: render satisfaction + risk + name in a single compact row instead of multi-line.
+  - Action buttons: collapse "Furnish / Renovate / List / Sell" into a single overflow `…` menu when the card is in collapsed mode (keep tenant CTAs primary).
+  - Target ~260px collapsed card height so a 1×3 row fits inside a 734px viewport with the hero header above it.
+- **`src/components/sections/PortfolioGrid.tsx`** line 68: keep `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` but tighten `gap-3 → gap-2` and add `xl:grid-cols-4` for high-DPI players.
+- Add a local `expanded` state in `PropertyCard` so any card can be expanded inline without affecting siblings; persist nothing (per-session).
 
-```
-netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue + Σ value − overdraftUsed
-```
+## 3. Property condition affects value
 
-It never subtracts mortgages. While a buy is in-flight, `cash` is down by `cashHeld` and `inflightBuyCapital` adds it back (net flat). On completion the inflight slot disappears (−cashHeld) and the full property `value` is added (+price), but the new mortgage debt is NOT subtracted, so the player gains roughly `mortgageAmount − fees` of phantom net worth. Subsequent store recomputes (level-up, bankruptcy) then correct it — explaining the "drops a fair bit later" symptom.
+Today value drifts purely on macro noise (`gameStore.ts:1312–1332`); condition only influences rent (`market.ts:getMarketRentPounds`) and a one-shot uplift on renovation completion (`gameStore.ts:3605`). Dilapidated properties never depreciate vs the market and premium ones never trade at a premium drift.
 
-- Update the formula to: `cash + inflightBuyCapital + renovationWIP + furnitureValue + Σ value − totalDebt − overdraftUsed`. `totalDebt` (mortgages + loans, line 157) is already computed in the same hook.
-- Sanity-check the dashboard/stat panels that read `netWorth` from this hook — none of them should re-subtract debt independently. Search `useGameState().netWorth` and verify call sites.
+- **`src/stores/gameStore.ts` lines 1317–1332**: replace the constant `monthlyDrift` with a condition-aware mean:
+  - `premium`     → +0.30%/mo mean (~3.6%/yr)
+  - `standard`    → +0.20%/mo mean (~2.4%/yr, today's default)
+  - `dilapidated` → −0.05%/mo mean (~−0.6%/yr — soft decay; renovate to reverse)
+  - Keep the ±0.15% jitter and the 4% dip roll for variance.
+  - Apply the same drift to `marketValue` so the "asking signal" tracks too.
+  - Keep the existing 2.5× purchase-basis cap (still valid).
+- **`src/lib/engine/taxation.ts`** (asset uplift on condition change, line 168): increase the gap so swing-based renovations reflect the new long-run delta — dilapidated→standard +18%, standard→premium +12% (currently smaller). Tune so renovation ROI stays the headline lever but the passive drift difference is felt over years.
+- Verify `useGameState` net-worth and the conveyancing/sales code already read `property.value`, so no further wiring is needed.
 
-## 3. Advertised yield == realised yield
+## 4. Section 13 market rent reflects renovations
 
-`gameStore.ts` ~line 526-553 completes a buy. Happy path uses the listed `prop.yield`. Bug path (line 529-534) fires when the property is missing from `estateAgentProperties` / `auctionProperties` at completion (e.g. it was removed/refreshed) and reconstructs with a *fresh* random yield `6 + Math.random() * 9`, so the player sees a different yield than the agent advertised.
+`property-card.tsx:668–677` already passes `condition`, `subtype`, `subtypeUnits`, `completedRenovationIds` into `getMarketRentPounds` — but the market rent shown in the Section 13 dialog still anchors low because:
+- `getMarketRentPounds` (market.ts:145) only counts 4 hard-coded "premium" renos and caps the bonus at +6%.
+- It uses `value` (which today doesn't reflect condition — fixed in item 3) as the base.
+- It ignores conversions (HMO / flats per-unit rent uplift is already in but capped low).
 
-- Persist the canonical yield on the conveyancing entry at offer time: extend `Conveyancing` with `advertisedYield?: number` and `advertisedMonthlyIncome?: number` (pennies). Populate in `buyProperty` / `buyPropertyAtPrice` (lines 2243 / 2339).
-- In the completion block, prefer `conv.advertisedYield` and `conv.advertisedMonthlyIncome` over any random fallback. Only fall back to `6 + Math.random()*9` if literally nothing is stored (legacy saves).
-- Re-derive `effectiveRent` from `settledValue × storedYield / 12` so the rent matches the yield label even when the buyer underpaid.
-
-## 4. Renovation dialog — extension sqft + per-renovation cooldown
-
-**4a. Eligibility counts in-progress extensions too**
-
-`src/components/ui/renovation-dialog.tsx` lines 317-327 builds `effectiveInternalSqft = internalSqft + Σ sqftAdded of *approved-not-yet-started* extensions`. It explicitly skips extensions that are `activeRenovations.includes(r.id)` — but those are the most relevant ones: planning approved, build under way, sqft *will* exist by the time the new conversion completes. The user screenshot shows "Needs 650+ sqft int (have 595)" while another extension is already in progress.
-
-- Change the filter to: include any extension that is approved (`status === 'approved'`) OR currently in `activeRenovations`, and only skip those already in `completedRenovationIds` (those are already baked into `internalSqft`).
-- Same effective sqft is used for the conversion's `scaleInputs` so cost/rent/value scale to the post-extension footprint, matching the existing batch behaviour (line 938).
-
-**4b. Planning refusal cooldown applies only to the refused renovation, not the whole property**
-
-Currently `PropertyLock { reason: 'planning_cooldown' }` is scoped only by `propertyId`, so a refused extension blocks ALL planning resubmissions on the property — including unrelated conversions.
-
-- `src/types/game.ts` `PropertyLock`: add optional `renovationTypeId?: string` (alongside the existing `slotIndex`).
-- `gameStore.ts` line 1257-1264 (refusal handling): push the lock with `renovationTypeId: app.renovationTypeId` so the cooldown is per-renovation.
-- `gameStore.ts` lines 3325-3332 and 3422-3428 (block guards in `submitPlanningApplication` + `submitBatchPlanningApplications`): tighten the find to also match `renovationTypeId === currentRenovationTypeId`. Untyped legacy locks (no `renovationTypeId`) keep the old property-wide behaviour so existing saves stay safe.
-- `gameStore.ts` line 849-851 (renovation eligibility block in monthly tick): same match tightening.
-- `renovation-dialog.tsx` line 81 + 643 + the `inPlanningCooldown` prop: compute cooldown *per renovation card* by matching `propertyLocks` `renovationTypeId === r.id`. Pass the full `propertyLocks` array into the dialog (or pre-compute a `Set<renoId>` of locked renovations) instead of the single boolean.
-- `planning-refused-dialog.tsx`: already lists the specific refused renovation; no behaviour change needed, just keep the per-reno cooldown copy.
+- **`src/lib/engine/market.ts` `getMarketRentPounds`**:
+  - Expand `PREMIUM_RENOS` to also include `extension`, `loft_conversion`, `garage_conversion`, `garden_landscaping`, `solar_panels`, `epc_upgrade` (the renos that materially affect rent in real-world Middlesbrough lets).
+  - Raise the per-reno premium from 1.5% to 2.5% and the cap from +6% to +15%.
+  - Add a `totalRenovationSpendPennies?` input — when provided, blend in a `min(0.20, spend / value × 0.8)` uplift so heavy refurbs further raise market rent independent of the named-reno list.
+  - Add a `marketValue?` input and prefer it over `value` when present (post-item-3 it tracks condition).
+- **`src/components/ui/property-card.tsx`** lines 668–677: pass `totalRenovationSpendPennies: property.totalRenovationSpendPennies` and `marketValue: property.marketValue` into `getMarketRentPounds`.
+- **`src/components/ui/rent-negotiation-dialog.tsx`**: keep the headline "Local market: £X/mo" copy but add a sub-line "Includes condition + £Y refurb uplift" when `totalRenovationSpendPennies > 0`, so the player understands why the figure jumped.
+- Re-test the `acceptanceProb` formula (line 68) — the new market rent should naturally lift the cap on proposed rents without code changes.
 
 ---
 
 ## Technical notes
 
-- `Conveyancing.advertisedYield` and `advertisedMonthlyIncome` initialise to `undefined` for existing saves; the fallback path keeps them safe.
-- `PropertyLock.renovationTypeId` is optional, so legacy `planning_cooldown` entries without an id still block (broad behaviour) until they expire — chosen over a migration to avoid touching persisted state.
-- Furnished stock in the agent gets a `marketValue` bumped by furniture value too, so on-purchase `settledValue` math (line 540) doesn't book a paper loss from the premium price.
-- `getFurnitureValuePennies` already handles `furnishingMonthsRemaining` — no engine changes needed for depreciation on pre-furnished stock.
+- Item 1 prop additions are additive; no breaking changes to existing callers if defaults are used.
+- Item 2's `expanded` flag stays in component state — keeps PortfolioGrid pure and avoids store churn.
+- Item 3's drift change persists into existing saves automatically (no migration; the state shape is unchanged, only the per-tick math).
+- Item 4 keeps `marketRent` in pounds (UI unit) — `getMarketRentPounds` already returns pounds, so callers stay unchanged.
