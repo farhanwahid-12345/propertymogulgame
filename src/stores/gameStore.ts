@@ -28,7 +28,7 @@ import {
   getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
   getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies,
 } from '@/lib/engine/financials';
-import { generateRandomProperty } from '@/lib/engine/market';
+import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
 import {
   calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
 } from '@/lib/mortgageEligibility';
