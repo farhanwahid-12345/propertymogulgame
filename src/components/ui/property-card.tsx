@@ -544,6 +544,7 @@ export const PropertyCard = memo(function PropertyCard({
                         propertyYield={property.yield}
                         currentSatisfaction={tenantSatisfaction}
                         satisfactionReasons={tenantSatisfactionReasons}
+                        furnishingTier={(property as any).furnishingTier}
                       />
                     )
                   )}
