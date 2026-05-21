@@ -35,6 +35,7 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
       />
       <MortgageManagement
         ownedProperties={propertiesWithDebt}
+        mortgages={gameState.mortgages}
         mortgageProviders={gameState.mortgageProviders}
         onRefinance={gameState.handleRefinance}
         cash={gameState.cash}
@@ -57,6 +58,7 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
       />
       <PortfolioMortgage
         ownedProperties={propertiesWithDebt}
+        mortgages={gameState.mortgages}
         mortgageProviders={gameState.mortgageProviders}
         cash={gameState.cash}
         setCash={gameState.setCash}
