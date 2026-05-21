@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, DollarSign, Lock, CreditCard, FileSearch, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierShared } from "@/lib/tenantRent";
+import { calcTenantRent, getProfileRentMultiplier, getConditionRentMultiplierShared, getFurnishingRentMultiplier } from "@/lib/tenantRent";
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { PropertyCondition } from "@/types/game";
@@ -217,6 +217,8 @@ interface TenantSelectorProps {
   /** Current tenant's satisfaction (0-100) — shown in the dialog header. */
   currentSatisfaction?: number;
   satisfactionReasons?: Array<{ reason: string; delta: number }>;
+  /** Furnishing tier — feeds the rent preview so it matches what the tenant will pay. */
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
 }
 
 export function TenantSelector({
@@ -232,6 +234,7 @@ export function TenantSelector({
   propertyYield,
   currentSatisfaction,
   satisfactionReasons = [],
+  furnishingTier,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -293,7 +296,12 @@ export function TenantSelector({
               : 'Different tenants offer different rent and risk profiles. The market refreshes each time you look!'}
             {!hasSittingTenant && displayBaseRent > 0 && (
               <span className="block mt-1 text-foreground">
-                Base rent: £{Math.round(displayBaseRent).toLocaleString()}/mo
+                Base rent: £{Math.round(displayBaseRent * getFurnishingRentMultiplier(furnishingTier) * getConditionRentMultiplierShared(condition)).toLocaleString()}/mo
+                {furnishingTier && furnishingTier !== 'unfurnished' && (
+                  <span className="ml-1 text-[10px] text-emerald-300 capitalize">
+                    (incl. {furnishingTier.replace('_', ' ')} +{Math.round((getFurnishingRentMultiplier(furnishingTier) - 1) * 100)}%)
+                  </span>
+                )}
               </span>
             )}
             {hasSittingTenant && typeof currentSatisfaction === 'number' && (
@@ -342,7 +350,7 @@ export function TenantSelector({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {tenantProfiles.map((tenant) => {
             // Use shared formula so preview matches what the tenant actually pays
-            const potentialRent = calcTenantRent(displayBaseRent, tenant, condition);
+            const potentialRent = calcTenantRent(displayBaseRent, tenant, condition, furnishingTier);
             const profileMult = getProfileRentMultiplier(tenant.profile);
             const conditionMult = getConditionRentMultiplierShared(condition);
             const isSelected = selectedTenant?.id === tenant.id;
