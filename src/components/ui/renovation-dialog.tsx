@@ -308,6 +308,7 @@ export function RenovationDialog({
   planningHistory = [],
   monthsPlayed = 0,
   inPlanningCooldown = false,
+  propertyLocks = [],
   hasTenant = false,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
@@ -316,17 +317,53 @@ export function RenovationDialog({
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
-  // Item 4a: effective internal sqft includes approved-but-not-built extensions.
+  // Per-renovation planning cooldown check — legacy property-wide locks (no
+  // renovationTypeId) still block, but new locks are scoped to the refused work.
+  const isInCooldown = (renoId: string): boolean => {
+    if (inPlanningCooldown) {
+      // Honour the property-wide boolean for unscoped legacy locks.
+      const anyLegacy = propertyLocks.some(
+        l => l.propertyId === propertyId
+          && l.reason === 'planning_cooldown'
+          && l.untilMonth > monthsPlayed
+          && !l.renovationTypeId,
+      );
+      if (anyLegacy) return true;
+    }
+    return propertyLocks.some(
+      l => l.propertyId === propertyId
+        && l.reason === 'planning_cooldown'
+        && l.untilMonth > monthsPlayed
+        && l.renovationTypeId === renoId,
+    );
+  };
+
+  // Item 4a: effective internal sqft includes BOTH approved-but-not-built AND
+  // currently in-progress extensions (their sqft will exist by the time any
+  // batched/follow-up conversion completes). Only completed extensions are
+  // already baked into `internalSqft` and so are excluded here.
   const approvedSqftPending = (planningApplications || [])
     .filter(a => a.status === 'approved')
     .reduce((sum, a) => {
       const r = RENOVATION_OPTIONS.find(o => o.id === a.renovationTypeId);
       if (!r || !r.sqftAdded) return sum;
-      // Skip if already in progress or completed
-      if (activeRenovations.includes(r.id) || completedRenovationIds.includes(r.id)) return sum;
+      if (completedRenovationIds.includes(r.id)) return sum; // already in internalSqft
       return sum + (r.sqftAdded || 0);
     }, 0);
-  const effectiveInternalSqft = (internalSqft || 0) + approvedSqftPending;
+  // Also include any extension that's actively being built (no longer in
+  // `planningApplications` once started, but still pending in `activeRenovations`).
+  const activeExtensionSqft = activeRenovations.reduce((sum, id) => {
+    const r = RENOVATION_OPTIONS.find(o => o.id === id);
+    if (!r || !r.sqftAdded) return sum;
+    if (completedRenovationIds.includes(r.id)) return sum;
+    // Don't double-count: skip if already counted in approvedSqftPending.
+    const stillApproved = (planningApplications || []).some(
+      a => a.renovationTypeId === id && a.status === 'approved',
+    );
+    if (stillApproved) return sum;
+    return sum + (r.sqftAdded || 0);
+  }, 0);
+  const effectiveInternalSqft = (internalSqft || 0) + approvedSqftPending + activeExtensionSqft;
 
   // Conversion units: bounds depend on internalSqft (use effective so approved extensions count)
   const isConversion = (r: RenovationType | null) => !!r && r.category === 'conversion';
@@ -495,7 +532,7 @@ export function RenovationDialog({
                   const application = renovation.requiresPlanning ? findApplication(renovation.id) : undefined;
                   const planningPending = application?.status === 'pending';
                   const planningApproved = application?.status === 'approved';
-                  const blockedByCooldown = renovation.requiresPlanning && inPlanningCooldown && !planningApproved;
+                  const blockedByCooldown = renovation.requiresPlanning && isInCooldown(renovation.id) && !planningApproved;
                   // Planning-gated renovations only need the planning fee to begin the process,
                   // so we let the user select & submit even if they can't yet afford the build
                   // OR a tenant is still in residence (works gated post-approval).
