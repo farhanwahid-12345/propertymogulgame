@@ -24,6 +24,8 @@ interface Props {
   tenantSatisfaction: number;
   /** Player cash (pounds) — for tribunal fee affordability check. */
   playerCash: number;
+  /** Cumulative renovation spend on this property (pennies) — surfaces refurb uplift hint. */
+  totalRenovationSpendPennies?: number;
   /** Apply the negotiated rent, in pounds. `outcome` drives satisfaction / lock. */
   onApply: (
     propertyId: string,
