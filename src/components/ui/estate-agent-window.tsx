@@ -12,6 +12,7 @@ import { Property } from "@/components/ui/property-card";
 import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, MessageSquare, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 
 interface PropertyOffer {
   id: string;
