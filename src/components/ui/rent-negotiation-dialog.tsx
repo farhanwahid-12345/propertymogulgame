@@ -174,6 +174,11 @@ export function RentNegotiationDialog({
               <div className="p-2 rounded-md bg-muted/40 border border-border">
                 <div className="text-xs text-muted-foreground">Local market</div>
                 <div className="font-semibold">£{Math.round(marketRent).toLocaleString()}/mo</div>
+                {totalRenovationSpendPennies > 0 && (
+                  <div className="text-[10px] text-emerald-300/90 mt-0.5">
+                    Includes refurb uplift (£{Math.round(totalRenovationSpendPennies / 100).toLocaleString()} spent)
+                  </div>
+                )}
               </div>
             </div>
             {marketRent > 0 && (() => {
