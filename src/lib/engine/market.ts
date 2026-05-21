@@ -2,7 +2,8 @@
 import type { Property } from "@/types/game";
 import { toPennies } from "@/lib/formatCurrency";
 import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
-import { getPropertyValueRangeForLevel } from "./financials";
+import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
+import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
  *  Cheaper stock yields more; prime stock yields less. ±1.5% jitter, clamped [2.5, 14]. */
