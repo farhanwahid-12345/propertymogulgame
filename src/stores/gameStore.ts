@@ -2412,6 +2412,8 @@ export const useGameStore = create<GameState & GameActions>()(
           purchasePrice,
           mortgageData,
           cashHeld: cashRequired,
+          advertisedYield: property.yield,
+          advertisedMonthlyIncome: property.monthlyIncome,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
