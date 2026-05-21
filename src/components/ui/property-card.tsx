@@ -50,6 +50,8 @@ export interface Property {
   subtypeUnits?: number;
   totalRenovationSpendPennies?: number;
   epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  furnishingMonthsRemaining?: number;
 }
 
 interface PropertyCardProps {
