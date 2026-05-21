@@ -121,10 +121,17 @@ export function useGameState() {
     (sum: number, p: any) => sum + fromPennies(getFurnitureValuePennies(p)),
     0,
   );
-  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ mortgage debt − overdraft drawn.
+  // Mortgage + loan debt — must be subtracted so net worth doesn't balloon when
+  // a financed purchase completes (the property value lands but the borrowed
+  // capital is still owed).
+  const totalMortgageDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
+  const loansBalanceForNw = loansRawForNw();
+  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps.
-  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
+  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
+    + ownedProperties.reduce((sum, p) => sum + p.value, 0)
+    - totalMortgageDebt - loansBalanceForNw - overdraftUsed;
   const nowTs = Date.now();
   const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
   const conveyancingPropertyIds = new Set(
