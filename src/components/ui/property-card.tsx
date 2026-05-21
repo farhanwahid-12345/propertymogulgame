@@ -303,6 +303,20 @@ export const PropertyCard = memo(function PropertyCard({
                 {property.subtype}
               </Badge>
             )}
+            {property.furnishingTier && property.furnishingTier !== 'unfurnished' && (() => {
+              const furniturePounds = Math.round(getFurnitureValuePennies(property) / 100);
+              const monthsLeft = property.furnishingMonthsRemaining ?? 0;
+              const label = property.furnishingTier === 'fully_furnished' ? 'Fully furnished' : 'Part furnished';
+              return (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10"
+                  title={`${label} — ${monthsLeft} mo of useful life remaining`}
+                >
+                  🛋️ £{furniturePounds.toLocaleString()} · {monthsLeft}mo
+                </Badge>
+              );
+            })()}
             {currentTenant && typeof currentTenant.defaultRisk === 'number' && (() => {
               const r = currentTenant.defaultRisk;
               const band = r <= 10 ? { label: 'Low Risk', cls: 'border-green-400/40 text-green-400' }
