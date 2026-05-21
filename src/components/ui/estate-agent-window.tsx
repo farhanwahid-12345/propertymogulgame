@@ -12,6 +12,7 @@ import { Property } from "@/components/ui/property-card";
 import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, MessageSquare, Ban } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 
 interface PropertyOffer {
   id: string;
@@ -444,9 +445,15 @@ export function EstateAgentWindow({
     });
   };
 
+  /** Suggested-price floor includes residual furniture value so the seller recoups it. */
+  const getSuggestedFloor = (prop: Property | null) => {
+    if (!prop) return 0;
+    return prop.value + Math.round(getFurnitureValuePennies(prop) / 100);
+  };
+
   const setPriceFromEstimate = (multiplier: number) => {
     if (selectedProperty) {
-      setNewListingPrice(Math.floor(selectedProperty.value * multiplier));
+      setNewListingPrice(Math.floor(getSuggestedFloor(selectedProperty) * multiplier));
     }
   };
 
@@ -950,9 +957,9 @@ export function EstateAgentWindow({
                     <Select
                       value={selectedProperty?.id || ""}
                       onValueChange={(id) => {
-                       const prop = unlistedProperties.find(p => p.id === id);
+                        const prop = unlistedProperties.find(p => p.id === id);
                         setSelectedProperty(prop || null);
-                        if (prop) setNewListingPrice(prop.value);
+                        if (prop) setNewListingPrice(getSuggestedFloor(prop));
                       }}
                     >
                       <SelectTrigger>
@@ -969,9 +976,11 @@ export function EstateAgentWindow({
                   </div>
 
                   {selectedProperty && (() => {
-                    const priceRatio = newListingPrice / selectedProperty.value;
+                    const furniturePounds = Math.round(getFurnitureValuePennies(selectedProperty) / 100);
+                    const suggestedFloor = getSuggestedFloor(selectedProperty);
+                    const priceRatio = newListingPrice / suggestedFloor;
                     const guidance = getPricingGuidance(priceRatio);
-                    const offerRange = getExpectedOfferRange(selectedProperty.value, priceRatio);
+                    const offerRange = getExpectedOfferRange(suggestedFloor, priceRatio);
                     return (
                       <>
                         {/* Property details */}
@@ -980,6 +989,12 @@ export function EstateAgentWindow({
                           <div><span className="text-muted-foreground">Area:</span> <span className="font-medium">{selectedProperty.neighborhood}</span></div>
                           <div><span className="text-muted-foreground">Market Value:</span> <span className="font-medium">£{selectedProperty.value.toLocaleString()}</span></div>
                           <div><span className="text-muted-foreground">Rent:</span> <span className="font-medium text-green-600">£{selectedProperty.monthlyIncome}/mo</span></div>
+                          {furniturePounds > 0 && (
+                            <div className="col-span-2 flex items-center gap-2 text-xs text-amber-300">
+                              🛋️ Furniture residual value: <span className="font-semibold">£{furniturePounds.toLocaleString()}</span>
+                              <span className="text-muted-foreground">— bundled into suggested price</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Slider-based asking price */}
@@ -994,14 +1009,15 @@ export function EstateAgentWindow({
                           <Slider
                             value={[newListingPrice]}
                             onValueChange={(vals) => setNewListingPrice(vals[0])}
-                            min={Math.floor(selectedProperty.value * 0.85)}
-                            max={Math.floor(selectedProperty.value * 1.5)}
+                            min={Math.floor(suggestedFloor * 0.85)}
+                            max={Math.floor(suggestedFloor * 1.5)}
                             step={1000}
                           />
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>85% (£{Math.floor(selectedProperty.value * 0.85).toLocaleString()})</span>
-                            <span>150% (£{Math.floor(selectedProperty.value * 1.5).toLocaleString()})</span>
+                            <span>85% (£{Math.floor(suggestedFloor * 0.85).toLocaleString()})</span>
+                            <span>150% (£{Math.floor(suggestedFloor * 1.5).toLocaleString()})</span>
                           </div>
+
 
                           {/* Quick preset buttons */}
                           <div className="flex gap-1.5 flex-wrap">

@@ -2,7 +2,8 @@
 import type { Property } from "@/types/game";
 import { toPennies } from "@/lib/formatCurrency";
 import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
-import { getPropertyValueRangeForLevel } from "./financials";
+import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
+import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
  *  Cheaper stock yields more; prime stock yields less. ±1.5% jitter, clamped [2.5, 14]. */
@@ -84,6 +85,35 @@ export function generateRandomProperty(level: number): Property {
     plotSqft,
     subtype: 'standard',
     epcRating,
+  };
+}
+
+/** Roll a furnishing tier for new-stock listings. ~78% unfurnished / 15% part / 7% full. */
+function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fully_furnished'; monthsRemaining?: number } {
+  const r = Math.random();
+  if (r < 0.07) return { tier: 'fully_furnished', monthsRemaining: 18 + Math.floor(Math.random() * 37) };
+  if (r < 0.22) return { tier: 'part_furnished', monthsRemaining: 18 + Math.floor(Math.random() * 37) };
+  return { tier: 'unfurnished' };
+}
+
+/** Wrap `generateRandomProperty` to occasionally list pre-furnished stock with bumped price & rent. */
+export function generateMarketProperty(level: number): Property {
+  const base = generateRandomProperty(level);
+  const roll = rollListingFurnishing();
+  if (roll.tier === 'unfurnished') return base;
+  const tempForFurniture = { ...base, furnishingTier: roll.tier, furnishingMonthsRemaining: roll.monthsRemaining };
+  const furniturePennies = getFurnitureValuePennies(tempForFurniture);
+  const rentMult = getFurnishingRentMultiplier(roll.tier);
+  const bumpedPrice = base.price + furniturePennies;
+  const bumpedValue = base.value + furniturePennies;
+  const bumpedRent = Math.floor(base.monthlyIncome * rentMult);
+  return {
+    ...base,
+    price: bumpedPrice,
+    value: bumpedValue,
+    monthlyIncome: bumpedRent,
+    furnishingTier: roll.tier,
+    furnishingMonthsRemaining: roll.monthsRemaining,
   };
 }
 

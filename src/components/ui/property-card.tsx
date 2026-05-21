@@ -21,6 +21,7 @@ import { MultiUnitSlots } from "@/components/ui/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 
 export interface Property {
   id: string;
@@ -50,6 +51,8 @@ export interface Property {
   subtypeUnits?: number;
   totalRenovationSpendPennies?: number;
   epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  furnishingMonthsRemaining?: number;
 }
 
 interface PropertyCardProps {
@@ -287,7 +290,7 @@ export const PropertyCard = memo(function PropertyCard({
         </div>
         <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
         {/* Sqft + concern chips row */}
-        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0) && (
+        {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0 || (property.furnishingTier && property.furnishingTier !== 'unfurnished')) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {property.internalSqft && (
               <span className="text-[10px] text-muted-foreground">
@@ -300,6 +303,20 @@ export const PropertyCard = memo(function PropertyCard({
                 {property.subtype}
               </Badge>
             )}
+            {property.furnishingTier && property.furnishingTier !== 'unfurnished' && (() => {
+              const furniturePounds = Math.round(getFurnitureValuePennies(property) / 100);
+              const monthsLeft = property.furnishingMonthsRemaining ?? 0;
+              const label = property.furnishingTier === 'fully_furnished' ? 'Fully furnished' : 'Part furnished';
+              return (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10"
+                  title={`${label} — ${monthsLeft} mo of useful life remaining`}
+                >
+                  🛋️ £{furniturePounds.toLocaleString()} · {monthsLeft}mo
+                </Badge>
+              );
+            })()}
             {currentTenant && typeof currentTenant.defaultRisk === 'number' && (() => {
               const r = currentTenant.defaultRisk;
               const band = r <= 10 ? { label: 'Low Risk', cls: 'border-green-400/40 text-green-400' }
