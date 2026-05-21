@@ -152,8 +152,11 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
             <p className="text-sm text-muted-foreground">Choose at least 2 properties to secure against portfolio mortgage</p>
             
             <div className="grid gap-3 max-h-60 overflow-y-auto">
-              {eligibleProperties.map(property => (
-                <Card 
+              {eligibleProperties.map(property => {
+                const existing = mortgages.find(m => m.propertyId === property.id);
+                const existingProvider = existing ? mortgageProviders.find((p: any) => p.id === existing.providerId) : null;
+                return (
+                <Card
                   key={property.id}
                   className={`cursor-pointer transition-colors ${
                     selectedPropertyIds.includes(property.id) ? 'ring-2 ring-purple-500' : ''
@@ -166,6 +169,13 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
                         <p className="font-medium">{property.name}</p>
                         <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
                         <p className="text-xs">Value: £{property.value.toLocaleString()} | Rent: £{property.monthlyIncome}/mo</p>
+                        {existing && existingProvider ? (
+                          <p className="text-xs mt-1 text-purple-300/90">
+                            🏦 {existingProvider.name} · {(existing.interestRate * 100).toFixed(2)}%
+                          </p>
+                        ) : (
+                          <p className="text-xs mt-1 text-muted-foreground italic">Unencumbered</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-sm">
@@ -178,7 +188,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              );})}
             </div>
           </div>
 
