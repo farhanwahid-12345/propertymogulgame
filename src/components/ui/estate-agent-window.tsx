@@ -957,9 +957,9 @@ export function EstateAgentWindow({
                     <Select
                       value={selectedProperty?.id || ""}
                       onValueChange={(id) => {
-                       const prop = unlistedProperties.find(p => p.id === id);
+                        const prop = unlistedProperties.find(p => p.id === id);
                         setSelectedProperty(prop || null);
-                        if (prop) setNewListingPrice(prop.value);
+                        if (prop) setNewListingPrice(getSuggestedFloor(prop));
                       }}
                     >
                       <SelectTrigger>
