@@ -4138,7 +4138,7 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           const pick = candidates.length > 0
             ? candidates[Math.floor(Math.random() * candidates.length)]
-            : generateRandomProperty(prev.level);
+            : generateMarketProperty(prev.level);
           if (!usedIds.has(pick.id) && !excludedIds.has(pick.id)) {
             estate.push({ ...pick });
             usedIds.add(pick.id);
