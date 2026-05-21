@@ -527,21 +527,23 @@ export const useGameStore = create<GameState & GameActions>()(
           // Find the property from market lists
           let prop = newEstateAgent.find(p => p.id === conv.propertyId) || newAuction.find(p => p.id === conv.propertyId);
           if (!prop) {
-            // Property was generated inline — reconstruct with derived rent so monthlyIncome isn't £0
+            // Property was generated inline — reconstruct using the advertised
+            // yield/rent snapshot so realised numbers match the agent's label.
             const reconstructedValue = conv.purchasePrice || 0;
-            const reconstructedYield = 6 + Math.random() * 9;
-            const derivedRent = reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0;
+            const reconstructedYield = conv.advertisedYield ?? (6 + Math.random() * 9);
+            const derivedRent = conv.advertisedMonthlyIncome
+              ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
             prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
           // Bargain reflected in net worth: settle value to min(listed, paid).
-          // Recompute rent from displayed yield × settled value so realised yield matches the label.
+          // Recompute rent from advertised yield × settled value so realised yield matches the label.
           const listedValue = prop.value;
           const paid = conv.purchasePrice || prop.price;
           const settledValue = Math.min(listedValue, paid);
-          const effectiveYield = prop.yield || (6 + Math.random() * 9);
+          const effectiveYield = conv.advertisedYield ?? prop.yield ?? (6 + Math.random() * 9);
           const effectiveRent = settledValue > 0
             ? Math.floor((settledValue * (effectiveYield / 100)) / 12)
-            : prop.monthlyIncome;
+            : (conv.advertisedMonthlyIncome ?? prop.monthlyIncome);
           const purchased: Property = {
             ...prop, owned: true, price: paid,
             value: settledValue,
@@ -2319,6 +2321,8 @@ export const useGameStore = create<GameState & GameActions>()(
           purchasePrice: property.price,
           mortgageData,
           cashHeld: cashRequired,
+          advertisedYield: property.yield,
+          advertisedMonthlyIncome: property.monthlyIncome,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
