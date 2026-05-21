@@ -50,6 +50,7 @@ export function RentNegotiationDialog({
   tenant,
   tenantSatisfaction,
   playerCash,
+  totalRenovationSpendPennies = 0,
   onApply,
   trigger,
 }: Props) {
