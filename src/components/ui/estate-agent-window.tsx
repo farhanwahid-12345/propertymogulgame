@@ -445,9 +445,15 @@ export function EstateAgentWindow({
     });
   };
 
+  /** Suggested-price floor includes residual furniture value so the seller recoups it. */
+  const getSuggestedFloor = (prop: Property | null) => {
+    if (!prop) return 0;
+    return prop.value + Math.round(getFurnitureValuePennies(prop) / 100);
+  };
+
   const setPriceFromEstimate = (multiplier: number) => {
     if (selectedProperty) {
-      setNewListingPrice(Math.floor(selectedProperty.value * multiplier));
+      setNewListingPrice(Math.floor(getSuggestedFloor(selectedProperty) * multiplier));
     }
   };
 
