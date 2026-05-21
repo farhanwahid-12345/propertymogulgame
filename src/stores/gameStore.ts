@@ -1315,14 +1315,18 @@ export const useGameStore = create<GameState & GameActions>()(
         // original purchase price, only `marketValue` drifts (the "asking" signal),
         // while booked `value` (used for net worth) is held at the cap.
         updatedOwnedProperties = updatedOwnedProperties.map(property => {
-          const monthlyDrift = 0.0025 + (Math.random() - 0.5) * 0.003; // ~0.10%–0.40%/mo
-          const isDip = Math.random() < 0.04; // 4% chance/month — small corrections more frequent
-          const change = isDip ? -(0.004 + Math.random() * 0.012) : monthlyDrift; // dips up to ~1.6%/mo
+          // Condition-aware mean drift: premium appreciates faster, dilapidated decays
+          const meanByCondition =
+            property.condition === 'premium'     ? 0.0030 :
+            property.condition === 'dilapidated' ? -0.0005 :
+                                                   0.0020; // standard
+          const monthlyDrift = meanByCondition + (Math.random() - 0.5) * 0.003; // ±0.15%
+          const isDip = Math.random() < 0.04;
+          const change = isDip ? -(0.004 + Math.random() * 0.012) : monthlyDrift;
           const purchaseBasis = property.price || property.value;
           const valueCap = Math.round(purchaseBasis * 2.5);
           const drifted = Math.round(property.value * (1 + change));
           const driftedMarket = Math.round((property.marketValue || property.value) * (1 + change));
-          // Apply soft cap on booked value; allow market value to drift either way still
           const newValue = change > 0 ? Math.min(drifted, valueCap) : drifted;
           return {
             ...property,
