@@ -13,6 +13,13 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthly
 
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
+  /** Active mortgages — used to surface current lender/rate on each tile. */
+  mortgages?: Array<{
+    propertyId: string;
+    providerId: string;
+    interestRate: number;
+    remainingBalance: number;
+  }>;
   mortgageProviders: any[];
   onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   cash: number;
@@ -20,7 +27,7 @@ interface PortfolioMortgageProps {
   creditScore?: number;
 }
 
-export function PortfolioMortgage({ ownedProperties, mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580 }: PortfolioMortgageProps) {
+export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580 }: PortfolioMortgageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
