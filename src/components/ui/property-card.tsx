@@ -172,6 +172,8 @@ export const PropertyCard = memo(function PropertyCard({
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
   const [showMonthlyCosts, setShowMonthlyCosts] = useState(false);
+  /** Collapsed financial detail by default for owned properties — keeps cards compact. */
+  const [financialsExpanded, setFinancialsExpanded] = useState(false);
   const [mortgagePercentage, setMortgagePercentage] = useState([60]);
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
