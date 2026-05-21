@@ -78,8 +78,10 @@ interface RenovationDialogProps {
   planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
   /** Current in-game month — for displaying "decision in N mo" countdowns. */
   monthsPlayed?: number;
-  /** True if this property is in a planning_cooldown lock (recent refusal). */
+  /** True if this property is in a *property-wide* planning cooldown (legacy). */
   inPlanningCooldown?: boolean;
+  /** Active property locks — used to compute per-renovation planning cooldown. */
+  propertyLocks?: Array<{ propertyId: string; reason: string; untilMonth: number; renovationTypeId?: string }>;
 }
 
 
