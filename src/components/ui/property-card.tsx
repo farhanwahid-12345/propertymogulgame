@@ -21,6 +21,7 @@ import { MultiUnitSlots } from "@/components/ui/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 
 export interface Property {
   id: string;
