@@ -181,6 +181,7 @@ export function PortfolioGrid({
               planningApplications={propertyApps}
               planningHistory={(gameState as any).planningApplications || []}
               inPlanningCooldown={inPlanningCooldown}
+              propertyLocks={(gameState.propertyLocks || []).filter((l: any) => l.propertyId === property.id)}
               multiUnitSlots={multiUnitSlots}
               hasAnyTenant={tenantRecs.length > 0}
               hasActiveDebtRecovery={((gameState as any).debtRecoveryCases || []).some((c: any) => c.propertyId === property.id && c.status === 'in_court')}
