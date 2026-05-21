@@ -527,21 +527,23 @@ export const useGameStore = create<GameState & GameActions>()(
           // Find the property from market lists
           let prop = newEstateAgent.find(p => p.id === conv.propertyId) || newAuction.find(p => p.id === conv.propertyId);
           if (!prop) {
-            // Property was generated inline — reconstruct with derived rent so monthlyIncome isn't £0
+            // Property was generated inline — reconstruct using the advertised
+            // yield/rent snapshot so realised numbers match the agent's label.
             const reconstructedValue = conv.purchasePrice || 0;
-            const reconstructedYield = 6 + Math.random() * 9;
-            const derivedRent = reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0;
+            const reconstructedYield = conv.advertisedYield ?? (6 + Math.random() * 9);
+            const derivedRent = conv.advertisedMonthlyIncome
+              ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
             prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
           // Bargain reflected in net worth: settle value to min(listed, paid).
-          // Recompute rent from displayed yield × settled value so realised yield matches the label.
+          // Recompute rent from advertised yield × settled value so realised yield matches the label.
           const listedValue = prop.value;
           const paid = conv.purchasePrice || prop.price;
           const settledValue = Math.min(listedValue, paid);
-          const effectiveYield = prop.yield || (6 + Math.random() * 9);
+          const effectiveYield = conv.advertisedYield ?? prop.yield ?? (6 + Math.random() * 9);
           const effectiveRent = settledValue > 0
             ? Math.floor((settledValue * (effectiveYield / 100)) / 12)
-            : prop.monthlyIncome;
+            : (conv.advertisedMonthlyIncome ?? prop.monthlyIncome);
           const purchased: Property = {
             ...prop, owned: true, price: paid,
             value: settledValue,
@@ -1254,11 +1256,13 @@ export const useGameStore = create<GameState & GameActions>()(
                 "destructive",
               );
               flashOps();
-              // Add 6-month cooldown lock so the player can't immediately resubmit
+              // Add 6-month cooldown lock scoped to the specific refused renovation
+              // so unrelated renovations on this property remain submittable.
               newPropertyLocks.push({
                 propertyId: app.propertyId,
                 reason: 'planning_cooldown',
                 untilMonth: newMonthNumber + 6,
+                renovationTypeId: app.renovationTypeId,
               });
             }
             return resolved;
@@ -2317,6 +2321,8 @@ export const useGameStore = create<GameState & GameActions>()(
           purchasePrice: property.price,
           mortgageData,
           cashHeld: cashRequired,
+          advertisedYield: property.yield,
+          advertisedMonthlyIncome: property.monthlyIncome,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -2406,6 +2412,8 @@ export const useGameStore = create<GameState & GameActions>()(
           purchasePrice,
           mortgageData,
           cashHeld: cashRequired,
+          advertisedYield: property.yield,
+          advertisedMonthlyIncome: property.monthlyIncome,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -3322,14 +3330,18 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Block if a previous refusal is still in cooldown
+        // Block if a previous refusal *for this same renovation* is still in cooldown.
+        // Legacy locks without renovationTypeId apply property-wide (safe fallback).
         const cooldown = (prev.propertyLocks || []).find(
-          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+          l => l.propertyId === propertyId
+            && l.reason === 'planning_cooldown'
+            && l.untilMonth > prev.monthsPlayed
+            && (l.renovationTypeId === undefined || l.renovationTypeId === renovationType.id),
         );
         if (cooldown) {
           showToast(
             "Planning Cooldown",
-            `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`,
+            `Cannot resubmit ${renovationType.name} until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`,
             "destructive",
           );
           return;
@@ -3419,12 +3431,19 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
 
-        // Cooldown / already-submitted gates
+        // Cooldown / already-submitted gates — per-renovation scoped.
+        const batchIds = new Set(items.map(r => r.id));
         const cooldown = (prev.propertyLocks || []).find(
-          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+          l => l.propertyId === propertyId
+            && l.reason === 'planning_cooldown'
+            && l.untilMonth > prev.monthsPlayed
+            && (l.renovationTypeId === undefined || batchIds.has(l.renovationTypeId)),
         );
         if (cooldown) {
-          showToast("Planning Cooldown", `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
+          const which = cooldown.renovationTypeId
+            ? items.find(r => r.id === cooldown.renovationTypeId)?.name || 'one of these items'
+            : 'this property';
+          showToast("Planning Cooldown", `${which} is in cooldown until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
           return;
         }
         const history = prev.planningApplications || [];

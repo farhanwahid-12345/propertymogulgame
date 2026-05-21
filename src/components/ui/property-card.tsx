@@ -101,8 +101,10 @@ interface PropertyCardProps {
   planningApplications?: Array<{ id: string; renovationTypeId: string; status: 'pending' | 'approved' | 'refused'; decisionMonth: number; submittedMonth: number }>;
   /** Full planning history across portfolio — used to show live track-record adjustment. */
   planningHistory?: Array<{ status: 'pending' | 'approved' | 'refused' }>;
-  /** True if this property has an active planning_cooldown lock. */
+  /** True if this property has an active planning_cooldown lock (legacy property-wide). */
   inPlanningCooldown?: boolean;
+  /** Active property locks (passed to RenovationDialog for per-renovation cooldown). */
+  propertyLocks?: Array<{ propertyId: string; reason: string; untilMonth: number; renovationTypeId?: string }>;
   /** True when ANY slot of the property is occupied — used to gate conversions. */
   hasAnyTenant?: boolean;
   /** True if a debt-recovery case is already in court for this property's tenant. */
@@ -152,6 +154,7 @@ export const PropertyCard = memo(function PropertyCard({
   planningApplications = [],
   planningHistory = [],
   inPlanningCooldown = false,
+  propertyLocks = [],
   hasAnyTenant = false,
   evictTenant,
   cancelEviction,
@@ -524,6 +527,7 @@ export const PropertyCard = memo(function PropertyCard({
                       evictTenant={evictTenant}
                       cancelEviction={cancelEviction}
                       applyRentIncrease={applyRentIncrease}
+                      furnishingTier={(property as any).furnishingTier}
                     />
                   ) : (
                     onSelectTenant && (
@@ -541,6 +545,7 @@ export const PropertyCard = memo(function PropertyCard({
                         propertyYield={property.yield}
                         currentSatisfaction={tenantSatisfaction}
                         satisfactionReasons={tenantSatisfactionReasons}
+                        furnishingTier={(property as any).furnishingTier}
                       />
                     )
                   )}
@@ -698,6 +703,7 @@ export const PropertyCard = memo(function PropertyCard({
                       planningHistory={planningHistory}
                       monthsPlayed={monthsPlayed}
                       inPlanningCooldown={inPlanningCooldown}
+                      propertyLocks={propertyLocks}
                       hasTenant={hasAnyTenant || !!currentTenant}
                     />
                   )}

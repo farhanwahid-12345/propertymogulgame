@@ -33,6 +33,11 @@ export interface Conveyancing {
   cashHeld: number; // pennies - cash locked in escrow
   isAuction?: boolean;
   buyerOffer?: any; // for selling via estate agent
+  /** Snapshot of the yield shown at the estate agent at offer-time —
+   *  preserved so the realised yield on completion matches the label. */
+  advertisedYield?: number;
+  /** Snapshot of the advertised monthly rent (pennies) at offer-time. */
+  advertisedMonthlyIncome?: number;
 }
 
 export interface Property {
@@ -212,6 +217,9 @@ export interface PropertyLock {
   untilMonth: number;
   /** Optional slot scope for multi-unit properties. Undefined = property-wide (legacy). */
   slotIndex?: number;
+  /** For `planning_cooldown`: the specific renovation type that was refused.
+   *  Undefined on legacy locks = property-wide block (broad/safe). */
+  renovationTypeId?: string;
 }
 
 export type PlanningStatus = 'pending' | 'approved' | 'refused';

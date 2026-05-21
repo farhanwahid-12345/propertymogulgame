@@ -121,10 +121,20 @@ export function useGameState() {
     (sum: number, p: any) => sum + fromPennies(getFurnitureValuePennies(p)),
     0,
   );
-  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ mortgage debt − overdraft drawn.
+  // Loan balances pulled up so net worth can subtract ALL debt (mortgages + loans).
+  const loansRawEarly = ((store as any).loans || []) as Array<{ remainingBalance?: number }>;
+  const totalLoanBalanceEarly = loansRawEarly.reduce(
+    (s, l: any) => s + fromPennies(l.remainingBalance || 0),
+    0,
+  );
+  const totalMortgageDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
+  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
-  // net worth from being inflated by short-term overdraft taps.
-  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue + ownedProperties.reduce((sum, p) => sum + p.value, 0) - overdraftUsed;
+  // net worth from being inflated by short-term overdraft taps. Subtracting mortgage
+  // + loan balances stops the "free money" jump when a financed buy completes.
+  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
+    + ownedProperties.reduce((sum, p) => sum + p.value, 0)
+    - totalMortgageDebt - totalLoanBalanceEarly - overdraftUsed;
   const nowTs = Date.now();
   const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
   const conveyancingPropertyIds = new Set(

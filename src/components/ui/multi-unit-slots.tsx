@@ -42,6 +42,7 @@ interface Props {
     tribunalFeePounds: number,
     slotIndex?: number,
   ) => void;
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
 }
 
 export function MultiUnitSlots({
@@ -60,6 +61,7 @@ export function MultiUnitSlots({
   evictTenant,
   cancelEviction,
   applyRentIncrease,
+  furnishingTier,
 }: Props) {
   const label = subtype === 'hmo' ? 'Room' : 'Unit';
   const occupied = slots.filter(s => s.tenant).length;
@@ -160,6 +162,7 @@ export function MultiUnitSlots({
                   conditionScore={conditionScore}
                   propertyValue={propertyValue}
                   propertyYield={propertyYield}
+                  furnishingTier={furnishingTier}
                 />
               )}
 
