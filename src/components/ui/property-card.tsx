@@ -11,7 +11,7 @@ import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dia
 import { FurnishingDialog } from "@/components/ui/furnishing-dialog";
 import { EvictionDialog } from "@/components/ui/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
-import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
