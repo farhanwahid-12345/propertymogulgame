@@ -111,11 +111,14 @@ export function PortfolioGrid({
           const propertyApps = ((gameState as any).planningApplications || []).filter(
             (a: any) => a.propertyId === property.id
           );
+          // Property-wide cooldown only fires when an *unscoped* legacy lock is present.
+          // Scoped locks are handled per-renovation inside RenovationDialog.
           const inPlanningCooldown = (gameState.propertyLocks || []).some(
             (l: any) =>
               l.propertyId === property.id &&
               l.reason === "planning_cooldown" &&
-              l.untilMonth > gameState.monthsPlayed
+              l.untilMonth > gameState.monthsPlayed &&
+              !l.renovationTypeId
           );
 
           // Multi-unit slot data for HMOs / converted flats
