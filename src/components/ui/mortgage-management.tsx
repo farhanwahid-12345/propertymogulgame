@@ -14,6 +14,16 @@ import { cn } from "@/lib/utils";
 
 interface MortgageManagementProps {
   ownedProperties: Property[];
+  /** Active mortgages — used to surface current lender/rate/term on each property tile. */
+  mortgages?: Array<{
+    propertyId: string;
+    providerId: string;
+    interestRate: number;
+    mortgageType: 'repayment' | 'interest-only';
+    termYears: number;
+    monthlyPayment: number;
+    remainingBalance: number;
+  }>;
   mortgageProviders: any[];
   onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   cash: number;
@@ -23,11 +33,12 @@ interface MortgageManagementProps {
   existingMonthlyMortgagePayments?: number; // pounds
 }
 
-export function MortgageManagement({ 
-  ownedProperties, 
-  mortgageProviders, 
-  onRefinance, 
-  cash, 
+export function MortgageManagement({
+  ownedProperties,
+  mortgages = [],
+  mortgageProviders,
+  onRefinance,
+  cash,
   setCash,
   creditScore = 580,
   totalRentalIncome = 0,
@@ -128,8 +139,11 @@ export function MortgageManagement({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Select Property to Refinance</h3>
               <div className="grid gap-3 max-h-60 overflow-y-auto">
-                {refinanceableProperties.map(property => (
-                  <Card 
+                {refinanceableProperties.map(property => {
+                  const existing = mortgages.find(m => m.propertyId === property.id);
+                  const existingProvider = existing ? mortgageProviders.find((p: any) => p.id === existing.providerId) : null;
+                  return (
+                  <Card
                     key={property.id}
                     className={`cursor-pointer transition-colors ${
                       selectedProperty?.id === property.id ? 'ring-2 ring-blue-500' : ''
@@ -148,6 +162,14 @@ export function MortgageManagement({
                           <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
                           <p className="text-xs">Current Value: £{property.value.toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">Rent: £{property.monthlyIncome.toLocaleString()}/mo</p>
+                          {existing && existingProvider && (
+                            <p className="text-xs mt-1 text-blue-300/90">
+                              🏦 {existingProvider.name} · {(existing.interestRate * 100).toFixed(2)}% · {existing.mortgageType === 'interest-only' ? 'Interest-only' : 'Repayment'} · {existing.termYears}y
+                            </p>
+                          )}
+                          {!existing && (
+                            <p className="text-xs mt-1 text-muted-foreground italic">No active mortgage — refinance to release equity</p>
+                          )}
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium">
@@ -161,7 +183,7 @@ export function MortgageManagement({
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                );})}
               </div>
               
               {refinanceableProperties.length === 0 && (

@@ -144,13 +144,17 @@ export function deriveSqft(p: { type: 'residential' | 'commercial' | 'luxury'; v
  */
 export function getMarketRentPounds(p: {
   value: number; // pounds
+  marketValue?: number; // pounds — prefer when present
   yield?: number; // %
   condition?: 'premium' | 'standard' | 'dilapidated';
   subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
   subtypeUnits?: number;
   completedRenovationIds?: string[];
+  /** Cumulative renovation spend in pennies — fuels a refurb-spend uplift. */
+  totalRenovationSpendPennies?: number;
 }): number {
-  if (!p.value || p.value <= 0) return 0;
+  const baseValue = (typeof p.marketValue === 'number' && p.marketValue > 0) ? p.marketValue : p.value;
+  if (!baseValue || baseValue <= 0) return 0;
   let conditionYield =
     p.condition === 'dilapidated' ? 0.085 :
     p.condition === 'premium'     ? 0.065 :
@@ -168,11 +172,21 @@ export function getMarketRentPounds(p: {
     p.condition === 'premium'     ? 1.12 :
     p.condition === 'dilapidated' ? 0.92 :
                                     1.0;
-  // Fit-out premium: each premium-tier upgrade adds 1.5% to qualityMult, cap +6%
-  const PREMIUM_RENOS = ['kitchen_upgrade', 'bathroom_renovation', 'central_heating', 'double_glazing'];
+  // Fit-out premium: named premium-tier renos add up to +15%
+  const PREMIUM_RENOS = [
+    'kitchen_upgrade', 'bathroom_renovation', 'central_heating', 'double_glazing',
+    'extension', 'loft_conversion', 'garage_conversion', 'garden_landscaping',
+    'solar_panels', 'epc_upgrade',
+  ];
   if (p.completedRenovationIds && p.completedRenovationIds.length) {
     const done = PREMIUM_RENOS.filter(id => p.completedRenovationIds!.includes(id)).length;
-    qualityMult += Math.min(0.06, done * 0.015);
+    qualityMult += Math.min(0.15, done * 0.025);
+  }
+  // Heavy refurb spend (catch-all): up to +20% based on spend/value ratio
+  if (p.totalRenovationSpendPennies && p.totalRenovationSpendPennies > 0 && baseValue > 0) {
+    const spendPounds = p.totalRenovationSpendPennies / 100;
+    const spendRatio = spendPounds / baseValue;
+    qualityMult += Math.min(0.20, spendRatio * 0.8);
   }
 
   // Per-unit multiplier for multi-unit subtypes
@@ -181,6 +195,6 @@ export function getMarketRentPounds(p: {
   if (p.subtype === 'hmo') unitMult = Math.min(1.32, 1 + 0.04 * (units - 1));
   else if (p.subtype === 'flats') unitMult = Math.min(1.4, 1 + 0.06 * (units - 1));
 
-  return Math.round((p.value * blended * qualityMult * unitMult) / 12);
+  return Math.round((baseValue * blended * qualityMult * unitMult) / 12);
 }
 
