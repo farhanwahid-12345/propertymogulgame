@@ -668,13 +668,17 @@ export const PropertyCard = memo(function PropertyCard({
                           marketRent={
                             getMarketRentPounds({
                               value: property.value,
+                              marketValue: property.marketValue,
                               yield: property.yield,
                               condition: property.condition as any,
                               subtype: property.subtype,
                               subtypeUnits: property.subtypeUnits,
                               completedRenovationIds: property.completedRenovationIds,
+                              totalRenovationSpendPennies: property.totalRenovationSpendPennies,
                             }) || property.monthlyIncome
                           }
+                          totalRenovationSpendPennies={property.totalRenovationSpendPennies}
+
 
                           monthsSinceLastIncrease={
                             property.lastRentIncrease !== undefined
