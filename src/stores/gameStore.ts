@@ -1254,11 +1254,13 @@ export const useGameStore = create<GameState & GameActions>()(
                 "destructive",
               );
               flashOps();
-              // Add 6-month cooldown lock so the player can't immediately resubmit
+              // Add 6-month cooldown lock scoped to the specific refused renovation
+              // so unrelated renovations on this property remain submittable.
               newPropertyLocks.push({
                 propertyId: app.propertyId,
                 reason: 'planning_cooldown',
                 untilMonth: newMonthNumber + 6,
+                renovationTypeId: app.renovationTypeId,
               });
             }
             return resolved;
@@ -3322,14 +3324,18 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Block if a previous refusal is still in cooldown
+        // Block if a previous refusal *for this same renovation* is still in cooldown.
+        // Legacy locks without renovationTypeId apply property-wide (safe fallback).
         const cooldown = (prev.propertyLocks || []).find(
-          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+          l => l.propertyId === propertyId
+            && l.reason === 'planning_cooldown'
+            && l.untilMonth > prev.monthsPlayed
+            && (l.renovationTypeId === undefined || l.renovationTypeId === renovationType.id),
         );
         if (cooldown) {
           showToast(
             "Planning Cooldown",
-            `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`,
+            `Cannot resubmit ${renovationType.name} until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`,
             "destructive",
           );
           return;
@@ -3419,12 +3425,19 @@ export const useGameStore = create<GameState & GameActions>()(
         const property = prev.ownedProperties.find(p => p.id === propertyId);
         if (!property) { showToast("Property Not Found", "Cannot submit planning application.", "destructive"); return; }
 
-        // Cooldown / already-submitted gates
+        // Cooldown / already-submitted gates — per-renovation scoped.
+        const batchIds = new Set(items.map(r => r.id));
         const cooldown = (prev.propertyLocks || []).find(
-          l => l.propertyId === propertyId && l.reason === 'planning_cooldown' && l.untilMonth > prev.monthsPlayed,
+          l => l.propertyId === propertyId
+            && l.reason === 'planning_cooldown'
+            && l.untilMonth > prev.monthsPlayed
+            && (l.renovationTypeId === undefined || batchIds.has(l.renovationTypeId)),
         );
         if (cooldown) {
-          showToast("Planning Cooldown", `Cannot resubmit until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
+          const which = cooldown.renovationTypeId
+            ? items.find(r => r.id === cooldown.renovationTypeId)?.name || 'one of these items'
+            : 'this property';
+          showToast("Planning Cooldown", `${which} is in cooldown until month ${cooldown.untilMonth} (${cooldown.untilMonth - prev.monthsPlayed} mo).`, "destructive");
           return;
         }
         const history = prev.planningApplications || [];
