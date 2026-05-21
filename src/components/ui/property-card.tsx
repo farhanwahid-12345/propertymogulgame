@@ -367,156 +367,145 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-3 pb-3">
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Price:</span>
-            <span className="font-bold text-lg">
-              £{property.price.toLocaleString()}
-            </span>
-          </div>
-          
-          {property.owned && (
-            <>
-              {renovationSpendPounds > 0 && (
-                <>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Renovation Spend:</span>
-                    <span className="font-medium text-amber-300">
-                      £{renovationSpendPounds.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Total Invested:</span>
-                    <span className="font-medium">
-                      £{totalInvested.toLocaleString()}
-                    </span>
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Market Value:</span>
-                <span className="font-bold">
-                  £{marketValueToUse.toLocaleString()}
-                </span>
+      <CardContent className="space-y-2 pb-3">
+        {property.owned ? (
+          <>
+            {/* Compact mini-grid — always visible. Tap "Details" to expand. */}
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              <div className="rounded-md bg-muted/30 px-2 py-1.5">
+                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Value</div>
+                <div className="text-sm font-bold leading-tight">£{(marketValueToUse / 1000).toFixed(0)}k</div>
               </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">
-                  {renovationSpendPounds > 0 ? 'Equity vs Market:' : 'Profit/Loss:'}
-                </span>
-                <span className={cn(
-                  "font-bold",
-                  equityVsMarket >= 0 ? "text-success" : "text-danger"
-                )}>
-                  {equityVsMarket >= 0 ? "+" : ""}£{equityVsMarket.toLocaleString()} ({equityPct}%)
-                </span>
-              </div>
-
-              {property.marketValue && property.marketValue > property.price && (
-                <div className="text-xs text-muted-foreground italic">
-                  * Purchased £{(property.marketValue - property.price).toLocaleString()} below market
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Monthly Income:</span>
-            <Badge className="bg-success/20 text-success border-success/30 hover:bg-success/30">
-              £{property.monthlyIncome.toLocaleString()}/mo
-            </Badge>
-          </div>
-
-          {/* Per-property LTV */}
-          {property.owned && propertyLTV > 0 && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">LTV:</span>
-              <span className={cn(
-                "font-semibold text-sm",
-                propertyLTV > 80 ? "text-danger" :
-                propertyLTV > 60 ? "text-yellow-400" :
-                "text-success"
-              )}>
-                {propertyLTV.toFixed(1)}%
-              </span>
-            </div>
-          )}
-
-          {property.owned && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowMonthlyCosts(!showMonthlyCosts)}
-                className="w-full justify-between text-xs h-7"
-              >
-                <span className="flex items-center gap-1">
-                  <Calculator className="h-3 w-3" />
-                  Monthly Cost Breakdown
-                </span>
-                <span className={cn(
-                  "font-semibold",
+              <div className="rounded-md bg-muted/30 px-2 py-1.5">
+                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Net /mo</div>
+                <div className={cn(
+                  "text-sm font-bold leading-tight",
                   netMonthlyIncome >= 0 ? "text-success" : "text-danger"
                 )}>
-                  Net: £{netMonthlyIncome.toLocaleString()}/mo
-                </span>
-              </Button>
+                  £{netMonthlyIncome.toLocaleString()}
+                </div>
+              </div>
+              <div className="rounded-md bg-muted/30 px-2 py-1.5">
+                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                  {propertyLTV > 0 ? 'LTV' : 'Equity'}
+                </div>
+                <div className={cn(
+                  "text-sm font-bold leading-tight",
+                  propertyLTV > 0
+                    ? (propertyLTV > 80 ? "text-danger" : propertyLTV > 60 ? "text-yellow-400" : "text-success")
+                    : (equityVsMarket >= 0 ? "text-success" : "text-danger")
+                )}>
+                  {propertyLTV > 0 ? `${propertyLTV.toFixed(0)}%` : `${equityPct}%`}
+                </div>
+              </div>
+            </div>
 
-              {showMonthlyCosts && (
-                <div className="space-y-1.5 pt-2 border-t text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFinancialsExpanded(!financialsExpanded)}
+              className="w-full justify-between text-[10px] h-6 px-2 text-muted-foreground hover:text-foreground"
+            >
+              <span className="flex items-center gap-1">
+                {financialsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {financialsExpanded ? 'Hide details' : 'Details'}
+              </span>
+              <span>Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
+            </Button>
+
+            {financialsExpanded && (
+              <div className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Purchase price</span>
+                  <span className="font-medium">£{property.price.toLocaleString()}</span>
+                </div>
+                {renovationSpendPounds > 0 && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Renovation spend</span>
+                      <span className="font-medium text-amber-300">£{renovationSpendPounds.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Total invested</span>
+                      <span className="font-medium">£{totalInvested.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Market value</span>
+                  <span className="font-medium">£{marketValueToUse.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">
+                    {renovationSpendPounds > 0 ? 'Equity vs market' : 'Profit/Loss'}
+                  </span>
+                  <span className={cn("font-medium", equityVsMarket >= 0 ? "text-success" : "text-danger")}>
+                    {equityVsMarket >= 0 ? "+" : ""}£{equityVsMarket.toLocaleString()} ({equityPct}%)
+                  </span>
+                </div>
+                {property.marketValue && property.marketValue > property.price && (
+                  <div className="text-[10px] text-muted-foreground italic">
+                    * Purchased £{(property.marketValue - property.price).toLocaleString()} below market
+                  </div>
+                )}
+
+                <div className="pt-1.5 border-t border-border/40 space-y-1">
                   <div className="flex justify-between items-center text-success">
-                    <span>+ Rental Income:</span>
+                    <span>+ Rental income</span>
                     <span className="font-medium">£{property.monthlyIncome.toLocaleString()}</span>
                   </div>
-                  
                   {monthlyMortgagePayment > 0 && (
                     <div className="flex justify-between items-center text-danger">
-                      <span>- Mortgage Payment:</span>
+                      <span>− Mortgage</span>
                       <span className="font-medium">£{monthlyMortgagePayment.toLocaleString()}</span>
                     </div>
                   )}
-                  
                   <div className="flex justify-between items-center text-muted-foreground">
-                    <span>- Insurance (0.4%):</span>
+                    <span>− Insurance (0.4%)</span>
                     <span className="font-medium">£{Math.round(monthlyInsurance).toLocaleString()}</span>
                   </div>
-
                   {monthlyCouncilTax > 0 && (
                     <div className="flex justify-between items-center text-muted-foreground">
-                      <span>- Council Tax (vacant):</span>
+                      <span>− Council tax (vacant)</span>
                       <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
                     </div>
                   )}
-
                   <div className="flex justify-between items-center text-muted-foreground">
-                    <span>- Maintenance (0.8%):</span>
+                    <span>− Maintenance (0.8%)</span>
                     <span className="font-medium">£{Math.round(monthlyMaintenance).toLocaleString()}</span>
                   </div>
-                  
-                  <div className="flex justify-between items-center pt-1.5 border-t font-semibold">
-                    <span>Net Monthly Income:</span>
-                    <span className={cn(
-                      netMonthlyIncome >= 0 ? "text-success" : "text-danger"
-                    )}>
+                  <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
+                    <span>Net monthly</span>
+                    <span className={cn(netMonthlyIncome >= 0 ? "text-success" : "text-danger")}>
                       £{netMonthlyIncome.toLocaleString()}/mo
                     </span>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-
-          {!property.owned && (
+              </div>
+            )}
+          </>
+        ) : (
+          /* Unowned (estate-agent / marketplace) cards keep the original layout. */
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Price:</span>
+              <span className="font-bold text-lg">£{property.price.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Monthly Income:</span>
+              <Badge className="bg-success/20 text-success border-success/30 hover:bg-success/30">
+                £{property.monthlyIncome.toLocaleString()}/mo
+              </Badge>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Annual Yield:</span>
               <span className="font-semibold text-[hsl(var(--stat-credit))]">
                 {((property.monthlyIncome * 12 / property.price) * 100).toFixed(2)}%
               </span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
 
         {property.owned ? (
           <div className="space-y-3">
