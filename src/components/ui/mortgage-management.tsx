@@ -14,6 +14,16 @@ import { cn } from "@/lib/utils";
 
 interface MortgageManagementProps {
   ownedProperties: Property[];
+  /** Active mortgages — used to surface current lender/rate/term on each property tile. */
+  mortgages?: Array<{
+    propertyId: string;
+    providerId: string;
+    interestRate: number;
+    mortgageType: 'repayment' | 'interest-only';
+    termYears: number;
+    monthlyPayment: number;
+    remainingBalance: number;
+  }>;
   mortgageProviders: any[];
   onRefinance: (propertyId: string, newLoanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => void;
   cash: number;
@@ -23,11 +33,12 @@ interface MortgageManagementProps {
   existingMonthlyMortgagePayments?: number; // pounds
 }
 
-export function MortgageManagement({ 
-  ownedProperties, 
-  mortgageProviders, 
-  onRefinance, 
-  cash, 
+export function MortgageManagement({
+  ownedProperties,
+  mortgages = [],
+  mortgageProviders,
+  onRefinance,
+  cash,
   setCash,
   creditScore = 580,
   totalRentalIncome = 0,
