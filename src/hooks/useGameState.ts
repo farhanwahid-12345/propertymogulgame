@@ -431,7 +431,21 @@ export function useGameState() {
     projectedTaxPennies: (store as any).projectedTaxPennies ?? 0,
 
     // Derived values
-    netWorth: netWorth - totalDebt,
+    // NOTE: `netWorth` (computed above) already subtracts mortgages + loans +
+    // overdraft. Do NOT subtract `totalDebt` again here — that was a long-
+    // standing double-subtraction bug that made net worth read low by
+    // roughly the mortgage balance.
+    netWorth,
+    netWorthBreakdown: {
+      cash,
+      propertyValue: ownedProperties.reduce((sum, p) => sum + p.value, 0),
+      furnitureValue,
+      renovationWIP,
+      conveyancingHeld: inflightBuyCapital,
+      mortgageDebt: totalMortgageDebt,
+      loanDebt: totalLoanBalanceEarly,
+      overdraftUsed,
+    },
     totalMonthlyIncome,
     totalMonthlyExpenses,
     expenseBreakdown: {
