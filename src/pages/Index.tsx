@@ -135,6 +135,7 @@ const Index = () => {
         <GameStats
           cash={gameState.cash}
           netWorth={gameState.netWorth}
+          netWorthBreakdown={(gameState as any).netWorthBreakdown}
           level={gameState.level}
           experience={gameState.experience}
           experienceToNext={gameState.experienceToNext}

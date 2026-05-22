@@ -1,6 +1,37 @@
 // Centralized mortgage eligibility system
 // Used by Estate Agent, Auction House, Mortgage Management (refinance), and Portfolio Mortgage
 
+import { BASE_MARKET_RATE } from "@/lib/engine/constants";
+
+/**
+ * Fixed-term adjustment applied on top of the live provider rate.
+ * Mirrors the values used by the store at mortgage creation time.
+ */
+export function getFixedTermRateAdjustment(fixedTermYears?: number): number {
+  switch (fixedTermYears) {
+    case 2: return -0.004;
+    case 5: return -0.002;
+    case 10: return 0.001;
+    default: return 0;
+  }
+}
+
+/**
+ * Effective per-provider rate BEFORE the credit-score adjustment.
+ *   = liveProviderRate + (currentMarketRate − BASE_MARKET_RATE) + fixedAdj
+ * Both UI (rate shown at signup) and store (rate persisted) must call this
+ * so the player gets exactly the rate they signed up for.
+ */
+export function getEffectiveProviderRate(args: {
+  liveProviderRate: number;
+  currentMarketRate: number;
+  fixedTermYears?: number;
+}): number {
+  return args.liveProviderRate
+    + (args.currentMarketRate - BASE_MARKET_RATE)
+    + getFixedTermRateAdjustment(args.fixedTermYears);
+}
+
 export interface MortgageEligibilityRequest {
   creditScore: number;
   loanAmount: number;
