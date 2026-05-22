@@ -3739,8 +3739,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = Math.round(newLoanAmount * 0.01);
         const totalFees = SOLICITOR_FEES + mortgageFee;
         const cashRaised = newLoanAmount - existingBal - totalFees;
-        const rate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE +
-          (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+        const rate = getEffectiveProviderRate({
+          liveProviderRate: prev.mortgageProviderRates[provider.id] || provider.baseRate,
+          currentMarketRate: prev.currentMarketRate,
+        }) + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = rate / 12;
         const numPayments = 300;
         const monthlyPayment = Math.round(newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1));
