@@ -59,6 +59,7 @@ interface GameStatsProps {
 export function GameStats({
   cash,
   netWorth,
+  netWorthBreakdown,
   level,
   experience,
   experienceToNext,
