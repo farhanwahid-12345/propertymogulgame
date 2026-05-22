@@ -3172,9 +3172,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaleInputs = property
           ? { internalSqft: effectiveSqft, propertyValue: fromPennies(property.value) }
           : { propertyValue: fromPennies(renovationType.cost) * 5 };
-        const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
-        const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
-        const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
+        const scaled = scaleRenovationForProperty(renovationType as any, scaleInputs);
+        const scaledCostPounds = scaled.cost;
+        const scaledRent = scaled.rent;
+        const scaledValue = scaled.value;
 
         const costPennies = toPennies(scaledCostPounds);
         const debited = debit(prev, costPennies);
