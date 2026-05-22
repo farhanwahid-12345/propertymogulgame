@@ -3836,7 +3836,6 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
-        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
         const existingPayments = prev.mortgages
           .filter(m => !selectedPropertyIds.includes(m.propertyId) && !overlappingPortfolioIds.has(m.id))
           .reduce((s, m) => s + m.monthlyPayment, 0);
@@ -3850,7 +3849,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(loanAmount),
           propertyValue: fromPennies(totalValue), propertyMonthlyRent: fromPennies(totalRent),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+          providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: adjustedMaxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
