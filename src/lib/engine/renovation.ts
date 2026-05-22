@@ -87,15 +87,49 @@ export function applyCeilingDiminishingReturns(
 /**
  * Probability-weighted expected outcome multiplier for a renovation.
  * Mirrors the engine's completion roll in `gameStore.ts`:
- *   60% × 1.0 + 30% × 0.85 + 8% × 0.65 + 2% × 0.45 ≈ 0.916
+ *   60% × 1.0 + 30% × 0.85 + 8% × 0.65 + 2% × 0.55 ≈ 0.92
+ * Calibrated so ≥60% of renovations are profitable and bottom-case
+ * losses are capped (no longer wipes out the whole cost basis).
  */
-export const RENOVATION_EXPECTED_MULTIPLIER = 0.916;
+export const RENOVATION_EXPECTED_MULTIPLIER = 0.92;
 
 /**
  * Conversion-only expected multiplier.
  *   55%×1.0 + 30%×1.5 + 12%×0.8 + 3%×0.3 ≈ 1.105
  */
 export const CONVERSION_EXPECTED_MULTIPLIER = 1.105;
+
+/**
+ * Single source of truth for per-property renovation pricing.
+ * Combines property-size scaling with the conversion-units multiplier so
+ * the dialog, planning system, and engine all agree on cost/rent/value.
+ */
+export function scaleRenovationForProperty(
+  r: {
+    cost: number;
+    rentIncrease: number;
+    valueIncrease: number;
+    category: string;
+    id: string;
+    subtypeUnits?: number;
+  },
+  inputs: RenovationScaleInputs,
+): { cost: number; rent: number; value: number; conversionMult: number } {
+  let mult = 1;
+  if (r.category === 'conversion' && r.subtypeUnits && r.subtypeUnits > 0) {
+    const subtype = r.id === 'convert_hmo' ? 'hmo' : r.id === 'convert_flats' ? 'flats' : 'standard';
+    const defaultUnits = subtype === 'flats' ? 2 : subtype === 'hmo' ? 4 : 1;
+    const def = getConversionScaleMultiplier({ propertyValue: inputs.propertyValue, subtype: subtype as any, units: defaultUnits });
+    const chosen = getConversionScaleMultiplier({ propertyValue: inputs.propertyValue, subtype: subtype as any, units: r.subtypeUnits });
+    mult = def > 0 ? chosen / def : 1;
+  }
+  return {
+    cost: Math.round(scaleRenovationCost(r.cost, inputs) * mult / 50) * 50,
+    rent: Math.round(scaleRenovationRent(r.rentIncrease, inputs) * mult / 5) * 5,
+    value: Math.round(scaleRenovationValue(r.valueIncrease, inputs) * mult / 100) * 100,
+    conversionMult: mult,
+  };
+}
 
 /**
  * Value-aware uplift multiplier for conversions. Bigger / more valuable
