@@ -105,10 +105,53 @@ export function GameStats({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Net Worth */}
           <div className="border-l-4 border-[hsl(var(--stat-money))] pl-3">
-            <div className="text-xs text-muted-foreground">💰 Net Worth</div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">💰 Net Worth</span>
+              {netWorthBreakdown && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-4 w-4 p-0">
+                      <Info className="h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Net Worth Breakdown</h4>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between"><span className="text-muted-foreground">Cash</span><span className="font-semibold">£{Math.round(netWorthBreakdown.cash).toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Property value</span><span className="font-semibold">£{Math.round(netWorthBreakdown.propertyValue).toLocaleString()}</span></div>
+                        {netWorthBreakdown.furnitureValue > 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Furniture (residual)</span><span className="font-semibold">£{Math.round(netWorthBreakdown.furnitureValue).toLocaleString()}</span></div>
+                        )}
+                        {netWorthBreakdown.renovationWIP > 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Renovation in progress</span><span className="font-semibold">£{Math.round(netWorthBreakdown.renovationWIP).toLocaleString()}</span></div>
+                        )}
+                        {netWorthBreakdown.conveyancingHeld > 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Conveyancing escrow</span><span className="font-semibold">£{Math.round(netWorthBreakdown.conveyancingHeld).toLocaleString()}</span></div>
+                        )}
+                        {netWorthBreakdown.mortgageDebt > 0 && (
+                          <div className="flex justify-between text-danger"><span>− Mortgage debt</span><span className="font-semibold">£{Math.round(netWorthBreakdown.mortgageDebt).toLocaleString()}</span></div>
+                        )}
+                        {netWorthBreakdown.loanDebt > 0 && (
+                          <div className="flex justify-between text-danger"><span>− Loans</span><span className="font-semibold">£{Math.round(netWorthBreakdown.loanDebt).toLocaleString()}</span></div>
+                        )}
+                        {netWorthBreakdown.overdraftUsed > 0 && (
+                          <div className="flex justify-between text-danger"><span>− Overdraft drawn</span><span className="font-semibold">£{Math.round(netWorthBreakdown.overdraftUsed).toLocaleString()}</span></div>
+                        )}
+                        <div className="border-t pt-1.5 flex justify-between font-medium">
+                          <span>Net Worth</span>
+                          <span>£{Math.round(netWorth).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
             <div className="text-xl font-bold text-foreground">£{netWorth.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
           </div>
+
 
           {/* Cash Flow */}
           <div className={cn(
