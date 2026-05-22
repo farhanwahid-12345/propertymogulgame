@@ -410,20 +410,16 @@ export function RenovationDialog({
     if (!selectedRenovation) return;
     let toSubmit: RenovationType = selectedRenovation;
     if (isConversion(selectedRenovation)) {
-      // Bake the chosen unit count into a one-shot type so the engine completes
-      // with the correct cost/rent/value and persists subtypeUnits onto the property.
+      // For conversions: pass through the BASE cost/rent/value untouched and let
+      // the engine apply property-size + conversion-units scaling (single source
+      // of truth in `scaleRenovationForProperty`). We only customise the name,
+      // planning fee, approval probability, and persist the chosen unit count.
       const u = conversionUnits;
-      const cost = Math.round(scaleRenovationCost(selectedRenovation.cost, scaleInputs) * conversionMult(selectedRenovation, u) / 50) * 50;
-      const rent = Math.round(scaleRenovationRent(selectedRenovation.rentIncrease, scaleInputs) * conversionMult(selectedRenovation, u) / 5) * 5;
-      const value = Math.round(scaleRenovationValue(selectedRenovation.valueIncrease, scaleInputs) * conversionMult(selectedRenovation, u) / 100) * 100;
       const planningFee = (selectedRenovation.planningFee ?? 500) + (u - defaultUnits(selectedRenovation)) * 100;
       const noun = isFlats(selectedRenovation) ? 'flat' : 'bed';
       toSubmit = {
         ...selectedRenovation,
         name: `${selectedRenovation.name} (${u}-${noun})`,
-        cost,
-        rentIncrease: rent,
-        valueIncrease: value,
         planningFee: Math.max(250, planningFee),
         // Approval likelihood drops slightly per extra unit
         baseApprovalProb: Math.max(0.35, (selectedRenovation.baseApprovalProb ?? 0.7) - 0.05 * (u - defaultUnits(selectedRenovation))),
