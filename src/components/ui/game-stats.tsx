@@ -19,6 +19,16 @@ interface EconomicEvent {
 interface GameStatsProps {
   cash: number;
   netWorth: number;
+  netWorthBreakdown?: {
+    cash: number;
+    propertyValue: number;
+    furnitureValue: number;
+    renovationWIP: number;
+    conveyancingHeld: number;
+    mortgageDebt: number;
+    loanDebt: number;
+    overdraftUsed: number;
+  };
   level: number;
   experience: number;
   experienceToNext: number;
