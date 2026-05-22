@@ -38,7 +38,8 @@ import {
   getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
 import { calcTenantRent, getFurnishingRentMultiplier, getConditionRentMultiplierShared } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, scaleRenovationForProperty, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
+import { getEffectiveProviderRate } from '@/lib/mortgageEligibility';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
