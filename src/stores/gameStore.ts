@@ -1917,14 +1917,14 @@ export const useGameStore = create<GameState & GameActions>()(
               else if (roll < 0.97) { valueMult = 0.8; rentMult = 0.8; outcomeNote = 'soft demand'; }
               else { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'planning issues'; }
             } else {
-              //  Realistic outcome distribution — tightened so "underwhelming"
-              //  no longer means losing money. Full ROI is the common case;
-              //  significant under-deliveries are rare.
-              //  60% × 1.0 (on spec) · 30% × 0.85 · 8% × 0.65 · 2% × 0.45
+              //  Realistic outcome distribution — calibrated so ≥60% of
+              //  renovations are profitable and worst-case losses don't wipe
+              //  the cost basis. Profit range typically 5–80% on full hit.
+              //  60% × 1.0 (on spec) · 30% × 0.85 · 8% × 0.65 · 2% × 0.55
               if (roll < 0.60) { outcomeNote = 'on spec'; }
               else if (roll < 0.90) { valueMult = 0.85; rentMult = 0.85; outcomeNote = 'minor issues'; }
               else if (roll < 0.98) { valueMult = 0.65; rentMult = 0.65; outcomeNote = 'underwhelming returns'; }
-              else { valueMult = 0.45; rentMult = 0.45; outcomeNote = 'major issues found'; }
+              else { valueMult = 0.55; rentMult = 0.55; outcomeNote = 'major issues found'; }
             }
 
             const propRecord = updatedProperties[idx];
