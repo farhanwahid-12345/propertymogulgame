@@ -38,7 +38,8 @@ import {
   getConditionValueUplift, projectAnnualTax,
 } from '@/lib/engine/taxation';
 import { calcTenantRent, getFurnishingRentMultiplier, getConditionRentMultiplierShared } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
+import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, scaleRenovationForProperty, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
+import { getEffectiveProviderRate } from '@/lib/mortgageEligibility';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
@@ -1916,14 +1917,14 @@ export const useGameStore = create<GameState & GameActions>()(
               else if (roll < 0.97) { valueMult = 0.8; rentMult = 0.8; outcomeNote = 'soft demand'; }
               else { valueMult = 0.3; rentMult = 0.3; outcomeNote = 'planning issues'; }
             } else {
-              //  Realistic outcome distribution — tightened so "underwhelming"
-              //  no longer means losing money. Full ROI is the common case;
-              //  significant under-deliveries are rare.
-              //  60% × 1.0 (on spec) · 30% × 0.85 · 8% × 0.65 · 2% × 0.45
+              //  Realistic outcome distribution — calibrated so ≥60% of
+              //  renovations are profitable and worst-case losses don't wipe
+              //  the cost basis. Profit range typically 5–80% on full hit.
+              //  60% × 1.0 (on spec) · 30% × 0.85 · 8% × 0.65 · 2% × 0.55
               if (roll < 0.60) { outcomeNote = 'on spec'; }
               else if (roll < 0.90) { valueMult = 0.85; rentMult = 0.85; outcomeNote = 'minor issues'; }
               else if (roll < 0.98) { valueMult = 0.65; rentMult = 0.65; outcomeNote = 'underwhelming returns'; }
-              else { valueMult = 0.45; rentMult = 0.45; outcomeNote = 'major issues found'; }
+              else { valueMult = 0.55; rentMult = 0.55; outcomeNote = 'major issues found'; }
             }
 
             const propRecord = updatedProperties[idx];
@@ -2277,14 +2278,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-          const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
           const eligibility = calculateMortgageEligibility({
             creditScore: prev.creditScore,
             loanAmount: fromPennies(mortgageAmount),
             propertyValue: fromPennies(property.price),
             propertyMonthlyRent: fromPennies(property.monthlyIncome),
-            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+            providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
             providerMinCreditScore: provider.minCreditScore,
             providerMaxLTV: provider.maxLTV,
             providerId: provider.id,
@@ -2369,14 +2369,13 @@ export const useGameStore = create<GameState & GameActions>()(
           const totalRentalIncome = prev.ownedProperties.reduce((total, prop) => total + prop.monthlyIncome, 0);
           const existingPayments = prev.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
           const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-          const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
           const eligibility = calculateMortgageEligibility({
             creditScore: prev.creditScore,
             loanAmount: fromPennies(mortgageAmount),
             propertyValue: fromPennies(purchasePrice),
             propertyMonthlyRent: fromPennies(property.monthlyIncome),
-            providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+            providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
             providerMinCreditScore: provider.minCreditScore,
             providerMaxLTV: provider.maxLTV,
             providerId: provider.id,
@@ -3173,9 +3172,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaleInputs = property
           ? { internalSqft: effectiveSqft, propertyValue: fromPennies(property.value) }
           : { propertyValue: fromPennies(renovationType.cost) * 5 };
-        const scaledCostPounds = scaleRenovationCost(renovationType.cost, scaleInputs);
-        const scaledRent = scaleRenovationRent(renovationType.rentIncrease, scaleInputs);
-        const scaledValue = scaleRenovationValue(renovationType.valueIncrease, scaleInputs);
+        const scaled = scaleRenovationForProperty(renovationType as any, scaleInputs);
+        const scaledCostPounds = scaled.cost;
+        const scaledRent = scaled.rent;
+        const scaledValue = scaled.value;
 
         const costPennies = toPennies(scaledCostPounds);
         const debited = debit(prev, costPennies);
@@ -3398,10 +3398,10 @@ export const useGameStore = create<GameState & GameActions>()(
           id: `pp_${propertyId}_${renovationType.id}_${Date.now()}`,
           propertyId,
           renovationTypeId: renovationType.id,
-          renovationCostPennies: toPennies(scaleRenovationCost(renovationType.cost, {
+          renovationCostPennies: toPennies(scaleRenovationForProperty(renovationType as any, {
             internalSqft: property.internalSqft,
             propertyValue: valuePounds,
-          })),
+          }).cost),
           renovationName: renovationType.name,
           submittedMonth: prev.monthsPlayed,
           decisionMonth: prev.monthsPlayed + waitMonths,
@@ -3508,10 +3508,10 @@ export const useGameStore = create<GameState & GameActions>()(
             id: `pp_${propertyId}_${r.id}_${Date.now()}_${i}`,
             propertyId,
             renovationTypeId: r.id,
-            renovationCostPennies: toPennies(scaleRenovationCost(r.cost, {
+            renovationCostPennies: toPennies(scaleRenovationForProperty(r as any, {
               internalSqft: sizingSqft,
               propertyValue: valuePounds,
-            })),
+            }).cost),
             renovationName: r.name,
             submittedMonth: prev.monthsPlayed,
             decisionMonth: prev.monthsPlayed + waitMonths,
@@ -3739,8 +3739,10 @@ export const useGameStore = create<GameState & GameActions>()(
         const mortgageFee = Math.round(newLoanAmount * 0.01);
         const totalFees = SOLICITOR_FEES + mortgageFee;
         const cashRaised = newLoanAmount - existingBal - totalFees;
-        const rate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + prev.currentMarketRate - BASE_MARKET_RATE +
-          (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
+        const rate = getEffectiveProviderRate({
+          liveProviderRate: prev.mortgageProviderRates[provider.id] || provider.baseRate,
+          currentMarketRate: prev.currentMarketRate,
+        }) + (prev.creditScore < 650 ? 0.01 : 0) + (prev.creditScore < 600 ? 0.015 : 0);
         const monthlyRate = rate / 12;
         const numPayments = 300;
         const monthlyPayment = Math.round(newLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1));
@@ -3774,13 +3776,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-        // Fixed-rate discount/premium vs SVR
-        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(newLoanAmount),
           propertyValue: fromPennies(property.value), propertyMonthlyRent: fromPennies(property.monthlyIncome),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+          providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
@@ -3839,7 +3839,6 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
         const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
-        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
         const existingPayments = prev.mortgages
           .filter(m => !selectedPropertyIds.includes(m.propertyId) && !overlappingPortfolioIds.has(m.id))
           .reduce((s, m) => s + m.monthlyPayment, 0);
@@ -3853,7 +3852,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(loanAmount),
           propertyValue: fromPennies(totalValue), propertyMonthlyRent: fromPennies(totalRent),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+          providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: adjustedMaxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
