@@ -3773,13 +3773,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const totalRentalIncome = prev.ownedProperties.reduce((t, p) => t + p.monthlyIncome, 0);
         const existingPayments = prev.mortgages.filter(m => m.propertyId !== propertyId).reduce((s, m) => s + m.monthlyPayment, 0);
         const providerRate = prev.mortgageProviderRates[provider.id] || provider.baseRate;
-        // Fixed-rate discount/premium vs SVR
-        const fixedAdjustment = fixedTermYears === 2 ? -0.004 : fixedTermYears === 5 ? -0.002 : fixedTermYears === 10 ? 0.001 : 0;
 
         const eligibility = calculateMortgageEligibility({
           creditScore: prev.creditScore, loanAmount: fromPennies(newLoanAmount),
           propertyValue: fromPennies(property.value), propertyMonthlyRent: fromPennies(property.monthlyIncome),
-          providerBaseRate: providerRate + prev.currentMarketRate - BASE_MARKET_RATE + fixedAdjustment,
+          providerBaseRate: getEffectiveProviderRate({ liveProviderRate: providerRate, currentMarketRate: prev.currentMarketRate, fixedTermYears }),
           providerMinCreditScore: provider.minCreditScore, providerMaxLTV: provider.maxLTV,
           providerId: provider.id, termYears, mortgageType,
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
