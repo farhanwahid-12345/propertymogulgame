@@ -3508,10 +3508,10 @@ export const useGameStore = create<GameState & GameActions>()(
             id: `pp_${propertyId}_${r.id}_${Date.now()}_${i}`,
             propertyId,
             renovationTypeId: r.id,
-            renovationCostPennies: toPennies(scaleRenovationCost(r.cost, {
+            renovationCostPennies: toPennies(scaleRenovationForProperty(r as any, {
               internalSqft: sizingSqft,
               propertyValue: valuePounds,
-            })),
+            }).cost),
             renovationName: r.name,
             submittedMonth: prev.monthsPlayed,
             decisionMonth: prev.monthsPlayed + waitMonths,
