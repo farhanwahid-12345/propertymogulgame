@@ -11,7 +11,7 @@ import type { Tenant } from '@/components/ui/tenant-selector';
 import { RENOVATION_OPTIONS, type RenovationType } from '@/components/ui/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
-import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
+import { playGavel, playLevelUp, playPaper, playConcernChime, playWarning } from '@/lib/sound';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
   CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
