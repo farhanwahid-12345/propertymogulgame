@@ -1,4 +1,5 @@
 import { useGameStore } from '../gameStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export const usePortfolio = () => useGameStore((s) => s.ownedProperties);
 export const usePropertyListings = () => useGameStore((s) => s.propertyListings);
@@ -9,7 +10,7 @@ export const usePlanningApplications = () => useGameStore((s) => s.planningAppli
 export const usePropertyLocks = () => useGameStore((s) => s.propertyLocks);
 
 export const usePortfolioActions = () =>
-  useGameStore((s) => ({
+  useGameStore(useShallow((s) => ({
     buyProperty: s.buyProperty,
     buyPropertyAtPrice: s.buyPropertyAtPrice,
     sellProperty: s.sellProperty,
@@ -27,4 +28,4 @@ export const usePortfolioActions = () =>
     furnishProperty: s.furnishProperty,
     submitPlanningApplication: s.submitPlanningApplication,
     submitBatchPlanningApplications: s.submitBatchPlanningApplications,
-  }));
+  })));
