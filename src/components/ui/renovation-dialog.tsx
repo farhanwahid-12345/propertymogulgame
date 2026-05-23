@@ -452,7 +452,19 @@ export function RenovationDialog({
         // Carry units through to the engine via a custom field on the type
         ...( { subtypeUnits: u } as any ),
       } as RenovationType;
-    }
+    } else if (selectedRenovation.id === 'epc_upgrade') {
+      // Item #1: scale cost/rent/value by band-jump count and persist target band.
+      const jumps = bandJumps(epcTarget);
+      const mult = 0.5 + 0.5 * jumps;
+      toSubmit = {
+        ...selectedRenovation,
+        name: `EPC Upgrade → ${epcTarget}`,
+        cost: Math.round(selectedRenovation.cost * mult),
+        rentIncrease: Math.round(selectedRenovation.rentIncrease * mult),
+        valueIncrease: Math.round(selectedRenovation.valueIncrease * mult),
+        ...( { epcTarget } as any ),
+      } as RenovationType;
+
     onRenovate(propertyId, toSubmit);
     setIsOpen(false);
     setSelectedRenovation(null);
