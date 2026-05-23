@@ -666,9 +666,14 @@ export const PropertyCard = memo(function PropertyCard({
                               subtypeUnits: property.subtypeUnits,
                               completedRenovationIds: property.completedRenovationIds,
                               totalRenovationSpendPennies: property.totalRenovationSpendPennies,
+                              furnishingTier: property.furnishingTier,
+                              epcRating: property.epcRating,
                             }) || property.monthlyIncome
                           }
                           totalRenovationSpendPennies={property.totalRenovationSpendPennies}
+                          furnishingTier={property.furnishingTier}
+                          epcRating={property.epcRating}
+
 
 
                           monthsSinceLastIncrease={

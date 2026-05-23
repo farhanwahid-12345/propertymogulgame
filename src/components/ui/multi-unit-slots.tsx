@@ -184,7 +184,9 @@ export function MultiUnitSlots({
                           condition,
                           subtype,
                           subtypeUnits: units,
+                          furnishingTier,
                         });
+
 
                         return whole > 0
                           ? Math.round(whole / units)
