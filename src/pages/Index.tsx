@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GameStats } from "@/components/ui/game-stats";
-import { ListedProperties } from "@/components/ui/listed-properties";
+import { GameStats } from "@/components/game/game-stats";
+import { ListedProperties } from "@/components/game/listed-properties";
 
-import { EvictionTimelineFeed } from "@/components/ui/eviction-timeline-feed";
-import { DepositDisputesFeed } from "@/components/ui/deposit-disputes-feed";
+import { EvictionTimelineFeed } from "@/components/game/eviction-timeline-feed";
+import { DepositDisputesFeed } from "@/components/game/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { MobileBottomNav } from "@/components/ui/mobile-bottom-nav";
-import { OnboardingFlow } from "@/components/ui/onboarding-flow";
+import { MobileBottomNav } from "@/components/game/mobile-bottom-nav";
+import { OnboardingFlow } from "@/components/game/onboarding-flow";
 import * as onboardingModule from "@/lib/onboarding";
-import { PlanningApprovedDialog } from "@/components/ui/planning-approved-dialog";
-import { PlanningRefusedDialog } from "@/components/ui/planning-refused-dialog";
-import { MacroEventModal } from "@/components/ui/macro-event-modal";
+import { PlanningApprovedDialog } from "@/components/game/planning-approved-dialog";
+import { PlanningRefusedDialog } from "@/components/game/planning-refused-dialog";
+import { MacroEventModal } from "@/components/game/macro-event-modal";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";

@@ -1,5 +1,5 @@
-import { EstateAgentWindow } from "@/components/ui/estate-agent-window";
-import { AuctionHouse } from "@/components/ui/auction-house";
+import { EstateAgentWindow } from "@/components/game/estate-agent-window";
+import { AuctionHouse } from "@/components/game/auction-house";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;

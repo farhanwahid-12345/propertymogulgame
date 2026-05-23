@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RENOVATION_OPTIONS } from "@/components/ui/renovation-dialog";
+import { RENOVATION_OPTIONS } from "@/components/game/renovation-dialog";
 
 describe("RENOVATION_OPTIONS sqft preservation invariants (item #4)", () => {
   it("every extension renovation adds positive internal sqft", () => {

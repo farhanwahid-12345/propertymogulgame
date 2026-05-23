@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Hammer, FileText } from "lucide-react";
 import type { Renovation, PlanningApplication } from "@/types/game";
-import type { Property } from "@/components/ui/property-card";
+import type { Property } from "@/components/game/property-card";
 
 interface RenovationTrackerProps {
   renovations: Renovation[];

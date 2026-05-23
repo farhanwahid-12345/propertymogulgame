@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TenantSelector, type Tenant } from "@/components/ui/tenant-selector";
-import { EvictionDialog } from "@/components/ui/eviction-dialog";
-import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
+import { TenantSelector, type Tenant } from "@/components/game/tenant-selector";
+import { EvictionDialog } from "@/components/game/eviction-dialog";
+import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
 import { Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMarketRentPounds } from "@/lib/engine/market";

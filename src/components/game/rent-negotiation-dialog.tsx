@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { ScrollText, AlertTriangle, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Tenant } from "@/components/ui/tenant-selector";
+import type { Tenant } from "@/components/game/tenant-selector";
 
 interface Props {
   propertyId: string;

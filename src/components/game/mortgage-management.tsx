@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Property } from "@/components/ui/property-card";
+import { Property } from "@/components/game/property-card";
 import { Building2, Calculator, TrendingDown, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment, calculateMortgageEligibility, findMaxEligibleLoan } from "@/lib/mortgageEligibility";

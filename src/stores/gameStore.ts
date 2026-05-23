@@ -7,8 +7,8 @@ import type {
   EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
   DepositDispute, PlanningApplication,
 } from '@/types/game';
-import type { Tenant } from '@/components/ui/tenant-selector';
-import { RENOVATION_OPTIONS, type RenovationType } from '@/components/ui/renovation-dialog';
+import type { Tenant } from '@/components/game/tenant-selector';
+import { RENOVATION_OPTIONS, type RenovationType } from '@/components/game/renovation-dialog';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
 import { playGavel, playLevelUp, playPaper, playConcernChime, playWarning } from '@/lib/sound';

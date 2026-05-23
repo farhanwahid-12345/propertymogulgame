@@ -2,9 +2,9 @@ import { useMemo, useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Hourglass, FileText, Hammer, Wrench, Sparkles } from "lucide-react";
-import { ConveyancingTracker } from "@/components/ui/conveyancing-tracker";
-import { RenovationTracker } from "@/components/ui/renovation-tracker";
-import { TenantConcernsFeed } from "@/components/ui/tenant-concerns-feed";
+import { ConveyancingTracker } from "@/components/game/conveyancing-tracker";
+import { RenovationTracker } from "@/components/game/renovation-tracker";
+import { TenantConcernsFeed } from "@/components/game/tenant-concerns-feed";
 import type {
   Conveyancing,
   Renovation,
