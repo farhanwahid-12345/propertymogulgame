@@ -82,7 +82,10 @@ interface RenovationDialogProps {
   inPlanningCooldown?: boolean;
   /** Active property locks — used to compute per-renovation planning cooldown. */
   propertyLocks?: Array<{ propertyId: string; reason: string; untilMonth: number; renovationTypeId?: string }>;
+  /** Item #1: current EPC band — gates target-band selector on EPC upgrade. */
+  currentEpc?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 }
+
 
 
 export const RENOVATION_OPTIONS: RenovationType[] = [
@@ -310,12 +313,34 @@ export function RenovationDialog({
   inPlanningCooldown = false,
   propertyLocks = [],
   hasTenant = false,
+  currentEpc,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [conversionUnits, setConversionUnits] = useState<number>(4);
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
+
+  // Item #1: target EPC band for `epc_upgrade`. Defaults to next band up.
+  const EPC_ORDER: Array<'G'|'F'|'E'|'D'|'C'|'B'|'A'> = ['G','F','E','D','C','B','A'];
+  const nextBandUp = (g?: string): 'A'|'B'|'C'|'D'|'E'|'F'|'G' => {
+    const i = EPC_ORDER.indexOf((g as any) ?? 'D');
+    return EPC_ORDER[Math.min(EPC_ORDER.length - 1, i + 1)] ?? 'A';
+  };
+  const [epcTarget, setEpcTarget] = useState<'A'|'B'|'C'|'D'|'E'|'F'|'G'>(nextBandUp(currentEpc));
+  const bandJumps = (target?: string): number => {
+    if (!currentEpc || !target) return 1;
+    const ci = EPC_ORDER.indexOf(currentEpc);
+    const ti = EPC_ORDER.indexOf(target as any);
+    return Math.max(1, ti - ci);
+  };
+  const epcMultiplierFor = (r: RenovationType): number => {
+    if (r.id !== 'epc_upgrade') return 1;
+    const target = selectedRenovation?.id === 'epc_upgrade' ? epcTarget : nextBandUp(currentEpc);
+    // 1 jump = 1.0×, 2 = 1.5×, 3 = 2.0× …
+    return 0.5 + 0.5 * bandJumps(target);
+  };
+
 
   // Per-renovation planning cooldown check — legacy property-wide locks (no
   // renovationTypeId) still block, but new locks are scoped to the refused work.
@@ -391,9 +416,10 @@ export function RenovationDialog({
     if (!isConversion(r)) return 1;
     return selectedRenovation && selectedRenovation.id === r!.id ? conversionUnits : defaultUnits(r);
   };
-  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) / 50) * 50;
-  const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 5) * 5;
-  const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 100) * 100;
+  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 50) * 50;
+  const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 5) * 5;
+  const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 100) * 100;
+
 
   // Ceiling-price awareness — applies to extensions/conversions
   const ceilingPrice = neighborhood && propertyType
@@ -426,7 +452,21 @@ export function RenovationDialog({
         // Carry units through to the engine via a custom field on the type
         ...( { subtypeUnits: u } as any ),
       } as RenovationType;
+    } else if (selectedRenovation.id === 'epc_upgrade') {
+      // Item #1: scale cost/rent/value by band-jump count and persist target band.
+      const jumps = bandJumps(epcTarget);
+      const mult = 0.5 + 0.5 * jumps;
+      toSubmit = {
+        ...selectedRenovation,
+        name: `EPC Upgrade → ${epcTarget}`,
+        cost: Math.round(selectedRenovation.cost * mult),
+        rentIncrease: Math.round(selectedRenovation.rentIncrease * mult),
+        valueIncrease: Math.round(selectedRenovation.valueIncrease * mult),
+        ...( { epcTarget } as any ),
+      } as RenovationType;
     }
+
+
     onRenovate(propertyId, toSubmit);
     setIsOpen(false);
     setSelectedRenovation(null);
@@ -834,6 +874,31 @@ export function RenovationDialog({
         {selectedRenovation && (
           <div className="bg-muted p-4 rounded-lg mt-4 space-y-3">
             <h4 className="font-semibold">Renovation Summary</h4>
+            {selectedRenovation.id === 'epc_upgrade' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Current EPC: <span className="font-semibold text-foreground">{currentEpc ?? '—'}</span>
+                  </span>
+                  <label className="flex items-center gap-2 text-xs">
+                    Target band:
+                    <select
+                      value={epcTarget}
+                      onChange={(e) => setEpcTarget(e.target.value as any)}
+                      className="bg-background border border-border rounded px-2 py-1 text-sm"
+                    >
+                      {EPC_ORDER
+                        .filter(b => !currentEpc || EPC_ORDER.indexOf(b) > EPC_ORDER.indexOf(currentEpc))
+                        .map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {bandJumps(epcTarget)} band jump{bandJumps(epcTarget) > 1 ? 's' : ''} — cost scales {(0.5 + 0.5 * bandJumps(epcTarget)).toFixed(1)}×.
+                </div>
+              </div>
+            )}
+
             {isConversion(selectedRenovation) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">

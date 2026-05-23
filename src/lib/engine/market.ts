@@ -152,7 +152,13 @@ export function getMarketRentPounds(p: {
   completedRenovationIds?: string[];
   /** Cumulative renovation spend in pennies — fuels a refurb-spend uplift. */
   totalRenovationSpendPennies?: number;
+  /** Item #6: furnished comparables command higher rent — apply the same
+   *  multiplier used by `calcTenantRent` so the market reference matches. */
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Item #1: EPC band shifts effective rent (renters pay for energy-efficient stock). */
+  epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 }): number {
+
   const baseValue = (typeof p.marketValue === 'number' && p.marketValue > 0) ? p.marketValue : p.value;
   if (!baseValue || baseValue <= 0) return 0;
   let conditionYield =
@@ -195,6 +201,21 @@ export function getMarketRentPounds(p: {
   if (p.subtype === 'hmo') unitMult = Math.min(1.32, 1 + 0.04 * (units - 1));
   else if (p.subtype === 'flats') unitMult = Math.min(1.4, 1 + 0.06 * (units - 1));
 
-  return Math.round((baseValue * blended * qualityMult * unitMult) / 12);
+  // Furnishing premium — mirrors `getFurnishingRentMultiplier`.
+  const furnishingMult = getFurnishingRentMultiplier(p.furnishingTier);
+
+  // EPC multiplier — A/B properties command a small rent premium; F/G a discount.
+  const epcMult =
+    p.epcRating === 'A' ? 1.05 :
+    p.epcRating === 'B' ? 1.03 :
+    p.epcRating === 'C' ? 1.01 :
+    p.epcRating === 'D' ? 1.00 :
+    p.epcRating === 'E' ? 0.98 :
+    p.epcRating === 'F' ? 0.95 :
+    p.epcRating === 'G' ? 0.92 :
+                          1.00;
+
+  return Math.round((baseValue * blended * qualityMult * unitMult * furnishingMult * epcMult) / 12);
 }
+
 
