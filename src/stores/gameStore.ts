@@ -4406,20 +4406,16 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       },
       partialize: (state) => {
-        const { clockTick, processMonthEnd, processMarketUpdate, processCounterResponses,
-          buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
-          listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
-          setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
-          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction, withdrawFromConveyancing,
-          disputeDeposit, dismissDispute,
-          startRenovation, upgradeCondition, furnishProperty, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
-          handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
-          dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
-          resolveTenantConcern, dismissTenantConcern, topUpCondition,
-          applyForLoan, settleLoan,
-          ...data } = state;
-        return data;
+        // Generically strip all function fields (actions). This is more robust
+        // than maintaining a hand-rolled destructure list — adding a new action
+        // to the store no longer risks bloating the persisted save.
+        const out: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(state)) {
+          if (typeof value !== 'function') out[key] = value;
+        }
+        return out as any;
       },
+
     }
   )
 );
