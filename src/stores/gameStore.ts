@@ -1998,7 +1998,9 @@ export const useGameStore = create<GameState & GameActions>()(
               ...sqftUpdate,
               ...subtypeUpdate,
               ...subtypeUnitsUpdate,
+              ...epcUpdate,
               ...conditionUpdate,
+
             };
             const expectedValue = renovation.type.valueIncrease;
             const actualValuePounds = fromPennies(actualValueGain);
