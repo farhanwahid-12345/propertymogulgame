@@ -464,6 +464,8 @@ export function RenovationDialog({
         valueIncrease: Math.round(selectedRenovation.valueIncrease * mult),
         ...( { epcTarget } as any ),
       } as RenovationType;
+    }
+
 
     onRenovate(propertyId, toSubmit);
     setIsOpen(false);
