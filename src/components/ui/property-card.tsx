@@ -722,6 +722,8 @@ export const PropertyCard = memo(function PropertyCard({
                       inPlanningCooldown={inPlanningCooldown}
                       propertyLocks={propertyLocks}
                       hasTenant={hasAnyTenant || !!currentTenant}
+                      currentEpc={property.epcRating}
+
                     />
                   )}
                   <FurnishingDialog

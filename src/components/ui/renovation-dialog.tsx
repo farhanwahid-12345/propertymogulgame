@@ -874,6 +874,31 @@ export function RenovationDialog({
         {selectedRenovation && (
           <div className="bg-muted p-4 rounded-lg mt-4 space-y-3">
             <h4 className="font-semibold">Renovation Summary</h4>
+            {selectedRenovation.id === 'epc_upgrade' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Current EPC: <span className="font-semibold text-foreground">{currentEpc ?? '—'}</span>
+                  </span>
+                  <label className="flex items-center gap-2 text-xs">
+                    Target band:
+                    <select
+                      value={epcTarget}
+                      onChange={(e) => setEpcTarget(e.target.value as any)}
+                      className="bg-background border border-border rounded px-2 py-1 text-sm"
+                    >
+                      {EPC_ORDER
+                        .filter(b => !currentEpc || EPC_ORDER.indexOf(b) > EPC_ORDER.indexOf(currentEpc))
+                        .map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  {bandJumps(epcTarget)} band jump{bandJumps(epcTarget) > 1 ? 's' : ''} — cost scales {(0.5 + 0.5 * bandJumps(epcTarget)).toFixed(1)}×.
+                </div>
+              </div>
+            )}
+
             {isConversion(selectedRenovation) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
