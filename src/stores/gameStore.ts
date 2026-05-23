@@ -1974,6 +1974,11 @@ export const useGameStore = create<GameState & GameActions>()(
                 }
               : {};
 
+            // Item #1: EPC upgrade persists the chosen target band.
+            const epcTarget = (renovation.type as any).epcTarget as Property['epcRating'] | undefined;
+            const epcUpdate = epcTarget && valueMult > 0 ? { epcRating: epcTarget } : {};
+
+
             updatedProperties[idx] = {
               ...updatedProperties[idx],
               value: updatedProperties[idx].value + actualValueGain,
