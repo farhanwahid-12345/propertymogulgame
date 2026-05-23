@@ -152,7 +152,13 @@ export function getMarketRentPounds(p: {
   completedRenovationIds?: string[];
   /** Cumulative renovation spend in pennies — fuels a refurb-spend uplift. */
   totalRenovationSpendPennies?: number;
+  /** Item #6: furnished comparables command higher rent — apply the same
+   *  multiplier used by `calcTenantRent` so the market reference matches. */
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Item #1: EPC band shifts effective rent (renters pay for energy-efficient stock). */
+  epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 }): number {
+
   const baseValue = (typeof p.marketValue === 'number' && p.marketValue > 0) ? p.marketValue : p.value;
   if (!baseValue || baseValue <= 0) return 0;
   let conditionYield =
