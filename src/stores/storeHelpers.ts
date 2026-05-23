@@ -40,9 +40,17 @@ export function calcDeposit(monthlyRentPennies: number): number {
 
 /** Side-effect free toast trigger — dynamic import keeps the store decoupled from React. */
 export function showToast(title: string, description: string, variant?: 'destructive' | 'success') {
+  // Phase 4 item #7: chime on every failed/destructive toast (chain collapse,
+  // mortgage rejection, insufficient funds, etc.). Throttled inside playWarning.
+  if (variant === 'destructive') {
+    import('@/lib/sound')
+      .then(({ playWarning }) => { try { playWarning(); } catch { /* noop */ } })
+      .catch(() => { /* noop */ });
+  }
   import('@/hooks/use-toast')
     .then(({ toast }) => {
       try { toast({ title, description, variant: variant as any }); } catch (e) { /* noop */ }
     })
     .catch(() => { /* noop — never let toast import crash the app */ });
 }
+
