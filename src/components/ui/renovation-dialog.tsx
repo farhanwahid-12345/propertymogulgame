@@ -82,7 +82,10 @@ interface RenovationDialogProps {
   inPlanningCooldown?: boolean;
   /** Active property locks — used to compute per-renovation planning cooldown. */
   propertyLocks?: Array<{ propertyId: string; reason: string; untilMonth: number; renovationTypeId?: string }>;
+  /** Item #1: current EPC band — gates target-band selector on EPC upgrade. */
+  currentEpc?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
 }
+
 
 
 export const RENOVATION_OPTIONS: RenovationType[] = [
@@ -310,12 +313,34 @@ export function RenovationDialog({
   inPlanningCooldown = false,
   propertyLocks = [],
   hasTenant = false,
+  currentEpc,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [conversionUnits, setConversionUnits] = useState<number>(4);
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
+
+  // Item #1: target EPC band for `epc_upgrade`. Defaults to next band up.
+  const EPC_ORDER: Array<'G'|'F'|'E'|'D'|'C'|'B'|'A'> = ['G','F','E','D','C','B','A'];
+  const nextBandUp = (g?: string): 'A'|'B'|'C'|'D'|'E'|'F'|'G' => {
+    const i = EPC_ORDER.indexOf((g as any) ?? 'D');
+    return EPC_ORDER[Math.min(EPC_ORDER.length - 1, i + 1)] ?? 'A';
+  };
+  const [epcTarget, setEpcTarget] = useState<'A'|'B'|'C'|'D'|'E'|'F'|'G'>(nextBandUp(currentEpc));
+  const bandJumps = (target?: string): number => {
+    if (!currentEpc || !target) return 1;
+    const ci = EPC_ORDER.indexOf(currentEpc);
+    const ti = EPC_ORDER.indexOf(target as any);
+    return Math.max(1, ti - ci);
+  };
+  const epcMultiplierFor = (r: RenovationType): number => {
+    if (r.id !== 'epc_upgrade') return 1;
+    const target = selectedRenovation?.id === 'epc_upgrade' ? epcTarget : nextBandUp(currentEpc);
+    // 1 jump = 1.0×, 2 = 1.5×, 3 = 2.0× …
+    return 0.5 + 0.5 * bandJumps(target);
+  };
+
 
   // Per-renovation planning cooldown check — legacy property-wide locks (no
   // renovationTypeId) still block, but new locks are scoped to the refused work.
