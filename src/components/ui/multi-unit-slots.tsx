@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TenantSelector, type Tenant } from "@/components/ui/tenant-selector";
 import { EvictionDialog } from "@/components/ui/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
-import { Heart } from "lucide-react";
+import { Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMarketRentPounds } from "@/lib/engine/market";
+
 
 export interface MultiUnitSlot {
   slotIndex: number;
@@ -65,19 +67,35 @@ export function MultiUnitSlots({
 }: Props) {
   const label = subtype === 'hmo' ? 'Room' : 'Unit';
   const occupied = slots.filter(s => s.tenant).length;
+  // Item #12: attention pulse when any slot needs landlord action.
+  const needsAttention = slots.some(s =>
+    (s.satisfaction !== undefined && s.satisfaction < 40) || !!s.pendingEviction
+  );
+  const [collapsed, setCollapsed] = useState(slots.length > 3);
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <button
+        type="button"
+        onClick={() => setCollapsed(!collapsed)}
+        className={cn(
+          "w-full flex items-center justify-between rounded-md px-2 py-1 hover:bg-muted/30 transition",
+          needsAttention && "animate-pulse"
+        )}
+      >
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
           {subtype === 'hmo' ? 'HMO Rooms' : 'Converted Units'}
+          {needsAttention && <span className="text-red-400 normal-case">· Needs attention</span>}
         </div>
         <Badge variant="outline" className="text-[10px]">
           {occupied}/{slots.length} occupied
         </Badge>
-      </div>
+      </button>
 
+      {!collapsed && (
       <div className="space-y-2">
+
         {slots.map(slot => {
           const slotIndex = slot.slotIndex;
           const tenant = slot.tenant;
