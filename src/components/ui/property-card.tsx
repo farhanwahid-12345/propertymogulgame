@@ -261,7 +261,7 @@ export const PropertyCard = memo(function PropertyCard({
       typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1.5 pt-3">
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-2 pb-3">
+      <CardContent className="space-y-1.5 pb-2">
         {property.owned ? (
           <>
             {/* Compact mini-grid — always visible. Tap "Details" to expand. */}
