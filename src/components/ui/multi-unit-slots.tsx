@@ -234,6 +234,8 @@ export function MultiUnitSlots({
           );
         })}
       </div>
+      )}
     </div>
+
   );
 }
