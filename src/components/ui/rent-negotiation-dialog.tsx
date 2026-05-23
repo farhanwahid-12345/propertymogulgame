@@ -26,6 +26,11 @@ interface Props {
   playerCash: number;
   /** Cumulative renovation spend on this property (pennies) — surfaces refurb uplift hint. */
   totalRenovationSpendPennies?: number;
+  /** Item #6: surface furnished-comparable hint when property is furnished. */
+  furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Item #1: surface EPC band influence on market rent. */
+  epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+
   /** Apply the negotiated rent, in pounds. `outcome` drives satisfaction / lock. */
   onApply: (
     propertyId: string,
@@ -51,6 +56,9 @@ export function RentNegotiationDialog({
   tenantSatisfaction,
   playerCash,
   totalRenovationSpendPennies = 0,
+  furnishingTier,
+  epcRating,
+
   onApply,
   trigger,
 }: Props) {
@@ -179,6 +187,17 @@ export function RentNegotiationDialog({
                     Includes refurb uplift (£{Math.round(totalRenovationSpendPennies / 100).toLocaleString()} spent)
                   </div>
                 )}
+                {furnishingTier && furnishingTier !== 'unfurnished' && (
+                  <div className="text-[10px] text-amber-300/90 mt-0.5">
+                    Furnished comparable ({furnishingTier.replace('_', ' ')}) — +{furnishingTier === 'fully_furnished' ? '12' : '5'}%
+                  </div>
+                )}
+                {epcRating && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5">
+                    EPC {epcRating}{['A','B'].includes(epcRating) ? ' premium' : ['F','G'].includes(epcRating) ? ' discount' : ''}
+                  </div>
+                )}
+
               </div>
             </div>
             {marketRent > 0 && (() => {
