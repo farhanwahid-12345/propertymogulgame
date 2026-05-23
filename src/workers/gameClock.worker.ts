@@ -1,17 +1,18 @@
 /**
- * Game-clock Web Worker.
+ * Game-clock Web Worker (item #17).
  *
  * Browsers throttle setInterval/setTimeout in background tabs to ≥1 minute.
- * Web Workers do NOT receive the same aggressive throttling, so by driving the
- * tick from inside a worker the in-game clock keeps running while the player
- * is on another tab.
+ * Web Workers are not throttled the same way, so we drive the tick from
+ * inside a worker to keep the in-game clock running across tab switches.
  *
- * The worker measures elapsed wall-clock time using performance.now() and
- * posts the elapsed delta (in ms) back to the main thread roughly every
- * second. The main thread is then responsible for converting that delta into
- * "ticks" and triggering month-end / market / counter-offer processes —
- * keeping all game state on the main thread's Zustand store.
+ * **Minimal payload contract** — the worker posts only
+ *   { type: 'tick', deltaMs: number }
+ * across the boundary. No game state is shipped: every piece of state
+ * (speed, isPaused, month, store actions) lives on the main thread and is
+ * read fresh inside the tick handler. This keeps postMessage cheap and
+ * avoids structured-clone overhead on hot ticks.
  */
+
 
 let lastTime = performance.now();
 let intervalId: ReturnType<typeof setInterval> | null = null;

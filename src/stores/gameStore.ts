@@ -4406,46 +4406,50 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       },
       partialize: (state) => {
-        const { clockTick, processMonthEnd, processMarketUpdate, processCounterResponses,
-          buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale,
-          listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice,
-          setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer,
-          reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter, selectTenant, applyRentIncrease, evictTenant, cancelEviction, withdrawFromConveyancing,
-          disputeDeposit, dismissDispute,
-          startRenovation, upgradeCondition, furnishProperty, settleMortgage, remortgageProperty, handleRefinance, handlePortfolioMortgage,
-          handleApplyOverdraft, setCash, setOverdraftUsed, payDamageWithCash, payDamageWithLoan,
-          dismissDamage, removeAuctionProperty, replenishMarket, resetGame, setEntityType,
-          resolveTenantConcern, dismissTenantConcern, topUpCondition,
-          applyForLoan, settleLoan,
-          ...data } = state;
-        return data;
+        // Generically strip all function fields (actions). This is more robust
+        // than maintaining a hand-rolled destructure list — adding a new action
+        // to the store no longer risks bloating the persisted save.
+        const out: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(state)) {
+          if (typeof value !== 'function') out[key] = value;
+        }
+        return out as any;
       },
+
     }
   )
 );
 
 // ─── SELECTORS ────────────────────────────────────────────
-export const usePlayerData = () => useGameStore(s => ({
+// Composite selectors return fresh object identities every render, which would
+// cause every subscriber to re-render on every tick. `useShallow` (zustand v5)
+// performs a shallow-equality check on the returned object so re-renders only
+// fire when one of the picked fields actually changes — critical for keeping
+// the dashboard smooth at 4× game speed.
+import { useShallow } from 'zustand/react/shallow';
+
+export const usePlayerData = () => useGameStore(useShallow(s => ({
   cash: s.cash, creditScore: s.creditScore, level: s.level,
   experience: s.experience, experienceToNext: s.experienceToNext,
   isBankrupt: s.isBankrupt, overdraftLimit: s.overdraftLimit, overdraftUsed: s.overdraftUsed,
   entityType: s.entityType,
-}));
+})));
 
-export const useTimeData = () => useGameStore(s => ({
+export const useTimeData = () => useGameStore(useShallow(s => ({
   monthsPlayed: s.monthsPlayed, timeUntilNextMonth: s.timeUntilNextMonth,
-}));
+})));
 
-export const usePropertyData = () => useGameStore(s => ({
+export const usePropertyData = () => useGameStore(useShallow(s => ({
   ownedProperties: s.ownedProperties,
   estateAgentProperties: s.estateAgentProperties,
   auctionProperties: s.auctionProperties,
   propertyListings: s.propertyListings,
   tenants: s.tenants, pendingDamages: s.pendingDamages,
   conveyancing: s.conveyancing,
-}));
+})));
 
-export const useFinanceData = () => useGameStore(s => ({
+export const useFinanceData = () => useGameStore(useShallow(s => ({
   mortgages: s.mortgages, currentMarketRate: s.currentMarketRate,
   mortgageProviderRates: s.mortgageProviderRates,
-}));
+})));
+
