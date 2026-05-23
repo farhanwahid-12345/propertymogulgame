@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect } from 'vitest';
 import { useGameStore } from './gameStore';
 
 /**
@@ -9,9 +10,7 @@ import { useGameStore } from './gameStore';
  * a refactor that renamed them). Critical state fields must always be present.
  */
 describe('gameStore persisted shape', () => {
-  beforeEach(() => {
-    useGameStore.persist?.clearStorage?.();
-  });
+
 
   it('strips all action functions from the persisted snapshot', () => {
     const state = useGameStore.getState();
