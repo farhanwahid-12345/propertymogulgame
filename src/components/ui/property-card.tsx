@@ -191,13 +191,17 @@ export const PropertyCard = memo(function PropertyCard({
   const cashRequired = property.price - mortgageAmount;
   const canAffordCash = playerCash >= property.price;
   const canAffordMortgage = playerCash >= cashRequired;
-  
+
   // Cost basis: purchase price + cumulative renovation spend
   const renovationSpendPounds = Math.round((property.totalRenovationSpendPennies || 0) / 100);
   const totalInvested = property.price + renovationSpendPounds;
   const marketValueToUse = property.marketValue || property.value;
   const equityVsMarket = marketValueToUse - totalInvested;
   const equityPct = totalInvested > 0 ? ((equityVsMarket / totalInvested) * 100).toFixed(1) : "0.0";
+  // Item #9: pure capital appreciation since purchase, separate from renovation spend.
+  const marketValueGain = marketValueToUse - property.price;
+  const marketValueGainPct = property.price > 0 ? ((marketValueGain / property.price) * 100).toFixed(1) : "0.0";
+
 
   // Calculate monthly costs for owned properties
   const propertyMortgage = mortgages.find(m => m.propertyId === property.id);
@@ -257,7 +261,7 @@ export const PropertyCard = memo(function PropertyCard({
       typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1.5 pt-3">
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -367,7 +371,7 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-2 pb-3">
+      <CardContent className="space-y-1.5 pb-2">
         {property.owned ? (
           <>
             {/* Compact mini-grid — always visible. Tap "Details" to expand. */}
@@ -387,17 +391,18 @@ export const PropertyCard = memo(function PropertyCard({
               </div>
               <div className="rounded-md bg-muted/30 px-2 py-1.5">
                 <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-                  {propertyLTV > 0 ? 'LTV' : 'Equity'}
+                  {propertyLTV > 0 ? 'LTV' : 'Market Value Gain'}
                 </div>
                 <div className={cn(
                   "text-sm font-bold leading-tight",
                   propertyLTV > 0
                     ? (propertyLTV > 80 ? "text-danger" : propertyLTV > 60 ? "text-yellow-400" : "text-success")
-                    : (equityVsMarket >= 0 ? "text-success" : "text-danger")
+                    : (marketValueGain >= 0 ? "text-success" : "text-danger")
                 )}>
-                  {propertyLTV > 0 ? `${propertyLTV.toFixed(0)}%` : `${equityPct}%`}
+                  {propertyLTV > 0 ? `${propertyLTV.toFixed(0)}%` : `${marketValueGain >= 0 ? '+' : ''}${marketValueGainPct}%`}
                 </div>
               </div>
+
             </div>
 
             <Button

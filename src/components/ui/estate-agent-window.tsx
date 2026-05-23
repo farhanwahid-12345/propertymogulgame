@@ -123,6 +123,10 @@ export function EstateAgentWindow({
   const [counteringOfferId, setCounteringOfferId] = useState<string | null>(null);
   const [counterAmount, setCounterAmount] = useState<string>("");
 
+  // Item #10: sort for the Buy tab.
+  const [buySort, setBuySort] = useState<'price-asc' | 'price-desc' | 'yield-asc' | 'yield-desc' | 'rent-asc' | 'rent-desc'>('price-asc');
+
+
   // Get level value range for filtering
   const getLevelRange = (playerLevel: number) => {
     switch (playerLevel) {
@@ -525,9 +529,35 @@ export function EstateAgentWindow({
               </div>
             )}
             
-            <p className="text-[10px] text-muted-foreground italic px-1">*Actual rent varies by tenant</p>
+            <div className="flex items-center justify-between gap-2 px-1">
+              <p className="text-[10px] text-muted-foreground italic">*Actual rent varies by tenant</p>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Sort</Label>
+                <Select value={buySort} onValueChange={(v) => setBuySort(v as any)}>
+                  <SelectTrigger className="h-7 w-[170px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="price-asc">Price · low → high</SelectItem>
+                    <SelectItem value="price-desc">Price · high → low</SelectItem>
+                    <SelectItem value="yield-desc">Yield · high → low</SelectItem>
+                    <SelectItem value="yield-asc">Yield · low → high</SelectItem>
+                    <SelectItem value="rent-desc">Base rent · high → low</SelectItem>
+                    <SelectItem value="rent-asc">Base rent · low → high</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {affordableProperties.slice(0, 20).map((property) => (
+              {[...affordableProperties].sort((a, b) => {
+                switch (buySort) {
+                  case 'price-asc':  return a.value - b.value;
+                  case 'price-desc': return b.value - a.value;
+                  case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
+                  case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
+                  case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
+                  case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
+                }
+              }).slice(0, 20).map((property) => (
+
                 <Card
                   key={property.id}
                   className={`cursor-pointer transition-all p-3 space-y-1 ${

@@ -91,9 +91,19 @@ export function PortfolioGrid({
             .map((r) => r.type.id);
           const tenantRecs = gameState.tenants.filter((t) => t.propertyId === property.id);
           const slot0 = tenantRecs.find((t) => (t.slotIndex ?? 0) === 0);
-          const concernCount = (gameState.tenantConcerns || []).filter(
-            (c: any) => c.propertyId === property.id && !c.resolvedMonth
-          ).length;
+          // Item #5: dedupe by id (defends against duplicate records lingering
+          // from migrations) and only count concerns that are still open.
+          const concernCount = (() => {
+            const map = new Map<string, any>();
+            for (const c of gameState.tenantConcerns || []) {
+              if (!c?.id || c.propertyId !== property.id) continue;
+              const existing = map.get(c.id);
+              if (existing?.resolvedMonth) continue;
+              map.set(c.id, c);
+            }
+            return Array.from(map.values()).filter((c) => !c.resolvedMonth).length;
+          })();
+
           const pendingEvSlot0 = (gameState.pendingEvictions || []).find(
             (e: any) => e.propertyId === property.id && (e.slotIndex ?? 0) === 0
           );

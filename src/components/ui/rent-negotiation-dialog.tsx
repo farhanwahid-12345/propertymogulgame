@@ -153,10 +153,11 @@ export function RentNegotiationDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="outline" size="sm" className="text-xs border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10">
-            <ScrollText className="h-3 w-3 mr-1" />
-            Propose Rent Increase
+          <Button variant="outline" size="sm" className="text-[11px] px-2 border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10 whitespace-nowrap">
+            <ScrollText className="h-3 w-3 mr-1 shrink-0" />
+            Propose Rent ↑
           </Button>
+
         )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
