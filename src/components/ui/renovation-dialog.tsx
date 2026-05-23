@@ -416,9 +416,10 @@ export function RenovationDialog({
     if (!isConversion(r)) return 1;
     return selectedRenovation && selectedRenovation.id === r!.id ? conversionUnits : defaultUnits(r);
   };
-  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) / 50) * 50;
-  const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 5) * 5;
-  const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) / 100) * 100;
+  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 50) * 50;
+  const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 5) * 5;
+  const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 100) * 100;
+
 
   // Ceiling-price awareness — applies to extensions/conversions
   const ceilingPrice = neighborhood && propertyType
