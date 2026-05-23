@@ -3,7 +3,7 @@ import { Bell, CalendarClock, Hammer, Receipt, Gavel, Info, AlertTriangle, Check
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ActivityFeed } from "@/components/ui/activity-feed";
+import { ActivityFeed } from "@/components/game/activity-feed";
 import { useNotifications, markAllRead, clearNotifications, type AppNotification } from "@/lib/notifications";
 import { buildUpcomingRows, monthLabel } from "@/lib/upcomingEvents";
 import { cn } from "@/lib/utils";

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PropertyOffers } from "@/components/ui/property-offers";
+import { PropertyOffers } from "@/components/game/property-offers";
 import { useState } from "react";
 import { Clock, Target, X, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";

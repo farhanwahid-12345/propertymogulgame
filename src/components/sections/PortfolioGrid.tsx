@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { PropertyCard } from "@/components/ui/property-card";
+import { PropertyCard } from "@/components/game/property-card";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;

@@ -1,7 +1,7 @@
 import type {
   Property, PropertyTenant, Renovation, PropertyOffer, PropertyListing,
 } from '@/types/game';
-import type { RenovationType } from '@/components/ui/renovation-dialog';
+import type { RenovationType } from '@/components/game/renovation-dialog';
 
 const VALID_PROPERTY_TYPES = ['residential', 'commercial', 'luxury'] as const;
 const VALID_MARKET_TRENDS = ['up', 'down', 'stable'] as const;

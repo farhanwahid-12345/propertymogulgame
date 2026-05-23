@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { MortgageSettlement } from "@/components/ui/mortgage-settlement";
-import { MortgageManagement } from "@/components/ui/mortgage-management";
-import { CreditOverdraft } from "@/components/ui/credit-overdraft";
-import { PortfolioMortgage } from "@/components/ui/portfolio-mortgage";
-import { LoansPanel } from "@/components/ui/loans-panel";
-import { TaxBreakdown } from "@/components/ui/tax-breakdown";
-import { OperationsCenter } from "@/components/ui/operations-center";
+import { MortgageSettlement } from "@/components/game/mortgage-settlement";
+import { MortgageManagement } from "@/components/game/mortgage-management";
+import { CreditOverdraft } from "@/components/game/credit-overdraft";
+import { PortfolioMortgage } from "@/components/game/portfolio-mortgage";
+import { LoansPanel } from "@/components/game/loans-panel";
+import { TaxBreakdown } from "@/components/game/tax-breakdown";
+import { OperationsCenter } from "@/components/game/operations-center";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fromPennies } from "@/lib/formatCurrency";

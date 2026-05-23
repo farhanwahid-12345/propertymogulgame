@@ -6,18 +6,18 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { TenantSelector, Tenant } from "@/components/ui/tenant-selector";
-import { RenovationDialog, RenovationType } from "@/components/ui/renovation-dialog";
-import { FurnishingDialog } from "@/components/ui/furnishing-dialog";
-import { EvictionDialog } from "@/components/ui/eviction-dialog";
-import { RentNegotiationDialog } from "@/components/ui/rent-negotiation-dialog";
+import { TenantSelector, Tenant } from "@/components/game/tenant-selector";
+import { RenovationDialog, RenovationType } from "@/components/game/renovation-dialog";
+import { FurnishingDialog } from "@/components/game/furnishing-dialog";
+import { EvictionDialog } from "@/components/game/eviction-dialog";
+import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getMarketRentPounds } from "@/lib/engine/market";
-import { RepairBar } from "@/components/ui/repair-bar";
-import { MultiUnitSlots } from "@/components/ui/multi-unit-slots";
+import { RepairBar } from "@/components/game/repair-bar";
+import { MultiUnitSlots } from "@/components/game/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
@@ -80,7 +80,7 @@ interface PropertyCardProps {
   /** Tenant satisfaction passed for negotiation acceptance probability. */
   applyRentIncrease?: (propertyId: string, newRentPounds: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePounds: number, slotIndex?: number) => void;
   /** Per-slot tenant data for HMOs / converted flats. When set, single-tenant block is replaced with multi-unit panel. */
-  multiUnitSlots?: import("@/components/ui/multi-unit-slots").MultiUnitSlot[];
+  multiUnitSlots?: import("@/components/game/multi-unit-slots").MultiUnitSlot[];
   mortgages?: Array<{
     propertyId: string;
     monthlyPayment: number;

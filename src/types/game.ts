@@ -1,6 +1,6 @@
 // Centralized game types - all monetary values stored as pennies (integers)
-import type { Tenant } from "@/components/ui/tenant-selector";
-import type { RenovationType } from "@/components/ui/renovation-dialog";
+import type { Tenant } from "@/components/game/tenant-selector";
+import type { RenovationType } from "@/components/game/renovation-dialog";
 
 // Property condition tiers
 export type PropertyCondition = 'dilapidated' | 'standard' | 'premium';

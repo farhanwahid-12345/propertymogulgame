@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
-import { GameClock, SpeedSelector } from "@/components/ui/game-clock";
-import { NotificationCentre } from "@/components/ui/notification-centre";
-import { ReputationBadge } from "@/components/ui/reputation-badge";
+import { GameClock, SpeedSelector } from "@/components/game/game-clock";
+import { NotificationCentre } from "@/components/game/notification-centre";
+import { ReputationBadge } from "@/components/game/reputation-badge";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
 import {
