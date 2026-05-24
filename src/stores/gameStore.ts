@@ -125,6 +125,9 @@ interface GameActions {
   // Pause
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
+  // Item #10 — pending-transaction approval queue
+  approvePendingTransaction: (id: string) => void;
+  approveAllPendingTransactions: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
