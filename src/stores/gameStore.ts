@@ -203,6 +203,7 @@ function createInitialState(): GameState {
     projectedTaxPennies: 0,
     projectedTaxStampedMonth: 0,
     pendingTransactions: [],
+    chainCollapseEvents: [],
   };
 }
 
