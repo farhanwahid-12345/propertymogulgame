@@ -4471,6 +4471,27 @@ export const useGameStore = create<GameState & GameActions>()(
         }
       },
 
+      dismissChainCollapseEvent: (id: string) => {
+        const s = get();
+        const remaining = (s.chainCollapseEvents || []).filter(e => e.id !== id);
+        const stillHasPending = ((s as any).pendingTransactions?.length || 0) > 0;
+        set({
+          chainCollapseEvents: remaining,
+          isPaused: remaining.length === 0 && !stillHasPending ? false : s.isPaused,
+        } as any);
+      },
+
+      dismissAllChainCollapseEvents: () => {
+        const s = get();
+        const stillHasPending = ((s as any).pendingTransactions?.length || 0) > 0;
+        set({
+          chainCollapseEvents: [],
+          isPaused: !stillHasPending ? false : s.isPaused,
+        } as any);
+      },
+
+
+
       markEconomicEventsSeen: (ids: string[]) => {
         if (!ids || ids.length === 0) return;
         const s = get() as any;
