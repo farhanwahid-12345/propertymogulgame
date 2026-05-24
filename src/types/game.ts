@@ -463,6 +463,8 @@ export interface GameState {
   projectedTaxStampedMonth?: number;
   /** Item #10 — queued debits awaiting explicit player approval. Game auto-pauses while any exist. */
   pendingTransactions?: PendingTransaction[];
+  /** Phase 3 #5 — queued chain-collapse pop-out events awaiting acknowledgement. */
+  chainCollapseEvents?: ChainCollapseEvent[];
 }
 
 /** A queued, non-rent / non-sale debit that the player must approve before it leaves cash. */
