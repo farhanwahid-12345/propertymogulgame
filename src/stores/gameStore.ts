@@ -1906,11 +1906,32 @@ export const useGameStore = create<GameState & GameActions>()(
           }
           return updated;
         });
-        // Keep last 30 resolved cases; preserve all active.
+        // Phase 4 #19: resolve High Court Enforcement escalations.
+        const casesWithHce = updatedCases.map(c => {
+          if (!c.escalatedToHighCourtMonth || c.hceResolved) return c;
+          if (newMonthNumber < (c.hceResolveMonth ?? Infinity)) return c;
+          const recovered = c.hceExpectedRecoveryPennies ?? 0;
+          if (recovered > 0) {
+            const credited = credit({ cash: finalCash, overdraftUsed: finalOverdraftUsed }, recovered);
+            finalCash = credited.cash;
+            finalOverdraftUsed = credited.overdraftUsed;
+            showToast("⚖️ HCE Recovered", `High Court Enforcement recovered £${fromPennies(recovered).toLocaleString()} from ${c.tenantName}.`, 'success' as any);
+          } else {
+            showToast("⚖️ HCE Unsuccessful", `HCE could not recover the residual debt from ${c.tenantName}.`, "destructive");
+          }
+          return {
+            ...c,
+            hceResolved: true,
+            netRecoveredPennies: (c.netRecoveredPennies ?? 0) + recovered,
+            status: recovered > 0 ? 'recovered' : c.status,
+          } as import('@/types/game').DebtRecoveryCase;
+        });
+        // Keep last 30 resolved cases; preserve all active (in_court or pending HCE).
         const trimmedCases = [
-          ...updatedCases.filter(c => c.status === 'in_court'),
-          ...updatedCases.filter(c => c.status !== 'in_court').slice(-30),
+          ...casesWithHce.filter(c => c.status === 'in_court' || (c.escalatedToHighCourtMonth && !c.hceResolved)),
+          ...casesWithHce.filter(c => c.status !== 'in_court' && !(c.escalatedToHighCourtMonth && !c.hceResolved)).slice(-30),
         ];
+
 
 
 
