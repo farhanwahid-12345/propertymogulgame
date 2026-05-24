@@ -1102,6 +1102,17 @@ export function EstateAgentWindow({
                           </div>
                         </div>
 
+                        {/* Phase 3 #18 — preview Early Repayment Charge on settlement */}
+                        {(() => {
+                          const ercPounds = getErcForProperty(selectedProperty.id);
+                          if (ercPounds <= 0) return null;
+                          return (
+                            <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200">
+                              ⚠️ Early Repayment Charge of <span className="font-semibold">£{ercPounds.toLocaleString()}</span> will be deducted from sale proceeds when this mortgage is redeemed.
+                            </div>
+                          );
+                        })()}
+
                         {/* Pricing guidance */}
                         <div className={`rounded-lg p-3 ${guidance.bg} border`}>
                           <p className={`text-sm font-medium ${guidance.color}`}>
@@ -1112,8 +1123,14 @@ export function EstateAgentWindow({
                           </p>
                         </div>
 
-                        <Button onClick={handleListProperty} className="w-full">
-                          List Property for £{newListingPrice.toLocaleString()}
+                        <Button
+                          onClick={handleListProperty}
+                          className="w-full"
+                          disabled={isPortfolioLocked(selectedProperty.id)}
+                        >
+                          {isPortfolioLocked(selectedProperty.id)
+                            ? '🔒 Locked — included in active portfolio mortgage'
+                            : `List Property for £${newListingPrice.toLocaleString()}`}
                         </Button>
                       </>
                     );
