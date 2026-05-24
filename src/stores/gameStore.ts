@@ -1524,7 +1524,43 @@ export const useGameStore = create<GameState & GameActions>()(
         // month's BILLS — not just because bills happen to settle first
         // (item #16: was previously debiting outflows from prev.cash before
         // crediting rent, which caused phantom overdraft taps).
-        const totalOutflows = mortgagePayments + councilTax + insurance + taxPaid;
+        //
+        // Item #10: insurance, council tax and tax bills are no longer silently
+        // debited — they go into `pendingTransactions` and the game auto-pauses
+        // until the player approves them via the dialog. Mortgage payments stay
+        // automatic (contractual direct debit).
+        const newPendingTransactions: import('@/types/game').PendingTransaction[] = [];
+        if (insurance > 0) {
+          newPendingTransactions.push({
+            id: `ptx-ins-${newMonthNumber}`,
+            type: 'insurance',
+            amount: insurance,
+            description: `Landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
+            month: newMonthNumber,
+          });
+        }
+        if (councilTax > 0) {
+          newPendingTransactions.push({
+            id: `ptx-ct-${newMonthNumber}`,
+            type: 'council_tax',
+            amount: councilTax,
+            description: `Council tax on empty properties — month ${newMonthNumber}`,
+            month: newMonthNumber,
+          });
+        }
+        if (taxPaid > 0) {
+          newPendingTransactions.push({
+            id: `ptx-tax-${newMonthNumber}`,
+            type: prev.entityType === 'ltd' ? 'corporation_tax' : 'income_tax',
+            amount: taxPaid,
+            description: prev.entityType === 'ltd'
+              ? `Corporation tax — tax year ${currentTaxYear}`
+              : `Self-assessment income tax — tax year ${currentTaxYear}`,
+            month: newMonthNumber,
+          });
+        }
+
+        const totalOutflows = mortgagePayments; // tax/insurance/council go via pending approval queue
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
         const netCashDelta = totalInflows - totalOutflows;
         let finalCash = prev.cash;
