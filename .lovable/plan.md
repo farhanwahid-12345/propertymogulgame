@@ -66,8 +66,9 @@ The document repeats multiple money-related bugs; fix them as one coordinated pa
 
 - Extend Vitest suite to cover every Phase 1–4 fix:
   - NW with loans, ERC on sale, planning + reno batching sqft math, EPC value/rent multipliers, furniture cost & uplift bounds, cash-offer acceptance bias, portfolio-mortgage sale lock, arrears escalation state machine, pending-transaction approval queue.
+- **Folded from Phase 3 verification**: in-game days-on-market increment, listing persistence (no auto-sale), yield recomputation on below-asking buys, instant-equity cushion bounds, chain-collapse modal trigger + reduced frequency, cash-offer acceptance bias + badge, portfolio-mortgaged sale lock UI, ERC preview in listing dialogs.
 - Add a manual QA checklist mapped 1-to-1 against document items 1–22.
-- Persistence audit: any new state keys (pendingTransactions, batchedProjects, lossCarryForward, arrearsStage) must round-trip through `localStorage`.
+- Persistence audit: any new state keys (pendingTransactions, batchedProjects, lossCarryForward, arrearsStage, listingMonth, isCash) must round-trip through `localStorage`.
 
 ---
 
