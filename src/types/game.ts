@@ -273,6 +273,8 @@ export interface PropertyOffer {
   daysOnMarket: number;
   isChainFree: boolean;
   mortgageApproved: boolean;
+  /** True when the buyer is a cash purchaser (no mortgage chain). */
+  isCash?: boolean;
   timestamp: number;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'buyer-countered' | 'walkaway';
   counterAmount?: number; // pennies
@@ -284,12 +286,26 @@ export interface PropertyOffer {
 export interface PropertyListing {
   propertyId: string;
   listingDate: number;
+  /** In-game month when the property was first listed (drives game-time DOM). */
+  listingMonth?: number;
   isAuction: boolean;
   daysUntilSale: number;
   askingPrice: number; // pennies
   offers?: PropertyOffer[];
   lastOfferCheck?: number;
   autoAcceptThreshold?: number; // pennies
+}
+
+/** Chain-collapse event payload surfaced in the global pop-out modal. */
+export interface ChainCollapseEvent {
+  id: string;
+  propertyName: string;
+  /** Were we the buyer ("buying") or seller ("selling") in the chain? */
+  side: 'buying' | 'selling';
+  /** In-game month it collapsed. */
+  month: number;
+  /** Pennies returned to cash (cashHeld refund), informational. */
+  cashReturned: number;
 }
 
 export interface Renovation {
@@ -447,6 +463,8 @@ export interface GameState {
   projectedTaxStampedMonth?: number;
   /** Item #10 — queued debits awaiting explicit player approval. Game auto-pauses while any exist. */
   pendingTransactions?: PendingTransaction[];
+  /** Phase 3 #5 — queued chain-collapse pop-out events awaiting acknowledgement. */
+  chainCollapseEvents?: ChainCollapseEvent[];
 }
 
 /** A queued, non-rent / non-sale debit that the player must approve before it leaves cash. */

@@ -13,6 +13,7 @@ import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, Me
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
+import { computeErcRate } from "@/lib/engine/constants";
 
 interface PropertyOffer {
   id: string;
@@ -21,6 +22,7 @@ interface PropertyOffer {
   daysOnMarket: number;
   isChainFree: boolean;
   mortgageApproved: boolean;
+  isCash?: boolean;
   timestamp: number;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'buyer-countered' | 'walkaway';
   counterAmount?: number;
@@ -32,6 +34,7 @@ interface PropertyOffer {
 interface PropertyListing {
   propertyId: string;
   listingDate: number;
+  listingMonth?: number;
   isAuction: boolean;
   daysUntilSale: number;
   askingPrice: number;
@@ -66,6 +69,16 @@ interface EstateAgentWindowProps {
   totalRentalIncome?: number; // pounds
   existingMonthlyMortgagePayments?: number; // pounds
   ownedPropertyCount?: number;
+  /** In-game month, drives game-time days-on-market badge. */
+  monthsPlayed?: number;
+  /** Mortgages list (pennies) — used to compute ERC preview at listing time. */
+  mortgages?: Array<{
+    propertyId: string;
+    remainingBalance: number;
+    startMonth?: number;
+    fixedTermYears?: number;
+    collateralPropertyIds?: string[];
+  }>;
 }
 
 export function EstateAgentWindow({ 
@@ -94,6 +107,8 @@ export function EstateAgentWindow({
   totalRentalIncome = 0,
   existingMonthlyMortgagePayments = 0,
   ownedPropertyCount = 0,
+  monthsPlayed = 0,
+  mortgages = [],
 }: EstateAgentWindowProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [newListingPrice, setNewListingPrice] = useState<number>(0);
@@ -494,6 +509,22 @@ export function EstateAgentWindow({
     if (ratio >= 0.95) return "secondary";
     return "destructive";
   };
+
+  /** Phase 3 #13 — true when the property collateralises an active portfolio mortgage. */
+  const isPortfolioLocked = (propertyId: string) =>
+    (mortgages || []).some(m =>
+      Array.isArray(m.collateralPropertyIds) && m.collateralPropertyIds.includes(propertyId),
+    );
+
+  /** Phase 3 #18 — ERC payable if this property's mortgage is redeemed on sale (pounds). */
+  const getErcForProperty = (propertyId: string): number => {
+    const m = (mortgages || []).find(x => x.propertyId === propertyId);
+    if (!m || !m.remainingBalance) return 0;
+    const monthsIntoTerm = typeof m.startMonth === 'number' ? Math.max(0, monthsPlayed - m.startMonth) : 0;
+    const rate = m.fixedTermYears ? computeErcRate(m.fixedTermYears, monthsIntoTerm) : (monthsIntoTerm < 60 ? 0.02 : 0);
+    return Math.round(m.remainingBalance * rate);
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -999,11 +1030,14 @@ export function EstateAgentWindow({
                         <SelectValue placeholder="Choose a property" />
                       </SelectTrigger>
                       <SelectContent>
-                        {unlistedProperties.map(property => (
-                          <SelectItem key={property.id} value={property.id}>
-                            {property.name} (Value: £{property.value.toLocaleString()})
-                          </SelectItem>
-                        ))}
+                        {unlistedProperties.map(property => {
+                          const locked = isPortfolioLocked(property.id);
+                          return (
+                            <SelectItem key={property.id} value={property.id} disabled={locked}>
+                              {property.name} (Value: £{property.value.toLocaleString()}){locked ? ' — locked in portfolio mortgage' : ''}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1068,6 +1102,17 @@ export function EstateAgentWindow({
                           </div>
                         </div>
 
+                        {/* Phase 3 #18 — preview Early Repayment Charge on settlement */}
+                        {(() => {
+                          const ercPounds = getErcForProperty(selectedProperty.id);
+                          if (ercPounds <= 0) return null;
+                          return (
+                            <div className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200">
+                              ⚠️ Early Repayment Charge of <span className="font-semibold">£{ercPounds.toLocaleString()}</span> will be deducted from sale proceeds when this mortgage is redeemed.
+                            </div>
+                          );
+                        })()}
+
                         {/* Pricing guidance */}
                         <div className={`rounded-lg p-3 ${guidance.bg} border`}>
                           <p className={`text-sm font-medium ${guidance.color}`}>
@@ -1078,8 +1123,14 @@ export function EstateAgentWindow({
                           </p>
                         </div>
 
-                        <Button onClick={handleListProperty} className="w-full">
-                          List Property for £{newListingPrice.toLocaleString()}
+                        <Button
+                          onClick={handleListProperty}
+                          className="w-full"
+                          disabled={isPortfolioLocked(selectedProperty.id)}
+                        >
+                          {isPortfolioLocked(selectedProperty.id)
+                            ? '🔒 Locked — included in active portfolio mortgage'
+                            : `List Property for £${newListingPrice.toLocaleString()}`}
                         </Button>
                       </>
                     );
@@ -1100,7 +1151,8 @@ export function EstateAgentWindow({
                     if (!property) return null;
 
                     const offers = listing.offers || [];
-                    const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
+                    const listingMonth = (listing as any).listingMonth ?? monthsPlayed;
+                    const daysOnMarket = Math.max(0, monthsPlayed - listingMonth) * 30;
                     const askingPrice = listing.askingPrice || property.value;
                     const priceRatio = askingPrice / property.value;
                     const guidance = getPricingGuidance(priceRatio);
@@ -1265,11 +1317,16 @@ export function EstateAgentWindow({
                                           )}
                                         </div>
                                       </div>
-                                      <div className="flex gap-1 mb-2">
-                                        {offer.isChainFree && (
+                                      <div className="flex gap-1 mb-2 flex-wrap">
+                                        {offer.isCash && (
+                                          <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-600">
+                                            💵 Cash buyer — higher acceptance
+                                          </Badge>
+                                        )}
+                                        {offer.isChainFree && !offer.isCash && (
                                           <Badge variant="secondary" className="text-xs">Chain Free</Badge>
                                         )}
-                                        {offer.mortgageApproved && (
+                                        {offer.mortgageApproved && !offer.isCash && (
                                           <Badge variant="secondary" className="text-xs">Mortgage Approved</Badge>
                                         )}
                                         {offer.counterAmount && offer.status === 'countered' && (

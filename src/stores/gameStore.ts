@@ -128,6 +128,9 @@ interface GameActions {
   // Item #10 — pending-transaction approval queue
   approvePendingTransaction: (id: string) => void;
   approveAllPendingTransactions: () => void;
+  // Phase 3 #5 — chain-collapse pop-out acknowledgement
+  dismissChainCollapseEvent: (id: string) => void;
+  dismissAllChainCollapseEvents: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
@@ -203,6 +206,7 @@ function createInitialState(): GameState {
     projectedTaxPennies: 0,
     projectedTaxStampedMonth: 0,
     pendingTransactions: [],
+    chainCollapseEvents: [],
   };
 }
 
@@ -504,14 +508,22 @@ export const useGameStore = create<GameState & GameActions>()(
         let cancelledConveyancing: Conveyancing[] = [];
         let activeConveyancing: Conveyancing[] = [];
         let conveyancingCashReturn = 0;
+        // Phase 3 #5 — chain-collapse pop-out queue (replaces silent toast).
+        const newChainCollapseEvents: import('@/types/game').ChainCollapseEvent[] = [];
 
         prev.conveyancing.forEach(conv => {
           if (newMonthNumber >= conv.completionMonth) {
-            // 10% chain collapse chance
-            if (Math.random() < 0.10) {
+            // Phase 3 #5: reduced chain collapse chance (was 10%, now 4%).
+            if (Math.random() < 0.04) {
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
-              showToast("⛓️ Chain Collapsed!", `${conv.propertyName} — the ${conv.status === 'buying' ? 'seller pulled out' : 'buyer pulled out'}. Transaction cancelled.`, "destructive");
+              newChainCollapseEvents.push({
+                id: `chain_${Date.now()}_${conv.propertyId}`,
+                propertyName: conv.propertyName,
+                side: conv.status,
+                month: newMonthNumber,
+                cashReturned: conv.cashHeld,
+              });
               flashOps();
             } else {
               if (conv.status === 'buying') completedBuys.push(conv);
@@ -522,6 +534,7 @@ export const useGameStore = create<GameState & GameActions>()(
             activeConveyancing.push(conv);
           }
         });
+
 
         // Complete buy conveyancing — add property + mortgage
         let newOwnedProperties = [...prev.ownedProperties];
@@ -541,19 +554,30 @@ export const useGameStore = create<GameState & GameActions>()(
               ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
             prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
-          // Bargain reflected in net worth: settle value to min(listed, paid).
-          // Recompute rent from advertised yield × settled value so realised yield matches the label.
-          const listedValue = prop.value;
+          // Phase 3 #2 — preserve the ADVERTISED rent so realised yield rises when
+          // we buy under asking; bonus a small "instant equity" cushion when the
+          // bargain is material (paid < 90% of listed value).
+          const listedValue = prev.estateAgentProperties.find(p => p.id === conv.propertyId)?.value
+            ?? prev.auctionProperties.find(p => p.id === conv.propertyId)?.value
+            ?? prop.value;
           const paid = conv.purchasePrice || prop.price;
-          const settledValue = Math.min(listedValue, paid);
-          const effectiveYield = conv.advertisedYield ?? prop.yield ?? (6 + Math.random() * 9);
-          const effectiveRent = settledValue > 0
-            ? Math.floor((settledValue * (effectiveYield / 100)) / 12)
-            : (conv.advertisedMonthlyIncome ?? prop.monthlyIncome);
+          const advertisedRent = conv.advertisedMonthlyIncome ?? prop.monthlyIncome;
+          const bargainRatio = listedValue > 0 ? paid / listedValue : 1;
+          let settledValue: number;
+          if (bargainRatio < 0.9 && listedValue > paid) {
+            // Material bargain → settle slightly above paid (capped at listed value,
+            // max +15% of paid) so net worth reflects the instant equity gain.
+            settledValue = Math.min(listedValue, Math.round(paid * 1.15));
+          } else {
+            settledValue = Math.min(listedValue, paid);
+          }
+          // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
+          const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
+          const effectiveRent = advertisedRent;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
             value: settledValue,
-            // marketValue clamped to purchase price so overpaying doesn't book an instant paper loss from fees
+            // marketValue tracks the listed value so the asking-side signal stays honest.
             marketValue: Math.max(settledValue, paid),
             yield: effectiveYield,
             monthlyIncome: effectiveRent,
@@ -1909,6 +1933,9 @@ export const useGameStore = create<GameState & GameActions>()(
           nextEconomicEventMonth: nextEventMonth,
           economicEvents,
           conveyancing: activeConveyancing,
+          chainCollapseEvents: newChainCollapseEvents.length > 0
+            ? [...(s.chainCollapseEvents || []), ...newChainCollapseEvents]
+            : s.chainCollapseEvents,
           estateAgentProperties: newEstateAgent,
           auctionProperties: newAuction,
           tenants: newTenants,
@@ -1947,7 +1974,12 @@ export const useGameStore = create<GameState & GameActions>()(
             ...newPendingTransactions,
           ],
           // Item #10: any queued debit auto-pauses the clock until approved.
-          isPaused: ((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0 ? true : s.isPaused,
+          // Item #10 + Phase 3 #5: any queued debit OR chain-collapse pop-out auto-pauses the clock.
+          isPaused:
+            (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
+            || newChainCollapseEvents.length > 0
+              ? true
+              : s.isPaused,
         } as any));
       },
 
@@ -2080,28 +2112,30 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         });
 
-        // Update listings
+        // Update listings — days-on-market driven by game time (in-game months),
+        // not wall-clock, so the badge actually advances during play (Phase 3 #1a).
         const updatedListings = prev.propertyListings.map(listing => {
-          const daysOnMarket = Math.floor((currentTime - listing.listingDate) / (1000 * 60 * 60 * 24));
+          // Backfill listingMonth for legacy listings (use current month so they start fresh).
+          const listingMonth = typeof listing.listingMonth === 'number'
+            ? listing.listingMonth
+            : prev.monthsPlayed;
+          const monthsOnMarket = Math.max(0, prev.monthsPlayed - listingMonth);
+          const daysOnMarket = monthsOnMarket * 30;
           const property = prev.ownedProperties.find(p => p.id === listing.propertyId);
           const daysSinceLastCheck = listing.lastOfferCheck
             ? Math.floor((currentTime - listing.lastOfferCheck) / (1000 * 60 * 60 * 24))
-            : 0;
+            : 999;
 
           let newOffers = listing.offers || [];
           let lastCheck = listing.lastOfferCheck || listing.listingDate;
 
           if (!listing.isAuction && property && daysSinceLastCheck >= 3) {
-            // Asking-vs-market ratio drives buyer interest and offer band.
-            // < market = busy, lots of competitive offers.
-            // 5–15% over market = slow trickle, lower offers.
-            // > 15% over market = stalling, sparse + lowball offers.
             const asking = listing.askingPrice || property.value;
             const market = property.value;
             const askRatio = asking / Math.max(1, market);
 
             let numNew: number;
-            let bandLow: number;  // % of asking
+            let bandLow: number;
             let bandHigh: number;
             let bidWarChance: number;
             if (askRatio <= 1.0) {
@@ -2111,11 +2145,9 @@ export const useGameStore = create<GameState & GameActions>()(
               numNew = Math.random() > 0.6 ? 2 : 1;
               bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.04;
             } else {
-              // Stalling territory: usually 0, occasional lowball.
               numNew = Math.random() > 0.75 ? 1 : 0;
               bandLow = 0.72; bandHigh = 0.84; bidWarChance = 0;
             }
-            // Time pressure: after ~30 days, buyers sense desperation and shave a bit.
             const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.003));
 
             const buyerNames = [
@@ -2126,34 +2158,48 @@ export const useGameStore = create<GameState & GameActions>()(
             for (let i = 0; i < numNew; i++) {
               const isBidWar = Math.random() < bidWarChance;
               const pct = isBidWar
-                ? 1.03 + Math.random() * 0.08  // 1.03× – 1.11× of asking
+                ? 1.03 + Math.random() * 0.08
                 : bandLow + Math.random() * (bandHigh - bandLow);
+              // Phase 3 #7 — ~25% of buyers are cash purchasers (no chain).
+              const isCash = Math.random() < 0.25;
               const offer: PropertyOffer = {
                 id: `offer-${Date.now()}-${i}`,
                 buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
                 amount: Math.floor(asking * pct * timeAdj),
-                daysOnMarket, isChainFree: Math.random() > 0.6,
-                mortgageApproved: Math.random() > 0.3, timestamp: currentTime,
+                daysOnMarket,
+                isChainFree: isCash || Math.random() > 0.6,
+                isCash,
+                mortgageApproved: isCash ? true : Math.random() > 0.3,
+                timestamp: currentTime,
                 status: 'pending', negotiationRound: 0,
               };
               newOffers.push(offer);
               if (listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold) {
                 showToast("Offer Auto-Accepted! 🎉", `${offer.buyerName}'s offer auto-accepted for ${property.name}!`);
               } else {
-                showToast("New Offer Received! 💰", `${offer.buyerName} offered for ${property.name}`);
+                showToast(
+                  isCash ? "Cash Offer Received! 💵" : "New Offer Received! 💰",
+                  `${offer.buyerName} offered for ${property.name}${isCash ? ' (cash buyer)' : ''}`,
+                );
               }
             }
             lastCheck = currentTime;
           }
 
+          // Phase 3 #1b — NEVER auto-complete a sale just because daysUntilSale hit
+          // zero. The only paths to completion are (a) the user-set auto-accept
+          // threshold being met, or (b) the player explicitly accepting an offer.
           const autoAccepted = newOffers.find(o =>
             listing.autoAcceptThreshold && o.amount >= listing.autoAcceptThreshold
           );
           if (autoAccepted) {
-            return { ...listing, daysUntilSale: 0, offers: newOffers, lastOfferCheck: lastCheck };
+            return { ...listing, listingMonth, daysUntilSale: 0, offers: newOffers, lastOfferCheck: lastCheck };
           }
-          return { ...listing, daysUntilSale: Math.max(0, listing.daysUntilSale - 1), offers: newOffers, lastOfferCheck: lastCheck };
+          // Keep daysUntilSale at >=1 so the listing persists indefinitely until the
+          // player accepts an offer or cancels the listing.
+          return { ...listing, listingMonth, daysUntilSale: Math.max(1, listing.daysUntilSale), offers: newOffers, lastOfferCheck: lastCheck };
         });
+
 
         // Process completed sales → move to conveyancing instead of instant
         const completedSales = updatedListings.filter(l => l.daysUntilSale === 0);
@@ -2161,8 +2207,9 @@ export const useGameStore = create<GameState & GameActions>()(
         completedSales.forEach(sale => {
           const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
           if (property) {
+            // Only auto-accept offers can trigger completion here (Phase 3 #1b).
             const autoOffer = sale.offers?.find(o => sale.autoAcceptThreshold && o.amount >= sale.autoAcceptThreshold);
-            const salePrice = autoOffer ? autoOffer.amount : (sale.isAuction ? Math.floor(property.value * 0.85) : property.value);
+            if (!autoOffer) return;
             newConveyancing.push({
               id: `conv_sell_${Date.now()}_${property.id}`,
               propertyId: property.id,
@@ -2170,13 +2217,14 @@ export const useGameStore = create<GameState & GameActions>()(
               status: 'selling',
               startMonth: prev.monthsPlayed,
               completionMonth: prev.monthsPlayed + 1 + Math.floor(Math.random() * 3),
-              salePrice,
+              salePrice: autoOffer.amount,
               cashHeld: 0,
               isAuction: sale.isAuction,
             });
             showToast("Sale Agreed! ⏳", `${property.name} — conveyancing started. Completion in 1-3 months.`);
           }
         });
+
 
         // Void periods
         const activeVoids = prev.voidPeriods.filter(vp => currentTime < vp.endDate);
@@ -2261,7 +2309,9 @@ export const useGameStore = create<GameState & GameActions>()(
           currentMarketRate: newMarketRate,
           currentLoanRates: newLoanRates,
           voidPeriods: activeVoids,
-          propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
+          // Listings persist until accepted/cancelled (Phase 3 #1b); only remove
+          // those whose conveyancing just kicked off this tick.
+          propertyListings: updatedListings.filter(l => !salePropIds.has(l.propertyId)),
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
@@ -2521,7 +2571,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60);
         const listing: PropertyListing = {
-          propertyId: property.id, listingDate: Date.now(), isAuction,
+          propertyId: property.id, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction,
           daysUntilSale: daysToSell, askingPrice: property.value,
           offers: [], lastOfferCheck: Date.now(),
         };
@@ -2604,7 +2654,7 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         const listing: PropertyListing = {
-          propertyId, listingDate: Date.now(), isAuction: false,
+          propertyId, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction: false,
           daysUntilSale: 30, askingPrice, offers: [], lastOfferCheck: Date.now(),
         };
         showToast("Property Listed", `${property.name} listed for £${fromPennies(askingPrice).toLocaleString()}`);
@@ -4449,6 +4499,27 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("All approved", `£${fromPennies(approvedAmount).toLocaleString()} paid${usedOverdraftTotal > 0 ? ` (£${fromPennies(usedOverdraftTotal).toLocaleString()} via overdraft)` : ''}.`);
         }
       },
+
+      dismissChainCollapseEvent: (id: string) => {
+        const s = get();
+        const remaining = (s.chainCollapseEvents || []).filter(e => e.id !== id);
+        const stillHasPending = ((s as any).pendingTransactions?.length || 0) > 0;
+        set({
+          chainCollapseEvents: remaining,
+          isPaused: remaining.length === 0 && !stillHasPending ? false : s.isPaused,
+        } as any);
+      },
+
+      dismissAllChainCollapseEvents: () => {
+        const s = get();
+        const stillHasPending = ((s as any).pendingTransactions?.length || 0) > 0;
+        set({
+          chainCollapseEvents: [],
+          isPaused: !stillHasPending ? false : s.isPaused,
+        } as any);
+      },
+
+
 
       markEconomicEventsSeen: (ids: string[]) => {
         if (!ids || ids.length === 0) return;
