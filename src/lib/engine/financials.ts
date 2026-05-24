@@ -100,12 +100,13 @@ export function getRequiredNetWorth(level: number): number {
   return toPennies(250_000) * Math.pow(2, level - 2);
 }
 
-/** Per-sqft furnishing install cost (pounds). Mirrors `furnishProperty`. */
+/** Per-sqft furnishing install cost (pounds). Mirrors `furnishProperty`.
+ *  Phase 2 item #4: reduced to ~30% of legacy values so furniture pays back. */
 export function getFurnishingCostPerSqft(
   tier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
 ): number {
-  if (tier === 'fully_furnished') return 18;
-  if (tier === 'part_furnished') return 8;
+  if (tier === 'fully_furnished') return 5;
+  if (tier === 'part_furnished') return 2;
   return 0;
 }
 

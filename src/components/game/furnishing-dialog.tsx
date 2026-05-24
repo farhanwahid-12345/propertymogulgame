@@ -30,9 +30,9 @@ interface Props {
 
 
 const TIERS = [
-  { id: 'unfurnished',     label: 'Unfurnished',     emoji: '🪑', costPerSqft: 0,  rentBoost: '0%',  blurb: 'Broadest tenant pool. No furniture risk.' },
-  { id: 'part_furnished',  label: 'Part Furnished',  emoji: '🛏️', costPerSqft: 8,  rentBoost: '+5%', blurb: 'White goods + soft furnishings. Mild premium.' },
-  { id: 'fully_furnished', label: 'Fully Furnished', emoji: '🛋️', costPerSqft: 18, rentBoost: '+12%',blurb: 'Premium fit-out. Attracts higher-end tenants.' },
+  { id: 'unfurnished',     label: 'Unfurnished',     emoji: '🪑', costPerSqft: 0, rentBoost: '0%',   blurb: 'Broadest tenant pool. No furniture risk.' },
+  { id: 'part_furnished',  label: 'Part Furnished',  emoji: '🛏️', costPerSqft: 2, rentBoost: '+10%', blurb: 'White goods + soft furnishings. Mild premium.' },
+  { id: 'fully_furnished', label: 'Fully Furnished', emoji: '🛋️', costPerSqft: 5, rentBoost: '+24%', blurb: 'Premium fit-out. Attracts higher-end tenants.' },
 ] as const;
 
 export function FurnishingDialog({ propertyId, propertyName, internalSqft = 800, currentTier = 'unfurnished', monthsRemaining, hasTenant, baseRent, condition }: Props) {

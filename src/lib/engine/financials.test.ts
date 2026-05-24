@@ -57,30 +57,30 @@ describe("getFurnitureValuePennies", () => {
     })).toBe(0);
   });
   it("depreciates linearly to half at 30 months remaining", () => {
-    // 800 sqft * £18 = £14,400 install → half = £7,200
+    // Phase 2 #4: fully_furnished = £5/sqft. 800 sqft × £5 = £4,000 install → half = £2,000.
     const v = getFurnitureValuePennies({
       furnishingTier: "fully_furnished", internalSqft: 800, furnishingMonthsRemaining: 30,
     });
-    expect(v).toBe(toPennies(7_200));
+    expect(v).toBe(toPennies(2_000));
   });
   it("is full install value at 60 months remaining", () => {
     const v = getFurnitureValuePennies({
       furnishingTier: "part_furnished", internalSqft: 800, furnishingMonthsRemaining: 60,
     });
-    expect(v).toBe(toPennies(800 * 8));
+    expect(v).toBe(toPennies(800 * 2));
   });
   it("uses default 800 sqft when missing", () => {
     expect(getFurnitureValuePennies({
       furnishingTier: "fully_furnished", furnishingMonthsRemaining: 60,
-    })).toBe(toPennies(800 * 18));
+    })).toBe(toPennies(800 * 5));
   });
 });
 
 describe("getFurnishingCostPerSqft", () => {
-  it("returns £0 unfurnished, £8 part, £18 full", () => {
+  it("returns £0 unfurnished, £2 part, £5 full (Phase 2 #4 — 30% of legacy)", () => {
     expect(getFurnishingCostPerSqft("unfurnished")).toBe(0);
-    expect(getFurnishingCostPerSqft("part_furnished")).toBe(8);
-    expect(getFurnishingCostPerSqft("fully_furnished")).toBe(18);
+    expect(getFurnishingCostPerSqft("part_furnished")).toBe(2);
+    expect(getFurnishingCostPerSqft("fully_furnished")).toBe(5);
   });
 });
 

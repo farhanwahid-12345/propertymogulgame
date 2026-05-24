@@ -26,7 +26,7 @@ import {
 import {
   calculateStampDuty, calculateDTI, fluctuateProviderRates, getInitialProviderRates,
   getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
-  getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies,
+  getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
 import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
 import {
@@ -2776,6 +2776,21 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.conveyancing.some(c => c.propertyId === propertyId)) {
           showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
         }
+        // Phase 2 item #15: block tenant placement while active works are running.
+        const activeReno = (prev.renovations || []).find(r => {
+          if (r.propertyId !== propertyId) return false;
+          // Renovation is "active" until its completionMonth (or completionDate fallback) passes.
+          if (typeof r.completionMonth === 'number') return prev.monthsPlayed < r.completionMonth;
+          return Date.now() < r.completionDate;
+        });
+        if (activeReno) {
+          showToast(
+            "Works in Progress",
+            `Cannot let — ${activeReno.type?.name || 'a renovation'} is underway. Wait for completion.`,
+            "destructive",
+          );
+          return;
+        }
         // Can't let to a new tenant during a relet lock (post move-in eviction) — slot-scoped
         const releLock = prev.propertyLocks.find(l => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex));
         if (releLock) {
@@ -3694,8 +3709,9 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         const sqft = property.internalSqft || 800;
-        // £8/sqft for part, £18/sqft for fully — typical UK BTL refit costs
-        const costPerSqft = tier === 'fully_furnished' ? 18 : tier === 'part_furnished' ? 8 : 0;
+        // Phase 2 item #4: furniture cost = ~30% of legacy values, scaled by sqft.
+        // Sourced from getFurnishingCostPerSqft so engine + UI stay in lock-step.
+        const costPerSqft = getFurnishingCostPerSqft(tier);
         const cost = toPennies(sqft * costPerSqft);
         if (cost > 0) {
           const debited = debit(prev, cost);

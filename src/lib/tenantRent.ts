@@ -42,13 +42,14 @@ export function getConditionRentMultiplierShared(condition?: PropertyCondition):
   }
 }
 
-/** Rent multiplier from furnishing tier. Defaults to unfurnished (1.0). */
+/** Rent multiplier from furnishing tier. Defaults to unfurnished (1.0).
+ *  Phase 2 item #6: doubled rent uplift so furniture ROI is meaningful. */
 export function getFurnishingRentMultiplier(
   tier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
 ): number {
   switch (tier) {
-    case 'part_furnished':  return 1.05;
-    case 'fully_furnished': return 1.12;
+    case 'part_furnished':  return 1.10;
+    case 'fully_furnished': return 1.24;
     case 'unfurnished':
     default:                return 1.00;
   }
