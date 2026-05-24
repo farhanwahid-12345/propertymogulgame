@@ -1030,11 +1030,14 @@ export function EstateAgentWindow({
                         <SelectValue placeholder="Choose a property" />
                       </SelectTrigger>
                       <SelectContent>
-                        {unlistedProperties.map(property => (
-                          <SelectItem key={property.id} value={property.id}>
-                            {property.name} (Value: £{property.value.toLocaleString()})
-                          </SelectItem>
-                        ))}
+                        {unlistedProperties.map(property => {
+                          const locked = isPortfolioLocked(property.id);
+                          return (
+                            <SelectItem key={property.id} value={property.id} disabled={locked}>
+                              {property.name} (Value: £{property.value.toLocaleString()}){locked ? ' — locked in portfolio mortgage' : ''}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
