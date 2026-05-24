@@ -2643,7 +2643,7 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         const listing: PropertyListing = {
-          propertyId, listingDate: Date.now(), isAuction: false,
+          propertyId, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction: false,
           daysUntilSale: 30, askingPrice, offers: [], lastOfferCheck: Date.now(),
         };
         showToast("Property Listed", `${property.name} listed for £${fromPennies(askingPrice).toLocaleString()}`);
