@@ -1960,7 +1960,12 @@ export const useGameStore = create<GameState & GameActions>()(
             ...newPendingTransactions,
           ],
           // Item #10: any queued debit auto-pauses the clock until approved.
-          isPaused: ((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0 ? true : s.isPaused,
+          // Item #10 + Phase 3 #5: any queued debit OR chain-collapse pop-out auto-pauses the clock.
+          isPaused:
+            (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
+            || newChainCollapseEvents.length > 0
+              ? true
+              : s.isPaused,
         } as any));
       },
 
