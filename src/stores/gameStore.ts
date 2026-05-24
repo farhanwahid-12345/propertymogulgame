@@ -554,19 +554,30 @@ export const useGameStore = create<GameState & GameActions>()(
               ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
             prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
-          // Bargain reflected in net worth: settle value to min(listed, paid).
-          // Recompute rent from advertised yield × settled value so realised yield matches the label.
-          const listedValue = prop.value;
+          // Phase 3 #2 — preserve the ADVERTISED rent so realised yield rises when
+          // we buy under asking; bonus a small "instant equity" cushion when the
+          // bargain is material (paid < 90% of listed value).
+          const listedValue = prev.estateAgentProperties.find(p => p.id === conv.propertyId)?.value
+            ?? prev.auctionProperties.find(p => p.id === conv.propertyId)?.value
+            ?? prop.value;
           const paid = conv.purchasePrice || prop.price;
-          const settledValue = Math.min(listedValue, paid);
-          const effectiveYield = conv.advertisedYield ?? prop.yield ?? (6 + Math.random() * 9);
-          const effectiveRent = settledValue > 0
-            ? Math.floor((settledValue * (effectiveYield / 100)) / 12)
-            : (conv.advertisedMonthlyIncome ?? prop.monthlyIncome);
+          const advertisedRent = conv.advertisedMonthlyIncome ?? prop.monthlyIncome;
+          const bargainRatio = listedValue > 0 ? paid / listedValue : 1;
+          let settledValue: number;
+          if (bargainRatio < 0.9 && listedValue > paid) {
+            // Material bargain → settle slightly above paid (capped at listed value,
+            // max +15% of paid) so net worth reflects the instant equity gain.
+            settledValue = Math.min(listedValue, Math.round(paid * 1.15));
+          } else {
+            settledValue = Math.min(listedValue, paid);
+          }
+          // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
+          const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
+          const effectiveRent = advertisedRent;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
             value: settledValue,
-            // marketValue clamped to purchase price so overpaying doesn't book an instant paper loss from fees
+            // marketValue tracks the listed value so the asking-side signal stays honest.
             marketValue: Math.max(settledValue, paid),
             yield: effectiveYield,
             monthlyIncome: effectiveRent,
