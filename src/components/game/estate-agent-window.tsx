@@ -449,10 +449,13 @@ export function EstateAgentWindow({
     });
   };
 
-  /** Suggested-price floor includes residual furniture value so the seller recoups it. */
+  /** Suggested-price floor includes the higher of booked value vs current
+   *  marketValue (which keeps drifting past the 2.5× soft cap) plus residual
+   *  furniture value — so listings reflect renovations & furniture (item #22). */
   const getSuggestedFloor = (prop: Property | null) => {
     if (!prop) return 0;
-    return prop.value + Math.round(getFurnitureValuePennies(prop) / 100);
+    const headlineValue = Math.max(prop.value || 0, prop.marketValue || 0);
+    return headlineValue + Math.round(getFurnitureValuePennies(prop) / 100);
   };
 
   const setPriceFromEstimate = (multiplier: number) => {
