@@ -300,6 +300,7 @@ const Index = () => {
       <PlanningApprovedDialog />
       <PlanningRefusedDialog />
       <MacroEventModal />
+      <PendingTransactionsDialog />
     </div>
   );
 };
