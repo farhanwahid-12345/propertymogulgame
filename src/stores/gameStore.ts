@@ -4557,9 +4557,15 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         // Pre-roll outcome at filing time so the player can't reload-scum.
+        // Phase 4 #19: a Letter Before Action issued within the last 6 months
+        // skews the roll toward 'recovered' (+12pp) and away from 'unrecoverable'.
+        const lbaBonus = (tenant.letterBeforeActionMonth !== undefined
+          && s.monthsPlayed - tenant.letterBeforeActionMonth <= 6) ? 0.12 : 0;
         const roll = Math.random();
+        const recoveredCutoff = 0.55 + lbaBonus;
+        const partialCutoff = 0.85 + (lbaBonus * 0.5);
         const status: 'recovered' | 'partial' | 'unrecoverable' =
-          roll < 0.55 ? 'recovered' : roll < 0.85 ? 'partial' : 'unrecoverable';
+          roll < recoveredCutoff ? 'recovered' : roll < partialCutoff ? 'partial' : 'unrecoverable';
         const resolveMonth = s.monthsPlayed + 6 + Math.floor(Math.random() * 7); // 6–12 months
         const newCase: import('@/types/game').DebtRecoveryCase = {
           id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${Math.random().toString(36).slice(2, 6)}`,
