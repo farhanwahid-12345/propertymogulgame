@@ -1517,24 +1517,32 @@ export const useGameStore = create<GameState & GameActions>()(
           lastCorpTaxMonth = newMonthNumber;
         }
 
-        // Cashflow: subtract outflows (mortgage + council + tax) directly,
-        // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
-        // through credit() so any drawn overdraft repays first.
-        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - insurance - taxPaid;
-        let postOutflowOverdraft = prev.overdraftUsed;
-        let cashAfterCredit = cashAfterOutflows;
-        // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
-        if (cashAfterCredit < 0) {
-          const shortfall = -cashAfterCredit;
-          const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
-          const taken = Math.min(shortfall, overdraftAvail);
-          cashAfterCredit = -shortfall + taken;
-          postOutflowOverdraft = prev.overdraftUsed + taken;
-        }
+        // Cashflow: net inflows against outflows in a single operation so the
+        // overdraft is only tapped when the month's RENT can't cover the
+        // month's BILLS — not just because bills happen to settle first
+        // (item #16: was previously debiting outflows from prev.cash before
+        // crediting rent, which caused phantom overdraft taps).
+        const totalOutflows = mortgagePayments + councilTax + insurance + taxPaid;
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
-        const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
-        let finalCash = Math.max(0, credited.cash);
-        let finalOverdraftUsed = credited.overdraftUsed;
+        const netCashDelta = totalInflows - totalOutflows;
+        let finalCash = prev.cash;
+        let finalOverdraftUsed = prev.overdraftUsed;
+        if (netCashDelta >= 0) {
+          finalCash = prev.cash + netCashDelta;
+        } else {
+          const shortfall = -netCashDelta;
+          if (prev.cash >= shortfall) {
+            finalCash = prev.cash - shortfall;
+          } else {
+            const fromCash = prev.cash;
+            const fromOverdraft = shortfall - fromCash;
+            const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
+            const taken = Math.min(fromOverdraft, overdraftAvail);
+            finalCash = Math.max(0, fromCash - shortfall + taken);
+            finalOverdraftUsed = prev.overdraftUsed + taken;
+          }
+        }
+
 
         // No auto-sweep — overdraft is only repaid when the player explicitly
         // does so via the Credit & Banking panel (item 9a).
