@@ -1939,6 +1939,12 @@ export const useGameStore = create<GameState & GameActions>()(
           debtRecoveryCases: trimmedCases,
           projectedTaxPennies: newProjectedTaxPennies,
           projectedTaxStampedMonth: newProjectedTaxStampedMonth,
+          pendingTransactions: [
+            ...((s as any).pendingTransactions || []),
+            ...newPendingTransactions,
+          ],
+          // Item #10: any queued debit auto-pauses the clock until approved.
+          isPaused: ((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0 ? true : s.isPaused,
         } as any));
       },
 
