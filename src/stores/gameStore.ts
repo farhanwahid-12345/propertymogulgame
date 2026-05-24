@@ -3694,8 +3694,9 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
         const sqft = property.internalSqft || 800;
-        // £8/sqft for part, £18/sqft for fully — typical UK BTL refit costs
-        const costPerSqft = tier === 'fully_furnished' ? 18 : tier === 'part_furnished' ? 8 : 0;
+        // Phase 2 item #4: furniture cost = ~30% of legacy values, scaled by sqft.
+        // Sourced from getFurnishingCostPerSqft so engine + UI stay in lock-step.
+        const costPerSqft = getFurnishingCostPerSqft(tier);
         const cost = toPennies(sqft * costPerSqft);
         if (cost > 0) {
           const debited = debit(prev, cost);
