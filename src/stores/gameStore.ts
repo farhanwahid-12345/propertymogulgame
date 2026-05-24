@@ -1301,8 +1301,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
         // Furniture as depreciating asset (matches useGameState calc).
         const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p as any), 0);
-        // Subtract drawn overdraft so leveling-up doesn't ignore borrowed money.
-        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth - prev.overdraftUsed;
+        // Subtract drawn overdraft AND outstanding unsecured loan balances so
+        // leveling-up cannot be triggered by borrowed money (item #20).
+        const loanDebtForLevel = (((prev as any).loans || []) as Array<{ remainingBalance?: number }>)
+          .reduce((s, l) => s + (l.remainingBalance || 0), 0);
+        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth
+          - prev.overdraftUsed - loanDebtForLevel;
         let newLevel = prev.level;
         while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
         if (newLevel > prev.level) {
@@ -1513,24 +1517,32 @@ export const useGameStore = create<GameState & GameActions>()(
           lastCorpTaxMonth = newMonthNumber;
         }
 
-        // Cashflow: subtract outflows (mortgage + council + tax) directly,
-        // then apply inflows (rent + sale proceeds + conveyancing returns + eviction deposit refunds)
-        // through credit() so any drawn overdraft repays first.
-        const cashAfterOutflows = prev.cash - mortgagePayments - councilTax - insurance - taxPaid;
-        let postOutflowOverdraft = prev.overdraftUsed;
-        let cashAfterCredit = cashAfterOutflows;
-        // If outflows pushed cash negative, that overflow is a debt — auto-tap overdraft if available
-        if (cashAfterCredit < 0) {
-          const shortfall = -cashAfterCredit;
-          const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
-          const taken = Math.min(shortfall, overdraftAvail);
-          cashAfterCredit = -shortfall + taken;
-          postOutflowOverdraft = prev.overdraftUsed + taken;
-        }
+        // Cashflow: net inflows against outflows in a single operation so the
+        // overdraft is only tapped when the month's RENT can't cover the
+        // month's BILLS — not just because bills happen to settle first
+        // (item #16: was previously debiting outflows from prev.cash before
+        // crediting rent, which caused phantom overdraft taps).
+        const totalOutflows = mortgagePayments + councilTax + insurance + taxPaid;
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
-        const credited = credit({ cash: cashAfterCredit, overdraftUsed: postOutflowOverdraft }, totalInflows);
-        let finalCash = Math.max(0, credited.cash);
-        let finalOverdraftUsed = credited.overdraftUsed;
+        const netCashDelta = totalInflows - totalOutflows;
+        let finalCash = prev.cash;
+        let finalOverdraftUsed = prev.overdraftUsed;
+        if (netCashDelta >= 0) {
+          finalCash = prev.cash + netCashDelta;
+        } else {
+          const shortfall = -netCashDelta;
+          if (prev.cash >= shortfall) {
+            finalCash = prev.cash - shortfall;
+          } else {
+            const fromCash = prev.cash;
+            const fromOverdraft = shortfall - fromCash;
+            const overdraftAvail = Math.max(0, prev.overdraftLimit - prev.overdraftUsed);
+            const taken = Math.min(fromOverdraft, overdraftAvail);
+            finalCash = Math.max(0, fromCash - shortfall + taken);
+            finalOverdraftUsed = prev.overdraftUsed + taken;
+          }
+        }
+
 
         // No auto-sweep — overdraft is only repaid when the player explicitly
         // does so via the Credit & Banking panel (item 9a).
@@ -1724,7 +1736,10 @@ export const useGameStore = create<GameState & GameActions>()(
           return t + p.value - (m?.remainingBalance || 0);
         }, 0);
         const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p as any), 0);
-        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal;
+        // Subtract outstanding unsecured loan balances so the bankruptcy gate
+        // reflects ALL debt the player owes (item #20).
+        const loanDebtFinal = updatedLoans.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
 
         let isBankrupt = false;
         if (inDistress) {
