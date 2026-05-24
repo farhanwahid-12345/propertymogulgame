@@ -1922,8 +1922,6 @@ export const useGameStore = create<GameState & GameActions>()(
           chainCollapseEvents: newChainCollapseEvents.length > 0
             ? [...(s.chainCollapseEvents || []), ...newChainCollapseEvents]
             : s.chainCollapseEvents,
-          // Auto-pause when a chain collapses — player must acknowledge before time resumes.
-          isPaused: newChainCollapseEvents.length > 0 ? true : s.isPaused,
           estateAgentProperties: newEstateAgent,
           auctionProperties: newAuction,
           tenants: newTenants,
