@@ -63,6 +63,7 @@ export function BankingPanelActions({ gameState, getDebtForProperty, totalPortfo
         cash={gameState.cash}
         setCash={gameState.setCash}
         creditScore={gameState.creditScore}
+        monthsPlayed={gameState.monthsPlayed}
         onPortfolioMortgage={gameState.handlePortfolioMortgage}
       />
     </div>
