@@ -134,6 +134,8 @@ interface GameActions {
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
+  issueLetterBeforeAction: (propertyId: string, slotIndex?: number) => void;
+  escalateToHighCourt: (caseId: string) => void;
   // Game
   resetGame: () => void;
 }
