@@ -45,6 +45,8 @@ export function PropertyMarketActions({ gameState, totalPortfolioIncome }: Prope
         totalRentalIncome={totalPortfolioIncome}
         existingMonthlyMortgagePayments={gameState.totalMonthlyExpenses}
         ownedPropertyCount={gameState.ownedProperties.length}
+        monthsPlayed={gameState.monthsPlayed}
+        mortgages={gameState.mortgages as any}
       />
       <AuctionHouse
         ownedProperties={gameState.ownedProperties}
