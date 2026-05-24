@@ -2560,7 +2560,7 @@ export const useGameStore = create<GameState & GameActions>()(
         }
         const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60);
         const listing: PropertyListing = {
-          propertyId: property.id, listingDate: Date.now(), isAuction,
+          propertyId: property.id, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction,
           daysUntilSale: daysToSell, askingPrice: property.value,
           offers: [], lastOfferCheck: Date.now(),
         };
