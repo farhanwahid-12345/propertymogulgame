@@ -2101,28 +2101,30 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         });
 
-        // Update listings
+        // Update listings — days-on-market driven by game time (in-game months),
+        // not wall-clock, so the badge actually advances during play (Phase 3 #1a).
         const updatedListings = prev.propertyListings.map(listing => {
-          const daysOnMarket = Math.floor((currentTime - listing.listingDate) / (1000 * 60 * 60 * 24));
+          // Backfill listingMonth for legacy listings (use current month so they start fresh).
+          const listingMonth = typeof listing.listingMonth === 'number'
+            ? listing.listingMonth
+            : prev.monthsPlayed;
+          const monthsOnMarket = Math.max(0, prev.monthsPlayed - listingMonth);
+          const daysOnMarket = monthsOnMarket * 30;
           const property = prev.ownedProperties.find(p => p.id === listing.propertyId);
           const daysSinceLastCheck = listing.lastOfferCheck
             ? Math.floor((currentTime - listing.lastOfferCheck) / (1000 * 60 * 60 * 24))
-            : 0;
+            : 999;
 
           let newOffers = listing.offers || [];
           let lastCheck = listing.lastOfferCheck || listing.listingDate;
 
           if (!listing.isAuction && property && daysSinceLastCheck >= 3) {
-            // Asking-vs-market ratio drives buyer interest and offer band.
-            // < market = busy, lots of competitive offers.
-            // 5–15% over market = slow trickle, lower offers.
-            // > 15% over market = stalling, sparse + lowball offers.
             const asking = listing.askingPrice || property.value;
             const market = property.value;
             const askRatio = asking / Math.max(1, market);
 
             let numNew: number;
-            let bandLow: number;  // % of asking
+            let bandLow: number;
             let bandHigh: number;
             let bidWarChance: number;
             if (askRatio <= 1.0) {
@@ -2132,11 +2134,9 @@ export const useGameStore = create<GameState & GameActions>()(
               numNew = Math.random() > 0.6 ? 2 : 1;
               bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.04;
             } else {
-              // Stalling territory: usually 0, occasional lowball.
               numNew = Math.random() > 0.75 ? 1 : 0;
               bandLow = 0.72; bandHigh = 0.84; bidWarChance = 0;
             }
-            // Time pressure: after ~30 days, buyers sense desperation and shave a bit.
             const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.003));
 
             const buyerNames = [
@@ -2147,34 +2147,48 @@ export const useGameStore = create<GameState & GameActions>()(
             for (let i = 0; i < numNew; i++) {
               const isBidWar = Math.random() < bidWarChance;
               const pct = isBidWar
-                ? 1.03 + Math.random() * 0.08  // 1.03× – 1.11× of asking
+                ? 1.03 + Math.random() * 0.08
                 : bandLow + Math.random() * (bandHigh - bandLow);
+              // Phase 3 #7 — ~25% of buyers are cash purchasers (no chain).
+              const isCash = Math.random() < 0.25;
               const offer: PropertyOffer = {
                 id: `offer-${Date.now()}-${i}`,
                 buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
                 amount: Math.floor(asking * pct * timeAdj),
-                daysOnMarket, isChainFree: Math.random() > 0.6,
-                mortgageApproved: Math.random() > 0.3, timestamp: currentTime,
+                daysOnMarket,
+                isChainFree: isCash || Math.random() > 0.6,
+                isCash,
+                mortgageApproved: isCash ? true : Math.random() > 0.3,
+                timestamp: currentTime,
                 status: 'pending', negotiationRound: 0,
               };
               newOffers.push(offer);
               if (listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold) {
                 showToast("Offer Auto-Accepted! 🎉", `${offer.buyerName}'s offer auto-accepted for ${property.name}!`);
               } else {
-                showToast("New Offer Received! 💰", `${offer.buyerName} offered for ${property.name}`);
+                showToast(
+                  isCash ? "Cash Offer Received! 💵" : "New Offer Received! 💰",
+                  `${offer.buyerName} offered for ${property.name}${isCash ? ' (cash buyer)' : ''}`,
+                );
               }
             }
             lastCheck = currentTime;
           }
 
+          // Phase 3 #1b — NEVER auto-complete a sale just because daysUntilSale hit
+          // zero. The only paths to completion are (a) the user-set auto-accept
+          // threshold being met, or (b) the player explicitly accepting an offer.
           const autoAccepted = newOffers.find(o =>
             listing.autoAcceptThreshold && o.amount >= listing.autoAcceptThreshold
           );
           if (autoAccepted) {
-            return { ...listing, daysUntilSale: 0, offers: newOffers, lastOfferCheck: lastCheck };
+            return { ...listing, listingMonth, daysUntilSale: 0, offers: newOffers, lastOfferCheck: lastCheck };
           }
-          return { ...listing, daysUntilSale: Math.max(0, listing.daysUntilSale - 1), offers: newOffers, lastOfferCheck: lastCheck };
+          // Keep daysUntilSale at >=1 so the listing persists indefinitely until the
+          // player accepts an offer or cancels the listing.
+          return { ...listing, listingMonth, daysUntilSale: Math.max(1, listing.daysUntilSale), offers: newOffers, lastOfferCheck: lastCheck };
         });
+
 
         // Process completed sales → move to conveyancing instead of instant
         const completedSales = updatedListings.filter(l => l.daysUntilSale === 0);
