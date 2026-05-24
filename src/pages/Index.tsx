@@ -7,7 +7,6 @@ import { ListedProperties } from "@/components/game/listed-properties";
 import { EvictionTimelineFeed } from "@/components/game/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/game/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { MobileBottomNav } from "@/components/game/mobile-bottom-nav";
 import { OnboardingFlow } from "@/components/game/onboarding-flow";
 import * as onboardingModule from "@/lib/onboarding";
 import { PlanningApprovedDialog } from "@/components/game/planning-approved-dialog";
