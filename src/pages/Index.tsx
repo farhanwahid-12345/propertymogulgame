@@ -302,6 +302,7 @@ const Index = () => {
       <PlanningRefusedDialog />
       <MacroEventModal />
       <PendingTransactionsDialog />
+      <ChainCollapseModal />
     </div>
   );
 };
