@@ -199,6 +199,7 @@ function createInitialState(): GameState {
     debtRecoveryCases: [],
     projectedTaxPennies: 0,
     projectedTaxStampedMonth: 0,
+    pendingTransactions: [],
   };
 }
 
