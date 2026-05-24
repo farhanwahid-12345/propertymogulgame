@@ -68,6 +68,16 @@ interface EstateAgentWindowProps {
   totalRentalIncome?: number; // pounds
   existingMonthlyMortgagePayments?: number; // pounds
   ownedPropertyCount?: number;
+  /** In-game month, drives game-time days-on-market badge. */
+  monthsPlayed?: number;
+  /** Mortgages list (pennies) — used to compute ERC preview at listing time. */
+  mortgages?: Array<{
+    propertyId: string;
+    remainingBalance: number;
+    startMonth?: number;
+    fixedTermYears?: number;
+    collateralPropertyIds?: string[];
+  }>;
 }
 
 export function EstateAgentWindow({ 
