@@ -1,13 +1,27 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, Building2, AlertCircle } from "lucide-react";
-import { fromPennies } from "@/lib/formatCurrency";
 import { computeErcRate, ERC_PERCENT, ERC_WINDOW_MONTHS } from "@/lib/engine/constants";
-import type { Mortgage } from "@/types/game";
+
+interface MortgageInPounds {
+  id: string;
+  propertyId: string;
+  providerId: string;
+  interestRate: number;
+  termYears: number;
+  mortgageType: 'repayment' | 'interest-only';
+  monthlyPayment: number;        // pounds
+  remainingBalance: number;      // pounds
+  collateralPropertyIds?: string[];
+  startMonth?: number;
+  fixedTermYears?: number;
+  fixedRate?: number;
+  revertedToSVR?: boolean;
+}
 
 interface PortfolioMortgageDetailsProps {
-  /** Active mortgages (raw, in pennies). */
-  mortgages: Mortgage[];
+  mortgages: MortgageInPounds[];
+  /** Owned properties — value here is in pounds (already converted by useGameState). */
   ownedProperties: Array<{ id: string; name: string; value: number }>;
   mortgageProviders: Array<{ id: string; name: string }>;
   monthsPlayed: number;
@@ -78,11 +92,11 @@ export function PortfolioMortgageDetails({
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-muted-foreground">Balance</span>
-                  <p className="font-bold">£{fromPennies(m.remainingBalance).toLocaleString()}</p>
+                  <p className="font-bold">£{Math.round(m.remainingBalance).toLocaleString()}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Monthly payment</span>
-                  <p className="font-bold text-purple-400">£{fromPennies(m.monthlyPayment).toLocaleString()}</p>
+                  <p className="font-bold text-purple-400">£{Math.round(m.monthlyPayment).toLocaleString()}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Rate</span>
@@ -97,13 +111,13 @@ export function PortfolioMortgageDetails({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Collateral value</span>
-                  <p className="font-medium">£{fromPennies(totalCollateralValue).toLocaleString()}</p>
+                  <p className="font-medium">£{Math.round(totalCollateralValue).toLocaleString()}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">ERC (if settled today)</span>
                   <p className={`font-medium ${ercAmount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
                     {ercAmount > 0
-                      ? `£${fromPennies(ercAmount).toLocaleString()} (${(ercRate * 100).toFixed(1)}%)`
+                      ? `£${ercAmount.toLocaleString()} (${(ercRate * 100).toFixed(1)}%)`
                       : 'None'}
                   </p>
                 </div>
@@ -118,7 +132,7 @@ export function PortfolioMortgageDetails({
                   {collateral.map(p => (
                     <li key={p.id} className="flex justify-between">
                       <span className="truncate">{p.name}</span>
-                      <span className="text-muted-foreground">£{fromPennies(p.value).toLocaleString()}</span>
+                      <span className="text-muted-foreground">£{Math.round(p.value).toLocaleString()}</span>
                     </li>
                   ))}
                 </ul>
