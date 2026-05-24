@@ -509,6 +509,22 @@ export function EstateAgentWindow({
     return "destructive";
   };
 
+  /** Phase 3 #13 — true when the property collateralises an active portfolio mortgage. */
+  const isPortfolioLocked = (propertyId: string) =>
+    (mortgages || []).some(m =>
+      Array.isArray(m.collateralPropertyIds) && m.collateralPropertyIds.includes(propertyId),
+    );
+
+  /** Phase 3 #18 — ERC payable if this property's mortgage is redeemed on sale (pounds). */
+  const getErcForProperty = (propertyId: string): number => {
+    const m = (mortgages || []).find(x => x.propertyId === propertyId);
+    if (!m || !m.remainingBalance) return 0;
+    const monthsIntoTerm = typeof m.startMonth === 'number' ? Math.max(0, monthsPlayed - m.startMonth) : 0;
+    const rate = m.fixedTermYears ? computeErcRate(m.fixedTermYears, monthsIntoTerm) : (monthsIntoTerm < 60 ? 0.02 : 0);
+    return Math.round(m.remainingBalance * rate);
+  };
+
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
