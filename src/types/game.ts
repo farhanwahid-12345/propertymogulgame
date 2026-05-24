@@ -500,6 +500,12 @@ export interface DebtRecoveryCase {
   netRecoveredPennies?: number;
   /** Fee taken by debt-recovery agency (decimal, e.g. 0.25). */
   recoveryFeePct: number;
+  /** Phase 4 #19: High Court Enforcement escalation after CCJ partial/unrecoverable. */
+  escalatedToHighCourtMonth?: number;
+  /** Pre-rolled extra pennies recovered via HCE (resolved on monthsPlayed + 3). */
+  hceExpectedRecoveryPennies?: number;
+  hceResolveMonth?: number;
+  hceResolved?: boolean;
 }
 
 /** Player arrears / forced-sale escalation state. */
