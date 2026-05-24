@@ -2298,7 +2298,9 @@ export const useGameStore = create<GameState & GameActions>()(
           currentMarketRate: newMarketRate,
           currentLoanRates: newLoanRates,
           voidPeriods: activeVoids,
-          propertyListings: updatedListings.filter(l => l.daysUntilSale > 0 && !salePropIds.has(l.propertyId)),
+          // Listings persist until accepted/cancelled (Phase 3 #1b); only remove
+          // those whose conveyancing just kicked off this tick.
+          propertyListings: updatedListings.filter(l => !salePropIds.has(l.propertyId)),
           tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
           lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
           conveyancing: [...prev.conveyancing, ...newConveyancing],
