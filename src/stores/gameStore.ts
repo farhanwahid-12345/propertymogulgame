@@ -2196,8 +2196,9 @@ export const useGameStore = create<GameState & GameActions>()(
         completedSales.forEach(sale => {
           const property = prev.ownedProperties.find(p => p.id === sale.propertyId);
           if (property) {
+            // Only auto-accept offers can trigger completion here (Phase 3 #1b).
             const autoOffer = sale.offers?.find(o => sale.autoAcceptThreshold && o.amount >= sale.autoAcceptThreshold);
-            const salePrice = autoOffer ? autoOffer.amount : (sale.isAuction ? Math.floor(property.value * 0.85) : property.value);
+            if (!autoOffer) return;
             newConveyancing.push({
               id: `conv_sell_${Date.now()}_${property.id}`,
               propertyId: property.id,
@@ -2205,13 +2206,14 @@ export const useGameStore = create<GameState & GameActions>()(
               status: 'selling',
               startMonth: prev.monthsPlayed,
               completionMonth: prev.monthsPlayed + 1 + Math.floor(Math.random() * 3),
-              salePrice,
+              salePrice: autoOffer.amount,
               cashHeld: 0,
               isAuction: sale.isAuction,
             });
             showToast("Sale Agreed! ⏳", `${property.name} — conveyancing started. Completion in 1-3 months.`);
           }
         });
+
 
         // Void periods
         const activeVoids = prev.voidPeriods.filter(vp => currentTime < vp.endDate);
