@@ -1279,11 +1279,16 @@ export function EstateAgentWindow({
                                           )}
                                         </div>
                                       </div>
-                                      <div className="flex gap-1 mb-2">
-                                        {offer.isChainFree && (
+                                      <div className="flex gap-1 mb-2 flex-wrap">
+                                        {offer.isCash && (
+                                          <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-600">
+                                            💵 Cash buyer — higher acceptance
+                                          </Badge>
+                                        )}
+                                        {offer.isChainFree && !offer.isCash && (
                                           <Badge variant="secondary" className="text-xs">Chain Free</Badge>
                                         )}
-                                        {offer.mortgageApproved && (
+                                        {offer.mortgageApproved && !offer.isCash && (
                                           <Badge variant="secondary" className="text-xs">Mortgage Approved</Badge>
                                         )}
                                         {offer.counterAmount && offer.status === 'countered' && (
