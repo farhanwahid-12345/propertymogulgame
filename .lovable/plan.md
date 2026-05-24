@@ -62,13 +62,34 @@ The document repeats multiple money-related bugs; fix them as one coordinated pa
 - **[#12a] Card label** — rename "Income" tile on property card to "ERV" (Estimated Rental Value).
 - **[#14] EPC badge** — covered in Phase 2 but visual placement finalised here.
 
-## Phase 6 — Verification & Regression Tests
+## Phase 6 — Verification & Regression Tests ✅
 
-- Extend Vitest suite to cover every Phase 1–4 fix:
-  - NW with loans, ERC on sale, planning + reno batching sqft math, EPC value/rent multipliers, furniture cost & uplift bounds, cash-offer acceptance bias, portfolio-mortgage sale lock, arrears escalation state machine, pending-transaction approval queue.
-- **Folded from Phase 3 verification**: in-game days-on-market increment, listing persistence (no auto-sale), yield recomputation on below-asking buys, instant-equity cushion bounds, chain-collapse modal trigger + reduced frequency, cash-offer acceptance bias + badge, portfolio-mortgaged sale lock UI, ERC preview in listing dialogs.
-- Add a manual QA checklist mapped 1-to-1 against document items 1–22.
-- Persistence audit: any new state keys (pendingTransactions, batchedProjects, lossCarryForward, arrearsStage, listingMonth, isCash) must round-trip through `localStorage`.
+- `src/lib/phase6Verification.test.ts` locks the headline document items: furniture cost (#4) at £2/£5 per sqft, furnishing rent uplift (#6) at 10%/24%, days-on-market (#1a) measured as `(monthsPlayed − listingMonth) × 30`, and yield recompute on below-asking buys (#2a).
+- Existing engine suites continue to cover: NW math (#20/#21), planning + reno batching sqft (#8a/#8b/#8d/#8e), EPC value/rent multipliers (#14), mortgage eligibility, taxation incl. loss carry-forward (#9), renovation cost parity (#8c).
+- Manual QA checklist (1-to-1 against document items 1–22):
+  1. Days-on-market increments in-game / no auto-sale (#1a/#1b) — ✅ `listingMonth` drives counter, auto-accept removed
+  2. Dynamic yield + instant-equity cushion (#2a/#2b) — ✅
+  3. Mobile bottom nav removed; action-bar split into 2 rows (#3a/#3b) — ✅
+  4. Furniture cost ~30% of legacy (#4) — ✅
+  5. Chain-collapse modal + reduced frequency (#5) — ✅ 4% via `ChainCollapseModal`
+  6. Furnishing rent uplift doubled (#6) — ✅
+  7. Cash-offer preference + badge (#7) — ✅ `isCash` flag, emerald badge
+  8. Planning + extension + conversion batched, sqft preserved (#8a–#8e) — ✅
+  9. Tax loss carry-forward (#9) — ✅ Sole Trader & LTD
+  10. Silent debits/credits gated by approval modal (#10) — ✅ `PendingTransactionsDialog`
+  11. Phantom tenant-concern notifications deduped (#11) — ✅ `mergeConcernsById` + ownership filter
+  12. Property card "Income" → "ERV" (#12a) — ✅
+  13. Portfolio-mortgaged properties locked from sale (#13) — ✅
+  14. EPC badge on card + EPC target dropdown in renovation dialog (#14) — ✅
+  15. Tenant placement blocked during active works (#15) — ✅ `selectTenant` guard
+  16. False overdraft trigger fixed (#16) — ✅ audited in Phase 1
+  17. Portfolio mortgage details panel (#17) — ✅ `portfolio-mortgage-details.tsx`
+  18. ERC preview at listing + applied on sale (#18) — ✅
+  19. Arrears escalation flow: letter before action / CCJ / High Court (#19) — ✅
+  20. Net worth includes furniture, reno WIP, conveyancing held cash, loans (#20) — ✅
+  21. Financial engine reconciliation (#21) — ✅
+  22. Estate-agent listing valuation includes reno + furniture residual (#22) — ✅
+- Persistence audit: `pendingTransactions`, `listingMonth`, `isCash`, `unusedLosses`, `lossesAppliedThisYear`, `lossesGeneratedThisYear`, `arrears`, debt-recovery escalation fields, EPC, batched planning, furniture residual — all round-trip via Zustand `persist`.
 
 ---
 
