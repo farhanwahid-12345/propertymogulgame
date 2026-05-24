@@ -4655,6 +4655,8 @@ export const useGameStore = create<GameState & GameActions>()(
         } as any);
         showToast("⚖️ Escalated to High Court", `£${fromPennies(fee).toLocaleString()} HCE fee paid. Decision in 3 months.`);
       },
+
+    }),
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
