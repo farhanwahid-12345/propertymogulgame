@@ -1301,8 +1301,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
         // Furniture as depreciating asset (matches useGameState calc).
         const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p as any), 0);
-        // Subtract drawn overdraft so leveling-up doesn't ignore borrowed money.
-        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth - prev.overdraftUsed;
+        // Subtract drawn overdraft AND outstanding unsecured loan balances so
+        // leveling-up cannot be triggered by borrowed money (item #20).
+        const loanDebtForLevel = (((prev as any).loans || []) as Array<{ remainingBalance?: number }>)
+          .reduce((s, l) => s + (l.remainingBalance || 0), 0);
+        const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth
+          - prev.overdraftUsed - loanDebtForLevel;
         let newLevel = prev.level;
         while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
         if (newLevel > prev.level) {
@@ -1724,7 +1728,10 @@ export const useGameStore = create<GameState & GameActions>()(
           return t + p.value - (m?.remainingBalance || 0);
         }, 0);
         const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p as any), 0);
-        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal;
+        // Subtract outstanding unsecured loan balances so the bankruptcy gate
+        // reflects ALL debt the player owes (item #20).
+        const loanDebtFinal = updatedLoans.reduce((s, l) => s + (l.remainingBalance || 0), 0);
+        const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
 
         let isBankrupt = false;
         if (inDistress) {
