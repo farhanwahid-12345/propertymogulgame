@@ -505,14 +505,22 @@ export const useGameStore = create<GameState & GameActions>()(
         let cancelledConveyancing: Conveyancing[] = [];
         let activeConveyancing: Conveyancing[] = [];
         let conveyancingCashReturn = 0;
+        // Phase 3 #5 — chain-collapse pop-out queue (replaces silent toast).
+        const newChainCollapseEvents: import('@/types/game').ChainCollapseEvent[] = [];
 
         prev.conveyancing.forEach(conv => {
           if (newMonthNumber >= conv.completionMonth) {
-            // 10% chain collapse chance
-            if (Math.random() < 0.10) {
+            // Phase 3 #5: reduced chain collapse chance (was 10%, now 4%).
+            if (Math.random() < 0.04) {
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
-              showToast("⛓️ Chain Collapsed!", `${conv.propertyName} — the ${conv.status === 'buying' ? 'seller pulled out' : 'buyer pulled out'}. Transaction cancelled.`, "destructive");
+              newChainCollapseEvents.push({
+                id: `chain_${Date.now()}_${conv.propertyId}`,
+                propertyName: conv.propertyName,
+                side: conv.status,
+                month: newMonthNumber,
+                cashReturned: conv.cashHeld,
+              });
               flashOps();
             } else {
               if (conv.status === 'buying') completedBuys.push(conv);
@@ -523,6 +531,7 @@ export const useGameStore = create<GameState & GameActions>()(
             activeConveyancing.push(conv);
           }
         });
+
 
         // Complete buy conveyancing — add property + mortgage
         let newOwnedProperties = [...prev.ownedProperties];
