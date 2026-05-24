@@ -21,6 +21,7 @@ interface PropertyOffer {
   daysOnMarket: number;
   isChainFree: boolean;
   mortgageApproved: boolean;
+  isCash?: boolean;
   timestamp: number;
   status: 'pending' | 'accepted' | 'rejected' | 'countered' | 'buyer-countered' | 'walkaway';
   counterAmount?: number;
@@ -32,6 +33,7 @@ interface PropertyOffer {
 interface PropertyListing {
   propertyId: string;
   listingDate: number;
+  listingMonth?: number;
   isAuction: boolean;
   daysUntilSale: number;
   askingPrice: number;
