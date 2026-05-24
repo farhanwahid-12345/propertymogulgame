@@ -10,6 +10,7 @@ import { Property } from "@/components/game/property-card";
 import { Building, Briefcase, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
+import { PortfolioMortgageDetails } from "@/components/game/portfolio-mortgage-details";
 
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
