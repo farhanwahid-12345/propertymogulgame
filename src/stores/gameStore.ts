@@ -128,6 +128,9 @@ interface GameActions {
   // Item #10 — pending-transaction approval queue
   approvePendingTransaction: (id: string) => void;
   approveAllPendingTransactions: () => void;
+  // Phase 3 #5 — chain-collapse pop-out acknowledgement
+  dismissChainCollapseEvent: (id: string) => void;
+  dismissAllChainCollapseEvents: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
