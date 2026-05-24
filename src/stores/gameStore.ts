@@ -26,7 +26,7 @@ import {
 import {
   calculateStampDuty, calculateDTI, fluctuateProviderRates, getInitialProviderRates,
   getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
-  getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies,
+  getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
 import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
 import {
