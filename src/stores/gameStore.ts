@@ -384,8 +384,8 @@ function migrateState(persisted: any): GameState {
   if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
     persisted.gameSpeed = 1;
   }
-  // Pause never persists as true — always start unpaused for safety
-  persisted.isPaused = false;
+  // Pause never persists as true — UNLESS pending approval queue still has items (item #10).
+  persisted.isPaused = Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0;
 
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
