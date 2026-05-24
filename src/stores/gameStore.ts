@@ -387,6 +387,7 @@ function migrateState(persisted: any): GameState {
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
   if (!Array.isArray(persisted.debtRecoveryCases)) persisted.debtRecoveryCases = [];
+  if (!Array.isArray(persisted.pendingTransactions)) persisted.pendingTransactions = [];
   if (typeof persisted.projectedTaxPennies !== 'number') persisted.projectedTaxPennies = 0;
   if (typeof persisted.projectedTaxStampedMonth !== 'number') persisted.projectedTaxStampedMonth = 0;
 
