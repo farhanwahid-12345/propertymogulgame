@@ -10,24 +10,35 @@ import { Property } from "@/components/game/property-card";
 import { Building, Briefcase, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMonthlyPayment } from "@/lib/mortgageEligibility";
+import { PortfolioMortgageDetails } from "@/components/game/portfolio-mortgage-details";
 
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
-  /** Active mortgages — used to surface current lender/rate on each tile. */
+  /** Active mortgages — full shape (pounds) so we can render the details panel and per-tile lender chips. */
   mortgages?: Array<{
+    id: string;
     propertyId: string;
     providerId: string;
     interestRate: number;
+    termYears: number;
+    mortgageType: 'repayment' | 'interest-only';
+    monthlyPayment: number;
     remainingBalance: number;
+    collateralPropertyIds?: string[];
+    startMonth?: number;
+    fixedTermYears?: number;
+    fixedRate?: number;
+    revertedToSVR?: boolean;
   }>;
   mortgageProviders: any[];
   onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
+  monthsPlayed?: number;
 }
 
-export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580 }: PortfolioMortgageProps) {
+export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580, monthsPlayed = 0 }: PortfolioMortgageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
@@ -126,6 +137,13 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
         </div>
         
         <div className="space-y-6">
+          <PortfolioMortgageDetails
+            mortgages={mortgages as any}
+            ownedProperties={ownedProperties}
+            mortgageProviders={mortgageProviders}
+            monthsPlayed={monthsPlayed}
+          />
+
           <Card className="bg-purple-500/10 border-purple-500/30">
             <CardContent className="p-4">
               <div className="grid grid-cols-3 gap-4 text-sm">

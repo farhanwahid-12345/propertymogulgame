@@ -193,6 +193,8 @@ export interface PropertyTenant {
   arrearsPennies?: number;
   /** Item 2: monthsPlayed snapshot of the last missed-rent toast for this tenant — throttles spam to ~1 per 2-3 months. */
   lastDefaultToastMonth?: number;
+  /** Phase 4 #19: monthsPlayed when a Letter Before Action was issued. Bumps CCJ recovery odds. */
+  letterBeforeActionMonth?: number;
 }
 
 export interface PendingEviction {
@@ -498,6 +500,12 @@ export interface DebtRecoveryCase {
   netRecoveredPennies?: number;
   /** Fee taken by debt-recovery agency (decimal, e.g. 0.25). */
   recoveryFeePct: number;
+  /** Phase 4 #19: High Court Enforcement escalation after CCJ partial/unrecoverable. */
+  escalatedToHighCourtMonth?: number;
+  /** Pre-rolled extra pennies recovered via HCE (resolved on monthsPlayed + 3). */
+  hceExpectedRecoveryPennies?: number;
+  hceResolveMonth?: number;
+  hceResolved?: boolean;
 }
 
 /** Player arrears / forced-sale escalation state. */
