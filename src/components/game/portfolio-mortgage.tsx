@@ -137,6 +137,13 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
         </div>
         
         <div className="space-y-6">
+          <PortfolioMortgageDetails
+            mortgages={mortgages as any}
+            ownedProperties={ownedProperties}
+            mortgageProviders={mortgageProviders}
+            monthsPlayed={monthsPlayed}
+          />
+
           <Card className="bg-purple-500/10 border-purple-500/30">
             <CardContent className="p-4">
               <div className="grid grid-cols-3 gap-4 text-sm">
