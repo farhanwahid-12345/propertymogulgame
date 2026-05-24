@@ -193,6 +193,8 @@ export interface PropertyTenant {
   arrearsPennies?: number;
   /** Item 2: monthsPlayed snapshot of the last missed-rent toast for this tenant — throttles spam to ~1 per 2-3 months. */
   lastDefaultToastMonth?: number;
+  /** Phase 4 #19: monthsPlayed when a Letter Before Action was issued. Bumps CCJ recovery odds. */
+  letterBeforeActionMonth?: number;
 }
 
 export interface PendingEviction {
