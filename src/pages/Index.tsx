@@ -7,7 +7,6 @@ import { ListedProperties } from "@/components/game/listed-properties";
 import { EvictionTimelineFeed } from "@/components/game/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/game/deposit-disputes-feed";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { MobileBottomNav } from "@/components/game/mobile-bottom-nav";
 import { OnboardingFlow } from "@/components/game/onboarding-flow";
 import * as onboardingModule from "@/lib/onboarding";
 import { PlanningApprovedDialog } from "@/components/game/planning-approved-dialog";
@@ -132,7 +131,7 @@ const Index = () => {
         netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
       />
 
-      <div className="container mx-auto px-4 py-4 space-y-3 pb-24 md:pb-6">
+      <div className="container mx-auto px-4 py-4 space-y-3 pb-6">
 
         <GameStats
           cash={gameState.cash}
@@ -156,31 +155,38 @@ const Index = () => {
         />
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div id="section-market" className="flex items-center gap-2 mt-2 flex-wrap min-w-0">
-            <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0 w-auto">
-              <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs flex-none">
-                🏪 Market
-              </TabsTrigger>
-              <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
-                🏦 Bank
-              </TabsTrigger>
-            </TabsList>
-            <div className="ml-auto flex items-center flex-wrap gap-2 justify-end">
-              {activeTab === 'market' && (
-                <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
-              )}
-              {activeTab === 'bank' && (
-                <>
+          <div id="section-market" className="flex flex-col gap-2 mt-2 min-w-0">
+            {/* Row 1: tab toggle + primary actions (Market actions, or Mortgages incl. Portfolio Mortgage on Bank tab) */}
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0 w-auto">
+                <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs flex-none">
+                  🏪 Market
+                </TabsTrigger>
+                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
+                  🏦 Bank
+                </TabsTrigger>
+              </TabsList>
+              <div className="ml-auto flex items-center flex-wrap gap-2 justify-end">
+                {activeTab === 'market' && (
+                  <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
+                )}
+                {activeTab === 'bank' && (
                   <BankingPanelActions
                     gameState={gameState}
                     getDebtForProperty={getDebtForProperty}
                     totalPortfolioIncome={totalPortfolioIncome}
                   />
+                )}
+              </div>
+            </div>
+            {/* Row 2: Loans / Tax / Operations — always present, sits directly beneath the primary actions */}
+            <div className="flex items-center flex-wrap gap-2 justify-end">
+              {activeTab === 'bank' && (
+                <>
                   <LoansInlineButton gameState={gameState} />
                   <TaxInlineButton gameState={gameState} />
                 </>
               )}
-              {/* Operations is always visible — flashes when tenant concerns arrive. */}
               <OperationsInlineButton gameState={gameState} />
             </div>
           </div>
@@ -285,11 +291,6 @@ const Index = () => {
         />
       </div>
 
-      <MobileBottomNav
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        alertCount={(gameState.pendingEvictions?.length || 0) + (gameState.depositDisputes?.length || 0)}
-      />
 
       <OnboardingGate
         setEntityType={gameState.setEntityType}
