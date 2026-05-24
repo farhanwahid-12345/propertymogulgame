@@ -497,7 +497,7 @@ export const PropertyCard = memo(function PropertyCard({
               <span className="font-bold text-lg">£{property.price.toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Monthly Income:</span>
+              <span className="text-sm font-medium" title="Estimated Rental Value">ERV:</span>
               <Badge className="bg-success/20 text-success border-success/30 hover:bg-success/30">
                 £{property.monthlyIncome.toLocaleString()}/mo
               </Badge>
