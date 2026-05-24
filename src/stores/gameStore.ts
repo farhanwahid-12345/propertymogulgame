@@ -4373,6 +4373,67 @@ export const useGameStore = create<GameState & GameActions>()(
         set({ isPaused: !!paused });
       },
 
+      approvePendingTransaction: (id: string) => {
+        const s = get() as any;
+        const queue: import('@/types/game').PendingTransaction[] = Array.isArray(s.pendingTransactions) ? s.pendingTransactions : [];
+        const tx = queue.find(t => t.id === id);
+        if (!tx) return;
+        const result = debit({ cash: s.cash, overdraftUsed: s.overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
+        if (!result) {
+          showToast("Insufficient funds", `Cannot approve £${fromPennies(tx.amount).toLocaleString()} — raise cash or extend overdraft first.`, 'destructive');
+          return;
+        }
+        const remaining = queue.filter(t => t.id !== id);
+        set({
+          cash: result.cash,
+          overdraftUsed: result.overdraftUsed,
+          pendingTransactions: remaining,
+          isPaused: remaining.length === 0 ? false : s.isPaused,
+        } as any);
+        if (result.usedOverdraft > 0) {
+          showToast("Approved (overdraft used)", `£${fromPennies(tx.amount).toLocaleString()} paid — £${fromPennies(result.usedOverdraft).toLocaleString()} via overdraft.`);
+        } else {
+          showToast("Approved", `£${fromPennies(tx.amount).toLocaleString()} — ${tx.description}`);
+        }
+      },
+
+      approveAllPendingTransactions: () => {
+        const s = get() as any;
+        const queue: import('@/types/game').PendingTransaction[] = Array.isArray(s.pendingTransactions) ? s.pendingTransactions : [];
+        if (queue.length === 0) return;
+        let cash = s.cash;
+        let overdraftUsed = s.overdraftUsed;
+        const remaining: import('@/types/game').PendingTransaction[] = [];
+        let approvedAmount = 0;
+        let usedOverdraftTotal = 0;
+        for (const tx of queue) {
+          const result = debit({ cash, overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
+          if (!result) {
+            remaining.push(tx);
+            continue;
+          }
+          cash = result.cash;
+          overdraftUsed = result.overdraftUsed;
+          approvedAmount += tx.amount;
+          usedOverdraftTotal += result.usedOverdraft;
+        }
+        set({
+          cash,
+          overdraftUsed,
+          pendingTransactions: remaining,
+          isPaused: remaining.length === 0 ? false : s.isPaused,
+        } as any);
+        if (remaining.length > 0) {
+          showToast(
+            "Partial approval",
+            `Approved £${fromPennies(approvedAmount).toLocaleString()}. ${remaining.length} item(s) skipped — insufficient funds.`,
+            'destructive',
+          );
+        } else {
+          showToast("All approved", `£${fromPennies(approvedAmount).toLocaleString()} paid${usedOverdraftTotal > 0 ? ` (£${fromPennies(usedOverdraftTotal).toLocaleString()} via overdraft)` : ''}.`);
+        }
+      },
+
       markEconomicEventsSeen: (ids: string[]) => {
         if (!ids || ids.length === 0) return;
         const s = get() as any;
