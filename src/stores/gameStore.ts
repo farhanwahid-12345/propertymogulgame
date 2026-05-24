@@ -4592,7 +4592,69 @@ export const useGameStore = create<GameState & GameActions>()(
         showToast("⚖️ Claim filed", `£325 filing fee paid. Expect a decision in 6–12 months for ${tenant.tenant.name} (£${fromPennies(arrearsPennies).toLocaleString()} owed).`);
       },
 
-    }),
+      // Phase 4 #19: cheap pre-CCJ warning shot. Adds a +12 percentage-point
+      // bias to the CCJ recovery outcome if filed within 6 months.
+      issueLetterBeforeAction: (propertyId, slotIndex = 0) => {
+        const s = get();
+        const tenant = s.tenants.find(t => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+        if (!tenant) { showToast("Cannot send letter", "Tenant not found.", "destructive"); return; }
+        if ((tenant.arrearsMonths ?? 0) < 1) {
+          showToast("Not needed", "Tenant has no arrears.", "destructive"); return;
+        }
+        if (tenant.letterBeforeActionMonth !== undefined) {
+          showToast("Already sent", "A Letter Before Action has already been issued.", "destructive"); return;
+        }
+        const FEE = 5000; // £50
+        const debited = debit(s, FEE);
+        if (!debited) { showToast("Insufficient funds", "Need £50 (incl. overdraft) to issue the letter.", "destructive"); return; }
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          tenants: s.tenants.map(t =>
+            t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+              ? { ...t, letterBeforeActionMonth: s.monthsPlayed }
+              : t,
+          ),
+        });
+        showToast("📨 Letter Before Action sent", `Formal demand issued to ${tenant.tenant.name}. CCJ filings within 6 months get a recovery boost.`);
+      },
+
+      // Phase 4 #19: escalate a CCJ that came back partial / unrecoverable to
+      // High Court Enforcement Officers. Fee = £71 + 7.5% of original debt.
+      // Pre-rolled 40% chance to recover the residual after 3 months.
+      escalateToHighCourt: (caseId) => {
+        const s = get();
+        const cases = (s as any).debtRecoveryCases || [];
+        const idx = cases.findIndex((c: any) => c.id === caseId);
+        if (idx < 0) { showToast("Case not found", "Cannot escalate.", "destructive"); return; }
+        const c = cases[idx];
+        if (c.status !== 'partial' && c.status !== 'unrecoverable') {
+          showToast("Not eligible", "Only partial / unrecoverable CCJs can be escalated to HCE.", "destructive"); return;
+        }
+        if (c.escalatedToHighCourtMonth !== undefined) {
+          showToast("Already escalated", "This case is already with the High Court.", "destructive"); return;
+        }
+        const fee = 7100 + Math.round(c.originalArrearsPennies * 0.075);
+        const debited = debit(s, fee);
+        if (!debited) { showToast("Insufficient funds", `Need £${fromPennies(fee).toLocaleString()} (incl. overdraft).`, "destructive"); return; }
+        const residual = Math.max(0, c.originalArrearsPennies - (c.netRecoveredPennies ?? 0));
+        const willRecover = Math.random() < 0.4;
+        const hceExpected = willRecover ? Math.round(residual * (0.7 + Math.random() * 0.2)) : 0;
+        const updated = [...cases];
+        updated[idx] = {
+          ...c,
+          escalatedToHighCourtMonth: s.monthsPlayed,
+          hceExpectedRecoveryPennies: hceExpected,
+          hceResolveMonth: s.monthsPlayed + 3,
+          hceResolved: false,
+        };
+        set({
+          cash: debited.cash,
+          overdraftUsed: debited.overdraftUsed,
+          debtRecoveryCases: updated,
+        } as any);
+        showToast("⚖️ Escalated to High Court", `£${fromPennies(fee).toLocaleString()} HCE fee paid. Decision in 3 months.`);
+      },
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
