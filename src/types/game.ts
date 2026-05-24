@@ -445,6 +445,24 @@ export interface GameState {
   projectedTaxPennies?: number;
   /** monthsPlayed snapshot when the projected tax warning was issued (de-dupes toast). */
   projectedTaxStampedMonth?: number;
+  /** Item #10 — queued debits awaiting explicit player approval. Game auto-pauses while any exist. */
+  pendingTransactions?: PendingTransaction[];
+}
+
+/** A queued, non-rent / non-sale debit that the player must approve before it leaves cash. */
+export type PendingTransactionType =
+  | 'insurance'
+  | 'council_tax'
+  | 'income_tax'
+  | 'corporation_tax'
+  | 'other';
+
+export interface PendingTransaction {
+  id: string;
+  type: PendingTransactionType;
+  amount: number; // pennies
+  description: string;
+  month: number;
 }
 
 /** A debt-recovery / county-court case filed against a tenant in arrears. */

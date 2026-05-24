@@ -125,6 +125,9 @@ interface GameActions {
   // Pause
   togglePause: () => void;
   setPaused: (paused: boolean) => void;
+  // Item #10 — pending-transaction approval queue
+  approvePendingTransaction: (id: string) => void;
+  approveAllPendingTransactions: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
@@ -199,6 +202,7 @@ function createInitialState(): GameState {
     debtRecoveryCases: [],
     projectedTaxPennies: 0,
     projectedTaxStampedMonth: 0,
+    pendingTransactions: [],
   };
 }
 
@@ -380,12 +384,13 @@ function migrateState(persisted: any): GameState {
   if (typeof persisted.gameSpeed !== 'number' || !Number.isFinite(persisted.gameSpeed)) {
     persisted.gameSpeed = 1;
   }
-  // Pause never persists as true — always start unpaused for safety
-  persisted.isPaused = false;
+  // Pause never persists as true — UNLESS pending approval queue still has items (item #10).
+  persisted.isPaused = Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0;
 
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
   if (!Array.isArray(persisted.debtRecoveryCases)) persisted.debtRecoveryCases = [];
+  if (!Array.isArray(persisted.pendingTransactions)) persisted.pendingTransactions = [];
   if (typeof persisted.projectedTaxPennies !== 'number') persisted.projectedTaxPennies = 0;
   if (typeof persisted.projectedTaxStampedMonth !== 'number') persisted.projectedTaxStampedMonth = 0;
 
@@ -1522,7 +1527,43 @@ export const useGameStore = create<GameState & GameActions>()(
         // month's BILLS — not just because bills happen to settle first
         // (item #16: was previously debiting outflows from prev.cash before
         // crediting rent, which caused phantom overdraft taps).
-        const totalOutflows = mortgagePayments + councilTax + insurance + taxPaid;
+        //
+        // Item #10: insurance, council tax and tax bills are no longer silently
+        // debited — they go into `pendingTransactions` and the game auto-pauses
+        // until the player approves them via the dialog. Mortgage payments stay
+        // automatic (contractual direct debit).
+        const newPendingTransactions: import('@/types/game').PendingTransaction[] = [];
+        if (insurance > 0) {
+          newPendingTransactions.push({
+            id: `ptx-ins-${newMonthNumber}`,
+            type: 'insurance',
+            amount: insurance,
+            description: `Landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
+            month: newMonthNumber,
+          });
+        }
+        if (councilTax > 0) {
+          newPendingTransactions.push({
+            id: `ptx-ct-${newMonthNumber}`,
+            type: 'council_tax',
+            amount: councilTax,
+            description: `Council tax on empty properties — month ${newMonthNumber}`,
+            month: newMonthNumber,
+          });
+        }
+        if (taxPaid > 0) {
+          newPendingTransactions.push({
+            id: `ptx-tax-${newMonthNumber}`,
+            type: prev.entityType === 'ltd' ? 'corporation_tax' : 'income_tax',
+            amount: taxPaid,
+            description: prev.entityType === 'ltd'
+              ? `Corporation tax — tax year ${currentTaxYear}`
+              : `Self-assessment income tax — tax year ${currentTaxYear}`,
+            month: newMonthNumber,
+          });
+        }
+
+        const totalOutflows = mortgagePayments; // tax/insurance/council go via pending approval queue
         const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
         const netCashDelta = totalInflows - totalOutflows;
         let finalCash = prev.cash;
@@ -1901,6 +1942,12 @@ export const useGameStore = create<GameState & GameActions>()(
           debtRecoveryCases: trimmedCases,
           projectedTaxPennies: newProjectedTaxPennies,
           projectedTaxStampedMonth: newProjectedTaxStampedMonth,
+          pendingTransactions: [
+            ...((s as any).pendingTransactions || []),
+            ...newPendingTransactions,
+          ],
+          // Item #10: any queued debit auto-pauses the clock until approved.
+          isPaused: ((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0 ? true : s.isPaused,
         } as any));
       },
 
@@ -4324,6 +4371,67 @@ export const useGameStore = create<GameState & GameActions>()(
 
       setPaused: (paused: boolean) => {
         set({ isPaused: !!paused });
+      },
+
+      approvePendingTransaction: (id: string) => {
+        const s = get() as any;
+        const queue: import('@/types/game').PendingTransaction[] = Array.isArray(s.pendingTransactions) ? s.pendingTransactions : [];
+        const tx = queue.find(t => t.id === id);
+        if (!tx) return;
+        const result = debit({ cash: s.cash, overdraftUsed: s.overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
+        if (!result) {
+          showToast("Insufficient funds", `Cannot approve £${fromPennies(tx.amount).toLocaleString()} — raise cash or extend overdraft first.`, 'destructive');
+          return;
+        }
+        const remaining = queue.filter(t => t.id !== id);
+        set({
+          cash: result.cash,
+          overdraftUsed: result.overdraftUsed,
+          pendingTransactions: remaining,
+          isPaused: remaining.length === 0 ? false : s.isPaused,
+        } as any);
+        if (result.usedOverdraft > 0) {
+          showToast("Approved (overdraft used)", `£${fromPennies(tx.amount).toLocaleString()} paid — £${fromPennies(result.usedOverdraft).toLocaleString()} via overdraft.`);
+        } else {
+          showToast("Approved", `£${fromPennies(tx.amount).toLocaleString()} — ${tx.description}`);
+        }
+      },
+
+      approveAllPendingTransactions: () => {
+        const s = get() as any;
+        const queue: import('@/types/game').PendingTransaction[] = Array.isArray(s.pendingTransactions) ? s.pendingTransactions : [];
+        if (queue.length === 0) return;
+        let cash = s.cash;
+        let overdraftUsed = s.overdraftUsed;
+        const remaining: import('@/types/game').PendingTransaction[] = [];
+        let approvedAmount = 0;
+        let usedOverdraftTotal = 0;
+        for (const tx of queue) {
+          const result = debit({ cash, overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
+          if (!result) {
+            remaining.push(tx);
+            continue;
+          }
+          cash = result.cash;
+          overdraftUsed = result.overdraftUsed;
+          approvedAmount += tx.amount;
+          usedOverdraftTotal += result.usedOverdraft;
+        }
+        set({
+          cash,
+          overdraftUsed,
+          pendingTransactions: remaining,
+          isPaused: remaining.length === 0 ? false : s.isPaused,
+        } as any);
+        if (remaining.length > 0) {
+          showToast(
+            "Partial approval",
+            `Approved £${fromPennies(approvedAmount).toLocaleString()}. ${remaining.length} item(s) skipped — insufficient funds.`,
+            'destructive',
+          );
+        } else {
+          showToast("All approved", `£${fromPennies(approvedAmount).toLocaleString()} paid${usedOverdraftTotal > 0 ? ` (£${fromPennies(usedOverdraftTotal).toLocaleString()} via overdraft)` : ''}.`);
+        }
       },
 
       markEconomicEventsSeen: (ids: string[]) => {
