@@ -14,21 +14,31 @@ import { PortfolioMortgageDetails } from "@/components/game/portfolio-mortgage-d
 
 interface PortfolioMortgageProps {
   ownedProperties: Property[];
-  /** Active mortgages — used to surface current lender/rate on each tile. */
+  /** Active mortgages — full shape (pounds) so we can render the details panel and per-tile lender chips. */
   mortgages?: Array<{
+    id: string;
     propertyId: string;
     providerId: string;
     interestRate: number;
+    termYears: number;
+    mortgageType: 'repayment' | 'interest-only';
+    monthlyPayment: number;
     remainingBalance: number;
+    collateralPropertyIds?: string[];
+    startMonth?: number;
+    fixedTermYears?: number;
+    fixedRate?: number;
+    revertedToSVR?: boolean;
   }>;
   mortgageProviders: any[];
   onPortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   cash: number;
   setCash: (cash: number) => void;
   creditScore?: number;
+  monthsPlayed?: number;
 }
 
-export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580 }: PortfolioMortgageProps) {
+export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgageProviders, onPortfolioMortgage, cash, setCash, creditScore = 580, monthsPlayed = 0 }: PortfolioMortgageProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([]);
   const [loanAmount, setLoanAmount] = useState<number[]>([0]);
