@@ -90,7 +90,23 @@ export interface Property {
   conditionLastTopUpMonth?: number;
   /** Sum of repair-bar points purchased in the current month (caps spam). */
   conditionTopUpPointsThisMonth?: number;
+  /** Phase 4 #15a — commercial use class. Defaults to 'E' (retail/office) when unset. */
+  useClass?: 'E' | 'sui_generis';
+  /** Phase 4 #13 — commercial FRI lease metadata. Only populated on commercial lets. */
+  commercialLease?: {
+    /** Full Repairing & Insuring — tenant covers maintenance + insurance. */
+    fri: boolean;
+    /** Fixed term length in months (typically 60 or 120). */
+    termMonths: number;
+    /** In-game month the lease started. */
+    startMonth: number;
+    /** In-game month the lease expires (startMonth + termMonths). */
+    expiryMonth: number;
+    /** monthsPlayed snapshot when 6-month renewal warning was last surfaced. */
+    renewalWarnedMonth?: number;
+  };
 }
+
 
 // Tenant concerns — issues raised that decay satisfaction if ignored
 export type ConcernCategory = 'maintenance' | 'noise' | 'mould' | 'appliance' | 'safety';
