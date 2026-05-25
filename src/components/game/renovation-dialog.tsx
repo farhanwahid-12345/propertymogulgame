@@ -88,7 +88,7 @@ interface RenovationDialogProps {
 
 
 
-export const RENOVATION_OPTIONS: RenovationType[] = [
+const RENOVATION_OPTIONS_BASE: RenovationType[] = [
   // Maintenance
   {
     id: "epc_upgrade",
