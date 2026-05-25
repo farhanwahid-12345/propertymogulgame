@@ -3442,21 +3442,18 @@ export const useGameStore = create<GameState & GameActions>()(
         // Debit prerequisite costs in addition to the main renovation.
         const extraCostPennies = prerequisiteExtensions.reduce((s, e) => s + e.costPennies, 0);
         let cashAfter = debited.cash;
-        let overdraftAfter = debited.overdraftUsed;
-        let extraOverdraftUsed = 0;
+        let overdraftAfter = prev.overdraftUsed;
         if (extraCostPennies > 0) {
-          const extraDebited = debit({ ...prev, cash: cashAfter, overdraftUsed: overdraftAfter }, extraCostPennies);
+          const extraDebited = debitStrict({ cash: cashAfter }, extraCostPennies);
           if (!extraDebited) {
             showToast(
-              "Insufficient Funds",
-              `Conversion needs an extra £${fromPennies(extraCostPennies).toLocaleString()} to also build the approved extension(s).`,
+              "Insufficient Cash",
+              `Conversion needs an extra £${fromPennies(extraCostPennies).toLocaleString()} in cash to also build the approved extension(s) — overdraft can't fund renovations.`,
               "destructive",
             );
             return;
           }
           cashAfter = extraDebited.cash;
-          overdraftAfter = extraDebited.overdraftUsed;
-          extraOverdraftUsed = extraDebited.usedOverdraft;
         }
 
         // The conversion can't physically complete before its prerequisite
