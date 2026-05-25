@@ -1105,8 +1105,13 @@ export const useGameStore = create<GameState & GameActions>()(
         });
 
         // ── MEES (Minimum Energy Efficiency Standards) ──
-        // F/G rated occupied properties are unlawful to let. Push a high-penalty
-        // safety concern (2× normal decay) once per property until they upgrade.
+        // Today: F/G properties cannot be let lawfully.
+        // From in-game 2030 (month 60+): C is the minimum band for new+existing lets.
+        // Phase 3 #15 — also surfaces a one-time 12-month-ahead pop-up warning
+        // for D/E properties so the player can plan an EPC upgrade ahead of the
+        // 2030 cutover (month 48 onwards).
+        const MEES_2030_MONTH = 60;
+        const MEES_2030_WARNING_MONTH = MEES_2030_MONTH - 12;
         const meesAlreadyByProp = new Set(
           prevConcerns
             .filter(c => !c.resolvedMonth && c.category === 'safety' && c.description.startsWith('EPC '))
@@ -1116,21 +1121,52 @@ export const useGameStore = create<GameState & GameActions>()(
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
           if (!property) return;
           const epc = property.epcRating;
-          if (epc !== 'F' && epc !== 'G') return;
+          if (!epc) return;
+          const post2030 = newMonthNumber >= MEES_2030_MONTH;
+          const illegalNow =
+            epc === 'F' || epc === 'G' ||
+            (post2030 && (epc === 'D' || epc === 'E'));
+          if (!illegalNow) return;
           if (meesAlreadyByProp.has(property.id)) return;
           if (inConveyancingIds.has(property.id)) return;
+          const standardLabel = post2030 ? 'MEES 2030 (Band C minimum)' : 'MEES';
           newConcerns.push({
             id: `mees_${newMonthNumber}_${property.id}_${Math.random().toString(36).slice(2, 6)}`,
             propertyId: property.id,
             tenantProfile: t.tenant.profile as any,
             category: 'safety',
-            description: `EPC ${epc} — illegal to let under MEES. Upgrade or face fines.`,
+            description: `EPC ${epc} — illegal to let under ${standardLabel}. Upgrade or face fines.`,
             raisedMonth: newMonthNumber,
             resolveCost: 0,
             satisfactionPenaltyIfIgnored: 12,
           });
           meesAlreadyByProp.add(property.id);
         });
+
+        // Phase 3 #15 — 12-month early warning toast for D/E lets approaching 2030.
+        if (newMonthNumber >= MEES_2030_WARNING_MONTH && newMonthNumber < MEES_2030_MONTH) {
+          const warnedKey = `mees2030_warned_${newMonthNumber}`;
+          newTenants.forEach(t => {
+            const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
+            if (!property) return;
+            const epc = property.epcRating;
+            if (epc !== 'D' && epc !== 'E') return;
+            if (meesAlreadyByProp.has(property.id)) return;
+            // Surface as a concern row so it persists rather than only a toast.
+            newConcerns.push({
+              id: `mees2030_warn_${newMonthNumber}_${property.id}`,
+              propertyId: property.id,
+              tenantProfile: t.tenant.profile as any,
+              category: 'safety',
+              description: `EPC ${epc} — lettings ban from 2030 (${MEES_2030_MONTH - newMonthNumber}mo). Plan an EPC upgrade.`,
+              raisedMonth: newMonthNumber,
+              resolveCost: 0,
+              satisfactionPenaltyIfIgnored: 0,
+            });
+            meesAlreadyByProp.add(property.id);
+          });
+        }
+
 
         // Only toast for concerns that will actually appear in the feed
         // (owned, unresolved, not in conveyancing).
