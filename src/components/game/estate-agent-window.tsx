@@ -71,6 +71,9 @@ interface EstateAgentWindowProps {
   ownedPropertyCount?: number;
   /** In-game month, drives game-time days-on-market badge. */
   monthsPlayed?: number;
+  /** Seconds remaining until next month tick — enables fractional day count. */
+  timeUntilNextMonth?: number;
+
   /** Mortgages list (pennies) — used to compute ERC preview at listing time. */
   mortgages?: Array<{
     propertyId: string;
