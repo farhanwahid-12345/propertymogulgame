@@ -484,6 +484,9 @@ export interface PayoffEvent {
   month: number;
   /** Pennies of principal paid (informational). */
   amountPennies?: number;
+}
+
+
 
 /** A queued, non-rent / non-sale debit that the player must approve before it leaves cash. */
 export type PendingTransactionType =
