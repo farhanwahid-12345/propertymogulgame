@@ -4144,6 +4144,7 @@ export const useGameStore = create<GameState & GameActions>()(
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
           totalRentalIncome: fromPennies(totalRentalIncome - property.monthlyIncome),
           ownedPropertyCount: prev.ownedProperties.length,
+          mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
         });
         // Inline rejection is shown by the panel; do not pop a global toast.
         if (!eligibility.eligible) { return; }
