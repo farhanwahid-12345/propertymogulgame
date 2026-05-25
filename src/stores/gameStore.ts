@@ -2606,6 +2606,8 @@ export const useGameStore = create<GameState & GameActions>()(
             existingMonthlyMortgagePayments: fromPennies(existingPayments),
             totalRentalIncome: fromPennies(totalRentalIncome),
             ownedPropertyCount: prev.ownedProperties.length,
+            mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
+            propertyNeedsRefurb: property.needsRefurb,
           });
 
           if (!eligibility.eligible) {
