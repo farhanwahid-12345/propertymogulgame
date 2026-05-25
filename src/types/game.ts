@@ -105,6 +105,10 @@ export interface Property {
     /** monthsPlayed snapshot when 6-month renewal warning was last surfaced. */
     renewalWarnedMonth?: number;
   };
+  /** Phase 5 #16 — auction lot is missing kitchen/bathroom or otherwise
+   *  uninhabitable. Standard BTL mortgages are refused; only bridging finance
+   *  can complete the purchase until the property is renovated. */
+  needsRefurb?: boolean;
 }
 
 
