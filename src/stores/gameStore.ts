@@ -590,16 +590,35 @@ export const useGameStore = create<GameState & GameActions>()(
           // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
           const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
           const effectiveRent = advertisedRent;
+          // Phase 4 #13 — initialise commercial FRI lease + use class on
+          // settlement. Preserve `type` explicitly so commercial never silently
+          // flips to residential.
+          const isCommercial = prop.type === 'commercial';
+          const commercialLeaseInit = isCommercial
+            ? {
+                fri: true,
+                termMonths: 60,
+                startMonth: newMonthNumber,
+                expiryMonth: newMonthNumber + 60,
+              }
+            : undefined;
+          const useClassInit = isCommercial
+            ? (Math.random() < 0.15 ? 'sui_generis' as const : 'E' as const)
+            : undefined;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
+            type: prop.type,
             value: settledValue,
             // marketValue tracks the listed value so the asking-side signal stays honest.
             marketValue: Math.max(settledValue, paid),
             yield: effectiveYield,
             monthlyIncome: effectiveRent,
             lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
+            ...(commercialLeaseInit ? { commercialLease: commercialLeaseInit } : {}),
+            ...(useClassInit ? { useClass: useClassInit } : {}),
           };
           newOwnedProperties.push(purchased);
+
           newEstateAgent = newEstateAgent.filter(p => p.id !== conv.propertyId);
           newAuction = newAuction.filter(p => p.id !== conv.propertyId);
 
@@ -703,7 +722,10 @@ export const useGameStore = create<GameState & GameActions>()(
         prev.tenants.forEach(t => {
           if (conveyancingPropertyIds.has(t.propertyId)) return;
           const risk = (t.tenant as any).defaultRisk ?? 5;
-          const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
+          const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          const monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
           if (Math.random() < monthlyP) {
             const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
             missedTenantKeys.add(key);
@@ -720,6 +742,7 @@ export const useGameStore = create<GameState & GameActions>()(
             }
           }
         });
+
 
         const monthlyIncome = newOwnedProperties.reduce((total, property) => {
           if (conveyancingPropertyIds.has(property.id)) return total; // No rent during conveyancing
@@ -1166,6 +1189,22 @@ export const useGameStore = create<GameState & GameActions>()(
             meesAlreadyByProp.add(property.id);
           });
         }
+
+        // Phase 4 #13 — commercial lease renewal warning 6 months before expiry.
+        // Fired once per lease via the renewalWarnedMonth marker on the property.
+        updatedOwnedProperties = updatedOwnedProperties.map(p => {
+          const lease = p.commercialLease;
+          if (!lease || p.type !== 'commercial') return p;
+          const monthsToExpiry = lease.expiryMonth - newMonthNumber;
+          if (monthsToExpiry === 6 && lease.renewalWarnedMonth !== newMonthNumber) {
+            showToast(
+              "Commercial Lease Renewal Due",
+              `${p.name} — FRI lease expires in 6 months (month ${lease.expiryMonth}). Negotiate renewal or expect a void.`,
+            );
+            return { ...p, commercialLease: { ...lease, renewalWarnedMonth: newMonthNumber } };
+          }
+          return p;
+        });
 
 
         // Only toast for concerns that will actually appear in the feed
@@ -3210,7 +3249,11 @@ export const useGameStore = create<GameState & GameActions>()(
         appealChance = Math.max(0, Math.min(0.85, appealChance));
         const willAppeal = Math.random() < appealChance;
 
-        const effectiveMonth = prev.monthsPlayed + noticeMonths;
+        // Phase 4 #11 — court backlog. Real-world possession claims sit in a
+        // 3-6 month queue before bailiff enforcement. Added on top of the
+        // statutory notice period so evictions are a major time commitment.
+        const courtBacklogMonths = 3 + Math.floor(Math.random() * 4); // 3..6
+        const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
         const updatedTenants = prev.tenants.map(t =>
           t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
             ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground }
@@ -3227,7 +3270,11 @@ export const useGameStore = create<GameState & GameActions>()(
           appealResolveMonth: willAppeal ? prev.monthsPlayed + 1 : undefined,
         };
         const appealNote = willAppeal ? ' Tenant has filed a tribunal appeal — ruling next month.' : '';
-        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.${appealNote}`);
+        showToast(
+          "Eviction Notice Served",
+          `${validReason}. ${noticeMonths}mo notice + ~${courtBacklogMonths}mo court backlog — possession by month ${effectiveMonth}.${appealNote}`,
+        );
+
         set({
           tenants: updatedTenants,
           pendingEvictions: [...prev.pendingEvictions, newEviction],

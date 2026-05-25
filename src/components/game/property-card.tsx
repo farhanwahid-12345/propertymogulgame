@@ -53,7 +53,18 @@ export interface Property {
   epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   furnishingMonthsRemaining?: number;
+  /** Phase 4 #15a — commercial use class. */
+  useClass?: 'E' | 'sui_generis';
+  /** Phase 4 #13 — commercial FRI lease metadata. */
+  commercialLease?: {
+    fri: boolean;
+    termMonths: number;
+    startMonth: number;
+    expiryMonth: number;
+    renewalWarnedMonth?: number;
+  };
 }
+
 
 interface PropertyCardProps {
   property: Property;
