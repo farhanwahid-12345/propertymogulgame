@@ -137,7 +137,7 @@ export interface MortgageProvider {
   description: string;
 }
 
-export type LoanKind = 'personal' | 'business' | 'investor';
+export type LoanKind = 'personal' | 'business' | 'investor' | 'bridging';
 
 export interface Loan {
   id: string;
@@ -154,6 +154,12 @@ export interface Loan {
   onTimeStreak?: number;
   /** Snapshot of monthsPlayed when last payment was missed (for arrears + credit penalty). */
   lastMissedMonth?: number;
+  /** Phase 5 #16 — interest-only flag (bridging finance). */
+  interestOnly?: boolean;
+  /** Phase 5 #16 — property this loan is secured against (bridging only). */
+  propertyId?: string;
+  /** Phase 5 #16 — credit/default penalty already applied once on bridge expiry. */
+  expiryPenaltyApplied?: boolean;
 }
 
 export interface Mortgage {
