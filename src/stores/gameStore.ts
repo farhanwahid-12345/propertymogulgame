@@ -590,16 +590,35 @@ export const useGameStore = create<GameState & GameActions>()(
           // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
           const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
           const effectiveRent = advertisedRent;
+          // Phase 4 #13 — initialise commercial FRI lease + use class on
+          // settlement. Preserve `type` explicitly so commercial never silently
+          // flips to residential.
+          const isCommercial = prop.type === 'commercial';
+          const commercialLeaseInit = isCommercial
+            ? {
+                fri: true,
+                termMonths: 60,
+                startMonth: newMonthNumber,
+                expiryMonth: newMonthNumber + 60,
+              }
+            : undefined;
+          const useClassInit = isCommercial
+            ? (Math.random() < 0.15 ? 'sui_generis' as const : 'E' as const)
+            : undefined;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
+            type: prop.type,
             value: settledValue,
             // marketValue tracks the listed value so the asking-side signal stays honest.
             marketValue: Math.max(settledValue, paid),
             yield: effectiveYield,
             monthlyIncome: effectiveRent,
             lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
+            ...(commercialLeaseInit ? { commercialLease: commercialLeaseInit } : {}),
+            ...(useClassInit ? { useClass: useClassInit } : {}),
           };
           newOwnedProperties.push(purchased);
+
           newEstateAgent = newEstateAgent.filter(p => p.id !== conv.propertyId);
           newAuction = newAuction.filter(p => p.id !== conv.propertyId);
 
