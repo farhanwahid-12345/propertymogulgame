@@ -1765,7 +1765,13 @@ export const useGameStore = create<GameState & GameActions>()(
             // 12-month on-time streak → +5 credit
             if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
             if (newBal <= 0) {
-              showToast("Loan Paid Off! 🎉", `${l.kind} loan fully repaid.`);
+              newPayoffEvents.push({
+                id: `payoff-loan-${l.id}-${newMonthNumber}`,
+                kind: 'loan',
+                label: l.kind,
+                month: newMonthNumber,
+                amountPennies: l.monthlyPayment,
+              });
               return;
             }
             updatedLoans.push({ ...l, remainingBalance: newBal, onTimeStreak: newStreak });
