@@ -88,7 +88,7 @@ interface RenovationDialogProps {
 
 
 
-export const RENOVATION_OPTIONS: RenovationType[] = [
+const RENOVATION_OPTIONS_BASE: RenovationType[] = [
   // Maintenance
   {
     id: "epc_upgrade",
@@ -285,6 +285,17 @@ export const RENOVATION_OPTIONS: RenovationType[] = [
     baseApprovalProb: 0.82,
   },
 ];
+
+// Phase 3 #12 — +25% headline ROI uplift on every option (values + rents).
+// Applied once at export time so dialog previews, planning previews, and the
+// settlement payout all see the same numbers.
+const RENO_ROI_UPLIFT = 1.25;
+export const RENOVATION_OPTIONS: RenovationType[] = RENOVATION_OPTIONS_BASE.map(r => ({
+  ...r,
+  rentIncrease: Math.round((r.rentIncrease * RENO_ROI_UPLIFT) / 5) * 5,
+  valueIncrease: Math.round((r.valueIncrease * RENO_ROI_UPLIFT) / 100) * 100,
+}));
+
 
 const CategoryColors = {
   maintenance: "text-secondary border-secondary/20 bg-secondary/5",
@@ -485,9 +496,14 @@ export function RenovationDialog({
    * the player can afford the build.
    */
   const ineligibilityReason = (r: RenovationType, phase: 'planning' | 'works' = 'works'): string | null => {
-    // Conversions structurally rebuild the property — must be vacant when works begin.
+    // Phase 3 #10 — `requiresVacant` works (conversions + heavy extensions) cannot
+    // begin while a tenant is in residence. Planning submission is allowed; only
+    // the physical works are gated.
     if (phase === 'works' && r.category === 'conversion' && hasTenant) {
       return `Vacate every unit (serve eviction notice) before converting`;
+    }
+    if (phase === 'works' && r.requiresVacant && hasTenant) {
+      return `Property must be vacant before works can start`;
     }
     if (r.allowedTypes && propertyType && !r.allowedTypes.includes(propertyType)) {
       return `Only for ${r.allowedTypes.join('/')}`;
@@ -512,6 +528,7 @@ export function RenovationDialog({
     }
     return null;
   };
+
 
   const groupedRenovations = RENOVATION_OPTIONS.reduce((acc, renovation) => {
     if (!acc[renovation.category]) acc[renovation.category] = [];
