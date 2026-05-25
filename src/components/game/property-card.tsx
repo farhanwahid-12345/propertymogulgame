@@ -673,8 +673,11 @@ export const PropertyCard = memo(function PropertyCard({
                               totalRenovationSpendPennies: property.totalRenovationSpendPennies,
                               furnishingTier: property.furnishingTier,
                               epcRating: property.epcRating,
+                              currentRentPounds: property.monthlyIncome,
+                              baselineRentPounds: property.baseRent || property.monthlyIncome,
                             }) || property.monthlyIncome
                           }
+
                           totalRenovationSpendPennies={property.totalRenovationSpendPennies}
                           furnishingTier={property.furnishingTier}
                           epcRating={property.epcRating}
