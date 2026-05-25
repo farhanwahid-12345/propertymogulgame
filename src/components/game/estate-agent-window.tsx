@@ -1157,7 +1157,9 @@ export function EstateAgentWindow({
 
                     const offers = listing.offers || [];
                     const listingMonth = (listing as any).listingMonth ?? monthsPlayed;
-                    const daysOnMarket = Math.max(0, monthsPlayed - listingMonth) * 30;
+                    const monthFraction = Math.max(0, Math.min(1, 1 - (timeUntilNextMonth / 180)));
+                    const daysOnMarket = Math.max(0, Math.floor(((monthsPlayed - listingMonth) + monthFraction) * 30));
+
                     const askingPrice = listing.askingPrice || property.value;
                     const priceRatio = askingPrice / property.value;
                     const guidance = getPricingGuidance(priceRatio);
