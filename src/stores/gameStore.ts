@@ -369,11 +369,8 @@ function migrateState(persisted: any): GameState {
     persisted._version = 12;
   }
 
-  // v12 → v13: add currentLoanRates; drop any persisted bridging loans
+  // v12 → v13: add currentLoanRates (bridging loans are now supported — Phase 5)
   if (persisted._version < 13) {
-    if (Array.isArray(persisted.loans)) {
-      persisted.loans = persisted.loans.filter((l: any) => l.kind !== 'bridging');
-    }
     if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
       persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
     }
