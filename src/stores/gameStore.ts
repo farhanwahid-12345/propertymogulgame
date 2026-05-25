@@ -209,6 +209,9 @@ function createInitialState(): GameState {
     projectedTaxStampedMonth: 0,
     pendingTransactions: [],
     chainCollapseEvents: [],
+    nextInsuranceDueMonth: 12,
+    lastInsuranceWarnedMonth: -1,
+    payoffEvents: [],
   };
 }
 
