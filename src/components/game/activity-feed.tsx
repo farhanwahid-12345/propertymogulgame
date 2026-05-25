@@ -131,6 +131,12 @@ export function ActivityFeed({
     renovations.forEach(r => {
       const cm = (r as any).completionMonth;
       if (typeof cm === "number" && monthsPlayed >= cm) {
+        const cost = (r.type as any)?.cost as number | undefined;
+        const valueGain = (r.type as any)?.valueIncrease as number | undefined;
+        const parts: string[] = [];
+        if (r.type?.name) parts.push(r.type.name);
+        if (typeof cost === "number" && cost > 0) parts.push(`Cost £${Math.round(cost).toLocaleString()}`);
+        if (typeof valueGain === "number" && valueGain > 0) parts.push(`Value +£${Math.round(valueGain).toLocaleString()}`);
         out.push({
           id: `rn_${r.id}`,
           month: cm,
@@ -138,7 +144,7 @@ export function ActivityFeed({
           icon: Hammer,
           iconClass: "text-emerald-400",
           title: `Renovation complete — ${propName(r.propertyId)}`,
-          detail: r.type?.name,
+          detail: parts.join(" • ") || undefined,
         });
       }
     });
