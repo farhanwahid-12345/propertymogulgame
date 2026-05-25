@@ -3395,8 +3395,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaledValue = scaled.value;
 
         const costPennies = toPennies(scaledCostPounds);
-        const debited = debit(prev, costPennies);
-        if (!debited) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()} (even with overdraft).`, "destructive"); return; }
+        // v3 #3/#14 — renovations are discretionary spend: cash-only, never tap
+        // the overdraft silently. Use debitStrict so the player must clear
+        // the overdraft (or release cash) before kicking off works.
+        const debited = debitStrict(prev, costPennies);
+        if (!debited) { showToast("Insufficient Cash", `Need £${scaledCostPounds.toLocaleString()} in cash to start this renovation — overdraft can't fund renovations.`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId && r.type.id === renovationType.id)) { showToast("Already In Progress", `${renovationType.name} is already underway on this property.`, "destructive"); return; }
 
         // Persist scaled values onto the renovation record so completion uses the same numbers
