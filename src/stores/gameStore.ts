@@ -1569,14 +1569,38 @@ export const useGameStore = create<GameState & GameActions>()(
         // until the player approves them via the dialog. Mortgage payments stay
         // automatic (contractual direct debit).
         const newPendingTransactions: import('@/types/game').PendingTransaction[] = [];
-        if (insurance > 0) {
-          newPendingTransactions.push({
-            id: `ptx-ins-${newMonthNumber}`,
-            type: 'insurance',
-            amount: insurance,
-            description: `Landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
-            month: newMonthNumber,
-          });
+
+        // v3 #2 — Annual landlord insurance. Bill once every 12 months and warn one month ahead.
+        const nextInsuranceDueMonth = (prev as any).nextInsuranceDueMonth ?? 12;
+        const lastInsuranceWarnedMonth = (prev as any).lastInsuranceWarnedMonth ?? -1;
+        let updatedNextInsuranceDueMonth = nextInsuranceDueMonth;
+        let updatedLastInsuranceWarnedMonth = lastInsuranceWarnedMonth;
+        const annualInsurancePennies = newOwnedProperties.reduce(
+          (t, p) => t + Math.floor(p.value * 0.004),
+          0,
+        );
+        if (annualInsurancePennies > 0) {
+          // 1-month-ahead warning toast
+          if (
+            newMonthNumber === nextInsuranceDueMonth - 1 &&
+            lastInsuranceWarnedMonth !== newMonthNumber
+          ) {
+            showToast(
+              "Insurance Due Next Month",
+              `Annual landlord insurance of £${fromPennies(annualInsurancePennies).toLocaleString()} will be billed next month.`,
+            );
+            updatedLastInsuranceWarnedMonth = newMonthNumber;
+          }
+          if (newMonthNumber >= nextInsuranceDueMonth) {
+            newPendingTransactions.push({
+              id: `ptx-ins-${newMonthNumber}`,
+              type: 'insurance',
+              amount: annualInsurancePennies,
+              description: `Annual landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
+              month: newMonthNumber,
+            });
+            updatedNextInsuranceDueMonth = newMonthNumber + 12;
+          }
         }
         if (councilTax > 0) {
           newPendingTransactions.push({
