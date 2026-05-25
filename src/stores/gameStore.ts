@@ -817,7 +817,8 @@ export const useGameStore = create<GameState & GameActions>()(
           if (recentDefaults.length === 0 && newOwnedProperties.length > 0) creditAdj += 3;
         }
 
-        // Check paid-off mortgages
+        // Check paid-off mortgages (v3 #4 — surface via modal queue, not just a toast)
+        const newPayoffEvents: import('@/types/game').PayoffEvent[] = [];
         const paidOff = updatedMortgages.filter(m =>
           (newMortgages.find(old => old.id === m.id)?.remainingBalance ?? 0) > 0 && m.remainingBalance === 0
         );
@@ -825,7 +826,12 @@ export const useGameStore = create<GameState & GameActions>()(
           const prop = newOwnedProperties.find(p => p.id === m.propertyId);
           if (prop) {
             creditAdj += 15;
-            showToast("Mortgage Paid Off! 🎉", `${prop.name} is now fully owned!`);
+            newPayoffEvents.push({
+              id: `payoff-mortgage-${m.id}-${newMonthNumber}`,
+              kind: 'mortgage',
+              label: prop.name,
+              month: newMonthNumber,
+            });
           }
         });
 
