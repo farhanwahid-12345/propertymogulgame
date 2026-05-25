@@ -131,6 +131,9 @@ interface GameActions {
   // Phase 3 #5 — chain-collapse pop-out acknowledgement
   dismissChainCollapseEvent: (id: string) => void;
   dismissAllChainCollapseEvents: () => void;
+  // v3 #4 — mortgage / loan payoff modal acknowledgement
+  dismissPayoffEvent: (id: string) => void;
+  dismissAllPayoffEvents: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
