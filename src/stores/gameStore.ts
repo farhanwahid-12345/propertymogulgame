@@ -1190,6 +1190,22 @@ export const useGameStore = create<GameState & GameActions>()(
           });
         }
 
+        // Phase 4 #13 — commercial lease renewal warning 6 months before expiry.
+        // Fired once per lease via the renewalWarnedMonth marker on the property.
+        updatedOwnedProperties = updatedOwnedProperties.map(p => {
+          const lease = p.commercialLease;
+          if (!lease || p.type !== 'commercial') return p;
+          const monthsToExpiry = lease.expiryMonth - newMonthNumber;
+          if (monthsToExpiry === 6 && lease.renewalWarnedMonth !== newMonthNumber) {
+            showToast(
+              "Commercial Lease Renewal Due",
+              `${p.name} — FRI lease expires in 6 months (month ${lease.expiryMonth}). Negotiate renewal or expect a void.`,
+            );
+            return { ...p, commercialLease: { ...lease, renewalWarnedMonth: newMonthNumber } };
+          }
+          return p;
+        });
+
 
         // Only toast for concerns that will actually appear in the feed
         // (owned, unresolved, not in conveyancing).
