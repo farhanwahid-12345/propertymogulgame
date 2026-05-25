@@ -157,7 +157,7 @@ const Index = () => {
 
         <Tabs id="section-tabs" value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div id="section-market" className="flex flex-col gap-2 mt-2 min-w-0">
-            {/* Row 1: tab toggle + primary actions (Market actions, or Mortgages incl. Portfolio Mortgage on Bank tab) */}
+            {/* Single action row: tab toggle + all primary actions inline (Phase 2 #1). */}
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <TabsList className="glass border-0 bg-white/[0.06] h-9 shrink-0 w-auto">
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs flex-none">
@@ -172,25 +172,21 @@ const Index = () => {
                   <PropertyMarketActions gameState={gameState} totalPortfolioIncome={totalPortfolioIncome} />
                 )}
                 {activeTab === 'bank' && (
-                  <BankingPanelActions
-                    gameState={gameState}
-                    getDebtForProperty={getDebtForProperty}
-                    totalPortfolioIncome={totalPortfolioIncome}
-                  />
+                  <>
+                    <BankingPanelActions
+                      gameState={gameState}
+                      getDebtForProperty={getDebtForProperty}
+                      totalPortfolioIncome={totalPortfolioIncome}
+                    />
+                    <LoansInlineButton gameState={gameState} />
+                    <TaxInlineButton gameState={gameState} />
+                  </>
                 )}
+                <OperationsInlineButton gameState={gameState} />
               </div>
             </div>
-            {/* Row 2: Loans / Tax / Operations — always present, sits directly beneath the primary actions */}
-            <div className="flex items-center flex-wrap gap-2 justify-end">
-              {activeTab === 'bank' && (
-                <>
-                  <LoansInlineButton gameState={gameState} />
-                  <TaxInlineButton gameState={gameState} />
-                </>
-              )}
-              <OperationsInlineButton gameState={gameState} />
-            </div>
           </div>
+
 
           <TabsContent value="market" className="mt-0" />
           <TabsContent value="bank" className="mt-0" />
