@@ -467,7 +467,23 @@ export interface GameState {
   pendingTransactions?: PendingTransaction[];
   /** Phase 3 #5 — queued chain-collapse pop-out events awaiting acknowledgement. */
   chainCollapseEvents?: ChainCollapseEvent[];
+  /** v3 #2 — month at which the next annual landlord-insurance bill becomes due. */
+  nextInsuranceDueMonth?: number;
+  /** v3 #2 — most recent month a one-month-ahead insurance warning was shown (dedupe). */
+  lastInsuranceWarnedMonth?: number;
+  /** v3 #4 — queued payoff events awaiting acknowledgement via modal. */
+  payoffEvents?: PayoffEvent[];
 }
+
+/** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */
+export interface PayoffEvent {
+  id: string;
+  kind: 'mortgage' | 'loan';
+  /** Friendly label (property name for mortgages, loan kind for loans). */
+  label: string;
+  month: number;
+  /** Pennies of principal paid (informational). */
+  amountPennies?: number;
 
 /** A queued, non-rent / non-sale debit that the player must approve before it leaves cash. */
 export type PendingTransactionType =
@@ -475,6 +491,7 @@ export type PendingTransactionType =
   | 'council_tax'
   | 'income_tax'
   | 'corporation_tax'
+  | 'eicr'
   | 'other';
 
 export interface PendingTransaction {
