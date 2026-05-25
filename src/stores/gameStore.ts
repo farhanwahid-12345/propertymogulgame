@@ -4217,6 +4217,7 @@ export const useGameStore = create<GameState & GameActions>()(
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
           totalRentalIncome: fromPennies(otherIncome),
           ownedPropertyCount: prev.ownedProperties.length,
+          mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
         });
         if (!eligibility.eligible) {
           return { ok: false, reason: eligibility.reason || "Failed lender criteria." };
