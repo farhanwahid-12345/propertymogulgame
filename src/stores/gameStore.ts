@@ -2985,6 +2985,24 @@ export const useGameStore = create<GameState & GameActions>()(
           return;
         }
 
+        // Phase 3 #15 — MEES letting block. F/G can't be let today;
+        // from in-game 2030 (month 60+) D/E lets are also banned.
+        const epc = property.epcRating;
+        const post2030 = prev.monthsPlayed >= 60;
+        const epcIllegal = epc === 'F' || epc === 'G' || (post2030 && (epc === 'D' || epc === 'E'));
+        if (epcIllegal) {
+          showToast(
+            "Letting Blocked — MEES",
+            `Property is EPC ${epc}. ${post2030
+              ? 'From 2030 you must reach Band C before letting.'
+              : 'F/G properties cannot be let. Upgrade EPC first.'}`,
+            "destructive",
+          );
+          return;
+        }
+
+
+
         // Multi-slot capacity (HMO rooms / converted flats)
         const isMultiUnit = property.subtype === 'hmo' || property.subtype === 'flats';
         const unitCount = isMultiUnit ? Math.max(1, property.subtypeUnits || 1) : 1;
