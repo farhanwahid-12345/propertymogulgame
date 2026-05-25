@@ -650,6 +650,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             <Badge variant="outline" className="mt-1">
                               {property.type}
                             </Badge>
+                            {property.needsRefurb && (
+                              <Badge variant="destructive" className="mt-1 ml-1">
+                                Needs full refurb — bridging only
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-bold text-orange-400">
