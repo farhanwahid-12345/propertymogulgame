@@ -47,6 +47,12 @@ export interface MortgageEligibilityRequest {
   existingMonthlyMortgagePayments: number; // total across all existing mortgages
   totalRentalIncome: number; // EXPECTED monthly rent across all owned properties (regardless of current tenancy)
   ownedPropertyCount?: number; // number of properties player currently owns
+  /** Phase 5 #17 — number of properties currently mortgaged. PRA Portfolio
+   *  Landlord stress-test triggers at 4+ mortgaged properties. */
+  mortgagedPropertyCount?: number;
+  /** Phase 5 #16 — property is missing kitchen/bathroom / uninhabitable.
+   *  Standard BTL lenders refuse; only bridging finance can complete. */
+  propertyNeedsRefurb?: boolean;
 }
 
 export interface MortgageEligibilityResult {
