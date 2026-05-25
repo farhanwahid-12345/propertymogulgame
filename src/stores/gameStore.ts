@@ -4463,6 +4463,17 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
+        // Phase 5 #16 — flag ~40% of auction stock as uninhabitable. Discounted
+        // ~25% to reflect the missing kitchen/bathroom + lender refusal.
+        auctions = auctions.map(p => {
+          if (p.needsRefurb !== undefined) return p;
+          if (Math.random() < 0.4) {
+            const discounted = Math.max(toPennies(40000), Math.round(p.price * 0.75));
+            return { ...p, needsRefurb: true, price: discounted, value: discounted };
+          }
+          return { ...p, needsRefurb: false };
+        });
+
         const usedIds = new Set([...auctions.map(p => p.id), ...estate.map(p => p.id)]);
         const totalAvailable = auctions.length + estate.length;
         const needed = Math.max(0, 30 - totalAvailable);
