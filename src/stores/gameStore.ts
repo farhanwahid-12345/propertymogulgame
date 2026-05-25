@@ -3478,12 +3478,10 @@ export const useGameStore = create<GameState & GameActions>()(
           completionMonth: startMonth + e.months,
         }));
 
-        const totalOverdraft = debited.usedOverdraft + extraOverdraftUsed;
-        const overdraftNote = totalOverdraft > 0 ? ` (£${fromPennies(totalOverdraft).toLocaleString()} via overdraft)` : '';
         const prereqNote = prerequisiteExtensions.length > 0
           ? ` Bundled with ${prerequisiteExtensions.map(e => e.renoType.name).join(', ')}.`
           : '';
-        showToast("Renovation Started!", `${renovationType.name} begun.${prereqNote}${overdraftNote}`);
+        showToast("Renovation Started!", `${renovationType.name} begun.${prereqNote}`);
 
         // Consume planning approvals: the main renovation's (if it needed one)
         // AND every prerequisite extension's approval.
