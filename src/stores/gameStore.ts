@@ -703,7 +703,10 @@ export const useGameStore = create<GameState & GameActions>()(
         prev.tenants.forEach(t => {
           if (conveyancingPropertyIds.has(t.propertyId)) return;
           const risk = (t.tenant as any).defaultRisk ?? 5;
-          const monthlyP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
+          const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          const monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
           if (Math.random() < monthlyP) {
             const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
             missedTenantKeys.add(key);
@@ -720,6 +723,7 @@ export const useGameStore = create<GameState & GameActions>()(
             }
           }
         });
+
 
         const monthlyIncome = newOwnedProperties.reduce((total, property) => {
           if (conveyancingPropertyIds.has(property.id)) return total; // No rent during conveyancing
