@@ -732,10 +732,14 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
         }, 0);
-        // Landlord insurance — 0.4%/yr of property value, charged every month regardless of tenancy.
-        const insurance = newOwnedProperties.reduce((total, property) => {
+        // v3 #2 — landlord insurance is billed ANNUALLY (0.4% of property value)
+        // and routed through the pending-approval queue. We still compute the
+        // monthly accrual here for cashflow projections; the actual debit
+        // happens once per 12 months below.
+        const monthlyInsuranceAccrual = newOwnedProperties.reduce((total, property) => {
           return total + Math.floor((property.value * 0.004) / 12);
         }, 0);
+        const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
         const totalExpenses = mortgagePayments + councilTax + insurance;
         const netIncome = monthlyIncome - totalExpenses;
 
