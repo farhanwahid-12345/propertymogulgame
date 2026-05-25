@@ -142,6 +142,15 @@ export function calculateMortgageEligibility(
     monthlyPayment,
   };
 
+  // 0. Phase 5 #16 — Standard BTL lenders refuse uninhabitable stock.
+  if (req.propertyNeedsRefurb) {
+    return {
+      ...result,
+      eligible: false,
+      reason: 'Mortgage Denied: Property is missing a kitchen/bathroom and fails the lender\'s habitability test. Use a bridging loan, renovate, then remortgage onto a standard product.',
+    };
+  }
+
   // 1. Credit score check against provider minimum
   if (req.creditScore < req.providerMinCreditScore) {
     return {
@@ -163,11 +172,14 @@ export function calculateMortgageEligibility(
   }
 
   // 3. ICR / Portfolio Affordability Stress Test
-  // If player owns < 3 properties: lenient 100% ICR (rent covers mortgage)
-  // If player owns >= 3 properties: portfolio-level 125% ICR on TOTAL income vs TOTAL payments
+  // PRA Portfolio Landlord regime kicks in once the borrower has 4+ mortgaged
+  // properties — every new application must then stress-test the ENTIRE book.
+  // Fallback for legacy callers: trigger by ownedPropertyCount >= 3.
   const ownedPropertyCount = req.ownedPropertyCount ?? 0;
-  
-  if (ownedPropertyCount < 3) {
+  const mortgagedPropertyCount = req.mortgagedPropertyCount ?? ownedPropertyCount;
+  const isPortfolioLandlord = mortgagedPropertyCount >= 4 || ownedPropertyCount >= 3;
+
+  if (!isPortfolioLandlord) {
     // Lenient: property rent just needs to cover 100% of its mortgage payment
     if (req.propertyMonthlyRent > 0 && monthlyPayment > 0) {
       const icrRatio = req.propertyMonthlyRent / monthlyPayment;
@@ -181,19 +193,18 @@ export function calculateMortgageEligibility(
       }
     }
   } else {
-    // Portfolio affordability: TOTAL EXPECTED rental income must be >= 120% of TOTAL mortgage payments.
-    // Slightly more lenient than the historic 1.25 threshold to reflect that the
-    // input is now expected (not realised) rent.
+    // Portfolio Landlord — TOTAL EXPECTED rental income must be >= 120% of TOTAL mortgage payments.
     const totalIncomeWithNew = req.totalRentalIncome + req.propertyMonthlyRent;
     const totalPaymentsWithNew = req.existingMonthlyMortgagePayments + monthlyPayment;
     if (totalPaymentsWithNew > 0 && totalIncomeWithNew > 0) {
       const portfolioICR = totalIncomeWithNew / totalPaymentsWithNew;
       result.icrRatio = portfolioICR;
       if (portfolioICR < 1.20) {
+        const praPrefix = mortgagedPropertyCount >= 4 ? 'Portfolio Landlord (PRA): ' : '';
         return {
           ...result,
           eligible: false,
-          reason: `Mortgage Denied: Portfolio expected rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 120% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.20).toLocaleString()}/mo expected income.`,
+          reason: `${praPrefix}Mortgage Denied: Portfolio expected rental income (£${Math.floor(totalIncomeWithNew).toLocaleString()}/mo) fails the 120% stress test vs total payments (£${Math.ceil(totalPaymentsWithNew).toLocaleString()}/mo). Need £${Math.ceil(totalPaymentsWithNew * 1.20).toLocaleString()}/mo expected income.`,
         };
       }
     }
