@@ -111,8 +111,10 @@ export function EstateAgentWindow({
   existingMonthlyMortgagePayments = 0,
   ownedPropertyCount = 0,
   monthsPlayed = 0,
+  timeUntilNextMonth = 180,
   mortgages = [],
 }: EstateAgentWindowProps) {
+
   const [isOpen, setIsOpen] = useState(false);
   const [newListingPrice, setNewListingPrice] = useState<number>(0);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
