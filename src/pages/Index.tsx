@@ -14,6 +14,7 @@ import { PlanningRefusedDialog } from "@/components/game/planning-refused-dialog
 import { MacroEventModal } from "@/components/game/macro-event-modal";
 import { PendingTransactionsDialog } from "@/components/game/pending-transactions-dialog";
 import { ChainCollapseModal } from "@/components/game/chain-collapse-modal";
+import { PayoffEventsModal } from "@/components/game/payoff-events-modal";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -304,6 +305,7 @@ const Index = () => {
       <MacroEventModal />
       <PendingTransactionsDialog />
       <ChainCollapseModal />
+      <PayoffEventsModal />
     </div>
   );
 };
