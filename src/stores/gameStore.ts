@@ -44,7 +44,7 @@ import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
 // ─── Helpers ──────────────────────────────────────────────
-import { showToast, debit, credit, calcDeposit } from './storeHelpers';
+import { showToast, debit, debitStrict, credit, calcDeposit } from './storeHelpers';
 import {
   asNumber, asString,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
