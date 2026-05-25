@@ -1805,9 +1805,15 @@ export const useGameStore = create<GameState & GameActions>()(
           return { ...p, lastEicrMonth: newMonthNumber };
         });
         if (eicrCharged > 0) {
-          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, eicrCharged);
-          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
-          else { finalCash -= eicrCharged; }
+          // v3 #14 — EICR no longer silently taps overdraft. Route through the
+          // pending-approval queue so the player explicitly signs it off.
+          newPendingTransactions.push({
+            id: `ptx-eicr-${newMonthNumber}`,
+            type: 'eicr',
+            amount: eicrCharged,
+            description: `Annual EICR (electrical safety) certificate — ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length} residential ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length === 1 ? 'property' : 'properties'}`,
+            month: newMonthNumber,
+          });
           finalYearlyDeductibleExpenses += eicrCharged;
         }
         // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
