@@ -46,15 +46,11 @@ Tightens the money-approval flow before larger mechanics land on top.
   - Fixed-term commercial leases (e.g. 5/10 yr) with a renewal/negotiation pop-up 6 months before expiry.
 - **[#15a] Commercial use-class differentiation** — split commercial into standard retail (E-class) vs Sui Generis (hot food takeaway / betting shop) with distinct yield + friction profiles.
 
-## Phase 5 — Auction Bridging & Portfolio Landlord (PRA)
+## Phase 5 — Auction Bridging & Portfolio Landlord (PRA) ✅
 
-- **[#16] Unmortgageable auction stock + bridging finance**
-  - Auction inventory: a meaningful share is flagged as missing kitchen/bathroom → unmortgageable on standard BTL.
-  - New bridging product: ~1%/mo interest, max 12-month term, available for these distressed lots.
-  - Player must renovate + remortgage onto a standard product before the bridge expires; otherwise default consequences.
-- **[#17] Portfolio Landlord threshold (PRA)**
-  - At 4th mortgaged property, flag account as "Portfolio Landlord".
-  - Stress-test the whole background portfolio on every new mortgage application; block new debt if aggregate LTV / yield fails. Surface explanation + remediation hints (inject cash, sell underperformers).
+- **[#16] Unmortgageable auction stock + bridging finance** — `needsRefurb` flag on Property; ~40% of fresh auction stock tagged with a discounted price + "Needs full refurb — bridging only" badge. Standard BTL eligibility refuses these. New `takeBridgingLoan(propertyId, amount)` store action issues a 12-month, interest-only loan at 12% APR (≈1%/mo), capped at 70% LTV. Monthly tick services interest, applies a one-shot credit −80 + rate jump on expiry default.
+- **[#17] Portfolio Landlord threshold (PRA)** — eligibility now accepts `mortgagedPropertyCount`; portfolio stress-test fires at 4+ mortgaged properties and the rejection message is prefixed `Portfolio Landlord (PRA):`. Legacy `ownedPropertyCount >= 3` fallback retained so older callers keep their behaviour.
+
 
 ## Phase 6 — Verification & Regression
 

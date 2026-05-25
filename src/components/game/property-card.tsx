@@ -63,6 +63,8 @@ export interface Property {
     expiryMonth: number;
     renewalWarnedMonth?: number;
   };
+  /** Phase 5 #16 — uninhabitable auction stock (no kitchen/bathroom). */
+  needsRefurb?: boolean;
 }
 
 

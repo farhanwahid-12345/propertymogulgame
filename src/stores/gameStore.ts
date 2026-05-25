@@ -104,6 +104,7 @@ interface GameActions {
   handlePortfolioMortgage: (selectedPropertyIds: string[], loanAmount: number, providerId: string, termYears: number, mortgageType: 'repayment' | 'interest-only', fixedTermYears?: number) => { ok: true } | { ok: false; reason: string };
   // Loans
   applyForLoan: (kind: 'personal' | 'business' | 'investor', amount: number, termMonths: number) => void;
+  takeBridgingLoan: (propertyId: string, amountPennies: number) => void;
   settleLoan: (loanId: string, partialAmount?: number) => void;
   // Overdraft / Cash
   handleApplyOverdraft: (requestedLimit: number) => void;
@@ -369,11 +370,8 @@ function migrateState(persisted: any): GameState {
     persisted._version = 12;
   }
 
-  // v12 → v13: add currentLoanRates; drop any persisted bridging loans
+  // v12 → v13: add currentLoanRates (bridging loans are now supported — Phase 5)
   if (persisted._version < 13) {
-    if (Array.isArray(persisted.loans)) {
-      persisted.loans = persisted.loans.filter((l: any) => l.kind !== 'bridging');
-    }
     if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
       persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
     }
@@ -1833,7 +1831,9 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // ── Loans amortisation (personal/business/investor) ──
-        const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
+        const allPrevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []);
+        const prevLoans = allPrevLoans.filter((l: any) => l.kind !== 'bridging');
+        const prevBridges = allPrevLoans.filter((l: any) => l.kind === 'bridging');
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
@@ -1877,6 +1877,36 @@ export const useGameStore = create<GameState & GameActions>()(
             });
           }
         });
+
+        // ── Bridging loans (interest-only, balloon at term) ──
+        prevBridges.forEach(l => {
+          const monthlyInterest = Math.max(1, Math.round(l.remainingBalance * (l.interestRate / 12)));
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, monthlyInterest);
+          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
+          else { creditAdj -= 10; }
+
+          const expiryMonth = l.startMonth + l.termMonths;
+          const isExpired = newMonthNumber >= expiryMonth && l.remainingBalance > 0;
+          if (isExpired && !l.expiryPenaltyApplied) {
+            creditAdj -= 80;
+            const penalisedRate = Math.min(0.30, l.interestRate + 0.06);
+            showToast(
+              "⚠ Bridging Loan Expired",
+              `Bridge against ${l.propertyId ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
+              "destructive",
+            );
+            updatedLoans.push({
+              ...l,
+              interestRate: penalisedRate,
+              monthlyPayment: monthlyInterest,
+              expiryPenaltyApplied: true,
+              lastMissedMonth: prev.monthsPlayed,
+            });
+          } else {
+            updatedLoans.push({ ...l, monthlyPayment: monthlyInterest });
+          }
+        });
+
 
         // ── Annual EICR (electrical safety) check on residential properties ──
         let eicrCharged = 0;
@@ -2577,6 +2607,8 @@ export const useGameStore = create<GameState & GameActions>()(
             existingMonthlyMortgagePayments: fromPennies(existingPayments),
             totalRentalIncome: fromPennies(totalRentalIncome),
             ownedPropertyCount: prev.ownedProperties.length,
+            mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
+            propertyNeedsRefurb: property.needsRefurb,
           });
 
           if (!eligibility.eligible) {
@@ -2668,6 +2700,8 @@ export const useGameStore = create<GameState & GameActions>()(
             existingMonthlyMortgagePayments: fromPennies(existingPayments),
             totalRentalIncome: fromPennies(totalRentalIncome),
             ownedPropertyCount: prev.ownedProperties.length,
+            mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
+            propertyNeedsRefurb: property.needsRefurb,
           });
 
           if (!eligibility.eligible) {
@@ -4111,6 +4145,7 @@ export const useGameStore = create<GameState & GameActions>()(
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
           totalRentalIncome: fromPennies(totalRentalIncome - property.monthlyIncome),
           ownedPropertyCount: prev.ownedProperties.length,
+          mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
         });
         // Inline rejection is shown by the panel; do not pop a global toast.
         if (!eligibility.eligible) { return; }
@@ -4183,6 +4218,7 @@ export const useGameStore = create<GameState & GameActions>()(
           existingMonthlyMortgagePayments: fromPennies(existingPayments),
           totalRentalIncome: fromPennies(otherIncome),
           ownedPropertyCount: prev.ownedProperties.length,
+          mortgagedPropertyCount: new Set(prev.mortgages.map(m => m.propertyId)).size,
         });
         if (!eligibility.eligible) {
           return { ok: false, reason: eligibility.reason || "Failed lender criteria." };
@@ -4296,9 +4332,45 @@ export const useGameStore = create<GameState & GameActions>()(
         const credited = credit(prev, amount);
         set({
           cash: credited.cash, overdraftUsed: credited.overdraftUsed,
-          loans: [...((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging'), loan],
+          loans: [...((prev as any).loans || []), loan],
         } as any);
         showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
+      },
+
+      // Phase 5 #16 — bridging finance for unmortgageable auction stock.
+      // 12% APR, interest-only, max 12-month term. Cap at 70% of property value.
+      takeBridgingLoan: (propertyId: string, amountPennies: number) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId)
+          || prev.conveyancing.find(c => c.propertyId === propertyId);
+        if (!property) { showToast("Bridge Failed", "Property not found in your portfolio.", "destructive"); return; }
+        const propValue = 'value' in property ? property.value : (property.purchasePrice || 0);
+        const maxBridge = Math.floor(propValue * 0.70);
+        if (amountPennies <= 0 || amountPennies > maxBridge) {
+          showToast("Bridge Rejected", `Max bridging finance is 70% of value (£${fromPennies(maxBridge).toLocaleString()}).`, "destructive");
+          return;
+        }
+        const rate = 0.12;
+        const monthlyPayment = Math.max(1, Math.round((amountPennies * rate) / 12));
+        const loan: import('@/types/game').Loan = {
+          id: `bridge_${propertyId}_${Date.now()}`,
+          kind: 'bridging',
+          principal: amountPennies, remainingBalance: amountPennies,
+          monthlyPayment, interestRate: rate, termMonths: 12,
+          startMonth: prev.monthsPlayed,
+          interestOnly: true,
+          propertyId,
+          onTimeStreak: 0,
+        };
+        const credited = credit(prev, amountPennies);
+        set({
+          cash: credited.cash, overdraftUsed: credited.overdraftUsed,
+          loans: [...((prev as any).loans || []), loan],
+        } as any);
+        showToast(
+          "Bridging Loan Issued 🌉",
+          `£${fromPennies(amountPennies).toLocaleString()} @ 12% interest-only. Term: 12 months — renovate then remortgage before expiry.`,
+        );
       },
 
       settleLoan: (loanId: string, partialAmount?: number) => {
@@ -4427,6 +4499,17 @@ export const useGameStore = create<GameState & GameActions>()(
             }
           }
         }
+
+        // Phase 5 #16 — flag ~40% of auction stock as uninhabitable. Discounted
+        // ~25% to reflect the missing kitchen/bathroom + lender refusal.
+        auctions = auctions.map(p => {
+          if (p.needsRefurb !== undefined) return p;
+          if (Math.random() < 0.4) {
+            const discounted = Math.max(toPennies(40000), Math.round(p.price * 0.75));
+            return { ...p, needsRefurb: true, price: discounted, value: discounted };
+          }
+          return { ...p, needsRefurb: false };
+        });
 
         const usedIds = new Set([...auctions.map(p => p.id), ...estate.map(p => p.id)]);
         const totalAvailable = auctions.length + estate.length;
