@@ -4548,6 +4548,18 @@ export const useGameStore = create<GameState & GameActions>()(
         } as any);
       },
 
+      // v3 #4 — payoff acknowledgement
+      dismissPayoffEvent: (id: string) => {
+        const s = get() as any;
+        const remaining = ((s.payoffEvents || []) as any[]).filter(e => e.id !== id);
+        set({ payoffEvents: remaining } as any);
+      },
+      dismissAllPayoffEvents: () => {
+        set({ payoffEvents: [] } as any);
+      },
+
+
+
 
 
       markEconomicEventsSeen: (ids: string[]) => {
