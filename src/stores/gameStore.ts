@@ -397,14 +397,22 @@ function migrateState(persisted: any): GameState {
     persisted.gameSpeed = 1;
   }
   // Pause never persists as true — UNLESS pending approval queue still has items (item #10).
-  persisted.isPaused = Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0;
+  persisted.isPaused = (Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0)
+    || (Array.isArray(persisted.chainCollapseEvents) && persisted.chainCollapseEvents.length > 0)
+    || (Array.isArray(persisted.payoffEvents) && persisted.payoffEvents.length > 0);
 
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
   if (!Array.isArray(persisted.debtRecoveryCases)) persisted.debtRecoveryCases = [];
   if (!Array.isArray(persisted.pendingTransactions)) persisted.pendingTransactions = [];
+  if (!Array.isArray(persisted.payoffEvents)) persisted.payoffEvents = [];
   if (typeof persisted.projectedTaxPennies !== 'number') persisted.projectedTaxPennies = 0;
   if (typeof persisted.projectedTaxStampedMonth !== 'number') persisted.projectedTaxStampedMonth = 0;
+  // v3 #2 — annual insurance scheduling
+  if (typeof persisted.nextInsuranceDueMonth !== 'number') {
+    persisted.nextInsuranceDueMonth = (persisted.monthsPlayed || 0) + 12;
+  }
+  if (typeof persisted.lastInsuranceWarnedMonth !== 'number') persisted.lastInsuranceWarnedMonth = -1;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
