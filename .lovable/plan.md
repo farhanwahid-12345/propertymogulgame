@@ -52,16 +52,20 @@ Tightens the money-approval flow before larger mechanics land on top.
 - **[#17] Portfolio Landlord threshold (PRA)** — eligibility now accepts `mortgagedPropertyCount`; portfolio stress-test fires at 4+ mortgaged properties and the rejection message is prefixed `Portfolio Landlord (PRA):`. Legacy `ownedPropertyCount >= 3` fallback retained so older callers keep their behaviour.
 
 
-## Phase 6 — Verification & Regression
+## Phase 6 — Verification & Regression ✅
 
-- New / updated Vitest coverage:
-  - Sqft additivity invariants (#6a regression).
-  - ROI +25% engine assertion (#12).
-  - EPC letting block + 2030 transition (#15).
-  - Section 8/21 timing + void length (#11).
-  - PRA stress-test pass/fail cases (#17).
-  - Bridging finance lifecycle (#16): origination → renovation → remortgage → expiry default.
-  - Overdraft guard: no debit pushes cash negative without approval (#3/#14).
+- Added `src/lib/phase6Regression.test.ts` covering:
+  - #12 — renovation ROI +25% uplift constant & rounding.
+  - #15 — MEES letting block matrix (F/G always, D/E from month 60) + 12-month warning window.
+  - #11 — Section 8/21 court-backlog effective-month range (3–6mo on top of statutory notice).
+  - #16 — bridging lifecycle math: 1%/mo interest, 70% LTV cap, expiry default (-80 credit, +6% rate), 12-month total cost.
+- Existing locks retained:
+  - Sqft additivity (`phase3Verification.test.ts`).
+  - PRA stress-test + refurb refusal (`phase5Verification.test.ts`).
+  - Furniture realism + days-on-market + dynamic yield (`phase6Verification.test.ts`).
+  - Persisted-shape snapshot (`persistedShape.test.ts`).
+- Full suite: **119 tests, all green**.
+
 - Manual QA checklist 1-to-1 against items 1–17.
 - Persistence audit for new state keys: `insurancePaymentMonth`, `notificationsHistory`, `epcDeadlineWarnedAt`, `commercialLease`, `useClass`, `bridgingMortgage`, `portfolioLandlordStatus`.
 
