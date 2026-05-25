@@ -221,7 +221,17 @@ export function getMarketRentPounds(p: {
     p.epcRating === 'G' ? 0.92 :
                           1.00;
 
-  return Math.round((baseValue * blended * qualityMult * unitMult * furnishingMult * epcMult) / 12);
+  const computed = Math.round((baseValue * blended * qualityMult * unitMult * furnishingMult * epcMult) / 12);
+  // Phase 2 #9a — comparator floor: at least 5% above current rent, and never
+  // below the original advertised baseline rent.
+  const currentFloor = p.currentRentPounds && p.currentRentPounds > 0
+    ? Math.round(p.currentRentPounds * 1.05)
+    : 0;
+  const baselineFloor = p.baselineRentPounds && p.baselineRentPounds > 0
+    ? Math.round(p.baselineRentPounds)
+    : 0;
+  return Math.max(computed, currentFloor, baselineFloor);
 }
+
 
 
