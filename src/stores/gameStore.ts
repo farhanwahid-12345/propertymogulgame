@@ -4332,9 +4332,45 @@ export const useGameStore = create<GameState & GameActions>()(
         const credited = credit(prev, amount);
         set({
           cash: credited.cash, overdraftUsed: credited.overdraftUsed,
-          loans: [...((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging'), loan],
+          loans: [...((prev as any).loans || []), loan],
         } as any);
         showToast("Loan Approved! 💰", `£${fromPennies(amount).toLocaleString()} ${kind} loan @ ${(rate * 100).toFixed(2)}% — £${fromPennies(monthlyPayment).toLocaleString()}/mo.`);
+      },
+
+      // Phase 5 #16 — bridging finance for unmortgageable auction stock.
+      // 12% APR, interest-only, max 12-month term. Cap at 70% of property value.
+      takeBridgingLoan: (propertyId: string, amountPennies: number) => {
+        const prev = get();
+        const property = prev.ownedProperties.find(p => p.id === propertyId)
+          || prev.conveyancing.find(c => c.propertyId === propertyId);
+        if (!property) { showToast("Bridge Failed", "Property not found in your portfolio.", "destructive"); return; }
+        const propValue = 'value' in property ? property.value : (property.purchasePrice || 0);
+        const maxBridge = Math.floor(propValue * 0.70);
+        if (amountPennies <= 0 || amountPennies > maxBridge) {
+          showToast("Bridge Rejected", `Max bridging finance is 70% of value (£${fromPennies(maxBridge).toLocaleString()}).`, "destructive");
+          return;
+        }
+        const rate = 0.12;
+        const monthlyPayment = Math.max(1, Math.round((amountPennies * rate) / 12));
+        const loan: import('@/types/game').Loan = {
+          id: `bridge_${propertyId}_${Date.now()}`,
+          kind: 'bridging',
+          principal: amountPennies, remainingBalance: amountPennies,
+          monthlyPayment, interestRate: rate, termMonths: 12,
+          startMonth: prev.monthsPlayed,
+          interestOnly: true,
+          propertyId,
+          onTimeStreak: 0,
+        };
+        const credited = credit(prev, amountPennies);
+        set({
+          cash: credited.cash, overdraftUsed: credited.overdraftUsed,
+          loans: [...((prev as any).loans || []), loan],
+        } as any);
+        showToast(
+          "Bridging Loan Issued 🌉",
+          `£${fromPennies(amountPennies).toLocaleString()} @ 12% interest-only. Term: 12 months — renovate then remortgage before expiry.`,
+        );
       },
 
       settleLoan: (loanId: string, partialAmount?: number) => {
