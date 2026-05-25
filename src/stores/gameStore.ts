@@ -1830,7 +1830,9 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         // ── Loans amortisation (personal/business/investor) ──
-        const prevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []).filter((l: any) => l.kind !== 'bridging');
+        const allPrevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []);
+        const prevLoans = allPrevLoans.filter((l: any) => l.kind !== 'bridging');
+        const prevBridges = allPrevLoans.filter((l: any) => l.kind === 'bridging');
         const updatedLoans: import('@/types/game').Loan[] = [];
         prevLoans.forEach(l => {
           const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
@@ -1874,6 +1876,36 @@ export const useGameStore = create<GameState & GameActions>()(
             });
           }
         });
+
+        // ── Bridging loans (interest-only, balloon at term) ──
+        prevBridges.forEach(l => {
+          const monthlyInterest = Math.max(1, Math.round(l.remainingBalance * (l.interestRate / 12)));
+          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, monthlyInterest);
+          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
+          else { creditAdj -= 10; }
+
+          const expiryMonth = l.startMonth + l.termMonths;
+          const isExpired = newMonthNumber >= expiryMonth && l.remainingBalance > 0;
+          if (isExpired && !l.expiryPenaltyApplied) {
+            creditAdj -= 80;
+            const penalisedRate = Math.min(0.30, l.interestRate + 0.06);
+            showToast(
+              "⚠ Bridging Loan Expired",
+              `Bridge against ${l.propertyId ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
+              "destructive",
+            );
+            updatedLoans.push({
+              ...l,
+              interestRate: penalisedRate,
+              monthlyPayment: monthlyInterest,
+              expiryPenaltyApplied: true,
+              lastMissedMonth: prev.monthsPlayed,
+            });
+          } else {
+            updatedLoans.push({ ...l, monthlyPayment: monthlyInterest });
+          }
+        });
+
 
         // ── Annual EICR (electrical safety) check on residential properties ──
         let eicrCharged = 0;
