@@ -196,6 +196,7 @@ export function MultiUnitSlots({
                         // Market rent is for the *whole* property — divide by
                         // unit count so a single room/flat compares like-for-like.
                         const units = Math.max(1, slots.length);
+                        const unitCurrent = slotRent || baseRentPerUnitPounds;
                         const whole = getMarketRentPounds({
                           value: propertyValue,
                           yield: propertyYield,
@@ -203,13 +204,16 @@ export function MultiUnitSlots({
                           subtype,
                           subtypeUnits: units,
                           furnishingTier,
+                          // Phase 2 #9a — anchor against current per-unit rent so
+                          // Section 13 comparator is realistic on sitting tenants.
+                          currentRentPounds: unitCurrent * units,
+                          baselineRentPounds: baseRentPerUnitPounds * units,
                         });
-
-
                         return whole > 0
                           ? Math.round(whole / units)
                           : baseRentPerUnitPounds;
                       })()}
+
                       monthsSinceLastIncrease={999}
                       tenant={tenant}
                       tenantSatisfaction={slot.satisfaction ?? 80}

@@ -82,7 +82,7 @@ export function ListedProperties({ propertyListings, ownedProperties, onAcceptOf
           if (!property) return null;
 
           const daysOnMarket = Math.floor((Date.now() - listing.listingDate) / (1000 * 60 * 60 * 24));
-          const offerCount = listing.offers?.length || 0;
+          const offerCount = (listing.offers || []).filter((o: any) => o.status !== 'walkaway' && o.status !== 'rejected').length;
           const isEditingThis = editingThreshold === listing.propertyId;
           const asking = listing.askingPrice || property.value;
           const market = property.value;

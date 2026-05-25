@@ -157,7 +157,13 @@ export function getMarketRentPounds(p: {
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   /** Item #1: EPC band shifts effective rent (renters pay for energy-efficient stock). */
   epcRating?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  /** Phase 2 #9a — current contractual rent in POUNDS; market rent must never
+   *  be lower than current rent + 5% (Section 13 comparator must be realistic). */
+  currentRentPounds?: number;
+  /** Phase 2 #9a — original advertised baseline rent (pounds), used as floor. */
+  baselineRentPounds?: number;
 }): number {
+
 
   const baseValue = (typeof p.marketValue === 'number' && p.marketValue > 0) ? p.marketValue : p.value;
   if (!baseValue || baseValue <= 0) return 0;
@@ -215,7 +221,17 @@ export function getMarketRentPounds(p: {
     p.epcRating === 'G' ? 0.92 :
                           1.00;
 
-  return Math.round((baseValue * blended * qualityMult * unitMult * furnishingMult * epcMult) / 12);
+  const computed = Math.round((baseValue * blended * qualityMult * unitMult * furnishingMult * epcMult) / 12);
+  // Phase 2 #9a — comparator floor: at least 5% above current rent, and never
+  // below the original advertised baseline rent.
+  const currentFloor = p.currentRentPounds && p.currentRentPounds > 0
+    ? Math.round(p.currentRentPounds * 1.05)
+    : 0;
+  const baselineFloor = p.baselineRentPounds && p.baselineRentPounds > 0
+    ? Math.round(p.baselineRentPounds)
+    : 0;
+  return Math.max(computed, currentFloor, baselineFloor);
 }
+
 
 
