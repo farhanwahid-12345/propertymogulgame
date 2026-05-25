@@ -286,6 +286,17 @@ const RENOVATION_OPTIONS_BASE: RenovationType[] = [
   },
 ];
 
+// Phase 3 #12 — +25% headline ROI uplift on every option (values + rents).
+// Applied once at export time so dialog previews, planning previews, and the
+// settlement payout all see the same numbers.
+const RENO_ROI_UPLIFT = 1.25;
+export const RENOVATION_OPTIONS: RenovationType[] = RENOVATION_OPTIONS_BASE.map(r => ({
+  ...r,
+  rentIncrease: Math.round((r.rentIncrease * RENO_ROI_UPLIFT) / 5) * 5,
+  valueIncrease: Math.round((r.valueIncrease * RENO_ROI_UPLIFT) / 100) * 100,
+}));
+
+
 const CategoryColors = {
   maintenance: "text-secondary border-secondary/20 bg-secondary/5",
   improvement: "text-primary border-primary/20 bg-primary/5",
