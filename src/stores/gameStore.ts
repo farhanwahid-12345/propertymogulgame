@@ -3214,7 +3214,11 @@ export const useGameStore = create<GameState & GameActions>()(
         appealChance = Math.max(0, Math.min(0.85, appealChance));
         const willAppeal = Math.random() < appealChance;
 
-        const effectiveMonth = prev.monthsPlayed + noticeMonths;
+        // Phase 4 #11 — court backlog. Real-world possession claims sit in a
+        // 3-6 month queue before bailiff enforcement. Added on top of the
+        // statutory notice period so evictions are a major time commitment.
+        const courtBacklogMonths = 3 + Math.floor(Math.random() * 4); // 3..6
+        const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
         const updatedTenants = prev.tenants.map(t =>
           t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
             ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground }
@@ -3231,7 +3235,11 @@ export const useGameStore = create<GameState & GameActions>()(
           appealResolveMonth: willAppeal ? prev.monthsPlayed + 1 : undefined,
         };
         const appealNote = willAppeal ? ' Tenant has filed a tribunal appeal — ruling next month.' : '';
-        showToast("Eviction Notice Served", `${validReason}. Tenant must vacate by month ${effectiveMonth}.${appealNote}`);
+        showToast(
+          "Eviction Notice Served",
+          `${validReason}. ${noticeMonths}mo notice + ~${courtBacklogMonths}mo court backlog — possession by month ${effectiveMonth}.${appealNote}`,
+        );
+
         set({
           tenants: updatedTenants,
           pendingEvictions: [...prev.pendingEvictions, newEviction],
