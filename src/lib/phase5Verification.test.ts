@@ -32,8 +32,7 @@ describe('Phase 5 #16 — unmortgageable auction stock', () => {
 });
 
 describe('Phase 5 #17 — PRA Portfolio Landlord threshold', () => {
-  it('uses lenient single-property ICR with 3 mortgaged properties', () => {
-    // Single-property ICR: 1200 / monthlyPayment must cover >= 1.0
+  it('does NOT label rejection as PRA when fewer than 4 properties are mortgaged', () => {
     const r = calculateMortgageEligibility({
       ...baseReq,
       mortgagedPropertyCount: 3,
@@ -41,11 +40,11 @@ describe('Phase 5 #17 — PRA Portfolio Landlord threshold', () => {
       totalRentalIncome: 1_200,
       existingMonthlyMortgagePayments: 3_000,
     });
-    expect(r.eligible).toBe(true);
+    expect(r.eligible).toBe(false);
+    expect(r.reason ?? '').not.toMatch(/Portfolio Landlord \(PRA\)/);
   });
 
-  it('flips to portfolio stress test once 4+ properties are mortgaged', () => {
-    // Same numbers but PRA kicks in — portfolio ICR fails 1.20×
+  it('labels rejection as PRA once 4+ properties are mortgaged', () => {
     const r = calculateMortgageEligibility({
       ...baseReq,
       mortgagedPropertyCount: 4,
