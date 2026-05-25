@@ -11,6 +11,7 @@ const ICONS: Record<PendingTransactionType, string> = {
   council_tax: "🏛️",
   income_tax: "🧾",
   corporation_tax: "🏢",
+  eicr: "⚡",
   other: "💷",
 };
 
@@ -19,6 +20,7 @@ const LABELS: Record<PendingTransactionType, string> = {
   council_tax: "Council Tax",
   income_tax: "Income Tax",
   corporation_tax: "Corporation Tax",
+  eicr: "EICR (Electrical Safety)",
   other: "Other Debit",
 };
 

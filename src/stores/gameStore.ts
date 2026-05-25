@@ -44,7 +44,7 @@ import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 
 // ─── Helpers ──────────────────────────────────────────────
-import { showToast, debit, credit, calcDeposit } from './storeHelpers';
+import { showToast, debit, debitStrict, credit, calcDeposit } from './storeHelpers';
 import {
   asNumber, asString,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
@@ -131,6 +131,9 @@ interface GameActions {
   // Phase 3 #5 — chain-collapse pop-out acknowledgement
   dismissChainCollapseEvent: (id: string) => void;
   dismissAllChainCollapseEvents: () => void;
+  // v3 #4 — mortgage / loan payoff modal acknowledgement
+  dismissPayoffEvent: (id: string) => void;
+  dismissAllPayoffEvents: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
@@ -209,6 +212,9 @@ function createInitialState(): GameState {
     projectedTaxStampedMonth: 0,
     pendingTransactions: [],
     chainCollapseEvents: [],
+    nextInsuranceDueMonth: 12,
+    lastInsuranceWarnedMonth: -1,
+    payoffEvents: [],
   };
 }
 
@@ -391,14 +397,22 @@ function migrateState(persisted: any): GameState {
     persisted.gameSpeed = 1;
   }
   // Pause never persists as true — UNLESS pending approval queue still has items (item #10).
-  persisted.isPaused = Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0;
+  persisted.isPaused = (Array.isArray(persisted.pendingTransactions) && persisted.pendingTransactions.length > 0)
+    || (Array.isArray(persisted.chainCollapseEvents) && persisted.chainCollapseEvents.length > 0)
+    || (Array.isArray(persisted.payoffEvents) && persisted.payoffEvents.length > 0);
 
   if (!Array.isArray(persisted.reputationLog)) persisted.reputationLog = [];
   if (!Array.isArray(persisted.seenEconomicEventIds)) persisted.seenEconomicEventIds = [];
   if (!Array.isArray(persisted.debtRecoveryCases)) persisted.debtRecoveryCases = [];
   if (!Array.isArray(persisted.pendingTransactions)) persisted.pendingTransactions = [];
+  if (!Array.isArray(persisted.payoffEvents)) persisted.payoffEvents = [];
   if (typeof persisted.projectedTaxPennies !== 'number') persisted.projectedTaxPennies = 0;
   if (typeof persisted.projectedTaxStampedMonth !== 'number') persisted.projectedTaxStampedMonth = 0;
+  // v3 #2 — annual insurance scheduling
+  if (typeof persisted.nextInsuranceDueMonth !== 'number') {
+    persisted.nextInsuranceDueMonth = (persisted.monthsPlayed || 0) + 12;
+  }
+  if (typeof persisted.lastInsuranceWarnedMonth !== 'number') persisted.lastInsuranceWarnedMonth = -1;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
@@ -726,10 +740,14 @@ export const useGameStore = create<GameState & GameActions>()(
           );
           return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
         }, 0);
-        // Landlord insurance — 0.4%/yr of property value, charged every month regardless of tenancy.
-        const insurance = newOwnedProperties.reduce((total, property) => {
+        // v3 #2 — landlord insurance is billed ANNUALLY (0.4% of property value)
+        // and routed through the pending-approval queue. We still compute the
+        // monthly accrual here for cashflow projections; the actual debit
+        // happens once per 12 months below.
+        const monthlyInsuranceAccrual = newOwnedProperties.reduce((total, property) => {
           return total + Math.floor((property.value * 0.004) / 12);
         }, 0);
+        const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
         const totalExpenses = mortgagePayments + councilTax + insurance;
         const netIncome = monthlyIncome - totalExpenses;
 
@@ -807,7 +825,8 @@ export const useGameStore = create<GameState & GameActions>()(
           if (recentDefaults.length === 0 && newOwnedProperties.length > 0) creditAdj += 3;
         }
 
-        // Check paid-off mortgages
+        // Check paid-off mortgages (v3 #4 — surface via modal queue, not just a toast)
+        const newPayoffEvents: import('@/types/game').PayoffEvent[] = [];
         const paidOff = updatedMortgages.filter(m =>
           (newMortgages.find(old => old.id === m.id)?.remainingBalance ?? 0) > 0 && m.remainingBalance === 0
         );
@@ -815,7 +834,12 @@ export const useGameStore = create<GameState & GameActions>()(
           const prop = newOwnedProperties.find(p => p.id === m.propertyId);
           if (prop) {
             creditAdj += 15;
-            showToast("Mortgage Paid Off! 🎉", `${prop.name} is now fully owned!`);
+            newPayoffEvents.push({
+              id: `payoff-mortgage-${m.id}-${newMonthNumber}`,
+              kind: 'mortgage',
+              label: prop.name,
+              month: newMonthNumber,
+            });
           }
         });
 
@@ -1559,14 +1583,38 @@ export const useGameStore = create<GameState & GameActions>()(
         // until the player approves them via the dialog. Mortgage payments stay
         // automatic (contractual direct debit).
         const newPendingTransactions: import('@/types/game').PendingTransaction[] = [];
-        if (insurance > 0) {
-          newPendingTransactions.push({
-            id: `ptx-ins-${newMonthNumber}`,
-            type: 'insurance',
-            amount: insurance,
-            description: `Landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
-            month: newMonthNumber,
-          });
+
+        // v3 #2 — Annual landlord insurance. Bill once every 12 months and warn one month ahead.
+        const nextInsuranceDueMonth = (prev as any).nextInsuranceDueMonth ?? 12;
+        const lastInsuranceWarnedMonth = (prev as any).lastInsuranceWarnedMonth ?? -1;
+        let updatedNextInsuranceDueMonth = nextInsuranceDueMonth;
+        let updatedLastInsuranceWarnedMonth = lastInsuranceWarnedMonth;
+        const annualInsurancePennies = newOwnedProperties.reduce(
+          (t, p) => t + Math.floor(p.value * 0.004),
+          0,
+        );
+        if (annualInsurancePennies > 0) {
+          // 1-month-ahead warning toast
+          if (
+            newMonthNumber === nextInsuranceDueMonth - 1 &&
+            lastInsuranceWarnedMonth !== newMonthNumber
+          ) {
+            showToast(
+              "Insurance Due Next Month",
+              `Annual landlord insurance of £${fromPennies(annualInsurancePennies).toLocaleString()} will be billed next month.`,
+            );
+            updatedLastInsuranceWarnedMonth = newMonthNumber;
+          }
+          if (newMonthNumber >= nextInsuranceDueMonth) {
+            newPendingTransactions.push({
+              id: `ptx-ins-${newMonthNumber}`,
+              type: 'insurance',
+              amount: annualInsurancePennies,
+              description: `Annual landlord insurance — month ${newMonthNumber} (${newOwnedProperties.length} ${newOwnedProperties.length === 1 ? 'property' : 'properties'})`,
+              month: newMonthNumber,
+            });
+            updatedNextInsuranceDueMonth = newMonthNumber + 12;
+          }
         }
         if (councilTax > 0) {
           newPendingTransactions.push({
@@ -1725,7 +1773,13 @@ export const useGameStore = create<GameState & GameActions>()(
             // 12-month on-time streak → +5 credit
             if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
             if (newBal <= 0) {
-              showToast("Loan Paid Off! 🎉", `${l.kind} loan fully repaid.`);
+              newPayoffEvents.push({
+                id: `payoff-loan-${l.id}-${newMonthNumber}`,
+                kind: 'loan',
+                label: l.kind,
+                month: newMonthNumber,
+                amountPennies: l.monthlyPayment,
+              });
               return;
             }
             updatedLoans.push({ ...l, remainingBalance: newBal, onTimeStreak: newStreak });
@@ -1759,9 +1813,15 @@ export const useGameStore = create<GameState & GameActions>()(
           return { ...p, lastEicrMonth: newMonthNumber };
         });
         if (eicrCharged > 0) {
-          const debited = debit({ cash: finalCash, overdraftUsed: finalOverdraftUsed, overdraftLimit: prev.overdraftLimit }, eicrCharged);
-          if (debited) { finalCash = debited.cash; finalOverdraftUsed = debited.overdraftUsed; }
-          else { finalCash -= eicrCharged; }
+          // v3 #14 — EICR no longer silently taps overdraft. Route through the
+          // pending-approval queue so the player explicitly signs it off.
+          newPendingTransactions.push({
+            id: `ptx-eicr-${newMonthNumber}`,
+            type: 'eicr',
+            amount: eicrCharged,
+            description: `Annual EICR (electrical safety) certificate — ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length} residential ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length === 1 ? 'property' : 'properties'}`,
+            month: newMonthNumber,
+          });
           finalYearlyDeductibleExpenses += eicrCharged;
         }
         // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
@@ -1996,11 +2056,19 @@ export const useGameStore = create<GameState & GameActions>()(
             ...((s as any).pendingTransactions || []),
             ...newPendingTransactions,
           ],
+          nextInsuranceDueMonth: updatedNextInsuranceDueMonth,
+          lastInsuranceWarnedMonth: updatedLastInsuranceWarnedMonth,
+          payoffEvents: newPayoffEvents.length > 0
+            ? [...(((s as any).payoffEvents) || []), ...newPayoffEvents]
+            : ((s as any).payoffEvents || []),
           // Item #10: any queued debit auto-pauses the clock until approved.
-          // Item #10 + Phase 3 #5: any queued debit OR chain-collapse pop-out auto-pauses the clock.
+          // Item #10 + Phase 3 #5 + v3 #4: pending debits, chain-collapse events
+          // OR payoff acknowledgements all auto-pause the clock.
           isPaused:
             (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
             || newChainCollapseEvents.length > 0
+            || newPayoffEvents.length > 0
+            || (((s as any).payoffEvents?.length) || 0) > 0
               ? true
               : s.isPaused,
         } as any));
@@ -3335,8 +3403,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const scaledValue = scaled.value;
 
         const costPennies = toPennies(scaledCostPounds);
-        const debited = debit(prev, costPennies);
-        if (!debited) { showToast("Insufficient Funds", `Need £${scaledCostPounds.toLocaleString()} (even with overdraft).`, "destructive"); return; }
+        // v3 #3/#14 — renovations are discretionary spend: cash-only, never tap
+        // the overdraft silently. Use debitStrict so the player must clear
+        // the overdraft (or release cash) before kicking off works.
+        const debited = debitStrict(prev, costPennies);
+        if (!debited) { showToast("Insufficient Cash", `Need £${scaledCostPounds.toLocaleString()} in cash to start this renovation — overdraft can't fund renovations.`, "destructive"); return; }
         if (prev.renovations.some(r => r.propertyId === propertyId && r.type.id === renovationType.id)) { showToast("Already In Progress", `${renovationType.name} is already underway on this property.`, "destructive"); return; }
 
         // Persist scaled values onto the renovation record so completion uses the same numbers
@@ -3379,21 +3450,18 @@ export const useGameStore = create<GameState & GameActions>()(
         // Debit prerequisite costs in addition to the main renovation.
         const extraCostPennies = prerequisiteExtensions.reduce((s, e) => s + e.costPennies, 0);
         let cashAfter = debited.cash;
-        let overdraftAfter = debited.overdraftUsed;
-        let extraOverdraftUsed = 0;
+        let overdraftAfter = prev.overdraftUsed;
         if (extraCostPennies > 0) {
-          const extraDebited = debit({ ...prev, cash: cashAfter, overdraftUsed: overdraftAfter }, extraCostPennies);
+          const extraDebited = debitStrict({ cash: cashAfter }, extraCostPennies);
           if (!extraDebited) {
             showToast(
-              "Insufficient Funds",
-              `Conversion needs an extra £${fromPennies(extraCostPennies).toLocaleString()} to also build the approved extension(s).`,
+              "Insufficient Cash",
+              `Conversion needs an extra £${fromPennies(extraCostPennies).toLocaleString()} in cash to also build the approved extension(s) — overdraft can't fund renovations.`,
               "destructive",
             );
             return;
           }
           cashAfter = extraDebited.cash;
-          overdraftAfter = extraDebited.overdraftUsed;
-          extraOverdraftUsed = extraDebited.usedOverdraft;
         }
 
         // The conversion can't physically complete before its prerequisite
@@ -3418,12 +3486,10 @@ export const useGameStore = create<GameState & GameActions>()(
           completionMonth: startMonth + e.months,
         }));
 
-        const totalOverdraft = debited.usedOverdraft + extraOverdraftUsed;
-        const overdraftNote = totalOverdraft > 0 ? ` (£${fromPennies(totalOverdraft).toLocaleString()} via overdraft)` : '';
         const prereqNote = prerequisiteExtensions.length > 0
           ? ` Bundled with ${prerequisiteExtensions.map(e => e.renoType.name).join(', ')}.`
           : '';
-        showToast("Renovation Started!", `${renovationType.name} begun.${prereqNote}${overdraftNote}`);
+        showToast("Renovation Started!", `${renovationType.name} begun.${prereqNote}`);
 
         // Consume planning approvals: the main renovation's (if it needed one)
         // AND every prerequisite extension's approval.
@@ -4541,6 +4607,18 @@ export const useGameStore = create<GameState & GameActions>()(
           isPaused: !stillHasPending ? false : s.isPaused,
         } as any);
       },
+
+      // v3 #4 — payoff acknowledgement
+      dismissPayoffEvent: (id: string) => {
+        const s = get() as any;
+        const remaining = ((s.payoffEvents || []) as any[]).filter(e => e.id !== id);
+        set({ payoffEvents: remaining } as any);
+      },
+      dismissAllPayoffEvents: () => {
+        set({ payoffEvents: [] } as any);
+      },
+
+
 
 
 

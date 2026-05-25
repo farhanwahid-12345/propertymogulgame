@@ -21,6 +21,22 @@ export function debit(
 }
 
 /**
+ * Strict cash-only debit. Returns null when the player's CASH alone can't
+ * cover the amount — never silently taps the overdraft. Use this for any
+ * discretionary, user-initiated spend (renovations, fees, optional services)
+ * so the overdraft is only ever engaged with the player's explicit consent.
+ * Phase 1 items #3 / #14.
+ */
+export function debitStrict(
+  state: { cash: number },
+  amount: number,
+): { cash: number } | null {
+  if (amount <= 0) return { cash: state.cash };
+  if (state.cash < amount) return null;
+  return { cash: state.cash - amount };
+}
+
+/**
  * Credit cash. Does NOT auto-repay overdraft — players control when to clear
  * the overdraft via the Credit & Banking panel. (Item 9a — auto-clawback was
  * surprising players who got loans or rent and saw their overdraft vanish.)
