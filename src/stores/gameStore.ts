@@ -2286,7 +2286,7 @@ export const useGameStore = create<GameState & GameActions>()(
             const refurbClearUpdate =
               updatedProperties[idx].needsRefurb &&
               completedAfter.includes('kitchen_upgrade') &&
-              completedAfter.includes('bathroom_upgrade')
+              completedAfter.includes('bathroom_renovation')
                 ? { needsRefurb: false }
                 : {};
 
