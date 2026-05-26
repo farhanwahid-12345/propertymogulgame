@@ -2599,7 +2599,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", "You already own this property.", "destructive"); return; }
         // Count conveyancing buys as pending
         const pendingBuys = prev.conveyancing.filter(c => c.status === 'buying').length;
-        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Property Limit", `Max ${getMaxPropertiesForLevel(prev.level)} at level ${prev.level}!`, "destructive"); return; }
+        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Property Limit", `Max ${getMaxPropertiesForLevel(prev.level)} properties (portfolio cap).`, "destructive"); return; }
 
         const allowedTypes = getAvailablePropertyTypes(prev.level);
         if (!allowedTypes.includes('all') && !allowedTypes.includes(property.type)) { showToast("Level Restriction", `Cannot buy ${property.type} at this level!`, "destructive"); return; }
@@ -2698,7 +2698,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.isBankrupt) return;
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", `You already own ${property.name}!`, "destructive"); return; }
         const pendingBuys = prev.conveyancing.filter(c => c.status === 'buying').length;
-        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Portfolio Limit", `Max ${getMaxPropertiesForLevel(prev.level)} at level ${prev.level}!`, "destructive"); return; }
+        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Portfolio Limit", `Max ${getMaxPropertiesForLevel(prev.level)} properties (portfolio cap).`, "destructive"); return; }
 
         const { min: minValue } = getPropertyValueRangeForLevel(prev.level);
         if (property.value < minValue) { showToast("Too Cheap", `Min value at level ${prev.level}`, "destructive"); return; }
