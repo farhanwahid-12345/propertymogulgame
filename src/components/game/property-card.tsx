@@ -770,9 +770,6 @@ export const PropertyCard = memo(function PropertyCard({
               </>
             )}
           </div>
-              </>
-            )}
-          </div>
         ) : (
           <div className="space-y-3">
             {!showMortgageOptions ? (
