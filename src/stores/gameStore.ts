@@ -1908,27 +1908,26 @@ export const useGameStore = create<GameState & GameActions>()(
 
 
         // ── Annual EICR (electrical safety) check on residential properties ──
+        // v4 #8a — emit ONE PendingTransaction per property so the player can
+        // see exactly which property each EICR is for.
         let eicrCharged = 0;
         const eicrUpdatedProps = updatedOwnedProperties.map(p => {
           if (p.type !== 'residential') return p;
           const last = p.lastEicrMonth ?? 0;
           if (newMonthNumber - last < 12) return p;
           eicrCharged += EICR_COST_PENNIES;
+          newPendingTransactions.push({
+            id: `ptx-eicr-${p.id}-${newMonthNumber}`,
+            type: 'eicr',
+            amount: EICR_COST_PENNIES,
+            description: `${p.name} — annual electrical safety certificate (EICR).`,
+            month: newMonthNumber,
+          });
           return { ...p, lastEicrMonth: newMonthNumber };
         });
         if (eicrCharged > 0) {
-          // v3 #14 — EICR no longer silently taps overdraft. Route through the
-          // pending-approval queue so the player explicitly signs it off.
-          newPendingTransactions.push({
-            id: `ptx-eicr-${newMonthNumber}`,
-            type: 'eicr',
-            amount: eicrCharged,
-            description: `Annual EICR (electrical safety) certificate — ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length} residential ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length === 1 ? 'property' : 'properties'}`,
-            month: newMonthNumber,
-          });
           finalYearlyDeductibleExpenses += eicrCharged;
         }
-        // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
         updatedOwnedProperties = eicrUpdatedProps;
 
         // ── Arrears / Court / Bailiff escalation ──────────────────────────

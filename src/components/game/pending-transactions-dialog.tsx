@@ -57,13 +57,13 @@ export function PendingTransactionsDialog() {
 
         <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
           {pendingTransactions.map((tx) => (
-            <div key={tx.id} className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-3 py-2">
-              <span className="text-2xl">{ICONS[tx.type]}</span>
+            <div key={tx.id} className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/50 px-3 py-2">
+              <span className="text-2xl leading-none mt-0.5">{ICONS[tx.type]}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold">{LABELS[tx.type]}</div>
-                <div className="text-xs text-muted-foreground truncate">{tx.description}</div>
+                <div className="text-xs text-muted-foreground break-words">{tx.description}</div>
               </div>
-              <div className="text-sm font-bold tabular-nums">£{fromPennies(tx.amount).toLocaleString()}</div>
+              <div className="text-sm font-bold tabular-nums whitespace-nowrap">£{fromPennies(tx.amount).toLocaleString()}</div>
               <Button size="sm" variant="outline" onClick={() => approveOne(tx.id)}>
                 Approve
               </Button>
