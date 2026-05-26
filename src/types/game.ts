@@ -38,6 +38,9 @@ export interface Conveyancing {
   advertisedYield?: number;
   /** Snapshot of the advertised monthly rent (pennies) at offer-time. */
   advertisedMonthlyIncome?: number;
+  /** Snapshot of property.type at offer time. Prevents commercial → residential
+   *  flip when the source listing is no longer in market lists at settlement. */
+  propertyType?: "residential" | "commercial" | "luxury";
 }
 
 export interface Property {
