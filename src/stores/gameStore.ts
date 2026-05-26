@@ -4521,12 +4521,14 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Phase 5 #16 — flag ~40% of auction stock as uninhabitable. Discounted
-        // ~25% to reflect the missing kitchen/bathroom + lender refusal.
+        // v4 #14 — ~40% of auction stock is uninhabitable. Discount randomly
+        // 30–60% off comparable stock to reflect missing kitchen/bathroom and
+        // standard-lender refusal. Buyers may use cash OR bridging finance.
         auctions = auctions.map(p => {
           if (p.needsRefurb !== undefined) return p;
           if (Math.random() < 0.4) {
-            const discounted = Math.max(toPennies(40000), Math.round(p.price * 0.75));
+            const discountPct = 0.30 + Math.random() * 0.30; // 30–60%
+            const discounted = Math.max(toPennies(40000), Math.round(p.price * (1 - discountPct)));
             return { ...p, needsRefurb: true, price: discounted, value: discounted };
           }
           return { ...p, needsRefurb: false };
