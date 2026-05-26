@@ -3200,15 +3200,21 @@ export const useGameStore = create<GameState & GameActions>()(
           ...(tenantRec.satisfactionReasons || []).slice(0, 4),
         ];
 
+        // v4 #15a — update only the specific slot's rent. For multi-unit,
+        // monthlyIncome is recomputed as the sum of all slot rents.
+        const isMultiUnit = (property.subtype === 'hmo' || property.subtype === 'flats') && (property.subtypeUnits ?? 1) > 1;
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+            ? { ...t, rentPennies: newRentPennies, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
+            : t
+        );
+        const recomputedMonthlyIncome = isMultiUnit
+          ? updatedTenants.filter(t => t.propertyId === propertyId).reduce((sum, t) => sum + ((t as any).rentPennies ?? 0), 0)
+          : newRentPennies;
         const updatedProps = prev.ownedProperties.map(p =>
           p.id === propertyId
-            ? { ...p, monthlyIncome: newRentPennies, baseRent: newRentPennies, lastRentIncrease: prev.monthsPlayed }
+            ? { ...p, monthlyIncome: recomputedMonthlyIncome, baseRent: isMultiUnit ? p.baseRent : newRentPennies, lastRentIncrease: prev.monthsPlayed }
             : p
-        );
-        const updatedTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId
-            ? { ...t, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
-            : t
         );
 
         showToast(
