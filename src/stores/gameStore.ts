@@ -1192,6 +1192,12 @@ export const useGameStore = create<GameState & GameActions>()(
               resolveCost: 0,
               satisfactionPenaltyIfIgnored: 0,
             });
+            // v4 #16 — also fire a one-time pop-up so the player can't miss it.
+            showToast(
+              "EPC Lettings Ban Approaching",
+              `${property.name} is EPC ${epc}. From 2030 (${MEES_2030_MONTH - newMonthNumber}mo) lets below Band C are illegal. Upgrade now to avoid a void.`,
+              "destructive",
+            );
             meesAlreadyByProp.add(property.id);
           });
         }
