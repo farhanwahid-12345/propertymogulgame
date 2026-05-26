@@ -28,7 +28,7 @@ import {
   getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
   getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
-import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
+import { generateRandomProperty, generateMarketProperty, deriveSqft } from '@/lib/engine/market';
 import {
   calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
 } from '@/lib/mortgageEligibility';
@@ -562,11 +562,14 @@ export const useGameStore = create<GameState & GameActions>()(
           if (!prop) {
             // Property was generated inline — reconstruct using the advertised
             // yield/rent snapshot so realised numbers match the agent's label.
+            // v4 #9 — preserve the snapshotted `propertyType`; older saves fall
+            // back to 'residential' but new buys carry the original type through.
             const reconstructedValue = conv.purchasePrice || 0;
             const reconstructedYield = conv.advertisedYield ?? (6 + Math.random() * 9);
             const derivedRent = conv.advertisedMonthlyIncome
               ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
-            prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
+            const reconstructedType = conv.propertyType ?? 'residential';
+            prop = { id: conv.propertyId, name: conv.propertyName, type: reconstructedType, price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
           // Phase 3 #2 — preserve the ADVERTISED rent so realised yield rises when
           // we buy under asking; bonus a small "instant equity" cushion when the
@@ -1516,16 +1519,16 @@ export const useGameStore = create<GameState & GameActions>()(
           );
         }
 
-        // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
-        // months + £ owed. Tenants who pay this month additionally pay back a
-        // slice (≤50% of monthly rent) of their arrears. Arrears only clear
-        // when fully repaid — paying current rent alone is NOT enough.
+        // v4 #3 — per-tenant arrears bookkeeping. Missed tenants accumulate
+        // months + £ owed and the player receives NO rent that month. When the
+        // tenant resumes paying, the FULL outstanding arrears balance is paid
+        // back in a single lump sum on top of normal rent (catch-up payment).
         let arrearsRepaidThisMonth = 0;
         newTenants = newTenants.map(t => {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+          const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+          const rentPennies = (t as any).rentPennies || (prop?.monthlyIncome ?? 0);
           if (missedTenantKeys.has(key)) {
-            const rentPennies = (t as any).rentPennies
-              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
             const lastToast = t.lastDefaultToastMonth ?? -999;
             const stamped = newMonthNumber - lastToast >= 3 ? newMonthNumber : (t.lastDefaultToastMonth ?? 0);
             return {
@@ -1535,18 +1538,14 @@ export const useGameStore = create<GameState & GameActions>()(
               lastDefaultToastMonth: stamped,
             };
           }
-          // Paying this month — chip away at arrears (up to 50% of monthly rent).
+          // Paying this month — repay the FULL outstanding balance as a lump sum.
           const owed = t.arrearsPennies ?? 0;
           if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
-            const rentPennies = (t as any).rentPennies
-              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
-            const repay = Math.min(owed, Math.floor(rentPennies * 0.5));
-            arrearsRepaidThisMonth += repay;
-            const newOwed = owed - repay;
+            arrearsRepaidThisMonth += owed;
             return {
               ...t,
-              arrearsPennies: newOwed,
-              arrearsMonths: newOwed <= 0 ? 0 : (t.arrearsMonths ?? 0),
+              arrearsPennies: 0,
+              arrearsMonths: 0,
             };
           }
           return t;
@@ -1909,27 +1908,26 @@ export const useGameStore = create<GameState & GameActions>()(
 
 
         // ── Annual EICR (electrical safety) check on residential properties ──
+        // v4 #8a — emit ONE PendingTransaction per property so the player can
+        // see exactly which property each EICR is for.
         let eicrCharged = 0;
         const eicrUpdatedProps = updatedOwnedProperties.map(p => {
           if (p.type !== 'residential') return p;
           const last = p.lastEicrMonth ?? 0;
           if (newMonthNumber - last < 12) return p;
           eicrCharged += EICR_COST_PENNIES;
+          newPendingTransactions.push({
+            id: `ptx-eicr-${p.id}-${newMonthNumber}`,
+            type: 'eicr',
+            amount: EICR_COST_PENNIES,
+            description: `${p.name} — annual electrical safety certificate (EICR).`,
+            month: newMonthNumber,
+          });
           return { ...p, lastEicrMonth: newMonthNumber };
         });
         if (eicrCharged > 0) {
-          // v3 #14 — EICR no longer silently taps overdraft. Route through the
-          // pending-approval queue so the player explicitly signs it off.
-          newPendingTransactions.push({
-            id: `ptx-eicr-${newMonthNumber}`,
-            type: 'eicr',
-            amount: eicrCharged,
-            description: `Annual EICR (electrical safety) certificate — ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length} residential ${eicrUpdatedProps.filter(p => p.type === 'residential' && p.lastEicrMonth === newMonthNumber).length === 1 ? 'property' : 'properties'}`,
-            month: newMonthNumber,
-          });
           finalYearlyDeductibleExpenses += eicrCharged;
         }
-        // Persist EICR month bumps via reassigning back into updatedOwnedProperties below.
         updatedOwnedProperties = eicrUpdatedProps;
 
         // ── Arrears / Court / Bailiff escalation ──────────────────────────
@@ -2254,13 +2252,18 @@ export const useGameStore = create<GameState & GameActions>()(
               ? updatedProperties[idx].monthlyIncome
               : updatedProperties[idx].monthlyIncome + actualRentGain;
 
-            // Item 15: extensions add internal sqft (and a touch of plot sqft).
-            // Only credited on a non-zero outcome (botched works produce no usable space).
+            // v4 #10 — extensions add internal sqft. Use deriveSqft as a
+            // robust fallback when `internalSqft` is missing (legacy property),
+            // otherwise `|| 0 + sqftAdded` would shrink a 900-sqft house to
+            // just `sqftAdded`. Result must be strictly greater than before.
             const sqftAdded = (renovation.type as any).sqftAdded as number | undefined;
-            const sqftUpdate = sqftAdded && valueMult > 0
+            const currentSqftSafe = updatedProperties[idx].internalSqft && updatedProperties[idx].internalSqft! > 0
+              ? updatedProperties[idx].internalSqft!
+              : deriveSqft({ type: updatedProperties[idx].type, value: fromPennies(updatedProperties[idx].value), internalSqft: updatedProperties[idx].internalSqft, plotSqft: updatedProperties[idx].plotSqft }).internalSqft;
+            const sqftUpdate = sqftAdded && sqftAdded > 0 && valueMult > 0
               ? {
-                  internalSqft: (updatedProperties[idx].internalSqft || 0) + sqftAdded,
-                  plotSqft: updatedProperties[idx].plotSqft || 0, // plot unchanged for extensions; conservatories use existing plot
+                  internalSqft: currentSqftSafe + sqftAdded,
+                  plotSqft: updatedProperties[idx].plotSqft || 0,
                 }
               : {};
 
@@ -2644,6 +2647,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashHeld: cashRequired,
           advertisedYield: property.yield,
           advertisedMonthlyIncome: property.monthlyIncome,
+          propertyType: property.type,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -2736,6 +2740,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashHeld: cashRequired,
           advertisedYield: property.yield,
           advertisedMonthlyIncome: property.monthlyIncome,
+          propertyType: property.type,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -3156,14 +3161,19 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // Section 13 rent increase — applies a negotiated rent and (if tribunal) debits fee.
-      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies) => {
+      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies, slotIndex) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
-        const tenantRec = prev.tenants.find(t => t.propertyId === propertyId);
+        const tenantRec = prev.tenants.find(t =>
+          t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+        );
         if (!property || !tenantRec) {
           showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
         }
-        if (newRentPennies <= property.monthlyIncome) {
+        // v4 #15a — for multi-unit (HMO/flats), property.monthlyIncome is the SUM
+        // of all slot rents. Compare against the SPECIFIC slot's current rent.
+        const currentSlotRent = (tenantRec as any).rentPennies ?? property.monthlyIncome;
+        if (newRentPennies <= currentSlotRent) {
           showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
         }
 
@@ -3194,15 +3204,21 @@ export const useGameStore = create<GameState & GameActions>()(
           ...(tenantRec.satisfactionReasons || []).slice(0, 4),
         ];
 
+        // v4 #15a — update only the specific slot's rent. For multi-unit,
+        // monthlyIncome is recomputed as the sum of all slot rents.
+        const isMultiUnit = (property.subtype === 'hmo' || property.subtype === 'flats') && (property.subtypeUnits ?? 1) > 1;
+        const updatedTenants = prev.tenants.map(t =>
+          t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+            ? { ...t, rentPennies: newRentPennies, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
+            : t
+        );
+        const recomputedMonthlyIncome = isMultiUnit
+          ? updatedTenants.filter(t => t.propertyId === propertyId).reduce((sum, t) => sum + ((t as any).rentPennies ?? 0), 0)
+          : newRentPennies;
         const updatedProps = prev.ownedProperties.map(p =>
           p.id === propertyId
-            ? { ...p, monthlyIncome: newRentPennies, baseRent: newRentPennies, lastRentIncrease: prev.monthsPlayed }
+            ? { ...p, monthlyIncome: recomputedMonthlyIncome, baseRent: isMultiUnit ? p.baseRent : newRentPennies, lastRentIncrease: prev.monthsPlayed }
             : p
-        );
-        const updatedTenants = prev.tenants.map(t =>
-          t.propertyId === propertyId
-            ? { ...t, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
-            : t
         );
 
         showToast(
