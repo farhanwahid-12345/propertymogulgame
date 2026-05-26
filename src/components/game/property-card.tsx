@@ -201,8 +201,16 @@ export const PropertyCard = memo(function PropertyCard({
   const propertyType = property.type in PropertyTypeIcon ? property.type : "residential";
   const Icon = PropertyTypeIcon[propertyType];
   const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
-  const cashRequired = property.price - mortgageAmount;
-  const canAffordCash = playerCash >= property.price;
+  // v4 #1 — itemised buying costs (pounds): solicitor + stamp duty + mortgage fee.
+  const solicitorFeePounds = 600;
+  const stampDutyPounds = property.price <= 250000
+    ? property.price * 0.03
+    : (250000 * 0.03) + ((property.price - 250000) * 0.08);
+  const mortgageFeePounds = Math.round(mortgageAmount * 0.01);
+  const buyingFeesTotalPounds = Math.round(solicitorFeePounds + stampDutyPounds + (mortgageAmount > 0 ? mortgageFeePounds : 0));
+  const cashFeesOnly = Math.round(solicitorFeePounds + stampDutyPounds);
+  const cashRequired = property.price - mortgageAmount + buyingFeesTotalPounds;
+  const canAffordCash = playerCash >= (property.price + cashFeesOnly);
   const canAffordMortgage = playerCash >= cashRequired;
 
   // Cost basis: purchase price + cumulative renovation spend
@@ -274,7 +282,7 @@ export const PropertyCard = memo(function PropertyCard({
       typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
-      <CardHeader className="pb-1.5 pt-3">
+      <CardHeader className="pb-1 pt-2">
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -384,7 +392,7 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-1.5 pb-2">
+      <CardContent className="space-y-1 pb-2">
         {property.owned ? (
           <>
             {/* Compact mini-grid — always visible. Tap "Details" to expand. */}
@@ -758,16 +766,28 @@ export const PropertyCard = memo(function PropertyCard({
                     condition={property.condition as any}
                   />
 
-                  <div className="col-span-full text-[10px] text-muted-foreground text-center">
-                    To sell: use <strong className="text-foreground/80">Estate Agent</strong> or <strong className="text-foreground/80">Auction House</strong>
-                  </div>
-
                 </div>
               </>
             )}
           </div>
         ) : (
           <div className="space-y-3">
+            {/* v4 #1 — itemised buying costs */}
+            <div className="rounded-md bg-muted/20 px-2 py-1.5 text-[10px] space-y-0.5 border border-border/40">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Solicitor</span><span className="font-medium">£{solicitorFeePounds.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Stamp duty</span><span className="font-medium">£{Math.round(stampDutyPounds).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Mortgage fee (1%)</span><span className="font-medium">£{mortgageAmount > 0 ? mortgageFeePounds.toLocaleString() : '—'}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-0.5 border-t border-border/40">
+                <span>{showMortgageOptions ? 'Cash needed' : 'Cash buy fees'}</span>
+                <span>£{(showMortgageOptions ? cashRequired : cashFeesOnly).toLocaleString()}</span>
+              </div>
+            </div>
             {!showMortgageOptions ? (
               <div className="grid grid-cols-2 gap-2">
                 <Button 

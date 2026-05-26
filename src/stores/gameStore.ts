@@ -146,7 +146,12 @@ interface GameActions {
 
 // ─── Initial state ────────────────────────────────────────
 function createInitialState(): GameState {
-  const shuffled = [...AVAILABLE_PROPERTIES].sort(() => Math.random() - 0.5);
+  // v4 #11 — jitter marketValue ±15% so asking ≠ true market on the static catalogue too.
+  const withMarketJitter = AVAILABLE_PROPERTIES.map(p => ({
+    ...p,
+    marketValue: Math.max(toPennies(40_000), Math.round(p.value * (1 + (Math.random() - 0.5) * 0.30))),
+  }));
+  const shuffled = [...withMarketJitter].sort(() => Math.random() - 0.5);
   return {
     _version: 14,
     cash: INITIAL_CASH,
