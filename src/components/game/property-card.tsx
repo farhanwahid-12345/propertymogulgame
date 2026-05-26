@@ -392,7 +392,7 @@ export const PropertyCard = memo(function PropertyCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-1.5 pb-2">
+      <CardContent className="space-y-1 pb-2">
         {property.owned ? (
           <>
             {/* Compact mini-grid — always visible. Tap "Details" to expand. */}
