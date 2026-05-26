@@ -67,12 +67,19 @@ export function generateRandomProperty(level: number): Property {
     plotSqft = Math.round(1500 + Math.random() * 4500);
   }
 
+  // v4 #11 — widen asking-vs-true-market spread (±15%) so the "below market" / "above
+  // market" signal is meaningful at the estate agent. Asking stays at `price`/`value`;
+  // `marketValue` jitters around it.
+  const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
+  const marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
+
   return {
     id,
     name: `${houseNumber} ${streetName}`,
     type,
     price,
     value,
+    marketValue,
     neighborhood,
     monthlyIncome: Math.max(toPennies(400), baseMonthlyIncome),
     image: "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400&h=300&fit=crop",
