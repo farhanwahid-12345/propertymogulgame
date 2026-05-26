@@ -2311,6 +2311,7 @@ export const useGameStore = create<GameState & GameActions>()(
               ...subtypeUpdate,
               ...subtypeUnitsUpdate,
               ...epcUpdate,
+              ...refurbClearUpdate,
               ...conditionUpdate,
 
             };
