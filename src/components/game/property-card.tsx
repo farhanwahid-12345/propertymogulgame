@@ -201,8 +201,16 @@ export const PropertyCard = memo(function PropertyCard({
   const propertyType = property.type in PropertyTypeIcon ? property.type : "residential";
   const Icon = PropertyTypeIcon[propertyType];
   const mortgageAmount = (property.price * mortgagePercentage[0]) / 100;
-  const cashRequired = property.price - mortgageAmount;
-  const canAffordCash = playerCash >= property.price;
+  // v4 #1 — itemised buying costs (pounds): solicitor + stamp duty + mortgage fee.
+  const solicitorFeePounds = 600;
+  const stampDutyPounds = property.price <= 250000
+    ? property.price * 0.03
+    : (250000 * 0.03) + ((property.price - 250000) * 0.08);
+  const mortgageFeePounds = Math.round(mortgageAmount * 0.01);
+  const buyingFeesTotalPounds = Math.round(solicitorFeePounds + stampDutyPounds + (mortgageAmount > 0 ? mortgageFeePounds : 0));
+  const cashFeesOnly = Math.round(solicitorFeePounds + stampDutyPounds);
+  const cashRequired = property.price - mortgageAmount + buyingFeesTotalPounds;
+  const canAffordCash = playerCash >= (property.price + cashFeesOnly);
   const canAffordMortgage = playerCash >= cashRequired;
 
   // Cost basis: purchase price + cumulative renovation spend
