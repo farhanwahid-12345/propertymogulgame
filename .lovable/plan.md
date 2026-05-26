@@ -75,4 +75,14 @@ Maintainability and regression-safety. Lands last because it touches the widest 
 - **No new third-party deps** expected — LCG, lazy loading, and skeletons are all stock React/Tailwind.
 - **Test budget**: each phase adds at least one regression test for the items it closes; full suite must stay green between phases.
 
-Awaiting approval before starting Phase 1.
+## Phase 1 ✅ (v4)
+
+- #3 arrears now lump-sum repaid on first paying month (no partial 50%).
+- #9 commercial type snapshotted on Conveyancing; reconstruction fallback preserves it.
+- #10 sqft non-shrink: deriveSqft backfills missing internalSqft before adding extension area.
+- #15a Section 13 compares against per-slot rent; multi-unit recomputes property.monthlyIncome = Σ slot rents.
+- #8a EICR splits into one pending row per property (named); dialog description no longer truncated.
+
+127 tests passing (8 new in `phase1V4Verification.test.ts`).
+
+Awaiting approval before starting Phase 2.
