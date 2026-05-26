@@ -142,12 +142,13 @@ export function calculateMortgageEligibility(
     monthlyPayment,
   };
 
-  // 0. Phase 5 #16 — Standard BTL lenders refuse uninhabitable stock.
+  // 0. v4 #14 — Standard BTL lenders refuse uninhabitable stock. Cash buyers
+  // can still purchase; bridging remains the financed route until refurbished.
   if (req.propertyNeedsRefurb) {
     return {
       ...result,
       eligible: false,
-      reason: 'Mortgage Denied: Property is missing a kitchen/bathroom and fails the lender\'s habitability test. Use a bridging loan, renovate, then remortgage onto a standard product.',
+      reason: 'Mortgage Denied: Property is missing a kitchen/bathroom and fails the lender\'s habitability test. Either buy in cash, use a bridging loan, or renovate then remortgage onto a standard product.',
     };
   }
 

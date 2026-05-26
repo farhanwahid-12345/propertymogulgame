@@ -85,4 +85,12 @@ Maintainability and regression-safety. Lands last because it touches the widest 
 
 127 tests passing (8 new in `phase1V4Verification.test.ts`).
 
+## Phase 3 ✅ (v4)
+
+- #4 flat 12-property hard cap via `MAX_PROPERTIES_HARD_CAP`; level-scaled cap removed; toasts updated.
+- #14 distressed auction stock now discounted 30–60% (random); standard-mortgage denial reason mentions cash buyers; renovating both kitchen + bathroom clears `needsRefurb`.
+- #16 EPC gaps: one-time pop-up toast added for D/E lets 12 months before the 2030 MEES ban (in addition to the existing persistent concern).
+
+130 tests passing (3 new in `phase3V4Verification.test.ts`).
+
 Awaiting approval before starting Phase 2.

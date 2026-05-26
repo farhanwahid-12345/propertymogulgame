@@ -80,7 +80,9 @@ export function getPropertyValueRangeForLevel(level: number): { min: number; max
   return { min: toPennies(min), max: toPennies(max) };
 }
 
-export function getMaxPropertiesForLevel(_level: number): number { return 9; }
+/** v4 #4 — Flat 12-property hard cap (replaces previous level-scaled cap). */
+export const MAX_PROPERTIES_HARD_CAP = 12;
+export function getMaxPropertiesForLevel(_level: number): number { return MAX_PROPERTIES_HARD_CAP; }
 
 export function getAvailablePropertyTypes(level: number): string[] {
   if (level >= 5) return ['all'];

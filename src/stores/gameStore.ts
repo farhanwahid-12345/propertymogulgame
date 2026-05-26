@@ -1192,6 +1192,12 @@ export const useGameStore = create<GameState & GameActions>()(
               resolveCost: 0,
               satisfactionPenaltyIfIgnored: 0,
             });
+            // v4 #16 — also fire a one-time pop-up so the player can't miss it.
+            showToast(
+              "EPC Lettings Ban Approaching",
+              `${property.name} is EPC ${epc}. From 2030 (${MEES_2030_MONTH - newMonthNumber}mo) lets below Band C are illegal. Upgrade now to avoid a void.`,
+              "destructive",
+            );
             meesAlreadyByProp.add(property.id);
           });
         }
@@ -2276,6 +2282,20 @@ export const useGameStore = create<GameState & GameActions>()(
             const epcTarget = (renovation.type as any).epcTarget as Property['epcRating'] | undefined;
             const epcUpdate = epcTarget && valueMult > 0 ? { epcRating: epcTarget } : {};
 
+            // v4 #14 — once both kitchen and bathroom are refurbished, the
+            // property re-enters the standard mortgageable pool ("bought back
+            // into the game"). Clears the needsRefurb flag for lender checks.
+            const completedAfter = [
+              ...(updatedProperties[idx].completedRenovationIds || []),
+              renovation.type.id,
+            ];
+            const refurbClearUpdate =
+              updatedProperties[idx].needsRefurb &&
+              completedAfter.includes('kitchen_upgrade') &&
+              completedAfter.includes('bathroom_renovation')
+                ? { needsRefurb: false }
+                : {};
+
 
             updatedProperties[idx] = {
               ...updatedProperties[idx],
@@ -2297,6 +2317,7 @@ export const useGameStore = create<GameState & GameActions>()(
               ...subtypeUpdate,
               ...subtypeUnitsUpdate,
               ...epcUpdate,
+              ...refurbClearUpdate,
               ...conditionUpdate,
 
             };
@@ -2578,7 +2599,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", "You already own this property.", "destructive"); return; }
         // Count conveyancing buys as pending
         const pendingBuys = prev.conveyancing.filter(c => c.status === 'buying').length;
-        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Property Limit", `Max ${getMaxPropertiesForLevel(prev.level)} at level ${prev.level}!`, "destructive"); return; }
+        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Property Limit", `Max ${getMaxPropertiesForLevel(prev.level)} properties (portfolio cap).`, "destructive"); return; }
 
         const allowedTypes = getAvailablePropertyTypes(prev.level);
         if (!allowedTypes.includes('all') && !allowedTypes.includes(property.type)) { showToast("Level Restriction", `Cannot buy ${property.type} at this level!`, "destructive"); return; }
@@ -2677,7 +2698,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (prev.isBankrupt) return;
         if (prev.ownedProperties.some(p => p.id === property.id)) { showToast("Already Owned", `You already own ${property.name}!`, "destructive"); return; }
         const pendingBuys = prev.conveyancing.filter(c => c.status === 'buying').length;
-        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Portfolio Limit", `Max ${getMaxPropertiesForLevel(prev.level)} at level ${prev.level}!`, "destructive"); return; }
+        if (prev.ownedProperties.length + pendingBuys >= getMaxPropertiesForLevel(prev.level)) { showToast("Portfolio Limit", `Max ${getMaxPropertiesForLevel(prev.level)} properties (portfolio cap).`, "destructive"); return; }
 
         const { min: minValue } = getPropertyValueRangeForLevel(prev.level);
         if (property.value < minValue) { showToast("Too Cheap", `Min value at level ${prev.level}`, "destructive"); return; }
@@ -4521,12 +4542,14 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
 
-        // Phase 5 #16 — flag ~40% of auction stock as uninhabitable. Discounted
-        // ~25% to reflect the missing kitchen/bathroom + lender refusal.
+        // v4 #14 — ~40% of auction stock is uninhabitable. Discount randomly
+        // 30–60% off comparable stock to reflect missing kitchen/bathroom and
+        // standard-lender refusal. Buyers may use cash OR bridging finance.
         auctions = auctions.map(p => {
           if (p.needsRefurb !== undefined) return p;
           if (Math.random() < 0.4) {
-            const discounted = Math.max(toPennies(40000), Math.round(p.price * 0.75));
+            const discountPct = 0.30 + Math.random() * 0.30; // 30–60%
+            const discounted = Math.max(toPennies(40000), Math.round(p.price * (1 - discountPct)));
             return { ...p, needsRefurb: true, price: discounted, value: discounted };
           }
           return { ...p, needsRefurb: false };
