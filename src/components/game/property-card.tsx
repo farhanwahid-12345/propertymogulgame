@@ -282,7 +282,7 @@ export const PropertyCard = memo(function PropertyCard({
       typeGlow[propertyType],
       property.owned && "ring-2 ring-primary/50"
     )}>
-      <CardHeader className="pb-1.5 pt-3">
+      <CardHeader className="pb-1 pt-2">
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
