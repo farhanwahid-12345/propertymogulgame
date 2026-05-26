@@ -1,80 +1,78 @@
-# Execution Plan — Lovable Improvements v3
 
-17 distinct items extracted from the document, grouped by subsystem into 6 phases. Each phase ends in a shippable, stable state. `[#N]` maps to the document item number.
+# Execution Plan — Lovable Improvements v4
 
-Note: items 1, 5, 6, 8, 9, 15a reference screenshots that didn't extract — interpretation is based on context and the project's recent v2 work. I'll confirm targets during implementation.
+24 items extracted from the document, grouped into 6 phases. Each phase ends in a shippable, stable state. `[#N]` maps to the document item number.
 
 ---
 
-## Phase 1 — Cash Safety & Notification Polish (low-risk wins)
+## Phase 1 — Critical Gameplay Bug Fixes
 
-Tightens the money-approval flow before larger mechanics land on top.
+The items players hit every session. Lands first so the rest of the work isn't blocked by broken core loops.
 
-- **[#3, #14] Overdraft phantom usage & approval gate** — audit every cash-debit path (renovations especially). Block any debit that would push cash negative unless the user explicitly approves overdraft use via the pending-transactions modal. Add invariant: `cash >= 0` after non-approved debits.
-- **[#2] Annual landlord insurance** — switch insurance from monthly silent debit to a single yearly charge, gated by the approval modal, with a notification one in-game month ahead.
-- **[#4] Loan / mortgage payoff pop-up** — fire a modal (not just a toast) when any mortgage or loan reaches zero balance.
-- **[#7] Notifications history tab** — scrollable history feed in the notifications panel covering renovations (cost + value gain), purchases, and sales.
+- **[#3] Arrears rent deferral** — when a tenant is in arrears, don't pay rent that month; accumulate the missed rent and pay it as a lump-sum bonus in the month they clear arrears. Fix "0 rent owed" display so the outstanding balance is visible.
+- **[#9] Commercial → residential flip on purchase** — re-audit the settlement path; a commercial property must keep `propertyType: 'commercial'` end-to-end. Add a regression test that buys every commercial listing and asserts the type after settlement.
+- **[#10] Sqft regression (again)** — extensions still shrink footprint in some flows. Add an engine invariant `assertSqftMonotonic(before, after, op)` that throws in dev and clamps in prod, wired into every renovation/conversion mutation. Lock with a fuzz test over all renovation options × all property sizes.
+- **[#15a] Section 13 on flats** — fix the "proposed rent is not higher than current rent" false-positive. Trace the comparator; likely comparing per-unit vs whole-block rent or stale `currentRent` on the flat unit. Add unit test for multi-unit Section 13.
+- **[#8a] EICR / Landlord Insurance pending-debit row** — show which property the EICR is for, and fix the unreadable/blocked-out lettering in the Approve Pending Debits modal.
 
-## Phase 2 — Estate Agent, Listings & Section 13 Corrections
+## Phase 2 — Estate Agent, Property Card & Cost Visibility
 
-- **[#1] Action-row layout** — move the relocated functions back inline with the other actions in a single row (revert the Phase-5/v2 split).
-- **[#5] Property-card text cleanup** — delete the text the user flagged under property cards (confirm exact string during implementation; likely the "ERV" helper line).
-- **[#8a] "0 days listed" bug** — `listingMonth` isn't being read on render; fix counter so days-listed increments per game month.
-- **[#8b] Withdrawn-offer ghosts** — when an offer is withdrawn at the estate agent, remove it from the offers list everywhere (currently still appears in the secondary view).
-- **[#9a] Section 13 market rent floor** — local market rent comparator is unrealistically low; recompute against current rent + neighbourhood baseline so the proposed rise is realistic.
+UI/UX polish around the buying and ownership surfaces.
 
-## Phase 3 — Renovation, Sqft & EPC Mechanics
+- **[#1] Itemised buying costs** — at the estate agent and during conveyancing, show solicitor fee, stamp duty, and mortgage fee as separate line items alongside the headline price (not just rolled into the total).
+- **[#2a] Slimmer property cards** — reduce vertical height so a player with ≤4 properties never has to scroll. Remove the "To sell: use Estate Agent or Auction House" helper line.
+- **[#11] Market value variance** — widen the spread between asking price and true market value so good negotiation visibly pays off and over-paying visibly hurts. Hook into the existing post-purchase valuation logic.
+- **[#18] Yield spread on the starter pool** — replace the uniform 14% yield on Level 1 `AVAILABLE_PROPERTIES` with an 11–16% jittered range so opening choices feel meaningful.
 
-- **[#6a] Sqft additivity (third attempt)** — extensions must strictly `internalSqft += sqftAdded`; conversions must never shrink footprint. Add regression test reproducing the "900 → 120 sqft" bug and lock with engine invariants.
-- **[#10] Planning while occupied** — allow planning submission with a sitting tenant; block only the physical renovation start until vacant.
-- **[#12] Renovation ROI uplift +25%** — scale `valueMult` / rent uplift on every renovation option so realised ROI averages ~25% higher; keep neighbourhood ceiling cap intact.
-- **[#15 main] EPC dropdown + card badge + legislation timeline**
-  - EPC target dropdown (A–G) in renovation dialog with cost scaling per band jump.
+## Phase 3 — EPC, Commercial Refurb & Property Limits
+
+Mechanical changes that touch shared engine code, batched together.
+
+- **[#16] EPC implementation (full)**
+  - EPC dropdown (A–G target) in the renovation dialog with cost scaling per band jump.
   - Prominent EPC badge on every property card.
-  - Letting block: properties below Band E today and below Band C from in-game 2030 cannot be let.
-  - 12-month-ahead pop-up warning for properties not meeting the upcoming standard.
+  - Letting block: below Band E today; below Band C from in-game 2030.
+  - 12-month-ahead warning pop-up before a property fails the upcoming standard.
+  - (Note: a slimmer version of this shipped in v3 Phase 3 — this item closes the gaps the user has re-flagged.)
+- **[#14] Distressed unmortgageable stock pricing & cash purchase**
+  - Properties needing a kitchen/bathroom (condition 0–20) get a 30–60% random discount vs comparable stock.
+  - Allow **cash purchase** (currently bridging-only) — bridging stays as the financed path.
+  - "Buy back into the game" wording: once renovated above condition threshold, they re-enter the standard mortgageable pool.
+- **[#4] Hard cap of 12 properties** — replace the existing level-scaled ownership cap with a flat ceiling of 12.
 
-## Phase 4 — Tenant Risk, Eviction Realism & Commercial Overhaul
+## Phase 4 — Tenant Realism & Game Direction
 
-- **[#11] High-risk tenant frequency + Section 8/21 realism**
-  - Double the per-month probability of arrears / ASB for high-risk tenant profiles.
-  - Enforce Section 8 vs Section 21 distinctions (grounds, notice periods).
-  - On notice served, queue a 3–6 month court-backlog void instead of instant removal.
-- **[#13] Commercial property fixes & FRI leases**
-  - Bug fix: commercial properties must not flip to residential on purchase.
-  - FRI logic: tenant covers maintenance + insurance; lower gross yield; fewer ops pop-ups.
-  - Fixed-term commercial leases (e.g. 5/10 yr) with a renewal/negotiation pop-up 6 months before expiry.
-- **[#15a] Commercial use-class differentiation** — split commercial into standard retail (E-class) vs Sui Generis (hot food takeaway / betting shop) with distinct yield + friction profiles.
+Smaller mechanical tweaks that round out the simulation.
 
-## Phase 5 — Auction Bridging & Portfolio Landlord (PRA) ✅
+- **[#21] Passive tenant satisfaction recovery** — +0.5–1 pt/month when condition is good and no open concerns, capped at 100. Skip recovery if any open concern exists or condition < threshold.
+- **[#20] Auto-pause on blocking modals** — whenever a modal requiring acknowledgment is queued (chain collapse, planning decision, payoff, macro event, Section 13 response), pause the game clock until dismissed. Resume on close, regardless of selected speed.
+- **[#19] Visible progression goal** — soft long-term target surfaced in `HeroHeader` (e.g. "£5M net worth" or "10-property empire") with a slim progress bar. Configurable target per level tier.
 
-- **[#16] Unmortgageable auction stock + bridging finance** — `needsRefurb` flag on Property; ~40% of fresh auction stock tagged with a discounted price + "Needs full refurb — bridging only" badge. Standard BTL eligibility refuses these. New `takeBridgingLoan(propertyId, amount)` store action issues a 12-month, interest-only loan at 12% APR (≈1%/mo), capped at 70% LTV. Monthly tick services interest, applies a one-shot credit −80 + rate jump on expiry default.
-- **[#17] Portfolio Landlord threshold (PRA)** — eligibility now accepts `mortgagedPropertyCount`; portfolio stress-test fires at 4+ mortgaged properties and the rejection message is prefixed `Portfolio Landlord (PRA):`. Legacy `ownedPropertyCount >= 3` fallback retained so older callers keep their behaviour.
+## Phase 5 — Performance & Code-Splitting
 
+UI responsiveness work; isolated from gameplay logic.
 
-## Phase 6 — Verification & Regression ✅
+- **[#5] `React.memo` on `PropertyCard`** — wrap and audit prop stability so it actually short-circuits re-renders in long lists (likely needs `useCallback` on parent handlers).
+- **[#6] Route/dialog lazy loading** — `React.lazy` + `Suspense` for heavy dialogs and panels (renovation dialog, mortgage management, auction dialog, eviction dialog, planning dialogs, portfolio mortgage, tax breakdown).
+- **[#7] Skeleton loaders** — replace generic spinners with Tailwind `animate-pulse` skeleton components matching the target layout (property cards, estate agent listings, conveyancing rows).
 
-- Added `src/lib/phase6Regression.test.ts` covering:
-  - #12 — renovation ROI +25% uplift constant & rounding.
-  - #15 — MEES letting block matrix (F/G always, D/E from month 60) + 12-month warning window.
-  - #11 — Section 8/21 court-backlog effective-month range (3–6mo on top of statutory notice).
-  - #16 — bridging lifecycle math: 1%/mo interest, 70% LTV cap, expiry default (-80 credit, +6% rate), 12-month total cost.
-- Existing locks retained:
-  - Sqft additivity (`phase3Verification.test.ts`).
-  - PRA stress-test + refurb refusal (`phase5Verification.test.ts`).
-  - Furniture realism + days-on-market + dynamic yield (`phase6Verification.test.ts`).
-  - Persisted-shape snapshot (`persistedShape.test.ts`).
-- Full suite: **119 tests, all green**.
+## Phase 6 — Architecture, Testability & Documentation
 
-- Manual QA checklist 1-to-1 against items 1–17.
-- Persistence audit for new state keys: `insurancePaymentMonth`, `notificationsHistory`, `epcDeadlineWarnedAt`, `commercialLease`, `useClass`, `bridgingMortgage`, `portfolioLandlordStatus`.
+Maintainability and regression-safety. Lands last because it touches the widest surface.
+
+- **[#13] Split `gameStore.ts`** — populate the existing empty slices in `src/stores/slices/` properly: `propertyStore`, `tenantStore`, `financialStore`, `conveyancingStore`. One domain per slice; the top-level `gameStore` becomes a thin composition root.
+- **[#17] Extract magic numbers from `gameStore.ts`** — every inline probability (`0.04`, `0.15`, `0.60` upheld chance, etc.) moves to `constants.ts` as a named export. Easier to tune; easier to test.
+- **[#22] Seeded PRNG** — introduce a small LCG (or `mulberry32`), inject it through the store, and replace raw `Math.random()` calls in game logic. Enables deterministic tests and bug repro from save files. Game RNG seed persists in save state.
+- **[#24] Store-level tests** — add 10–15 tests covering month-end cashflow, credit score transitions, eviction state machine, conveyancing settlement, and arrears deferral (#3). Uses the seeded PRNG from #22.
+- **[#23] Migration runner** — explicit `migrate(savedState, fromVersion, toVersion)` invoked on every load, with a per-version migration registry. Stale `_version: 15` saves must migrate cleanly to current `_version`. Add a test that loads a v15 fixture.
+- **[#12] `GAME_MECHANICS.md`** — write a reference doc covering: rent calculation, condition decay, mortgage interest (incl. dynamic rates + ICR/PRA), depreciation, renovation ROI uplift, EPC rules, tenant satisfaction, macro events, taxation per entity. Cross-links to the relevant engine files.
 
 ---
 
-## Technical notes
+## Cross-cutting technical notes
 
-- Phases 1–2 are small and ship fast; Phase 3 reopens the renovation engine so it should land as one batch.
-- New persisted keys per phase — write one migration per phase, not per feature.
-- No new third-party dependencies expected.
+- **Persistence keys added or changed**: `epcRating`/`epcTarget` on Property (if not present), `arrearsBalance` on Tenant, `rngSeed` at store root, `progressionTarget` at store root, `needsRefurbDiscountPct` on Property. One migration step per phase that introduces new keys.
+- **No new third-party deps** expected — LCG, lazy loading, and skeletons are all stock React/Tailwind.
+- **Test budget**: each phase adds at least one regression test for the items it closes; full suite must stay green between phases.
 
 Awaiting approval before starting Phase 1.
