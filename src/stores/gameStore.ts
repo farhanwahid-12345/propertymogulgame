@@ -28,7 +28,7 @@ import {
   getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
   getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
-import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
+import { generateRandomProperty, generateMarketProperty, deriveSqft } from '@/lib/engine/market';
 import {
   calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
 } from '@/lib/mortgageEligibility';
@@ -2253,13 +2253,18 @@ export const useGameStore = create<GameState & GameActions>()(
               ? updatedProperties[idx].monthlyIncome
               : updatedProperties[idx].monthlyIncome + actualRentGain;
 
-            // Item 15: extensions add internal sqft (and a touch of plot sqft).
-            // Only credited on a non-zero outcome (botched works produce no usable space).
+            // v4 #10 — extensions add internal sqft. Use deriveSqft as a
+            // robust fallback when `internalSqft` is missing (legacy property),
+            // otherwise `|| 0 + sqftAdded` would shrink a 900-sqft house to
+            // just `sqftAdded`. Result must be strictly greater than before.
             const sqftAdded = (renovation.type as any).sqftAdded as number | undefined;
-            const sqftUpdate = sqftAdded && valueMult > 0
+            const currentSqftSafe = updatedProperties[idx].internalSqft && updatedProperties[idx].internalSqft! > 0
+              ? updatedProperties[idx].internalSqft!
+              : deriveSqft({ type: updatedProperties[idx].type, value: fromPennies(updatedProperties[idx].value), internalSqft: updatedProperties[idx].internalSqft, plotSqft: updatedProperties[idx].plotSqft }).internalSqft;
+            const sqftUpdate = sqftAdded && sqftAdded > 0 && valueMult > 0
               ? {
-                  internalSqft: (updatedProperties[idx].internalSqft || 0) + sqftAdded,
-                  plotSqft: updatedProperties[idx].plotSqft || 0, // plot unchanged for extensions; conservatories use existing plot
+                  internalSqft: currentSqftSafe + sqftAdded,
+                  plotSqft: updatedProperties[idx].plotSqft || 0,
                 }
               : {};
 
