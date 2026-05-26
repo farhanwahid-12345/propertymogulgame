@@ -1519,16 +1519,16 @@ export const useGameStore = create<GameState & GameActions>()(
           );
         }
 
-        // Item 2: per-tenant arrears bookkeeping. Missed tenants accumulate
-        // months + £ owed. Tenants who pay this month additionally pay back a
-        // slice (≤50% of monthly rent) of their arrears. Arrears only clear
-        // when fully repaid — paying current rent alone is NOT enough.
+        // v4 #3 — per-tenant arrears bookkeeping. Missed tenants accumulate
+        // months + £ owed and the player receives NO rent that month. When the
+        // tenant resumes paying, the FULL outstanding arrears balance is paid
+        // back in a single lump sum on top of normal rent (catch-up payment).
         let arrearsRepaidThisMonth = 0;
         newTenants = newTenants.map(t => {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
+          const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+          const rentPennies = (t as any).rentPennies || (prop?.monthlyIncome ?? 0);
           if (missedTenantKeys.has(key)) {
-            const rentPennies = (t as any).rentPennies
-              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
             const lastToast = t.lastDefaultToastMonth ?? -999;
             const stamped = newMonthNumber - lastToast >= 3 ? newMonthNumber : (t.lastDefaultToastMonth ?? 0);
             return {
@@ -1538,18 +1538,14 @@ export const useGameStore = create<GameState & GameActions>()(
               lastDefaultToastMonth: stamped,
             };
           }
-          // Paying this month — chip away at arrears (up to 50% of monthly rent).
+          // Paying this month — repay the FULL outstanding balance as a lump sum.
           const owed = t.arrearsPennies ?? 0;
           if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
-            const rentPennies = (t as any).rentPennies
-              || (prev.ownedProperties.find(p => p.id === t.propertyId)?.monthlyIncome ?? 0);
-            const repay = Math.min(owed, Math.floor(rentPennies * 0.5));
-            arrearsRepaidThisMonth += repay;
-            const newOwed = owed - repay;
+            arrearsRepaidThisMonth += owed;
             return {
               ...t,
-              arrearsPennies: newOwed,
-              arrearsMonths: newOwed <= 0 ? 0 : (t.arrearsMonths ?? 0),
+              arrearsPennies: 0,
+              arrearsMonths: 0,
             };
           }
           return t;
@@ -3161,14 +3157,19 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       // Section 13 rent increase — applies a negotiated rent and (if tribunal) debits fee.
-      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies) => {
+      applyRentIncrease: (propertyId, newRentPennies, outcome, tribunalFeePennies, slotIndex) => {
         const prev = get();
         const property = prev.ownedProperties.find(p => p.id === propertyId);
-        const tenantRec = prev.tenants.find(t => t.propertyId === propertyId);
+        const tenantRec = prev.tenants.find(t =>
+          t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+        );
         if (!property || !tenantRec) {
           showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
         }
-        if (newRentPennies <= property.monthlyIncome) {
+        // v4 #15a — for multi-unit (HMO/flats), property.monthlyIncome is the SUM
+        // of all slot rents. Compare against the SPECIFIC slot's current rent.
+        const currentSlotRent = (tenantRec as any).rentPennies ?? property.monthlyIncome;
+        if (newRentPennies <= currentSlotRent) {
           showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
         }
 
