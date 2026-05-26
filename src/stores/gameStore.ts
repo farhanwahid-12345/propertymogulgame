@@ -562,11 +562,14 @@ export const useGameStore = create<GameState & GameActions>()(
           if (!prop) {
             // Property was generated inline — reconstruct using the advertised
             // yield/rent snapshot so realised numbers match the agent's label.
+            // v4 #9 — preserve the snapshotted `propertyType`; older saves fall
+            // back to 'residential' but new buys carry the original type through.
             const reconstructedValue = conv.purchasePrice || 0;
             const reconstructedYield = conv.advertisedYield ?? (6 + Math.random() * 9);
             const derivedRent = conv.advertisedMonthlyIncome
               ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
-            prop = { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
+            const reconstructedType = conv.propertyType ?? 'residential';
+            prop = { id: conv.propertyId, name: conv.propertyName, type: reconstructedType, price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
           }
           // Phase 3 #2 — preserve the ADVERTISED rent so realised yield rises when
           // we buy under asking; bonus a small "instant equity" cushion when the
@@ -2644,6 +2647,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashHeld: cashRequired,
           advertisedYield: property.yield,
           advertisedMonthlyIncome: property.monthlyIncome,
+          propertyType: property.type,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -2736,6 +2740,7 @@ export const useGameStore = create<GameState & GameActions>()(
           cashHeld: cashRequired,
           advertisedYield: property.yield,
           advertisedMonthlyIncome: property.monthlyIncome,
+          propertyType: property.type,
         };
 
         showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
