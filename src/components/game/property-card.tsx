@@ -772,6 +772,22 @@ export const PropertyCard = memo(function PropertyCard({
           </div>
         ) : (
           <div className="space-y-3">
+            {/* v4 #1 — itemised buying costs */}
+            <div className="rounded-md bg-muted/20 px-2 py-1.5 text-[10px] space-y-0.5 border border-border/40">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Solicitor</span><span className="font-medium">£{solicitorFeePounds.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Stamp duty</span><span className="font-medium">£{Math.round(stampDutyPounds).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Mortgage fee (1%)</span><span className="font-medium">£{mortgageAmount > 0 ? mortgageFeePounds.toLocaleString() : '—'}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-0.5 border-t border-border/40">
+                <span>{showMortgageOptions ? 'Cash needed' : 'Cash buy fees'}</span>
+                <span>£{(showMortgageOptions ? cashRequired : cashFeesOnly).toLocaleString()}</span>
+              </div>
+            </div>
             {!showMortgageOptions ? (
               <div className="grid grid-cols-2 gap-2">
                 <Button 
