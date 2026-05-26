@@ -2276,6 +2276,20 @@ export const useGameStore = create<GameState & GameActions>()(
             const epcTarget = (renovation.type as any).epcTarget as Property['epcRating'] | undefined;
             const epcUpdate = epcTarget && valueMult > 0 ? { epcRating: epcTarget } : {};
 
+            // v4 #14 — once both kitchen and bathroom are refurbished, the
+            // property re-enters the standard mortgageable pool ("bought back
+            // into the game"). Clears the needsRefurb flag for lender checks.
+            const completedAfter = [
+              ...(updatedProperties[idx].completedRenovationIds || []),
+              renovation.type.id,
+            ];
+            const refurbClearUpdate =
+              updatedProperties[idx].needsRefurb &&
+              completedAfter.includes('kitchen_upgrade') &&
+              completedAfter.includes('bathroom_upgrade')
+                ? { needsRefurb: false }
+                : {};
+
 
             updatedProperties[idx] = {
               ...updatedProperties[idx],
