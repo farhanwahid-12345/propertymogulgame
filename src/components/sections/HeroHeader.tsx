@@ -84,7 +84,11 @@ export function HeroHeader({
   currentMarketRate = 0,
   totalDebt = 0,
   netMonthlyCashflow = 0,
+  netWorth = 0,
+  level = 1,
 }: HeroHeaderProps) {
+  const goal = pickGoal(level, netWorth);
+  const goalPct = Math.max(0, Math.min(100, (netWorth / goal.target) * 100));
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
