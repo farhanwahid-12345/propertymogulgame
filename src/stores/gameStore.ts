@@ -2190,14 +2190,21 @@ export const useGameStore = create<GameState & GameActions>()(
           payoffEvents: newPayoffEvents.length > 0
             ? [...(((s as any).payoffEvents) || []), ...newPayoffEvents]
             : ((s as any).payoffEvents || []),
-          // Item #10: any queued debit auto-pauses the clock until approved.
-          // Item #10 + Phase 3 #5 + v3 #4: pending debits, chain-collapse events
-          // OR payoff acknowledgements all auto-pause the clock.
+          // Item #10 + Phase 3 #5 + v3 #4 + Phase 4 #20: pending debits,
+          // chain-collapse events, payoff acknowledgements, planning decisions,
+          // and macro-economic event pop-ups all auto-pause the clock until
+          // the player dismisses them.
           isPaused:
             (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
             || newChainCollapseEvents.length > 0
             || newPayoffEvents.length > 0
             || (((s as any).payoffEvents?.length) || 0) > 0
+            || newlyApprovedPlanningIds.length > 0
+            || newlyRefusedPlanningIds.length > 0
+            || (((s as any).pendingPlanningCelebrations?.length) || 0) > 0
+            || (((s as any).pendingPlanningRefusals?.length) || 0) > 0
+            || economicEvents.length !== prev.economicEvents.length
+            || (economicEvents.length > 0 && economicEvents[economicEvents.length - 1]?.month === newMonthNumber)
               ? true
               : s.isPaused,
         } as any));
