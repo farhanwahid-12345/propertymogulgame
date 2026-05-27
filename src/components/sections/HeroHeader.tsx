@@ -45,6 +45,26 @@ interface HeroHeaderProps {
   currentMarketRate?: number;
   totalDebt?: number;
   netMonthlyCashflow?: number;
+  netWorth?: number;
+  level?: number;
+}
+
+// Phase 4 #19: soft long-term targets surfaced as a slim progress bar.
+// Tier scales with level — first target is achievable, later ones aspirational.
+const PROGRESSION_TARGETS: Array<{ minLevel: number; target: number; label: string }> = [
+  { minLevel: 1, target: 250_000,   label: "£250k net worth" },
+  { minLevel: 2, target: 500_000,   label: "£500k net worth" },
+  { minLevel: 3, target: 1_000_000, label: "£1M net worth" },
+  { minLevel: 4, target: 2_500_000, label: "£2.5M net worth" },
+  { minLevel: 5, target: 5_000_000, label: "£5M net worth" },
+  { minLevel: 6, target: 10_000_000, label: "£10M empire" },
+];
+
+function pickGoal(level: number, netWorth: number) {
+  // Pick the lowest target the player hasn't yet hit, scoped to their tier.
+  const tier = PROGRESSION_TARGETS.filter(t => t.minLevel <= Math.max(1, level));
+  const next = tier.find(t => netWorth < t.target) || PROGRESSION_TARGETS.find(t => netWorth < t.target);
+  return next || PROGRESSION_TARGETS[PROGRESSION_TARGETS.length - 1];
 }
 
 export function HeroHeader({
