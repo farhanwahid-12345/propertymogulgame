@@ -165,10 +165,30 @@ export function HeroHeader({
                 Property Tycoon{compact ? "" : " 🏘️"}
               </h1>
               {!compact && (
-                <p className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                  <span>Build your empire, one house at a time!</span>
-                  <ReputationBadge reputation={reputation} log={reputationLog} />
-                </p>
+                <div className="hidden md:flex flex-col gap-1 mt-0.5">
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Build your empire, one house at a time!</span>
+                    <ReputationBadge reputation={reputation} log={reputationLog} />
+                  </p>
+                  <div
+                    className="flex items-center gap-2 max-w-md"
+                    title={`Goal: ${goal.label} — £${netWorth.toLocaleString()} of £${goal.target.toLocaleString()}`}
+                    aria-label={`Progression goal: ${goal.label}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
+                      🎯 {goal.label}
+                    </span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all"
+                        style={{ width: `${goalPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] tabular-nums text-muted-foreground/80 shrink-0 w-8 text-right">
+                      {Math.floor(goalPct)}%
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
