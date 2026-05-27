@@ -924,6 +924,12 @@ export const useGameStore = create<GameState & GameActions>()(
         // damages, recent rent hikes). Low satisfaction can trigger an
         // early exit (creating a void period).
         const recentDamageIds = new Set(prev.pendingDamages.map(d => d.propertyId));
+        // Phase 4 #21: gate passive recovery when an open concern exists for the property.
+        const openConcernPropertyIds = new Set(
+          (prev.tenantConcerns || [])
+            .filter((c: any) => !c.resolvedMonth)
+            .map((c: any) => c.propertyId),
+        );
         let satisfactionAdjustedTenants = newTenants.map(t => {
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
           if (!property) return t;
@@ -961,12 +967,21 @@ export const useGameStore = create<GameState & GameActions>()(
             delta -= 1; reasons.push({ reason: 'Recent rent increase', delta: -1 });
           }
 
-          // Happiness drift: stronger pull toward ~75 baseline whenever no acute pressure
+          // Phase 4 #21: passive recovery — gentle +0.5–1 pt/mo when conditions
+          // are good and no open concerns exist. Skip if property is below
+          // standard or there are unresolved concerns dragging things down.
           const hasNegativePressure = delta < 0;
-          if (!hasNegativePressure) {
-            const drift = t.satisfaction < 75 ? 2 : t.satisfaction <= 85 ? 1 : 0;
-            delta += drift;
-            reasons.push({ reason: 'Stable conditions', delta: drift });
+          const conditionGood = property.condition === 'standard' || property.condition === 'premium';
+          const hasOpenConcern = openConcernPropertyIds.has(property.id);
+          if (!hasNegativePressure && conditionGood && !hasOpenConcern) {
+            // 0.5–1 pt range; round to int after accumulation to keep storage clean
+            const recovery = 0.5 + Math.random() * 0.5;
+            const rounded = Math.random() < (recovery - Math.floor(recovery)) ? Math.ceil(recovery) : Math.floor(recovery);
+            const applied = Math.max(0, rounded);
+            if (applied > 0) {
+              delta += applied;
+              reasons.push({ reason: 'Passive recovery — good conditions, no concerns', delta: applied });
+            }
           }
 
           // Cap monthly net drop at -3 (was -4) — gentler decay overall
@@ -2175,14 +2190,21 @@ export const useGameStore = create<GameState & GameActions>()(
           payoffEvents: newPayoffEvents.length > 0
             ? [...(((s as any).payoffEvents) || []), ...newPayoffEvents]
             : ((s as any).payoffEvents || []),
-          // Item #10: any queued debit auto-pauses the clock until approved.
-          // Item #10 + Phase 3 #5 + v3 #4: pending debits, chain-collapse events
-          // OR payoff acknowledgements all auto-pause the clock.
+          // Item #10 + Phase 3 #5 + v3 #4 + Phase 4 #20: pending debits,
+          // chain-collapse events, payoff acknowledgements, planning decisions,
+          // and macro-economic event pop-ups all auto-pause the clock until
+          // the player dismisses them.
           isPaused:
             (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
             || newChainCollapseEvents.length > 0
             || newPayoffEvents.length > 0
             || (((s as any).payoffEvents?.length) || 0) > 0
+            || newlyApprovedPlanningIds.length > 0
+            || newlyRefusedPlanningIds.length > 0
+            || (((s as any).pendingPlanningCelebrations?.length) || 0) > 0
+            || (((s as any).pendingPlanningRefusals?.length) || 0) > 0
+            || economicEvents.length !== prev.economicEvents.length
+            || (economicEvents.length > 0 && economicEvents[economicEvents.length - 1]?.month === newMonthNumber)
               ? true
               : s.isPaused,
         } as any));

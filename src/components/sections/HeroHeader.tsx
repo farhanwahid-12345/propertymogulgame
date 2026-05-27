@@ -45,6 +45,26 @@ interface HeroHeaderProps {
   currentMarketRate?: number;
   totalDebt?: number;
   netMonthlyCashflow?: number;
+  netWorth?: number;
+  level?: number;
+}
+
+// Phase 4 #19: soft long-term targets surfaced as a slim progress bar.
+// Tier scales with level — first target is achievable, later ones aspirational.
+const PROGRESSION_TARGETS: Array<{ minLevel: number; target: number; label: string }> = [
+  { minLevel: 1, target: 250_000,   label: "£250k net worth" },
+  { minLevel: 2, target: 500_000,   label: "£500k net worth" },
+  { minLevel: 3, target: 1_000_000, label: "£1M net worth" },
+  { minLevel: 4, target: 2_500_000, label: "£2.5M net worth" },
+  { minLevel: 5, target: 5_000_000, label: "£5M net worth" },
+  { minLevel: 6, target: 10_000_000, label: "£10M empire" },
+];
+
+function pickGoal(level: number, netWorth: number) {
+  // Pick the lowest target the player hasn't yet hit, scoped to their tier.
+  const tier = PROGRESSION_TARGETS.filter(t => t.minLevel <= Math.max(1, level));
+  const next = tier.find(t => netWorth < t.target) || PROGRESSION_TARGETS.find(t => netWorth < t.target);
+  return next || PROGRESSION_TARGETS[PROGRESSION_TARGETS.length - 1];
 }
 
 export function HeroHeader({
@@ -64,7 +84,11 @@ export function HeroHeader({
   currentMarketRate = 0,
   totalDebt = 0,
   netMonthlyCashflow = 0,
+  netWorth = 0,
+  level = 1,
 }: HeroHeaderProps) {
+  const goal = pickGoal(level, netWorth);
+  const goalPct = Math.max(0, Math.min(100, (netWorth / goal.target) * 100));
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
@@ -141,10 +165,30 @@ export function HeroHeader({
                 Property Tycoon{compact ? "" : " 🏘️"}
               </h1>
               {!compact && (
-                <p className="hidden md:flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                  <span>Build your empire, one house at a time!</span>
-                  <ReputationBadge reputation={reputation} log={reputationLog} />
-                </p>
+                <div className="hidden md:flex flex-col gap-1 mt-0.5">
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Build your empire, one house at a time!</span>
+                    <ReputationBadge reputation={reputation} log={reputationLog} />
+                  </p>
+                  <div
+                    className="flex items-center gap-2 max-w-md"
+                    title={`Goal: ${goal.label} — £${netWorth.toLocaleString()} of £${goal.target.toLocaleString()}`}
+                    aria-label={`Progression goal: ${goal.label}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
+                      🎯 {goal.label}
+                    </span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all"
+                        style={{ width: `${goalPct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] tabular-nums text-muted-foreground/80 shrink-0 w-8 text-right">
+                      {Math.floor(goalPct)}%
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
