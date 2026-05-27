@@ -93,4 +93,12 @@ Maintainability and regression-safety. Lands last because it touches the widest 
 
 130 tests passing (3 new in `phase3V4Verification.test.ts`).
 
-Awaiting approval before starting Phase 2.
+## Phase 4 ✅ (v4)
+
+- #21 passive satisfaction recovery: +0.5–1 pt/mo only when condition is standard/premium AND no open concerns for the property; previous always-on drift removed.
+- #20 auto-pause extended to planning approvals/refusals and macro-economic event pop-ups (in addition to existing pending debits, chain collapse, payoff).
+- #19 progression goal bar in `HeroHeader` — tiered targets from £250k → £10M, slim progress bar with %, hidden in compact mode.
+
+134 tests passing (4 new in `phase4V4Verification.test.ts`).
+
+Awaiting approval before starting Phase 5.
