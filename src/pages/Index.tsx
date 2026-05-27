@@ -130,6 +130,8 @@ const Index = () => {
         currentMarketRate={gameState.currentMarketRate}
         totalDebt={gameState.totalDebt}
         netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
+        netWorth={gameState.netWorth}
+        level={gameState.level}
       />
 
       <div className="container mx-auto px-4 py-4 space-y-3 pb-6">
