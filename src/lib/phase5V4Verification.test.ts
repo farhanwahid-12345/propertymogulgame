@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+
 import { PropertyCard } from "@/components/game/property-card";
 import { PropertyCardSkeleton, PanelSkeleton, ListingRowSkeleton } from "@/components/ui/property-card-skeleton";
 
