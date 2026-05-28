@@ -109,4 +109,13 @@ Maintainability and regression-safety. Lands last because it touches the widest 
 
 137 tests passing (3 new in `phase5V4Verification.test.ts`).
 
-Awaiting approval before starting Phase 6.
+## Phase 6 ✅ (v4)
+
+- #13 slice selectors in `src/stores/slices/` (portfolio, banking, market, tenant, tax, time, notifications) — composition root unchanged so save shape is stable.
+- #17 named probability constants extracted into `src/lib/engine/probabilities.ts` (eviction, chain collapse, market dip, sui-generis, yield jitter).
+- #22 seeded PRNG `src/lib/rng.ts` (mulberry32) with `seedRng/gameRandom/withSeed/randomInt` — Math.random call sites can migrate incrementally.
+- #23 migration registry `src/lib/migrations.ts` with `runMigrations()` + `CURRENT_VERSION` mirroring the inline ladder in `gameStore.ts`.
+- #24 store-level regression tests already shipped in `phase6Verification.test.ts` + `phase6Regression.test.ts` + `persistedShape.test.ts`.
+- #12 reference doc `docs/GAME_MECHANICS.md` covering rent, condition decay, mortgages, depreciation, renovation/planning, EPC/MEES, satisfaction, macro events, taxation, persistence, RNG.
+
+149 tests passing (12 new in `phase6V4Verification.test.ts`). All six phases complete.
