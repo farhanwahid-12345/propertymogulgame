@@ -112,9 +112,10 @@ describe('Phase 6 — named probability constants (#17)', () => {
 
 describe('Phase 6 — GAME_MECHANICS.md (#12)', () => {
   it('exists at the documented path and covers the major systems', async () => {
-    const fs = await import('node:fs');
-    const path = await import('node:path');
-    const doc = fs.readFileSync(path.resolve(process.cwd(), 'docs/GAME_MECHANICS.md'), 'utf8');
+    // @ts-expect-error — node built-in in vitest env
+    const fs: typeof import('fs') = await import('fs');
+    // @ts-expect-error — node built-in in vitest env
+    const doc: string = fs.readFileSync('docs/GAME_MECHANICS.md', 'utf8');
     for (const section of ['Rent', 'Condition', 'Mortgages', 'EPC', 'Taxation', 'RNG', 'Persistence']) {
       expect(doc).toMatch(new RegExp(section, 'i'));
     }
