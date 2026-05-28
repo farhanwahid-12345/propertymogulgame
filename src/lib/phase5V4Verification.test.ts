@@ -22,9 +22,9 @@ describe("Phase 5 — Performance & Code-Splitting (v4)", () => {
   });
 
   it("BankingPanel uses React.lazy for heavy panels (#6)", async () => {
-    const src = await import("fs").then((fs) =>
-      fs.promises.readFile("src/components/sections/BankingPanel.tsx", "utf8"),
-    );
+    // @ts-expect-error - fs available at vitest runtime
+    const fs = await import("fs");
+    const src = fs.readFileSync("src/components/sections/BankingPanel.tsx", "utf8");
     expect(src).toMatch(/lazy\(\(\) =>\s*import\("@\/components\/game\/operations-center"\)/);
     expect(src).toMatch(/lazy\(\(\) =>\s*import\("@\/components\/game\/loans-panel"\)/);
     expect(src).toMatch(/lazy\(\(\) =>\s*import\("@\/components\/game\/tax-breakdown"\)/);
