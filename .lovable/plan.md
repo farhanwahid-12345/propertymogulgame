@@ -101,4 +101,12 @@ Maintainability and regression-safety. Lands last because it touches the widest 
 
 134 tests passing (4 new in `phase4V4Verification.test.ts`).
 
-Awaiting approval before starting Phase 5.
+## Phase 5 ✅ (v4)
+
+- #5 confirmed `PropertyCard` is wrapped in `React.memo`; store actions from Zustand are stable refs so memoization short-circuits as intended.
+- #6 lazy-loaded `OperationsCenter`, `LoansPanel`, `TaxBreakdown` via `React.lazy` in `BankingPanel.tsx`; dialog body now wrapped in `<Suspense fallback={<PanelSkeleton />}>`.
+- #7 added `PropertyCardSkeleton`, `ListingRowSkeleton`, `PanelSkeleton` in `src/components/ui/property-card-skeleton.tsx`.
+
+137 tests passing (3 new in `phase5V4Verification.test.ts`).
+
+Awaiting approval before starting Phase 6.

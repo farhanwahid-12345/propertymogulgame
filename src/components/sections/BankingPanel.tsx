@@ -1,15 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { MortgageSettlement } from "@/components/game/mortgage-settlement";
 import { MortgageManagement } from "@/components/game/mortgage-management";
 import { CreditOverdraft } from "@/components/game/credit-overdraft";
 import { PortfolioMortgage } from "@/components/game/portfolio-mortgage";
-import { LoansPanel } from "@/components/game/loans-panel";
-import { TaxBreakdown } from "@/components/game/tax-breakdown";
-import { OperationsCenter } from "@/components/game/operations-center";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fromPennies } from "@/lib/formatCurrency";
+import { PanelSkeleton } from "@/components/ui/property-card-skeleton";
 import type { useGameState } from "@/hooks/useGameState";
+
+// Phase 5 #6 — lazy-load heavy panels that only mount inside an opened dialog.
+const OperationsCenter = lazy(() =>
+  import("@/components/game/operations-center").then((m) => ({ default: m.OperationsCenter })),
+);
+const LoansPanel = lazy(() =>
+  import("@/components/game/loans-panel").then((m) => ({ default: m.LoansPanel })),
+);
+const TaxBreakdown = lazy(() =>
+  import("@/components/game/tax-breakdown").then((m) => ({ default: m.TaxBreakdown })),
+);
 
 type GameState = ReturnType<typeof useGameState>;
 
@@ -108,7 +117,7 @@ function InlineDialogButton({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
-          {children}
+          <Suspense fallback={<PanelSkeleton />}>{children}</Suspense>
         </DialogContent>
       </Dialog>
     </>
