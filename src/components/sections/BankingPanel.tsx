@@ -117,7 +117,7 @@ function InlineDialogButton({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
-          {children}
+          <Suspense fallback={<PanelSkeleton />}>{children}</Suspense>
         </DialogContent>
       </Dialog>
     </>
