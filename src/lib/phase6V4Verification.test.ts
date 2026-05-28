@@ -112,8 +112,8 @@ describe('Phase 6 — named probability constants (#17)', () => {
 
 describe('Phase 6 — GAME_MECHANICS.md (#12)', () => {
   it('exists at the documented path and covers the major systems', async () => {
-    const fs = await import('fs');
-    const doc: string = fs.readFileSync('docs/GAME_MECHANICS.md', 'utf8');
+    // Vite supports `?raw` to import any file as a string at test time.
+    const doc = (await import('../../docs/GAME_MECHANICS.md?raw')).default as string;
     for (const section of ['Rent', 'Condition', 'Mortgages', 'EPC', 'Taxation', 'RNG', 'Persistence']) {
       expect(doc).toMatch(new RegExp(section, 'i'));
     }
