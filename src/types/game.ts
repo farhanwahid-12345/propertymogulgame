@@ -412,6 +412,8 @@ export interface GameState {
   onboardingCompleted?: boolean;
   /** Landlord reputation 0-100 — gates premium tenant access, displayed as stars. Starts at 50. */
   landlordReputation: number;
+  /** Seed for the deterministic PRNG (mulberry32). Generated on first load. */
+  rngSeed?: number;
   // Properties
   ownedProperties: Property[];
   estateAgentProperties: Property[];
