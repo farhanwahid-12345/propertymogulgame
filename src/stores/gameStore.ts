@@ -5026,10 +5026,12 @@ export const useGameStore = create<GameState & GameActions>()(
     {
       name: 'propertyTycoonSave',
       storage: createDebouncedStorage(2000),
-      version: 12,
+      version: CURRENT_VERSION,
       migrate: (persisted: any, _version: number) => {
         // Always run migrateState — idempotent and repairs any stale field shape
-        return migrateState(persisted);
+        const migrated = migrateState(persisted);
+        if (typeof migrated.rngSeed === 'number') seedRng(migrated.rngSeed);
+        return migrated;
       },
       merge: (persistedState: any, currentState) => {
         // Zustand only calls migrate() on version mismatch; merge() hardens hydration for
@@ -5039,10 +5041,12 @@ export const useGameStore = create<GameState & GameActions>()(
         }
 
         try {
-          return {
+          const merged = {
             ...currentState,
             ...migrateState(persistedState),
           };
+          if (typeof merged.rngSeed === 'number') seedRng(merged.rngSeed);
+          return merged;
         } catch {
           return currentState;
         }
