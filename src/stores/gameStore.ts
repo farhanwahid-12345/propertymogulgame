@@ -159,7 +159,8 @@ function createInitialState(): GameState {
   }));
   const shuffled = [...withMarketJitter].sort(() => gameRandom() - 0.5);
   return {
-    _version: 14,
+    _version: CURRENT_VERSION,
+    rngSeed: Math.floor(Math.random() * 0xFFFFFFFF) >>> 0,
     cash: INITIAL_CASH,
     level: 1,
     experience: 0,
