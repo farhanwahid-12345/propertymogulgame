@@ -149,9 +149,9 @@ function createInitialState(): GameState {
   // v4 #11 — jitter marketValue ±15% so asking ≠ true market on the static catalogue too.
   const withMarketJitter = AVAILABLE_PROPERTIES.map(p => ({
     ...p,
-    marketValue: Math.max(toPennies(40_000), Math.round(p.value * (1 + (Math.random() - 0.5) * 0.30))),
+    marketValue: Math.max(toPennies(40_000), Math.round(p.value * (1 + (gameRandom() - 0.5) * 0.30))),
   }));
-  const shuffled = [...withMarketJitter].sort(() => Math.random() - 0.5);
+  const shuffled = [...withMarketJitter].sort(() => gameRandom() - 0.5);
   return {
     _version: 14,
     cash: INITIAL_CASH,
@@ -192,7 +192,7 @@ function createInitialState(): GameState {
     yearlyDeductibleExpenses: 0,
     lastCorporationTaxMonth: 0,
     lastGlobalDamageMonth: 0,
-    nextEconomicEventMonth: 3 + Math.floor(Math.random() * 4),
+    nextEconomicEventMonth: 3 + Math.floor(gameRandom() * 4),
     economicEvents: [],
     tenantEvents: [],
     taxRecords: [],
@@ -312,7 +312,7 @@ function migrateState(persisted: any): GameState {
       const monthsPlayed = asNumber(persisted.monthsPlayed);
       persisted.pendingDamages.forEach((d: any) => {
         persisted.tenantConcerns.push({
-          id: `concern_damage_${d.id || Math.random().toString(36).slice(2, 8)}`,
+          id: `concern_damage_${d.id || gameRandom().toString(36).slice(2, 8)}`,
           propertyId: asString(d.propertyId),
           tenantProfile: 'standard',
           category: 'maintenance',
@@ -533,7 +533,7 @@ export const useGameStore = create<GameState & GameActions>()(
         prev.conveyancing.forEach(conv => {
           if (newMonthNumber >= conv.completionMonth) {
             // Phase 3 #5: reduced chain collapse chance (was 10%, now 4%).
-            if (Math.random() < 0.04) {
+            if (gameRandom() < 0.04) {
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
               newChainCollapseEvents.push({
@@ -570,7 +570,7 @@ export const useGameStore = create<GameState & GameActions>()(
             // v4 #9 — preserve the snapshotted `propertyType`; older saves fall
             // back to 'residential' but new buys carry the original type through.
             const reconstructedValue = conv.purchasePrice || 0;
-            const reconstructedYield = conv.advertisedYield ?? (6 + Math.random() * 9);
+            const reconstructedYield = conv.advertisedYield ?? (6 + gameRandom() * 9);
             const derivedRent = conv.advertisedMonthlyIncome
               ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
             const reconstructedType = conv.propertyType ?? 'residential';
@@ -609,7 +609,7 @@ export const useGameStore = create<GameState & GameActions>()(
               }
             : undefined;
           const useClassInit = isCommercial
-            ? (Math.random() < 0.15 ? 'sui_generis' as const : 'E' as const)
+            ? (gameRandom() < 0.15 ? 'sui_generis' as const : 'E' as const)
             : undefined;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
@@ -732,7 +732,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
           const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
           const monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
-          if (Math.random() < monthlyP) {
+          if (gameRandom() < monthlyP) {
             const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
             missedTenantKeys.add(key);
             missedRentPropertyIds.add(t.propertyId);
@@ -975,8 +975,8 @@ export const useGameStore = create<GameState & GameActions>()(
           const hasOpenConcern = openConcernPropertyIds.has(property.id);
           if (!hasNegativePressure && conditionGood && !hasOpenConcern) {
             // 0.5–1 pt range; round to int after accumulation to keep storage clean
-            const recovery = 0.5 + Math.random() * 0.5;
-            const rounded = Math.random() < (recovery - Math.floor(recovery)) ? Math.ceil(recovery) : Math.floor(recovery);
+            const recovery = 0.5 + gameRandom() * 0.5;
+            const rounded = gameRandom() < (recovery - Math.floor(recovery)) ? Math.ceil(recovery) : Math.floor(recovery);
             const applied = Math.max(0, rounded);
             if (applied > 0) {
               delta += applied;
@@ -1004,11 +1004,11 @@ export const useGameStore = create<GameState & GameActions>()(
         const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
-          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && Math.random() < 0.05;
+          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && gameRandom() < 0.05;
           if (!guaranteedExit && !probabilisticExit) return true;
 
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
-          const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+          const voidDuration = (30 + gameRandom() * 60) * 24 * 60 * 60 * 1000;
           earlyExitVoids.push({ propertyId: t.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
 
           // Deposit deduction mirrors eviction-completion logic (lines ~1035)
@@ -1021,7 +1021,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
           if (withheld > 0) {
             walkoutDisputes.push({
-              id: `dispute_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              id: `dispute_${t.propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
               propertyId: t.propertyId,
               propertyName: property?.name || t.propertyId,
               tenantName: t.tenant.name,
@@ -1040,7 +1040,7 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast(title, `${t.tenant.name}${property ? ` left ${property.name}` : ''}. ${reasonLine}${depositLine}`, "destructive");
 
           newTenantHistory.push({
-            id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+            id: `dep_${t.propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
             propertyId: t.propertyId,
             propertyName: property?.name || t.propertyId,
             tenantName: t.tenant.name,
@@ -1051,7 +1051,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const d = guaranteedExit ? -4 : -2;
           reputationDelta += d;
           reputationLogEntries.push({
-            id: `rep_walk_${t.propertyId}_${newMonthNumber}_${Math.floor(Math.random()*1e6)}`,
+            id: `rep_walk_${t.propertyId}_${newMonthNumber}_${Math.floor(gameRandom()*1e6)}`,
             month: newMonthNumber, reason: `${t.tenant.name} walked out of ${property?.name || 'a property'}`,
             delta: d, category: 'walkout',
           });
@@ -1123,20 +1123,20 @@ export const useGameStore = create<GameState & GameActions>()(
           if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
           chance = Math.max(0.005, chance);
 
-          if (Math.random() >= chance) return;
+          if (gameRandom() >= chance) return;
 
           // When repair bar is low, bias toward maintenance/mould/safety templates
           const pool = conditionScore < 50
             ? CONCERN_TEMPLATES.filter(t => t.category === 'maintenance' || t.category === 'mould' || t.category === 'safety')
             : CONCERN_TEMPLATES;
-          const tpl = pool[Math.floor(Math.random() * pool.length)];
-          const desc = tpl.descriptions[Math.floor(Math.random() * tpl.descriptions.length)];
+          const tpl = pool[Math.floor(gameRandom() * pool.length)];
+          const desc = tpl.descriptions[Math.floor(gameRandom() * tpl.descriptions.length)];
           const [lo, hi] = tpl.baseCostPct;
-          const pct = lo + Math.random() * (hi - lo);
+          const pct = lo + gameRandom() * (hi - lo);
           const cost = Math.max(toPennies(150), Math.min(toPennies(3000), Math.round(property.value * pct)));
           const penaltyMod = t.tenant.profile === 'premium' ? 1 : t.tenant.profile === 'budget' ? 0.7 : 1;
           newConcerns.push({
-            id: `concern_${newMonthNumber}_${t.propertyId}_${Math.random().toString(36).slice(2, 7)}`,
+            id: `concern_${newMonthNumber}_${t.propertyId}_${gameRandom().toString(36).slice(2, 7)}`,
             propertyId: t.propertyId,
             tenantProfile: t.tenant.profile as any,
             category: tpl.category,
@@ -1175,7 +1175,7 @@ export const useGameStore = create<GameState & GameActions>()(
           if (inConveyancingIds.has(property.id)) return;
           const standardLabel = post2030 ? 'MEES 2030 (Band C minimum)' : 'MEES';
           newConcerns.push({
-            id: `mees_${newMonthNumber}_${property.id}_${Math.random().toString(36).slice(2, 6)}`,
+            id: `mees_${newMonthNumber}_${property.id}_${gameRandom().toString(36).slice(2, 6)}`,
             propertyId: property.id,
             tenantProfile: t.tenant.profile as any,
             category: 'safety',
@@ -1290,7 +1290,7 @@ export const useGameStore = create<GameState & GameActions>()(
           let ev = rawEv;
           // ── Tenant-filed appeal resolves this month? ──
           if (ev.appealFiled && !ev.appealResolved && ev.appealResolveMonth !== undefined && newMonthNumber >= ev.appealResolveMonth) {
-            const upheld = Math.random() < 0.60;
+            const upheld = gameRandom() < 0.60;
             if (upheld) {
               showToast(
                 "Tribunal Ruling: Upheld",
@@ -1336,7 +1336,7 @@ export const useGameStore = create<GameState & GameActions>()(
           // If we withheld anything, raise an open dispute the player can respond to
           if (withheld > 0) {
             newDepositDisputes.push({
-              id: `dispute_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+              id: `dispute_${ev.propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
               propertyId: ev.propertyId,
               propertyName: property?.name || ev.propertyId,
               tenantName: tenantRec.tenant.name,
@@ -1349,10 +1349,10 @@ export const useGameStore = create<GameState & GameActions>()(
 
           // Remove tenant + start a void period
           newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
-          const voidDuration = (30 + Math.random() * 60) * 24 * 60 * 60 * 1000;
+          const voidDuration = (30 + gameRandom() * 60) * 24 * 60 * 60 * 1000;
           newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
           newTenantHistory.push({
-            id: `dep_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random() * 1e6)}`,
+            id: `dep_${ev.propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
             propertyId: ev.propertyId,
             propertyName: property?.name || ev.propertyId,
             tenantName: tenantRec.tenant.name,
@@ -1364,7 +1364,7 @@ export const useGameStore = create<GameState & GameActions>()(
             const d = ev.ground === 'antisocial_behaviour' ? 1 : -3;
             reputationDelta += d;
             reputationLogEntries.push({
-              id: `rep_evict_${ev.propertyId}_${newMonthNumber}_${Math.floor(Math.random()*1e6)}`,
+              id: `rep_evict_${ev.propertyId}_${newMonthNumber}_${Math.floor(gameRandom()*1e6)}`,
               month: newMonthNumber,
               reason: ev.ground === 'antisocial_behaviour'
                 ? `Removed anti-social tenant from ${property?.name || 'a property'}`
@@ -1482,9 +1482,9 @@ export const useGameStore = create<GameState & GameActions>()(
             property.condition === 'premium'     ? 0.0030 :
             property.condition === 'dilapidated' ? -0.0005 :
                                                    0.0020; // standard
-          const monthlyDrift = meanByCondition + (Math.random() - 0.5) * 0.003; // ±0.15%
-          const isDip = Math.random() < 0.04;
-          const change = isDip ? -(0.004 + Math.random() * 0.012) : monthlyDrift;
+          const monthlyDrift = meanByCondition + (gameRandom() - 0.5) * 0.003; // ±0.15%
+          const isDip = gameRandom() < 0.04;
+          const change = isDip ? -(0.004 + gameRandom() * 0.012) : monthlyDrift;
           const purchaseBasis = property.price || property.value;
           const valueCap = Math.round(purchaseBasis * 2.5);
           const drifted = Math.round(property.value * (1 + change));
@@ -1767,9 +1767,9 @@ export const useGameStore = create<GameState & GameActions>()(
 
         if (newMonthNumber >= nextEventMonth && updatedOwnedProperties.length > 0) {
           // 30% chance the timer fires but nothing newsworthy happens — quiet stretches
-          const skipRoll = Math.random();
+          const skipRoll = gameRandom();
           if (skipRoll < 0.30) {
-            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
+            nextEventMonth = newMonthNumber + 8 + Math.floor(gameRandom() * 9); // 8–16mo
           } else {
             const eventTypes: Array<{ type: MacroEconomicEvent['type']; name: string; description: string; weight: number }> = [
               // Big shocks — rarer
@@ -1783,7 +1783,7 @@ export const useGameStore = create<GameState & GameActions>()(
             ];
             // Weighted pick
             const totalWeight = eventTypes.reduce((s, e) => s + e.weight, 0);
-            let r = Math.random() * totalWeight;
+            let r = gameRandom() * totalWeight;
             const chosen = eventTypes.find(e => (r -= e.weight) <= 0) || eventTypes[0];
             const event: MacroEconomicEvent = {
               id: `event_${newMonthNumber}`, name: chosen.name,
@@ -1843,7 +1843,7 @@ export const useGameStore = create<GameState & GameActions>()(
             }
 
             showToast(chosen.name, chosen.description);
-            nextEventMonth = newMonthNumber + 8 + Math.floor(Math.random() * 9); // 8–16mo
+            nextEventMonth = newMonthNumber + 8 + Math.floor(gameRandom() * 9); // 8–16mo
           }
         }
 
@@ -2075,7 +2075,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const predetermined = ((c as any)._predeterminedStatus || 'recovered') as 'recovered' | 'partial' | 'unrecoverable';
           let recoveredGross = 0;
           if (predetermined === 'recovered') recoveredGross = c.originalArrearsPennies;
-          else if (predetermined === 'partial') recoveredGross = Math.floor(c.originalArrearsPennies * (0.3 + Math.random() * 0.4));
+          else if (predetermined === 'partial') recoveredGross = Math.floor(c.originalArrearsPennies * (0.3 + gameRandom() * 0.4));
           const net = Math.floor(recoveredGross * (1 - c.recoveryFeePct));
           if (net > 0) {
             const credited = credit({ cash: finalCash, overdraftUsed: finalOverdraftUsed }, net);
@@ -2213,7 +2213,7 @@ export const useGameStore = create<GameState & GameActions>()(
       processMarketUpdate: () => {
         const prev = get();
         const currentTime = Date.now();
-        const marketChange = (Math.random() - 0.5) * 0.002;
+        const marketChange = (gameRandom() - 0.5) * 0.002;
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
 
         // Completed renovations — driven by in-game months so duration matches
@@ -2229,7 +2229,7 @@ export const useGameStore = create<GameState & GameActions>()(
           const idx = updatedProperties.findIndex(p => p.id === renovation.propertyId);
           if (idx >= 0) {
             // ROI variability roll: realistic outcome distribution
-            const roll = Math.random();
+            const roll = gameRandom();
             let valueMult = 1.0, rentMult = 1.0, outcomeNote = '';
             if (renovation.type.category === 'conversion') {
               // Conversions are GDV plays — bigger upside, rarer total flops
@@ -2386,13 +2386,13 @@ export const useGameStore = create<GameState & GameActions>()(
             let bandHigh: number;
             let bidWarChance: number;
             if (askRatio <= 1.0) {
-              numNew = Math.random() > 0.4 ? 2 : 1;
+              numNew = gameRandom() > 0.4 ? 2 : 1;
               bandLow = 0.92; bandHigh = 1.02; bidWarChance = 0.12;
             } else if (askRatio <= 1.15) {
-              numNew = Math.random() > 0.6 ? 2 : 1;
+              numNew = gameRandom() > 0.6 ? 2 : 1;
               bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.04;
             } else {
-              numNew = Math.random() > 0.75 ? 1 : 0;
+              numNew = gameRandom() > 0.75 ? 1 : 0;
               bandLow = 0.72; bandHigh = 0.84; bidWarChance = 0;
             }
             const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.003));
@@ -2403,20 +2403,20 @@ export const useGameStore = create<GameState & GameActions>()(
               "Liverpool Capital Group", "First Time Buyer", "Retirement Home Buyer"
             ];
             for (let i = 0; i < numNew; i++) {
-              const isBidWar = Math.random() < bidWarChance;
+              const isBidWar = gameRandom() < bidWarChance;
               const pct = isBidWar
-                ? 1.03 + Math.random() * 0.08
-                : bandLow + Math.random() * (bandHigh - bandLow);
+                ? 1.03 + gameRandom() * 0.08
+                : bandLow + gameRandom() * (bandHigh - bandLow);
               // Phase 3 #7 — ~25% of buyers are cash purchasers (no chain).
-              const isCash = Math.random() < 0.25;
+              const isCash = gameRandom() < 0.25;
               const offer: PropertyOffer = {
                 id: `offer-${Date.now()}-${i}`,
-                buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
+                buyerName: buyerNames[Math.floor(gameRandom() * buyerNames.length)],
                 amount: Math.floor(asking * pct * timeAdj),
                 daysOnMarket,
-                isChainFree: isCash || Math.random() > 0.6,
+                isChainFree: isCash || gameRandom() > 0.6,
                 isCash,
-                mortgageApproved: isCash ? true : Math.random() > 0.3,
+                mortgageApproved: isCash ? true : gameRandom() > 0.3,
                 timestamp: currentTime,
                 status: 'pending', negotiationRound: 0,
               };
@@ -2463,7 +2463,7 @@ export const useGameStore = create<GameState & GameActions>()(
               propertyName: property.name,
               status: 'selling',
               startMonth: prev.monthsPlayed,
-              completionMonth: prev.monthsPlayed + 1 + Math.floor(Math.random() * 3),
+              completionMonth: prev.monthsPlayed + 1 + Math.floor(gameRandom() * 3),
               salePrice: autoOffer.amount,
               cashHeld: 0,
               isAuction: sale.isAuction,
@@ -2504,7 +2504,7 @@ export const useGameStore = create<GameState & GameActions>()(
 
           prev.tenants.forEach(({ propertyId, tenant }) => {
             if (newDamageConcerns.length > 0) return;
-            if (Math.random() >= tenant.damageRisk / 100) return;
+            if (gameRandom() >= tenant.damageRisk / 100) return;
             const property = prev.ownedProperties.find(p => p.id === propertyId);
             if (!property) return;
             // Don't generate damage on properties leaving the portfolio
@@ -2516,9 +2516,9 @@ export const useGameStore = create<GameState & GameActions>()(
             const existing = prev.annualRepairCosts.find(a => a.propertyId === propertyId && a.year === currentYear);
             const currentCost = existing?.totalCost || 0;
             if (currentCost >= annualCap) return;
-            const maxDmg = Math.min(Math.round(property.value * (0.01 + Math.random() * 0.01)), annualCap - currentCost);
+            const maxDmg = Math.min(Math.round(property.value * (0.01 + gameRandom() * 0.01)), annualCap - currentCost);
             if (maxDmg > 0) {
-              const desc = damageDescriptions[Math.floor(Math.random() * damageDescriptions.length)];
+              const desc = damageDescriptions[Math.floor(gameRandom() * damageDescriptions.length)];
               newDamageConcerns.push({
                 id: `concern_damage_${Date.now()}_${propertyId}`,
                 propertyId,
@@ -2541,7 +2541,7 @@ export const useGameStore = create<GameState & GameActions>()(
         // so concurrent monthly ticks can't clobber the new damage concerns.
         // Loan spreads drift slightly each month within product bounds
         const driftLoanSpread = (current: number, min: number, max: number) => {
-          const next = current + (Math.random() - 0.5) * 0.006;
+          const next = current + (gameRandom() - 0.5) * 0.006;
           return Math.max(min, Math.min(max, next));
         };
         const newLoanRates = {
@@ -2593,13 +2593,13 @@ export const useGameStore = create<GameState & GameActions>()(
               hasChanges = true;
               const acceptChance = offer.negotiationRound >= 3 ? 0.8 : 0.6;
               const counterChance = offer.negotiationRound >= 3 ? 0 : 0.25;
-              const roll = Math.random();
+              const roll = gameRandom();
               if (roll < acceptChance) {
                 showToast("Counter-Offer Accepted! 🎉", `${offer.buyerName} accepted your counter for ${property.name}!`);
                 return { ...offer, status: 'accepted' as const, amount: offer.counterAmount || offer.amount };
               } else if (roll < acceptChance + counterChance) {
                 const diff = (offer.counterAmount || offer.amount) - offer.amount;
-                const buyerCounter = offer.amount + Math.floor(diff * (0.4 + Math.random() * 0.3));
+                const buyerCounter = offer.amount + Math.floor(diff * (0.4 + gameRandom() * 0.3));
                 showToast("Buyer Counter-Offered", `${offer.buyerName} countered with £${fromPennies(buyerCounter).toLocaleString()}`);
                 return { ...offer, status: 'buyer-countered' as const, buyerCounterAmount: buyerCounter, counterResponseDate: undefined };
               } else {
@@ -2682,7 +2682,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
         // Create conveyancing entry instead of instant purchase
-        const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
+        const conveyancingMonths = 1 + Math.floor(gameRandom() * 3);
         const conv: Conveyancing = {
           id: `conv_buy_${Date.now()}_${property.id}`,
           propertyId: property.id,
@@ -2775,7 +2775,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const debited = debit(prev, cashRequired);
         if (!debited) { showToast("Insufficient Funds", `Need £${fromPennies(cashRequired).toLocaleString()} (even with overdraft).`, "destructive"); return; }
 
-        const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
+        const conveyancingMonths = 1 + Math.floor(gameRandom() * 3);
         const conv: Conveyancing = {
           id: `conv_buy_${Date.now()}_${property.id}`,
           propertyId: property.id,
@@ -2822,7 +2822,7 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
           return;
         }
-        const daysToSell = isAuction ? 1 : 30 + Math.floor(Math.random() * 60);
+        const daysToSell = isAuction ? 1 : 30 + Math.floor(gameRandom() * 60);
         const listing: PropertyListing = {
           propertyId: property.id, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction,
           daysUntilSale: daysToSell, askingPrice: property.value,
@@ -2838,7 +2838,7 @@ export const useGameStore = create<GameState & GameActions>()(
         if (!property) return;
 
         // Move to conveyancing instead of instant sale
-        const conveyancingMonths = 1 + Math.floor(Math.random() * 3);
+        const conveyancingMonths = 1 + Math.floor(gameRandom() * 3);
         const conv: Conveyancing = {
           id: `conv_sell_${Date.now()}_${propertyId}`,
           propertyId,
@@ -2983,7 +2983,7 @@ export const useGameStore = create<GameState & GameActions>()(
       })),
 
       counterOffer: (propertyId, offerId, counterAmount) => {
-        const responseDelay = 5000 + Math.random() * 5000;
+        const responseDelay = 5000 + gameRandom() * 5000;
         showToast("Counter-Offer Sent", `Awaiting buyer response...`);
         set(s => ({
           propertyListings: s.propertyListings.map(l =>
@@ -3008,21 +3008,21 @@ export const useGameStore = create<GameState & GameActions>()(
 
         const currentPrice = listing.askingPrice || property.value;
         const newPrice = Math.floor(currentPrice * (1 - reductionPercent));
-        const numNew = Math.random() > 0.3 ? (Math.random() > 0.5 ? 3 : 2) : 1;
+        const numNew = gameRandom() > 0.3 ? (gameRandom() > 0.5 ? 3 : 2) : 1;
         const buyerNames = ["Mr & Mrs Johnson", "Sarah Matthews", "David Chen", "Emma Wilson", "The Thompson Family", "Investment Properties Ltd"];
         const newOffers: PropertyOffer[] = [];
         for (let i = 0; i < numNew; i++) {
-          const roll = Math.random();
+          const roll = gameRandom();
           let offerAmount: number;
-          if (roll < 0.70) offerAmount = property.value * (0.90 + Math.random() * 0.15);
-          else if (roll < 0.85) offerAmount = property.value * (0.80 + Math.random() * 0.10);
-          else offerAmount = property.value * (1.05 + Math.random() * 0.10);
+          if (roll < 0.70) offerAmount = property.value * (0.90 + gameRandom() * 0.15);
+          else if (roll < 0.85) offerAmount = property.value * (0.80 + gameRandom() * 0.10);
+          else offerAmount = property.value * (1.05 + gameRandom() * 0.10);
           offerAmount = Math.min(offerAmount, newPrice);
           newOffers.push({
             id: `offer-${Date.now()}-reduce-${i}`,
-            buyerName: buyerNames[Math.floor(Math.random() * buyerNames.length)],
+            buyerName: buyerNames[Math.floor(gameRandom() * buyerNames.length)],
             amount: Math.floor(offerAmount), daysOnMarket: 0,
-            isChainFree: Math.random() > 0.5, mortgageApproved: Math.random() > 0.25,
+            isChainFree: gameRandom() > 0.5, mortgageApproved: gameRandom() > 0.25,
             timestamp: Date.now(), status: 'pending', negotiationRound: 0,
           });
         }
@@ -3053,7 +3053,7 @@ export const useGameStore = create<GameState & GameActions>()(
       },
 
       rejectBuyerCounter: (propertyId, offerId, newCounterAmount) => {
-        const responseDelay = 5000 + Math.random() * 5000;
+        const responseDelay = 5000 + gameRandom() * 5000;
         showToast("Counter-Offer Sent", `Awaiting buyer response...`);
         set(s => ({
           propertyListings: s.propertyListings.map(l =>
@@ -3345,12 +3345,12 @@ export const useGameStore = create<GameState & GameActions>()(
         if ((tenant.satisfaction ?? 50) >= 60) appealChance += 0.15;
         if (tenant.tenant.profile === 'risky') appealChance -= 0.10;
         appealChance = Math.max(0, Math.min(0.85, appealChance));
-        const willAppeal = Math.random() < appealChance;
+        const willAppeal = gameRandom() < appealChance;
 
         // Phase 4 #11 — court backlog. Real-world possession claims sit in a
         // 3-6 month queue before bailiff enforcement. Added on top of the
         // statutory notice period so evictions are a major time commitment.
-        const courtBacklogMonths = 3 + Math.floor(Math.random() * 4); // 3..6
+        const courtBacklogMonths = 3 + Math.floor(gameRandom() * 4); // 3..6
         const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
         const updatedTenants = prev.tenants.map(t =>
           t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
@@ -3449,7 +3449,7 @@ export const useGameStore = create<GameState & GameActions>()(
           showToast("No Open Dispute", "This dispute is no longer open.", "destructive");
           return;
         }
-        const roll = Math.random();
+        const roll = gameRandom();
         let outcome: 'won' | 'settled' | 'lost';
         let extraRefund = 0;
         if (roll < 0.35) { outcome = 'won'; extraRefund = 0; }
@@ -3805,7 +3805,7 @@ export const useGameStore = create<GameState & GameActions>()(
         });
 
         // Roll the outcome NOW, reveal at decisionMonth
-        const approved = Math.random() < prob;
+        const approved = gameRandom() < prob;
         const refusalReasons = [
           'Over-development for the area — would harm street character.',
           'Loss of family housing stock conflicts with the Local Plan.',
@@ -3813,7 +3813,7 @@ export const useGameStore = create<GameState & GameActions>()(
           'Daylight/sunlight impact on neighbouring properties.',
           'Inadequate amenity space for proposed occupancy.',
         ];
-        const refusalReason = approved ? undefined : refusalReasons[Math.floor(Math.random() * refusalReasons.length)];
+        const refusalReason = approved ? undefined : refusalReasons[Math.floor(gameRandom() * refusalReasons.length)];
 
         const waitMonths = Math.max(1, renovationType.planningWaitMonths ?? 2);
         const application: PlanningApplication = {
@@ -3919,8 +3919,8 @@ export const useGameStore = create<GameState & GameActions>()(
             approvalsCount,
             refusalsCount,
           });
-          const approved = Math.random() < prob;
-          const refusalReason = approved ? undefined : refusalReasons[Math.floor(Math.random() * refusalReasons.length)];
+          const approved = gameRandom() < prob;
+          const refusalReason = approved ? undefined : refusalReasons[Math.floor(gameRandom() * refusalReasons.length)];
           const waitMonths = Math.max(1, r.planningWaitMonths ?? 2);
           // Conversions in this batch get sized against current sqft + any extension sqft also in the batch.
           const sizingSqft = r.category === 'conversion'
@@ -4386,7 +4386,7 @@ export const useGameStore = create<GameState & GameActions>()(
           }
         }
         const loan: import('@/types/game').Loan = {
-          id: `loan_${kind}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+          id: `loan_${kind}_${Date.now()}_${Math.floor(gameRandom() * 1e6)}`,
           kind, principal: amount, remainingBalance: amount,
           monthlyPayment, interestRate: rate, termMonths,
           startMonth: prev.monthsPlayed,
@@ -4569,8 +4569,8 @@ export const useGameStore = create<GameState & GameActions>()(
         // standard-lender refusal. Buyers may use cash OR bridging finance.
         auctions = auctions.map(p => {
           if (p.needsRefurb !== undefined) return p;
-          if (Math.random() < 0.4) {
-            const discountPct = 0.30 + Math.random() * 0.30; // 30–60%
+          if (gameRandom() < 0.4) {
+            const discountPct = 0.30 + gameRandom() * 0.30; // 30–60%
             const discounted = Math.max(toPennies(40000), Math.round(p.price * (1 - discountPct)));
             return { ...p, needsRefurb: true, price: discounted, value: discounted };
           }
@@ -4596,12 +4596,12 @@ export const useGameStore = create<GameState & GameActions>()(
           const extra = 8 - affordableCount;
           for (let i = 0; i < extra; i++) {
             const priceFloor = Math.max(toPennies(40000), min);
-            const targetPrice = priceFloor + Math.random() * (priceFloor * 0.5);
+            const targetPrice = priceFloor + gameRandom() * (priceFloor * 0.5);
             const adjusted = Math.max(priceFloor, Math.min(max, Math.floor(targetPrice / 100_000) * 100_000));
             const prop = generateRandomProperty(prev.level);
             prop.price = adjusted;
             prop.value = adjusted;
-            prop.monthlyIncome = Math.floor((adjusted * (6 + Math.random() * 9) / 100) / 12);
+            prop.monthlyIncome = Math.floor((adjusted * (6 + gameRandom() * 9) / 100) / 12);
             if (!usedIds.has(prop.id) && !excludedIds.has(prop.id)) {
               estate.push(prop);
               usedIds.add(prop.id);
@@ -4614,7 +4614,7 @@ export const useGameStore = create<GameState & GameActions>()(
             !usedIds.has(p.id) && !excludedIds.has(p.id) && p.price >= min && p.price <= max
           );
           const pick = candidates.length > 0
-            ? candidates[Math.floor(Math.random() * candidates.length)]
+            ? candidates[Math.floor(gameRandom() * candidates.length)]
             : generateMarketProperty(prev.level);
           if (!usedIds.has(pick.id) && !excludedIds.has(pick.id)) {
             estate.push({ ...pick });
@@ -4910,14 +4910,14 @@ export const useGameStore = create<GameState & GameActions>()(
         // skews the roll toward 'recovered' (+12pp) and away from 'unrecoverable'.
         const lbaBonus = (tenant.letterBeforeActionMonth !== undefined
           && s.monthsPlayed - tenant.letterBeforeActionMonth <= 6) ? 0.12 : 0;
-        const roll = Math.random();
+        const roll = gameRandom();
         const recoveredCutoff = 0.55 + lbaBonus;
         const partialCutoff = 0.85 + (lbaBonus * 0.5);
         const status: 'recovered' | 'partial' | 'unrecoverable' =
           roll < recoveredCutoff ? 'recovered' : roll < partialCutoff ? 'partial' : 'unrecoverable';
-        const resolveMonth = s.monthsPlayed + 6 + Math.floor(Math.random() * 7); // 6–12 months
+        const resolveMonth = s.monthsPlayed + 6 + Math.floor(gameRandom() * 7); // 6–12 months
         const newCase: import('@/types/game').DebtRecoveryCase = {
-          id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${Math.random().toString(36).slice(2, 6)}`,
+          id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${gameRandom().toString(36).slice(2, 6)}`,
           propertyId,
           propertyName: prop.name,
           tenantName: tenant.tenant.name,
@@ -4993,8 +4993,8 @@ export const useGameStore = create<GameState & GameActions>()(
         const debited = debit(s, fee);
         if (!debited) { showToast("Insufficient funds", `Need £${fromPennies(fee).toLocaleString()} (incl. overdraft).`, "destructive"); return; }
         const residual = Math.max(0, c.originalArrearsPennies - (c.netRecoveredPennies ?? 0));
-        const willRecover = Math.random() < 0.4;
-        const hceExpected = willRecover ? Math.round(residual * (0.7 + Math.random() * 0.2)) : 0;
+        const willRecover = gameRandom() < 0.4;
+        const hceExpected = willRecover ? Math.round(residual * (0.7 + gameRandom() * 0.2)) : 0;
         const updated = [...cases];
         updated[idx] = {
           ...c,
