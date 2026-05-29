@@ -539,7 +539,7 @@ export const useGameStore = create<GameState & GameActions>()(
         prev.conveyancing.forEach(conv => {
           if (newMonthNumber >= conv.completionMonth) {
             // Phase 3 #5: reduced chain collapse chance (was 10%, now 4%).
-            if (gameRandom() < 0.04) {
+            if (gameRandom() < CHAIN_COLLAPSE_PROB) {
               cancelledConveyancing.push(conv);
               conveyancingCashReturn += conv.cashHeld;
               newChainCollapseEvents.push({
@@ -615,7 +615,7 @@ export const useGameStore = create<GameState & GameActions>()(
               }
             : undefined;
           const useClassInit = isCommercial
-            ? (gameRandom() < 0.15 ? 'sui_generis' as const : 'E' as const)
+            ? (gameRandom() < SUI_GENERIS_PROB ? 'sui_generis' as const : 'E' as const)
             : undefined;
           const purchased: Property = {
             ...prop, owned: true, price: paid,
@@ -1010,7 +1010,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
-          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && gameRandom() < 0.05;
+          const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && gameRandom() < TENANT_WALKOUT_RISK_PROB;
           if (!guaranteedExit && !probabilisticExit) return true;
 
           const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
@@ -1296,7 +1296,7 @@ export const useGameStore = create<GameState & GameActions>()(
           let ev = rawEv;
           // ── Tenant-filed appeal resolves this month? ──
           if (ev.appealFiled && !ev.appealResolved && ev.appealResolveMonth !== undefined && newMonthNumber >= ev.appealResolveMonth) {
-            const upheld = gameRandom() < 0.60;
+            const upheld = gameRandom() < EVICTION_UPHELD_PROB;
             if (upheld) {
               showToast(
                 "Tribunal Ruling: Upheld",
@@ -1489,7 +1489,7 @@ export const useGameStore = create<GameState & GameActions>()(
             property.condition === 'dilapidated' ? -0.0005 :
                                                    0.0020; // standard
           const monthlyDrift = meanByCondition + (gameRandom() - 0.5) * 0.003; // ±0.15%
-          const isDip = gameRandom() < 0.04;
+          const isDip = gameRandom() < MARKET_DIP_PROB;
           const change = isDip ? -(0.004 + gameRandom() * 0.012) : monthlyDrift;
           const purchaseBasis = property.price || property.value;
           const valueCap = Math.round(purchaseBasis * 2.5);
