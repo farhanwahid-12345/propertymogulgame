@@ -5099,3 +5099,12 @@ export const useFinanceData = () => useGameStore(useShallow(s => ({
   mortgageProviderRates: s.mortgageProviderRates,
 })));
 
+
+// ─── RNG bootstrap ────────────────────────────────────────
+// Seed mulberry32 from the persisted/initial rngSeed so all gameRandom()
+// call sites are deterministic from store init. Re-seeded by persist.migrate
+// / persist.merge after hydration completes.
+{
+  const s = useGameStore.getState();
+  if (typeof s.rngSeed === 'number') seedRng(s.rngSeed);
+}
