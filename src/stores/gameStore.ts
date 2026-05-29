@@ -42,6 +42,12 @@ import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, scaleRe
 import { getEffectiveProviderRate } from '@/lib/mortgageEligibility';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
+import { gameRandom, seedRng } from '@/lib/rng';
+import { runMigrations, CURRENT_VERSION, type Migration } from '@/lib/migrations';
+import {
+  CHAIN_COLLAPSE_PROB, SUI_GENERIS_PROB, EVICTION_UPHELD_PROB,
+  MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
+} from '@/lib/engine/probabilities';
 
 // ─── Helpers ──────────────────────────────────────────────
 import { showToast, debit, debitStrict, credit, calcDeposit } from './storeHelpers';
