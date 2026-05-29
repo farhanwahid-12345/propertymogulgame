@@ -5,12 +5,12 @@
  * other suites already exercise hydration.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { CURRENT_VERSION, runMigrations, type Migration } from '@/lib/migrations';
 import { seedRng, gameRandom, withSeed } from '@/lib/rng';
 
-const storeSrc = readFileSync(resolve(__dirname, '../stores/gameStore.ts'), 'utf8');
+// @ts-expect-error - fs available at vitest runtime
+const fs = await import('fs');
+const storeSrc: string = fs.readFileSync('src/stores/gameStore.ts', 'utf8');
 
 describe('Phase 1 (v5) — wiring', () => {
   it('no raw Math.random() in gameStore.ts (except the seed bootstrap)', () => {
