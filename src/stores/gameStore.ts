@@ -232,170 +232,174 @@ function createInitialState(): GameState {
 }
 
 // ─── Save migration ───────────────────────────────────────
-function migrateState(persisted: any): GameState {
-  const initial = createInitialState();
-
-  // v1 (or no version) = pounds; v2 = pennies
-  if (!persisted._version || persisted._version < 2) {
-    const moneyFields = ['cash', 'overdraftLimit', 'overdraftUsed', 'yearlyNetProfit'];
-    moneyFields.forEach(f => {
-      if (typeof persisted[f] === 'number') persisted[f] = toPennies(persisted[f]);
-    });
-    const propMoneyFields = ['price', 'value', 'monthlyIncome', 'mortgageRemaining', 'marketValue', 'baseRent'];
-    ['ownedProperties', 'estateAgentProperties', 'auctionProperties'].forEach(arrKey => {
-      if (Array.isArray(persisted[arrKey])) {
-        persisted[arrKey] = persisted[arrKey].map((p: any) => {
-          const out = { ...p };
-          propMoneyFields.forEach(f => { if (typeof out[f] === 'number') out[f] = toPennies(out[f]); });
-          return out;
-        });
-      }
-    });
-    if (Array.isArray(persisted.mortgages)) {
-      persisted.mortgages = persisted.mortgages.map((m: any) => ({
-        ...m, principal: toPennies(m.principal || 0), monthlyPayment: toPennies(m.monthlyPayment || 0), remainingBalance: toPennies(m.remainingBalance || 0),
-      }));
-    }
-    if (Array.isArray(persisted.propertyListings)) {
-      persisted.propertyListings = persisted.propertyListings.map((l: any) => ({
-        ...l, askingPrice: toPennies(l.askingPrice || 0),
-        autoAcceptThreshold: l.autoAcceptThreshold ? toPennies(l.autoAcceptThreshold) : undefined,
-        offers: Array.isArray(l.offers) ? l.offers.map((o: any) => ({
-          ...o, amount: toPennies(o.amount || 0),
-          counterAmount: o.counterAmount ? toPennies(o.counterAmount) : undefined,
-          buyerCounterAmount: o.buyerCounterAmount ? toPennies(o.buyerCounterAmount) : undefined,
-        })) : [],
-      }));
-    }
-    if (Array.isArray(persisted.pendingDamages)) {
-      persisted.pendingDamages = persisted.pendingDamages.map((d: any) => ({ ...d, repairCost: toPennies(d.repairCost || 0) }));
-    }
-    if (Array.isArray(persisted.tenantEvents)) {
-      persisted.tenantEvents = persisted.tenantEvents.map((e: any) => ({ ...e, amount: toPennies(e.amount || 0) }));
-    }
-    if (Array.isArray(persisted.annualRepairCosts)) {
-      persisted.annualRepairCosts = persisted.annualRepairCosts.map((a: any) => ({ ...a, totalCost: toPennies(a.totalCost || 0) }));
-    }
-    persisted._version = 2;
-  }
-
-  // v2 → v3: add condition, entityType, conveyancing, tax fields
-  if (persisted._version < 3) {
-    // Add condition to all properties
-    ['ownedProperties', 'estateAgentProperties', 'auctionProperties'].forEach(arrKey => {
-      if (Array.isArray(persisted[arrKey])) {
-        persisted[arrKey] = persisted[arrKey].map((p: any) => ({
-          ...p,
-          condition: p.condition || 'standard',
-          monthsSinceLastRenovation: p.monthsSinceLastRenovation ?? 0,
+// Ordered registry consumed by `runMigrations` (src/lib/migrations.ts).
+// Each step mutates `persisted` in place; the runner stamps `_version`.
+const migrationSteps: ReadonlyArray<Migration> = [
+  {
+    from: 1, to: 2, describe: 'pounds → pennies',
+    apply: (persisted) => {
+      const moneyFields = ['cash', 'overdraftLimit', 'overdraftUsed', 'yearlyNetProfit'];
+      moneyFields.forEach(f => {
+        if (typeof persisted[f] === 'number') persisted[f] = toPennies(persisted[f]);
+      });
+      const propMoneyFields = ['price', 'value', 'monthlyIncome', 'mortgageRemaining', 'marketValue', 'baseRent'];
+      ['ownedProperties', 'estateAgentProperties', 'auctionProperties'].forEach(arrKey => {
+        if (Array.isArray(persisted[arrKey])) {
+          persisted[arrKey] = persisted[arrKey].map((p: any) => {
+            const out = { ...p };
+            propMoneyFields.forEach(f => { if (typeof out[f] === 'number') out[f] = toPennies(out[f]); });
+            return out;
+          });
+        }
+      });
+      if (Array.isArray(persisted.mortgages)) {
+        persisted.mortgages = persisted.mortgages.map((m: any) => ({
+          ...m, principal: toPennies(m.principal || 0), monthlyPayment: toPennies(m.monthlyPayment || 0), remainingBalance: toPennies(m.remainingBalance || 0),
         }));
       }
-    });
-    persisted.entityType = persisted.entityType || 'sole_trader';
-    persisted.conveyancing = persisted.conveyancing || [];
-    persisted.taxRecords = persisted.taxRecords || [];
-    persisted.totalTaxPaid = persisted.totalTaxPaid || 0;
-    // Upgrade credit score for existing players (they had 580 start, now 750)
-    if (persisted.creditScore && persisted.creditScore < 650 && persisted.monthsPlayed < 3) {
-      persisted.creditScore = 750;
-    }
-    persisted._version = 3;
-  }
-
-  // v3 → v4: add tenantConcerns
-  if (persisted._version < 4) {
-    persisted._version = 4;
-  }
-
-  // v4 → v5: ensure tenantConcerns exists (repairs stale v4 saves missing the field)
-  if (persisted._version < 5) {
-    persisted._version = 5;
-  }
-
-  // v5 → v6: migrate pendingDamages → tenantConcerns (damage now flows through concerns feed)
-  if (persisted._version < 6) {
-    if (Array.isArray(persisted.pendingDamages) && persisted.pendingDamages.length > 0) {
-      if (!Array.isArray(persisted.tenantConcerns)) persisted.tenantConcerns = [];
-      const monthsPlayed = asNumber(persisted.monthsPlayed);
-      persisted.pendingDamages.forEach((d: any) => {
-        persisted.tenantConcerns.push({
-          id: `concern_damage_${d.id || gameRandom().toString(36).slice(2, 8)}`,
-          propertyId: asString(d.propertyId),
-          tenantProfile: 'standard',
-          category: 'maintenance',
-          description: `Repair needed at ${d.propertyName || 'property'}`,
-          raisedMonth: monthsPlayed,
-          resolveCost: asNumber(d.repairCost),
-          satisfactionPenaltyIfIgnored: 5,
-          source: 'damage',
-        });
+      if (Array.isArray(persisted.propertyListings)) {
+        persisted.propertyListings = persisted.propertyListings.map((l: any) => ({
+          ...l, askingPrice: toPennies(l.askingPrice || 0),
+          autoAcceptThreshold: l.autoAcceptThreshold ? toPennies(l.autoAcceptThreshold) : undefined,
+          offers: Array.isArray(l.offers) ? l.offers.map((o: any) => ({
+            ...o, amount: toPennies(o.amount || 0),
+            counterAmount: o.counterAmount ? toPennies(o.counterAmount) : undefined,
+            buyerCounterAmount: o.buyerCounterAmount ? toPennies(o.buyerCounterAmount) : undefined,
+          })) : [],
+        }));
+      }
+      if (Array.isArray(persisted.pendingDamages)) {
+        persisted.pendingDamages = persisted.pendingDamages.map((d: any) => ({ ...d, repairCost: toPennies(d.repairCost || 0) }));
+      }
+      if (Array.isArray(persisted.tenantEvents)) {
+        persisted.tenantEvents = persisted.tenantEvents.map((e: any) => ({ ...e, amount: toPennies(e.amount || 0) }));
+      }
+      if (Array.isArray(persisted.annualRepairCosts)) {
+        persisted.annualRepairCosts = persisted.annualRepairCosts.map((a: any) => ({ ...a, totalCost: toPennies(a.totalCost || 0) }));
+      }
+    },
+  },
+  {
+    from: 2, to: 3, describe: 'add condition / entity / conveyancing / tax fields',
+    apply: (persisted) => {
+      ['ownedProperties', 'estateAgentProperties', 'auctionProperties'].forEach(arrKey => {
+        if (Array.isArray(persisted[arrKey])) {
+          persisted[arrKey] = persisted[arrKey].map((p: any) => ({
+            ...p,
+            condition: p.condition || 'standard',
+            monthsSinceLastRenovation: p.monthsSinceLastRenovation ?? 0,
+          }));
+        }
       });
-    }
-    persisted.pendingDamages = [];
-    persisted._version = 6;
-  }
+      persisted.entityType = persisted.entityType || 'sole_trader';
+      persisted.conveyancing = persisted.conveyancing || [];
+      persisted.taxRecords = persisted.taxRecords || [];
+      persisted.totalTaxPaid = persisted.totalTaxPaid || 0;
+      if (persisted.creditScore && persisted.creditScore < 650 && persisted.monthsPlayed < 3) {
+        persisted.creditScore = 750;
+      }
+    },
+  },
+  { from: 3, to: 4, describe: 'add tenantConcerns (init)', apply: () => {} },
+  { from: 4, to: 5, describe: 'tenantConcerns repair', apply: () => {} },
+  {
+    from: 5, to: 6, describe: 'pendingDamages → tenantConcerns',
+    apply: (persisted) => {
+      if (Array.isArray(persisted.pendingDamages) && persisted.pendingDamages.length > 0) {
+        if (!Array.isArray(persisted.tenantConcerns)) persisted.tenantConcerns = [];
+        const monthsPlayed = asNumber(persisted.monthsPlayed);
+        persisted.pendingDamages.forEach((d: any) => {
+          persisted.tenantConcerns.push({
+            id: `concern_damage_${d.id || gameRandom().toString(36).slice(2, 8)}`,
+            propertyId: asString(d.propertyId),
+            tenantProfile: 'standard',
+            category: 'maintenance',
+            description: `Repair needed at ${d.propertyName || 'property'}`,
+            raisedMonth: monthsPlayed,
+            resolveCost: asNumber(d.repairCost),
+            satisfactionPenaltyIfIgnored: 5,
+            source: 'damage',
+          });
+        });
+      }
+      persisted.pendingDamages = [];
+    },
+  },
+  {
+    from: 6, to: 7, describe: "Renters' Rights: deposit + eviction fields",
+    apply: (persisted) => {
+      if (Array.isArray(persisted.tenants)) {
+        persisted.tenants = persisted.tenants.map((t: any) => ({
+          ...t,
+          depositHeld: typeof t?.depositHeld === 'number' ? t.depositHeld : 0,
+        }));
+      }
+      if (!Array.isArray(persisted.pendingEvictions)) persisted.pendingEvictions = [];
+      if (!Array.isArray(persisted.propertyLocks)) persisted.propertyLocks = [];
+    },
+  },
+  {
+    from: 7, to: 8, describe: 'add depositDisputes',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.depositDisputes)) persisted.depositDisputes = [];
+    },
+  },
+  {
+    from: 8, to: 9, describe: 'add planningApplications',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.planningApplications)) persisted.planningApplications = [];
+    },
+  },
+  {
+    from: 9, to: 10, describe: 'add tenantHistory',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.tenantHistory)) persisted.tenantHistory = [];
+    },
+  },
+  {
+    from: 10, to: 11, describe: 'per-year tax accumulators',
+    apply: (persisted) => {
+      if (typeof persisted.yearlyGrossRent !== 'number') persisted.yearlyGrossRent = 0;
+      if (typeof persisted.yearlyMortgageInterest !== 'number') persisted.yearlyMortgageInterest = 0;
+      if (typeof persisted.yearlyDeductibleExpenses !== 'number') persisted.yearlyDeductibleExpenses = 0;
+    },
+  },
+  {
+    from: 11, to: 12, describe: 'entityChosen flag',
+    apply: (persisted) => {
+      if (typeof persisted.entityChosen !== 'boolean') persisted.entityChosen = true;
+    },
+  },
+  {
+    from: 12, to: 13, describe: 'currentLoanRates',
+    apply: (persisted) => {
+      if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
+        persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
+      }
+    },
+  },
+  {
+    from: 13, to: 14, describe: 'landlordReputation + onboardingCompleted',
+    apply: (persisted) => {
+      if (typeof persisted.landlordReputation !== 'number') persisted.landlordReputation = 50;
+      if (typeof persisted.onboardingCompleted !== 'boolean') persisted.onboardingCompleted = true;
+    },
+  },
+  {
+    from: 14, to: 15, describe: 'rngSeed for deterministic PRNG',
+    apply: (persisted) => {
+      if (typeof persisted.rngSeed !== 'number' || !Number.isFinite(persisted.rngSeed)) {
+        persisted.rngSeed = Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+      }
+    },
+  },
+];
 
-  // v6 → v7: Renters' Rights — add deposit/eviction fields, init pendingEvictions and propertyLocks
-  if (persisted._version < 7) {
-    if (Array.isArray(persisted.tenants)) {
-      persisted.tenants = persisted.tenants.map((t: any) => ({
-        ...t,
-        depositHeld: typeof t?.depositHeld === 'number' ? t.depositHeld : 0,
-      }));
-    }
-    if (!Array.isArray(persisted.pendingEvictions)) persisted.pendingEvictions = [];
-    if (!Array.isArray(persisted.propertyLocks)) persisted.propertyLocks = [];
-    persisted._version = 7;
-  }
+function migrateState(persisted: any): GameState {
+  const initial = createInitialState();
+  runMigrations(persisted, migrationSteps, CURRENT_VERSION);
 
-  // v7 → v8: add depositDisputes slice
-  if (persisted._version < 8) {
-    if (!Array.isArray(persisted.depositDisputes)) persisted.depositDisputes = [];
-    persisted._version = 8;
-  }
 
-  // v8 → v9: add planningApplications slice
-  if (persisted._version < 9) {
-    if (!Array.isArray(persisted.planningApplications)) persisted.planningApplications = [];
-    persisted._version = 9;
-  }
-
-  // v9 → v10: add tenantHistory slice
-  if (persisted._version < 10) {
-    if (!Array.isArray(persisted.tenantHistory)) persisted.tenantHistory = [];
-    persisted._version = 10;
-  }
-
-  // v10 → v11: add per-year tax accumulators
-  if (persisted._version < 11) {
-    if (typeof persisted.yearlyGrossRent !== 'number') persisted.yearlyGrossRent = 0;
-    if (typeof persisted.yearlyMortgageInterest !== 'number') persisted.yearlyMortgageInterest = 0;
-    if (typeof persisted.yearlyDeductibleExpenses !== 'number') persisted.yearlyDeductibleExpenses = 0;
-    persisted._version = 11;
-  }
-
-  // v11 → v12: add entityChosen flag (existing saves are grandfathered as chosen)
-  if (persisted._version < 12) {
-    if (typeof persisted.entityChosen !== 'boolean') {
-      persisted.entityChosen = true;
-    }
-    persisted._version = 12;
-  }
-
-  // v12 → v13: add currentLoanRates (bridging loans are now supported — Phase 5)
-  if (persisted._version < 13) {
-    if (!persisted.currentLoanRates || typeof persisted.currentLoanRates !== 'object') {
-      persisted.currentLoanRates = { personal: LOAN_PRODUCTS.personal.baseSpread, business: LOAN_PRODUCTS.business.baseSpread };
-    }
-    persisted._version = 13;
-  }
-
-  // v13 → v14: add landlordReputation + onboardingCompleted (existing saves grandfathered)
-  if (persisted._version < 14) {
-    if (typeof persisted.landlordReputation !== 'number') persisted.landlordReputation = 50;
-    if (typeof persisted.onboardingCompleted !== 'boolean') persisted.onboardingCompleted = true;
-    persisted._version = 14;
-  }
 
   // Always backfill tenantConcerns regardless of version — defensive against schema drift
   if (!Array.isArray(persisted.tenantConcerns)) {
