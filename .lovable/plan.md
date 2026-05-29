@@ -82,3 +82,13 @@ Lands last because it touches the widest surface. Incremental, one slice at a ti
 - **RNG discipline**: from Phase 1 onward, all new probabilistic code uses `gameRandom()` / `withSeed()` — no raw `Math.random()` in `src/stores/` or `src/lib/engine/`.
 
 Stopping here for your review — awaiting approval before starting Phase 1.
+
+## Phase 1 ✅ (v5)
+
+- #7a all 84 `Math.random()` call sites in `gameStore.ts` swapped to `gameRandom()` from `src/lib/rng.ts`; module-level bootstrap seeds mulberry32 from the persisted `rngSeed`.
+- #7b inline literals replaced at the named sites with `CHAIN_COLLAPSE_PROB`, `SUI_GENERIS_PROB`, `EVICTION_UPHELD_PROB`, `MARKET_DIP_PROB`, `TENANT_WALKOUT_RISK_PROB` from `src/lib/engine/probabilities.ts`.
+- #7c `migrateState()` now drives the per-version ladder through `runMigrations()` + an exported `migrationSteps: Migration[]` array — single source of truth.
+- #8 `persist({ version })` now reads `CURRENT_VERSION` instead of the stale `12`, so v12/v13 saves actually migrate.
+- New persisted key: `rngSeed` (root). Added as `GameState.rngSeed?: number`, with a v14→v15 migration that backfills existing saves. `CURRENT_VERSION` bumped to 15.
+
+157 tests passing (8 new in `phase1V5Verification.test.ts`).
