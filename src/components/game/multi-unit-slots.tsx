@@ -61,6 +61,7 @@ export function MultiUnitSlots({
   monthsPlayed,
   playerCash,
   slots,
+  lastRentIncreaseMonth,
   onSelectTenant,
   evictTenant,
   cancelEviction,
