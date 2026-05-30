@@ -34,6 +34,8 @@ interface Props {
   monthsPlayed: number;
   playerCash: number;
   slots: MultiUnitSlot[];
+  /** monthsPlayed snapshot of last rent increase on this property; used to enforce the 12-month Section 13 cap. */
+  lastRentIncreaseMonth?: number;
   onSelectTenant: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
   evictTenant?: (propertyId: string, ground: any, slotIndex?: number) => void;
   cancelEviction?: (propertyId: string, slotIndex?: number) => void;
