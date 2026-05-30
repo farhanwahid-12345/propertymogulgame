@@ -557,6 +557,7 @@ export const PropertyCard = memo(function PropertyCard({
                       monthsPlayed={monthsPlayed}
                       playerCash={playerCash}
                       slots={multiUnitSlots}
+                      lastRentIncreaseMonth={property.lastRentIncrease}
                       onSelectTenant={onSelectTenant}
                       evictTenant={evictTenant}
                       cancelEviction={cancelEviction}

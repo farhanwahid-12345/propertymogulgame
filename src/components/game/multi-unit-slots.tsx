@@ -34,6 +34,8 @@ interface Props {
   monthsPlayed: number;
   playerCash: number;
   slots: MultiUnitSlot[];
+  /** monthsPlayed snapshot of last rent increase on this property; used to enforce the 12-month Section 13 cap. */
+  lastRentIncreaseMonth?: number;
   onSelectTenant: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
   evictTenant?: (propertyId: string, ground: any, slotIndex?: number) => void;
   cancelEviction?: (propertyId: string, slotIndex?: number) => void;
@@ -59,6 +61,7 @@ export function MultiUnitSlots({
   monthsPlayed,
   playerCash,
   slots,
+  lastRentIncreaseMonth,
   onSelectTenant,
   evictTenant,
   cancelEviction,
@@ -191,12 +194,15 @@ export function MultiUnitSlots({
                     <RentNegotiationDialog
                       propertyId={propertyId}
                       propertyName={`${propertyName} · ${label} ${slotIndex + 1}`}
-                      currentRent={slotRent || baseRentPerUnitPounds}
+                      // Phase 2 #10 — slot-specific rent (rentPennies/100 for this propertyId+slotIndex)
+                      // instead of property.monthlyIncome, which is the SUM across all units and
+                      // produced false-positive "raise rent" comparisons on flats/HMOs.
+                      currentRent={slot.rentPounds ?? baseRentPerUnitPounds}
                       marketRent={(() => {
                         // Market rent is for the *whole* property — divide by
                         // unit count so a single room/flat compares like-for-like.
                         const units = Math.max(1, slots.length);
-                        const unitCurrent = slotRent || baseRentPerUnitPounds;
+                        const unitCurrent = slot.rentPounds ?? baseRentPerUnitPounds;
                         const whole = getMarketRentPounds({
                           value: propertyValue,
                           yield: propertyYield,
@@ -214,7 +220,11 @@ export function MultiUnitSlots({
                           : baseRentPerUnitPounds;
                       })()}
 
-                      monthsSinceLastIncrease={999}
+                      monthsSinceLastIncrease={
+                        lastRentIncreaseMonth !== undefined
+                          ? Math.max(0, monthsPlayed - lastRentIncreaseMonth)
+                          : 999
+                      }
                       tenant={tenant}
                       tenantSatisfaction={slot.satisfaction ?? 80}
                       playerCash={playerCash}

@@ -92,3 +92,8 @@ Stopping here for your review — awaiting approval before starting Phase 1.
 - New persisted key: `rngSeed` (root). Added as `GameState.rngSeed?: number`, with a v14→v15 migration that backfills existing saves. `CURRENT_VERSION` bumped to 15.
 
 157 tests passing (8 new in `phase1V5Verification.test.ts`).
+
+## Phase 2 — DONE
+- #9: Itemised buyer cost breakdown (offer, deposit, stamp duty, solicitor, mortgage fee, total) added to estate-agent buy dialog.
+- #10: MultiUnitSlots now passes slot-specific rent (slot.rentPounds) and real monthsSinceLastIncrease (from property.lastRentIncrease) to RentNegotiationDialog — fixes Section 13 false-positive on flats/HMOs.
+- Tests: 157 passing.
