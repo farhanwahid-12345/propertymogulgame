@@ -817,6 +817,44 @@ export function EstateAgentWindow({
                         );
                       })()}
 
+                      {/* Phase 2 #9 — Itemised buyer costs breakdown */}
+                      {(() => {
+                        if (!selectedBuyProperty) return null;
+                        const price = offerAmount[0];
+                        const loanAmount = Math.floor(price * (mortgagePercentage[0] / 100));
+                        const deposit = price - loanAmount;
+                        const stampDuty = price <= 250000
+                          ? Math.round(price * 0.03)
+                          : Math.round(250000 * 0.03 + (price - 250000) * 0.08);
+                        const solicitor = 600;
+                        const mortgageFee = Math.round(loanAmount * 0.01);
+                        const totalCashNeeded = deposit + stampDuty + solicitor + mortgageFee;
+                        const shortfall = totalCashNeeded - cash;
+                        return (
+                          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-xs">
+                            <div className="font-semibold text-sm mb-1">Upfront Cost Breakdown</div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Offer price</span><span className="font-medium">£{price.toLocaleString()}</span></div>
+                            {loanAmount > 0 && (
+                              <div className="flex justify-between text-emerald-400"><span>− Mortgage ({mortgagePercentage[0]}% LTV)</span><span>−£{loanAmount.toLocaleString()}</span></div>
+                            )}
+                            <div className="flex justify-between"><span className="text-muted-foreground">Deposit</span><span className="font-medium">£{deposit.toLocaleString()}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Stamp duty (3% / 8% over £250k)</span><span>£{stampDuty.toLocaleString()}</span></div>
+                            <div className="flex justify-between"><span className="text-muted-foreground">Solicitor fees</span><span>£{solicitor.toLocaleString()}</span></div>
+                            {mortgageFee > 0 && (
+                              <div className="flex justify-between"><span className="text-muted-foreground">Mortgage arrangement (1% of loan)</span><span>£{mortgageFee.toLocaleString()}</span></div>
+                            )}
+                            <div className="border-t border-border/60 my-1.5" />
+                            <div className="flex justify-between font-bold text-sm"><span>Total cash required</span><span>£{totalCashNeeded.toLocaleString()}</span></div>
+                            <div className="flex justify-between text-[11px]"><span className="text-muted-foreground">Your cash</span><span className={shortfall > 0 ? "text-destructive" : "text-emerald-400"}>£{cash.toLocaleString()}</span></div>
+                            {shortfall > 0 && (
+                              <div className="text-destructive text-[11px] mt-1">⚠️ Short by £{shortfall.toLocaleString()} — increase LTV or lower offer.</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+
+
                       <Button
                         className="w-full"
                         onClick={() => {
