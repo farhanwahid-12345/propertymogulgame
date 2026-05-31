@@ -228,6 +228,9 @@ function createInitialState(): GameState {
     nextInsuranceDueMonth: 12,
     lastInsuranceWarnedMonth: -1,
     payoffEvents: [],
+    goalTarget: 500_000 * 100, // £500k net worth — first explicit endgame target
+    goalAchievedAt: undefined,
+    seenEpcTutorial: false,
   };
 }
 
