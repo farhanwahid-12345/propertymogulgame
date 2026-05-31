@@ -97,3 +97,11 @@ Stopping here for your review — awaiting approval before starting Phase 1.
 - #9: Itemised buyer cost breakdown (offer, deposit, stamp duty, solicitor, mortgage fee, total) added to estate-agent buy dialog.
 - #10: MultiUnitSlots now passes slot-specific rent (slot.rentPounds) and real monthsSinceLastIncrease (from property.lastRentIncrease) to RentNegotiationDialog — fixes Section 13 false-positive on flats/HMOs.
 - Tests: 157 passing.
+
+## Phase 3 — DONE
+- #1a Investor loan rate now scales inversely with reputation (clamped ±0.05–0.06%); cap factor and rate adjustment surfaced in loans-panel dialog with "⭐ Reputation N/100 → max £X @ Y% APR" line.
+- #1b Added positive reputation triggers: mortgage payoff (+3), successful improvement/conversion/extension renovation (+2), 12-month happy-tenant anniversary (+1, satisfaction ≥70). Buffer hoisted earlier in `advanceMonth`; separate buffer added inside `processMarketUpdate` for renovation completions.
+- #4 `goalTarget` (default £500k net worth, pennies) + `goalAchievedAt` persisted on root state. HeroHeader prefers explicit goal over tier-scaled `pickGoal`, switches 🎯 → 🏆 on achievement. One-shot achievement toast fires from `advanceMonth`'s set().
+- #6 `seenEpcTutorial` persisted; new `EpcTutorialDialog` mounted in `Index.tsx` fires on first encounter with E/F/G EPC in any market (estate agent, auction, owned), then sets the flag.
+- Migration v15→v16 backfills `goalTarget` + `seenEpcTutorial`. `CURRENT_VERSION = 16`. `migrationSteps` now exported for test access.
+- Tests: 160 passing (+4 new `phase3V5Verification.test.ts`). Pre-existing `phase5Verification.test.ts` "refurb clears" assertion fails independently of Phase 3 — unrelated to these changes.

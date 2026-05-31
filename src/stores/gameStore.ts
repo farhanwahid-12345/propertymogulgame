@@ -228,13 +228,16 @@ function createInitialState(): GameState {
     nextInsuranceDueMonth: 12,
     lastInsuranceWarnedMonth: -1,
     payoffEvents: [],
+    goalTarget: 500_000 * 100, // £500k net worth — first explicit endgame target
+    goalAchievedAt: undefined,
+    seenEpcTutorial: false,
   };
 }
 
 // ─── Save migration ───────────────────────────────────────
 // Ordered registry consumed by `runMigrations` (src/lib/migrations.ts).
 // Each step mutates `persisted` in place; the runner stamps `_version`.
-const migrationSteps: ReadonlyArray<Migration> = [
+export const migrationSteps: ReadonlyArray<Migration> = [
   {
     from: 1, to: 2, describe: 'pounds → pennies',
     apply: (persisted) => {
@@ -393,6 +396,18 @@ const migrationSteps: ReadonlyArray<Migration> = [
       }
     },
   },
+  {
+    from: 15, to: 16, describe: 'goalTarget + seenEpcTutorial (Phase 3 #4, #6)',
+    apply: (persisted) => {
+      if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
+        // Default endgame target = £500k net worth (pennies).
+        persisted.goalTarget = 500_000 * 100;
+      }
+      if (typeof persisted.seenEpcTutorial !== 'boolean') {
+        persisted.seenEpcTutorial = false;
+      }
+    },
+  },
 ];
 
 function migrateState(persisted: any): GameState {
@@ -427,6 +442,11 @@ function migrateState(persisted: any): GameState {
     persisted.nextInsuranceDueMonth = (persisted.monthsPlayed || 0) + 12;
   }
   if (typeof persisted.lastInsuranceWarnedMonth !== 'number') persisted.lastInsuranceWarnedMonth = -1;
+  // Phase 3 #4/#6 — defensive backfill (also handled by migration v15→v16, kept for safety).
+  if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
+    persisted.goalTarget = 500_000 * 100;
+  }
+  if (typeof persisted.seenEpcTutorial !== 'boolean') persisted.seenEpcTutorial = false;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
@@ -865,6 +885,11 @@ export const useGameStore = create<GameState & GameActions>()(
           if (recentDefaults.length === 0 && newOwnedProperties.length > 0) creditAdj += 3;
         }
 
+        // ── Reputation buffer (Phase 3 #1b) ──
+        // Declared early so payoff/renovation/tenancy positive triggers can push too.
+        let reputationDelta = 0;
+        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+
         // Check paid-off mortgages (v3 #4 — surface via modal queue, not just a toast)
         const newPayoffEvents: import('@/types/game').PayoffEvent[] = [];
         const paidOff = updatedMortgages.filter(m =>
@@ -879,6 +904,15 @@ export const useGameStore = create<GameState & GameActions>()(
               kind: 'mortgage',
               label: prop.name,
               month: newMonthNumber,
+            });
+            // Phase 3 #1b — paying off a mortgage demonstrates landlord stability.
+            reputationDelta += 3;
+            reputationLogEntries.push({
+              id: `rep_payoff_${m.id}_${newMonthNumber}`,
+              month: newMonthNumber,
+              reason: `Paid off mortgage on ${prop.name}`,
+              delta: 3,
+              category: 'other',
             });
           }
         });
@@ -1011,8 +1045,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
         let walkoutDepositRefund = 0;
         const walkoutDisputes: DepositDispute[] = [];
-        let reputationDelta = 0;
-        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+        // (reputationDelta/reputationLogEntries declared earlier — see "// ── Reputation buffer ──")
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
           const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && gameRandom() < TENANT_WALKOUT_RISK_PROB;
@@ -2135,6 +2168,23 @@ export const useGameStore = create<GameState & GameActions>()(
 
 
 
+        // Phase 3 #1b — Long-tenancy bonus: every 12 months a sitting tenant has
+        // remained with satisfaction ≥ 70, the landlord earns +1 reputation.
+        newTenants.forEach(t => {
+          if (typeof t.moveInMonth !== 'number') return;
+          const tenure = newMonthNumber - t.moveInMonth;
+          if (tenure <= 0 || tenure % 12 !== 0) return;
+          if ((t.satisfaction ?? 70) < 70) return;
+          reputationDelta += 1;
+          reputationLogEntries.push({
+            id: `rep_longtenancy_${t.propertyId}_${t.slotIndex}_${newMonthNumber}`,
+            month: newMonthNumber,
+            reason: `${t.tenant.name} reached ${tenure / 12} year${tenure === 12 ? '' : 's'} as a happy tenant`,
+            delta: 1,
+            category: 'tenancy',
+          });
+        });
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
@@ -2218,6 +2268,17 @@ export const useGameStore = create<GameState & GameActions>()(
             || (economicEvents.length > 0 && economicEvents[economicEvents.length - 1]?.month === newMonthNumber)
               ? true
               : s.isPaused,
+          // Phase 3 #4 — stamp goal achievement once net worth crosses the target.
+          goalAchievedAt: (() => {
+            const existing = (s as any).goalAchievedAt;
+            if (typeof existing === 'number' && existing > 0) return existing;
+            const target = ((s as any).goalTarget ?? 0) as number;
+            if (target > 0 && netWorthFinal >= target) {
+              showToast("🏆 Goal Reached!", `You hit £${fromPennies(target).toLocaleString()} net worth. Set a new target or keep building.`);
+              return newMonthNumber;
+            }
+            return existing;
+          })(),
         } as any));
       },
 
@@ -2226,6 +2287,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const currentTime = Date.now();
         const marketChange = (gameRandom() - 0.5) * 0.002;
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
+
+        // Phase 3 #1b — local reputation buffer for events fired inside this tick
+        // (renovation completions). Merged into landlordReputation/reputationLog in set().
+        let reputationDelta = 0;
+        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+        const newMonthNumber = prev.monthsPlayed;
 
         // Completed renovations — driven by in-game months so duration matches
         // the dialog's headline and respects gameSpeed. Wall-clock is fallback only.
@@ -2366,6 +2433,18 @@ export const useGameStore = create<GameState & GameActions>()(
                 : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
+            // Phase 3 #1b — successful improvement/conversion renovation lifts reputation
+            // (premium-quality stock benefits the local rental community).
+            if (valueMult > 0 && (renovation.type.category === 'improvement' || renovation.type.category === 'conversion' || renovation.type.category === 'extension')) {
+              reputationDelta += 2;
+              reputationLogEntries.push({
+                id: `rep_reno_${renovation.id}_${newMonthNumber}`,
+                month: newMonthNumber,
+                reason: `Completed ${renovation.type.name} on ${updatedProperties[idx].name}`,
+                delta: 2,
+                category: 'maintenance',
+              });
+            }
             // ops flash handled below in processMarketUpdate's set()
           }
         });
@@ -2578,6 +2657,12 @@ export const useGameStore = create<GameState & GameActions>()(
           opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
             ? Date.now()
             : (s as any).opsFlashAt || 0,
+          landlordReputation: reputationDelta !== 0
+            ? Math.max(0, Math.min(100, (s.landlordReputation ?? 50) + reputationDelta))
+            : (s.landlordReputation ?? 50),
+          reputationLog: reputationLogEntries.length > 0
+            ? [...((s as any).reputationLog || []), ...reputationLogEntries].slice(-40)
+            : ((s as any).reputationLog || []),
         } as any));
 
         // Toast AFTER state commit — guarantees the matching concern is in the feed
@@ -4374,12 +4459,17 @@ export const useGameStore = create<GameState & GameActions>()(
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        // APR: investor uses fixed product spread (no credit penalty); others credit-adjusted.
+        // APR: investor uses fixed product spread + reputation-based rate adjustment
+        // (Phase 3 #1a — better landlord reputation → cheaper investor loan).
+        // Others credit-adjusted.
         const creditPenalty = kind === 'investor' ? 0
           : prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
+        const reputationRateAdj = kind === 'investor'
+          ? Math.max(-0.05, Math.min(0.06, (60 - (prev.landlordReputation ?? 50)) * 0.002))
+          : 0;
         const spread = kind === 'investor' ? product.baseSpread
           : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
-        const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
+        const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 

@@ -15,6 +15,7 @@ import { MacroEventModal } from "@/components/game/macro-event-modal";
 import { PendingTransactionsDialog } from "@/components/game/pending-transactions-dialog";
 import { ChainCollapseModal } from "@/components/game/chain-collapse-modal";
 import { PayoffEventsModal } from "@/components/game/payoff-events-modal";
+import { EpcTutorialDialog } from "@/components/game/epc-tutorial-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -304,6 +305,7 @@ const Index = () => {
       <PendingTransactionsDialog />
       <ChainCollapseModal />
       <PayoffEventsModal />
+      <EpcTutorialDialog />
     </div>
   );
 };

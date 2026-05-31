@@ -31,14 +31,20 @@ export function LoansPanel() {
   const amountPounds = Math.max(0, Number(amountStr) || 0);
   const product = LOAN_PRODUCTS[kind];
 
-  // Dynamic APR: market rate + current spread + credit penalty (investor uses fixed product spread).
+  const reputation = ((store as any).landlordReputation ?? 50) as number;
+
+  // Dynamic APR: market rate + current spread + credit penalty
+  // (Phase 3 #1a — investor uses fixed product spread + reputation-based rate adjustment).
   const creditPenalty = kind === 'investor'
     ? 0
     : store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
+  const reputationRateAdj = kind === 'investor'
+    ? Math.max(-0.05, Math.min(0.06, (60 - reputation) * 0.002))
+    : 0;
   const spread = kind === 'investor'
     ? product.baseSpread
     : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
-  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty);
+  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty + reputationRateAdj);
 
   // Dynamic cap based on rent roll, debt service & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
@@ -168,6 +174,14 @@ export function LoansPanel() {
                   <span className="text-muted-foreground">Monthly payment</span>
                   <strong>£{fromPennies(Math.max(0, estimatedMonthlyPennies)).toLocaleString()}</strong>
                 </div>
+                {kind === 'investor' && (
+                  <div className="flex justify-between text-xs pt-1 border-t border-border/40">
+                    <span className="text-muted-foreground">⭐ Reputation {Math.round(reputation)}/100</span>
+                    <span className={reputationRateAdj < 0 ? 'text-success' : reputationRateAdj > 0 ? 'text-danger' : 'text-muted-foreground'}>
+                      → max £{fromPennies(dynamicMax).toLocaleString()} @ {(rate * 100).toFixed(2)}% APR
+                    </span>
+                  </div>
+                )}
               </div>
 
               {eligibilityIssue && (

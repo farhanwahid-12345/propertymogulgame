@@ -504,6 +504,12 @@ export interface GameState {
   lastInsuranceWarnedMonth?: number;
   /** v3 #4 — queued payoff events awaiting acknowledgement via modal. */
   payoffEvents?: PayoffEvent[];
+  /** Phase 3 #4 — explicit long-term endgame target (pennies of net worth). Configured per profile. */
+  goalTarget?: number;
+  /** Phase 3 #4 — monthsPlayed at which the player first crossed `goalTarget`. */
+  goalAchievedAt?: number;
+  /** Phase 3 #6 — has the MEES/EPC contextual tutorial been shown yet? */
+  seenEpcTutorial?: boolean;
 }
 
 /** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */
