@@ -905,6 +905,15 @@ export const useGameStore = create<GameState & GameActions>()(
               label: prop.name,
               month: newMonthNumber,
             });
+            // Phase 3 #1b — paying off a mortgage demonstrates landlord stability.
+            reputationDelta += 3;
+            reputationLogEntries.push({
+              id: `rep_payoff_${m.id}_${newMonthNumber}`,
+              month: newMonthNumber,
+              reason: `Paid off mortgage on ${prop.name}`,
+              delta: 3,
+              category: 'other',
+            });
           }
         });
 
