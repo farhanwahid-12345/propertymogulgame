@@ -2168,6 +2168,23 @@ export const useGameStore = create<GameState & GameActions>()(
 
 
 
+        // Phase 3 #1b — Long-tenancy bonus: every 12 months a sitting tenant has
+        // remained with satisfaction ≥ 70, the landlord earns +1 reputation.
+        newTenants.forEach(t => {
+          if (typeof t.moveInMonth !== 'number') return;
+          const tenure = newMonthNumber - t.moveInMonth;
+          if (tenure <= 0 || tenure % 12 !== 0) return;
+          if ((t.satisfaction ?? 70) < 70) return;
+          reputationDelta += 1;
+          reputationLogEntries.push({
+            id: `rep_longtenancy_${t.propertyId}_${t.slotIndex}_${newMonthNumber}`,
+            month: newMonthNumber,
+            reason: `${t.tenant.name} reached ${tenure / 12} year${tenure === 12 ? '' : 's'} as a happy tenant`,
+            delta: 1,
+            category: 'tenancy',
+          });
+        });
+
         set(s => ({
           cash: finalCash,
           overdraftUsed: finalOverdraftUsed,
