@@ -184,7 +184,7 @@ export function HeroHeader({
                     aria-label={`Progression goal: ${goal.label}`}
                   >
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
-                      🎯 {goal.label}
+                      {goalAchievedAt ? `🏆 ${goal.label}` : `🎯 ${goal.label}`}
                     </span>
                     <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
                       <div
