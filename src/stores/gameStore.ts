@@ -4459,12 +4459,17 @@ export const useGameStore = create<GameState & GameActions>()(
         if (termMonths < product.minTermMonths || termMonths > product.maxTermMonths) {
           showToast("Invalid Term", `Term must be ${product.minTermMonths}–${product.maxTermMonths} months.`, "destructive"); return;
         }
-        // APR: investor uses fixed product spread (no credit penalty); others credit-adjusted.
+        // APR: investor uses fixed product spread + reputation-based rate adjustment
+        // (Phase 3 #1a — better landlord reputation → cheaper investor loan).
+        // Others credit-adjusted.
         const creditPenalty = kind === 'investor' ? 0
           : prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
+        const reputationRateAdj = kind === 'investor'
+          ? Math.max(-0.05, Math.min(0.06, (60 - (prev.landlordReputation ?? 50)) * 0.002))
+          : 0;
         const spread = kind === 'investor' ? product.baseSpread
           : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
-        const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty);
+        const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj);
         const monthlyRate = rate / 12;
         const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 
