@@ -393,6 +393,18 @@ const migrationSteps: ReadonlyArray<Migration> = [
       }
     },
   },
+  {
+    from: 15, to: 16, describe: 'goalTarget + seenEpcTutorial (Phase 3 #4, #6)',
+    apply: (persisted) => {
+      if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
+        // Default endgame target = £500k net worth (pennies).
+        persisted.goalTarget = 500_000 * 100;
+      }
+      if (typeof persisted.seenEpcTutorial !== 'boolean') {
+        persisted.seenEpcTutorial = false;
+      }
+    },
+  },
 ];
 
 function migrateState(persisted: any): GameState {
