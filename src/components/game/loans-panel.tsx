@@ -31,14 +31,20 @@ export function LoansPanel() {
   const amountPounds = Math.max(0, Number(amountStr) || 0);
   const product = LOAN_PRODUCTS[kind];
 
-  // Dynamic APR: market rate + current spread + credit penalty (investor uses fixed product spread).
+  const reputation = ((store as any).landlordReputation ?? 50) as number;
+
+  // Dynamic APR: market rate + current spread + credit penalty
+  // (Phase 3 #1a — investor uses fixed product spread + reputation-based rate adjustment).
   const creditPenalty = kind === 'investor'
     ? 0
     : store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
+  const reputationRateAdj = kind === 'investor'
+    ? Math.max(-0.05, Math.min(0.06, (60 - reputation) * 0.002))
+    : 0;
   const spread = kind === 'investor'
     ? product.baseSpread
     : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
-  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty);
+  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty + reputationRateAdj);
 
   // Dynamic cap based on rent roll, debt service & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
