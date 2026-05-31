@@ -442,6 +442,11 @@ function migrateState(persisted: any): GameState {
     persisted.nextInsuranceDueMonth = (persisted.monthsPlayed || 0) + 12;
   }
   if (typeof persisted.lastInsuranceWarnedMonth !== 'number') persisted.lastInsuranceWarnedMonth = -1;
+  // Phase 3 #4/#6 — defensive backfill (also handled by migration v15→v16, kept for safety).
+  if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
+    persisted.goalTarget = 500_000 * 100;
+  }
+  if (typeof persisted.seenEpcTutorial !== 'boolean') persisted.seenEpcTutorial = false;
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
