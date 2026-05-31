@@ -885,6 +885,11 @@ export const useGameStore = create<GameState & GameActions>()(
           if (recentDefaults.length === 0 && newOwnedProperties.length > 0) creditAdj += 3;
         }
 
+        // ── Reputation buffer (Phase 3 #1b) ──
+        // Declared early so payoff/renovation/tenancy positive triggers can push too.
+        let reputationDelta = 0;
+        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+
         // Check paid-off mortgages (v3 #4 — surface via modal queue, not just a toast)
         const newPayoffEvents: import('@/types/game').PayoffEvent[] = [];
         const paidOff = updatedMortgages.filter(m =>
@@ -1031,8 +1036,7 @@ export const useGameStore = create<GameState & GameActions>()(
         const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
         let walkoutDepositRefund = 0;
         const walkoutDisputes: DepositDispute[] = [];
-        let reputationDelta = 0;
-        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+        // (reputationDelta/reputationLogEntries declared earlier — see "// ── Reputation buffer ──")
         satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
           const guaranteedExit = t.satisfaction <= 0;
           const probabilisticExit = t.satisfaction > 0 && t.satisfaction < 15 && gameRandom() < TENANT_WALKOUT_RISK_PROB;
