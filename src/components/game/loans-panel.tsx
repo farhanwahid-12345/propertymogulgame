@@ -174,6 +174,14 @@ export function LoansPanel() {
                   <span className="text-muted-foreground">Monthly payment</span>
                   <strong>£{fromPennies(Math.max(0, estimatedMonthlyPennies)).toLocaleString()}</strong>
                 </div>
+                {kind === 'investor' && (
+                  <div className="flex justify-between text-xs pt-1 border-t border-border/40">
+                    <span className="text-muted-foreground">⭐ Reputation {Math.round(reputation)}/100</span>
+                    <span className={reputationRateAdj < 0 ? 'text-success' : reputationRateAdj > 0 ? 'text-danger' : 'text-muted-foreground'}>
+                      → max £{fromPennies(dynamicMax).toLocaleString()} @ {(rate * 100).toFixed(2)}% APR
+                    </span>
+                  </div>
+                )}
               </div>
 
               {eligibilityIssue && (
