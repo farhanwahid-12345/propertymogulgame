@@ -2399,6 +2399,18 @@ export const useGameStore = create<GameState & GameActions>()(
                 : `${renovation.type.name} on ${updatedProperties[idx].name} — value gain £${actualValuePounds.toLocaleString()} (expected £${expectedValue.toLocaleString()}).`) + rentNote,
               valueMult === 0 ? 'destructive' : undefined,
             );
+            // Phase 3 #1b — successful improvement/conversion renovation lifts reputation
+            // (premium-quality stock benefits the local rental community).
+            if (valueMult > 0 && (renovation.type.category === 'improvement' || renovation.type.category === 'conversion' || renovation.type.category === 'extension')) {
+              reputationDelta += 2;
+              reputationLogEntries.push({
+                id: `rep_reno_${renovation.id}_${newMonthNumber}`,
+                month: newMonthNumber,
+                reason: `Completed ${renovation.type.name} on ${updatedProperties[idx].name}`,
+                delta: 2,
+                category: 'maintenance',
+              });
+            }
             // ops flash handled below in processMarketUpdate's set()
           }
         });
