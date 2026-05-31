@@ -2260,6 +2260,12 @@ export const useGameStore = create<GameState & GameActions>()(
         const marketChange = (gameRandom() - 0.5) * 0.002;
         const newMarketRate = Math.max(0.015, Math.min(0.08, prev.currentMarketRate + marketChange));
 
+        // Phase 3 #1b — local reputation buffer for events fired inside this tick
+        // (renovation completions). Merged into landlordReputation/reputationLog in set().
+        let reputationDelta = 0;
+        const reputationLogEntries: Array<{ id: string; month: number; reason: string; delta: number; category: 'eviction' | 'walkout' | 'tribunal' | 'dispute' | 'maintenance' | 'tenancy' | 'other' }> = [];
+        const newMonthNumber = prev.monthsPlayed;
+
         // Completed renovations — driven by in-game months so duration matches
         // the dialog's headline and respects gameSpeed. Wall-clock is fallback only.
         const isRenoComplete = (r: Renovation) =>
