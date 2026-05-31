@@ -2629,6 +2629,12 @@ export const useGameStore = create<GameState & GameActions>()(
           opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
             ? Date.now()
             : (s as any).opsFlashAt || 0,
+          landlordReputation: reputationDelta !== 0
+            ? Math.max(0, Math.min(100, (s.landlordReputation ?? 50) + reputationDelta))
+            : (s.landlordReputation ?? 50),
+          reputationLog: reputationLogEntries.length > 0
+            ? [...((s as any).reputationLog || []), ...reputationLogEntries].slice(-40)
+            : ((s as any).reputationLog || []),
         } as any));
 
         // Toast AFTER state commit — guarantees the matching concern is in the feed
