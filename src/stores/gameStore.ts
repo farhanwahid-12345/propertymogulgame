@@ -237,7 +237,7 @@ function createInitialState(): GameState {
 // ─── Save migration ───────────────────────────────────────
 // Ordered registry consumed by `runMigrations` (src/lib/migrations.ts).
 // Each step mutates `persisted` in place; the runner stamps `_version`.
-const migrationSteps: ReadonlyArray<Migration> = [
+export const migrationSteps: ReadonlyArray<Migration> = [
   {
     from: 1, to: 2, describe: 'pounds → pennies',
     apply: (persisted) => {
