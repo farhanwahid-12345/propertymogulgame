@@ -87,7 +87,15 @@ export function HeroHeader({
   netWorth = 0,
   level = 1,
 }: HeroHeaderProps) {
-  const goal = pickGoal(level, netWorth);
+  // Phase 3 #4 — the explicit, persisted goalTarget takes precedence over the
+  // tier-scaled PROGRESSION_TARGETS. Falls back to the tier system for legacy
+  // saves and when the goal has been achieved (next aspirational tier shown).
+  const goalTargetPounds = useGameStore((s) => ((s as any).goalTarget ?? 0) / 100);
+  const goalAchievedAt = useGameStore((s) => (s as any).goalAchievedAt as number | undefined);
+  const tierGoal = pickGoal(level, netWorth);
+  const goal = goalTargetPounds > 0 && !goalAchievedAt
+    ? { target: goalTargetPounds, label: `£${goalTargetPounds.toLocaleString()} net worth` }
+    : tierGoal;
   const goalPct = Math.max(0, Math.min(100, (netWorth / goal.target) * 100));
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
