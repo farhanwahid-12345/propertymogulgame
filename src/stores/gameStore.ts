@@ -2268,6 +2268,17 @@ export const useGameStore = create<GameState & GameActions>()(
             || (economicEvents.length > 0 && economicEvents[economicEvents.length - 1]?.month === newMonthNumber)
               ? true
               : s.isPaused,
+          // Phase 3 #4 — stamp goal achievement once net worth crosses the target.
+          goalAchievedAt: (() => {
+            const existing = (s as any).goalAchievedAt;
+            if (typeof existing === 'number' && existing > 0) return existing;
+            const target = ((s as any).goalTarget ?? 0) as number;
+            if (target > 0 && netWorthFinal >= target) {
+              showToast("🏆 Goal Reached!", `You hit £${fromPennies(target).toLocaleString()} net worth. Set a new target or keep building.`);
+              return newMonthNumber;
+            }
+            return existing;
+          })(),
         } as any));
       },
 
