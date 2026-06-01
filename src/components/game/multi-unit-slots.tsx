@@ -247,6 +247,23 @@ export function MultiUnitSlots({
                   />
                 </div>
               )}
+
+              {subtype === 'flats' && onSplitFlatUnit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-[10px] h-6"
+                  onClick={() => {
+                    const choice = window.confirm(
+                      `Split "${propertyName} Flat ${slotIndex + 1}" into its own leasehold property?\n\n` +
+                      `OK = peppercorn ground rent (£10/yr)\nCancel = 0.5% of value per year`
+                    );
+                    onSplitFlatUnit(propertyId, slotIndex, choice ? 'peppercorn' : 'percent');
+                  }}
+                >
+                  Title-split this flat
+                </Button>
+              )}
             </div>
           );
         })}
