@@ -112,6 +112,18 @@ export interface Property {
    *  uninhabitable. Standard BTL mortgages are refused; only bridging finance
    *  can complete the purchase until the property is renovated. */
   needsRefurb?: boolean;
+  /** Phase 4 #3 — city this property belongs to. Defaults to 'middlesbrough'. */
+  city?: 'middlesbrough' | 'leeds' | 'manchester' | 'london';
+  /** Phase 4 #2 — id of the parent house this flat was split out of (leasehold flats only). */
+  titleSplitOf?: string;
+  /** Phase 4 #2 — slot index this flat occupied in its parent before splitting. */
+  flatUnitId?: number;
+  /** Phase 4 #2 — leasehold flag. Triggers monthly service charge + ground rent. */
+  isLeasehold?: boolean;
+  /** Phase 4 #2 — annual service charge as a % of value (2–5%). Decimal e.g. 0.03. */
+  serviceChargePctAnnual?: number;
+  /** Phase 4 #2 — fixed annual ground rent (pennies). Peppercorn = 1000 (£10). */
+  groundRentPennies?: number;
 }
 
 

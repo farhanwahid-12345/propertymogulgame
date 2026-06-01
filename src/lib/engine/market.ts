@@ -4,6 +4,7 @@ import { toPennies } from "@/lib/formatCurrency";
 import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
 import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
 import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
+import { getCityConfig, pickTypeForCity, type CityId } from "./cities";
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
  *  Cheaper stock yields more; prime stock yields less. ±1.5% jitter, clamped [2.5, 14]. */
@@ -20,23 +21,37 @@ export function yieldForValue(valuePennies: number): number {
   return Math.max(3, Math.min(16, jittered));
 }
 
-export function generateRandomProperty(level: number): Property {
+/**
+ * Phase 4 #3 — Generate a random property, optionally for a specific city.
+ * When `cityId` is omitted we default to Middlesbrough so existing call-sites
+ * keep their old behaviour.
+ */
+export function generateRandomProperty(level: number, cityId?: CityId): Property {
+  const city = getCityConfig(cityId);
   const id = `gen_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-  const types: Property['type'][] = ['residential', 'commercial', 'luxury'];
-  const type = types[Math.floor(Math.random() * types.length)];
+  const type = pickTypeForCity(city, Math.random);
 
-  const { min, max } = getPropertyValueRangeForLevel(level);
-  const actualMin = Math.max(toPennies(40_000), min);
-  const basePrice = actualMin + Math.random() * (max - actualMin);
+  // Blend city value band with level-gated max so the player can't see absurd
+  // London stock at level 1; the city sets the floor + ceiling shape, the level
+  // gate clips the upper end.
+  const cityMin = toPennies(city.valueRange.min);
+  const cityMax = toPennies(city.valueRange.max);
+  const { max: levelMax } = getPropertyValueRangeForLevel(level);
+  const actualMin = Math.max(toPennies(40_000), cityMin);
+  const actualMax = Math.max(actualMin + toPennies(1_000), Math.min(cityMax, levelMax));
+  const basePrice = actualMin + Math.random() * (actualMax - actualMin);
   // Round to nearest £1,000 (in pennies = 100_000)
   const price = Math.floor(basePrice / 100_000) * 100_000;
   const value = price;
 
-  const averageYield = yieldForValue(value);
+  // Yield: blend the city's typical range with the value-anchored centre.
+  const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
+  const valueAnchored = yieldForValue(value);
+  const averageYield = (cityYield * 0.7) + (valueAnchored * 0.3);
   const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
 
-  const neighborhood = NEIGHBORHOODS[Math.floor(Math.random() * NEIGHBORHOODS.length)];
-  const streetName = MIDDLESBROUGH_STREETS[Math.floor(Math.random() * MIDDLESBROUGH_STREETS.length)];
+  const neighborhood = city.neighborhoods[Math.floor(Math.random() * city.neighborhoods.length)];
+  const streetName = city.streets[Math.floor(Math.random() * city.streets.length)];
   const houseNumber = Math.floor(1 + Math.random() * 200);
 
   // Random condition for generated properties
@@ -67,9 +82,6 @@ export function generateRandomProperty(level: number): Property {
     plotSqft = Math.round(1500 + Math.random() * 4500);
   }
 
-  // v4 #11 — widen asking-vs-true-market spread (±15%) so the "below market" / "above
-  // market" signal is meaningful at the estate agent. Asking stays at `price`/`value`;
-  // `marketValue` jitters around it.
   const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
   const marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
 
@@ -92,8 +104,10 @@ export function generateRandomProperty(level: number): Property {
     plotSqft,
     subtype: 'standard',
     epcRating,
+    city: city.id,
   };
 }
+
 
 /** Roll a furnishing tier for new-stock listings. ~78% unfurnished / 15% part / 7% full. */
 function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fully_furnished'; monthsRemaining?: number } {
@@ -104,8 +118,8 @@ function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fu
 }
 
 /** Wrap `generateRandomProperty` to occasionally list pre-furnished stock with bumped price & rent. */
-export function generateMarketProperty(level: number): Property {
-  const base = generateRandomProperty(level);
+export function generateMarketProperty(level: number, cityId?: CityId): Property {
+  const base = generateRandomProperty(level, cityId);
   const roll = rollListingFurnishing();
   if (roll.tier === 'unfurnished') return base;
   const tempForFurniture = { ...base, furnishingTier: roll.tier, furnishingMonthsRemaining: roll.monthsRemaining };

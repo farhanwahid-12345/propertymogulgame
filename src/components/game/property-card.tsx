@@ -65,6 +65,14 @@ export interface Property {
   };
   /** Phase 5 #16 — uninhabitable auction stock (no kitchen/bathroom). */
   needsRefurb?: boolean;
+  /** Phase 4 #3 — city. */
+  city?: 'middlesbrough' | 'leeds' | 'manchester' | 'london';
+  /** Phase 4 #2 — leasehold flat title-split metadata. */
+  titleSplitOf?: string;
+  flatUnitId?: number;
+  isLeasehold?: boolean;
+  serviceChargePctAnnual?: number;
+  groundRentPennies?: number;
 }
 
 

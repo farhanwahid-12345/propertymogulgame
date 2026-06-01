@@ -54,6 +54,12 @@ export function sanitizeProperty(property: any): Property {
       ? property.subtype
       : undefined,
     completedRenovationIds: Array.isArray(property?.completedRenovationIds) ? property.completedRenovationIds.filter((x: any) => typeof x === 'string') : [],
+    city: ['middlesbrough', 'leeds', 'manchester', 'london'].includes(property?.city) ? property.city : 'middlesbrough',
+    titleSplitOf: typeof property?.titleSplitOf === 'string' ? property.titleSplitOf : undefined,
+    flatUnitId: typeof property?.flatUnitId === 'number' ? property.flatUnitId : undefined,
+    isLeasehold: Boolean(property?.isLeasehold),
+    serviceChargePctAnnual: typeof property?.serviceChargePctAnnual === 'number' ? property.serviceChargePctAnnual : undefined,
+    groundRentPennies: typeof property?.groundRentPennies === 'number' ? property.groundRentPennies : undefined,
   };
 }
 

@@ -29,6 +29,7 @@ import {
   getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
 import { generateRandomProperty, generateMarketProperty, deriveSqft } from '@/lib/engine/market';
+import { getUnlockedCities } from '@/lib/engine/cities';
 import {
   calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
 } from '@/lib/mortgageEligibility';
@@ -146,6 +147,8 @@ interface GameActions {
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
   issueLetterBeforeAction: (propertyId: string, slotIndex?: number) => void;
   escalateToHighCourt: (caseId: string) => void;
+  // Phase 4 #2 — Title-split a converted flat into its own leasehold property
+  splitFlatUnit: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
   // Game
   resetGame: () => void;
 }
@@ -400,7 +403,6 @@ export const migrationSteps: ReadonlyArray<Migration> = [
     from: 15, to: 16, describe: 'goalTarget + seenEpcTutorial (Phase 3 #4, #6)',
     apply: (persisted) => {
       if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
-        // Default endgame target = £500k net worth (pennies).
         persisted.goalTarget = 500_000 * 100;
       }
       if (typeof persisted.seenEpcTutorial !== 'boolean') {
@@ -408,7 +410,22 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       }
     },
   },
+  {
+    from: 16, to: 17, describe: 'Phase 4 #3 — backfill `city` on every property/listing',
+    apply: (persisted) => {
+      const arrs = ['ownedProperties', 'estateAgentProperties', 'auctionProperties'];
+      arrs.forEach(k => {
+        if (Array.isArray(persisted[k])) {
+          persisted[k] = persisted[k].map((p: any) => ({
+            ...p,
+            city: p?.city || 'middlesbrough',
+          }));
+        }
+      });
+    },
+  },
 ];
+
 
 function migrateState(persisted: any): GameState {
   const initial = createInitialState();
@@ -808,7 +825,16 @@ export const useGameStore = create<GameState & GameActions>()(
           return total + Math.floor((property.value * 0.004) / 12);
         }, 0);
         const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
-        const totalExpenses = mortgagePayments + councilTax + insurance;
+        // Phase 4 #2 — Leasehold service charge + ground rent (monthly slice of annual cost).
+        const leaseholdCosts = newOwnedProperties.reduce((total, property) => {
+          if (!property.isLeasehold) return total;
+          const sc = property.serviceChargePctAnnual
+            ? Math.floor((property.value * property.serviceChargePctAnnual) / 12)
+            : 0;
+          const gr = property.groundRentPennies ? Math.floor(property.groundRentPennies / 12) : 0;
+          return total + sc + gr;
+        }, 0);
+        const totalExpenses = mortgagePayments + councilTax + insurance + leaseholdCosts;
         const netIncome = monthlyIncome - totalExpenses;
 
         // Update mortgage balances + capture this month's actual interest portion
@@ -4699,7 +4725,10 @@ export const useGameStore = create<GameState & GameActions>()(
             const priceFloor = Math.max(toPennies(40000), min);
             const targetPrice = priceFloor + gameRandom() * (priceFloor * 0.5);
             const adjusted = Math.max(priceFloor, Math.min(max, Math.floor(targetPrice / 100_000) * 100_000));
-            const prop = generateRandomProperty(prev.level);
+            // Phase 4 #3 — spread new stock across unlocked cities.
+            const unlocked = getUnlockedCities(prev.level);
+            const pickedCity = unlocked[Math.floor(gameRandom() * unlocked.length)]?.id;
+            const prop = generateRandomProperty(prev.level, pickedCity);
             prop.price = adjusted;
             prop.value = adjusted;
             prop.monthlyIncome = Math.floor((adjusted * (6 + gameRandom() * 9) / 100) / 12);
@@ -4856,7 +4885,110 @@ export const useGameStore = create<GameState & GameActions>()(
         showToast("Concern Snoozed", "It'll keep nagging until resolved.");
       },
 
-      // ─── RESET ─────────────────────────────
+      // ─── PHASE 4 #2 — Title-split a converted flat ────────────────────
+      splitFlatUnit: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => {
+        const prev = get();
+        const parent = prev.ownedProperties.find(p => p.id === propertyId);
+        if (!parent) return;
+        if (parent.subtype !== 'flats') {
+          showToast("Cannot Split", "Only converted-flat properties can have units split off.", "destructive");
+          return;
+        }
+        const units = Math.max(1, parent.subtypeUnits ?? 1);
+        if (units <= 0) return;
+        // Solicitor fee for title split (legal work to create separate leasehold title).
+        const splitFee = SOLICITOR_FEES;
+        if (!debit(prev, splitFee)) {
+          showToast("Insufficient Funds", `Need £${fromPennies(splitFee).toLocaleString()} for solicitor fees to split the title.`, "destructive");
+          return;
+        }
+
+        const perUnitValue = Math.round(parent.value / units);
+        // Sum-of-parts > whole post-split: bump each unit value by 8%.
+        const splitUnitValue = Math.round(perUnitValue * 1.08);
+        // Remaining house value adjusts down by the original pro-rata (slightly less than 1/N).
+        const remainingValue = Math.max(0, parent.value - perUnitValue);
+
+        const slotTenant = prev.tenants.find(t => t.propertyId === propertyId && t.slotIndex === slotIndex);
+        const slotRentPennies = slotTenant?.rentPennies ?? Math.round(parent.monthlyIncome / units);
+
+        const serviceChargePct = 0.02 + gameRandom() * 0.03; // 2–5%/yr of value
+        const groundRentPennies = groundRentMode === 'peppercorn'
+          ? 1000 // £10/yr
+          : Math.round(splitUnitValue * 0.005); // 0.5%/yr of value
+
+        const newId = `split_${propertyId}_${slotIndex}_${Date.now()}`;
+        const newFlat: Property = {
+          ...parent,
+          id: newId,
+          name: `${parent.name} — Flat ${slotIndex + 1}`,
+          price: splitUnitValue,
+          value: splitUnitValue,
+          marketValue: splitUnitValue,
+          monthlyIncome: slotRentPennies,
+          subtype: 'standard',
+          subtypeUnits: undefined,
+          owned: true,
+          titleSplitOf: parent.id,
+          flatUnitId: slotIndex,
+          isLeasehold: true,
+          serviceChargePctAnnual: serviceChargePct,
+          groundRentPennies,
+          completedRenovationIds: [],
+          renovationCompletionMonths: {},
+          totalRenovationSpendPennies: 0,
+        };
+
+        const remainingUnits = units - 1;
+        const removingParent = remainingUnits <= 0;
+
+        // Reindex remaining tenants on the parent (slots above split move down by 1).
+        const reindexedTenants = prev.tenants
+          .filter(t => !(t.propertyId === propertyId && t.slotIndex === slotIndex))
+          .map(t => {
+            if (t.propertyId !== propertyId) return t;
+            if (t.slotIndex > slotIndex) return { ...t, slotIndex: t.slotIndex - 1 };
+            return t;
+          });
+
+        let migratedTenant: PropertyTenant | null = null;
+        if (slotTenant) {
+          migratedTenant = {
+            ...slotTenant,
+            propertyId: newId,
+            slotIndex: 0,
+            rentPennies: slotRentPennies,
+          };
+        }
+
+        const updatedOwned: Property[] = [];
+        for (const p of prev.ownedProperties) {
+          if (p.id !== propertyId) { updatedOwned.push(p); continue; }
+          if (removingParent) continue;
+          updatedOwned.push({
+            ...p,
+            value: remainingValue,
+            marketValue: remainingValue,
+            subtypeUnits: remainingUnits,
+            monthlyIncome: Math.max(0, p.monthlyIncome - slotRentPennies),
+          });
+        }
+        updatedOwned.push(newFlat);
+
+        set({
+          ownedProperties: updatedOwned,
+          tenants: migratedTenant
+            ? [...reindexedTenants, migratedTenant]
+            : reindexedTenants,
+        });
+
+        showToast(
+          "Title Split Complete",
+          `Flat ${slotIndex + 1} is now its own leasehold property. Service charge ${(serviceChargePct * 100).toFixed(1)}%/yr; ground rent £${fromPennies(groundRentPennies).toLocaleString()}/yr.`,
+        );
+      },
+
+
       resetGame: () => {
         const fresh = createInitialState();
         set(fresh);
