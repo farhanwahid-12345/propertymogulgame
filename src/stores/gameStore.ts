@@ -400,7 +400,6 @@ export const migrationSteps: ReadonlyArray<Migration> = [
     from: 15, to: 16, describe: 'goalTarget + seenEpcTutorial (Phase 3 #4, #6)',
     apply: (persisted) => {
       if (typeof persisted.goalTarget !== 'number' || !Number.isFinite(persisted.goalTarget)) {
-        // Default endgame target = £500k net worth (pennies).
         persisted.goalTarget = 500_000 * 100;
       }
       if (typeof persisted.seenEpcTutorial !== 'boolean') {
@@ -408,7 +407,22 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       }
     },
   },
+  {
+    from: 16, to: 17, describe: 'Phase 4 #3 — backfill `city` on every property/listing',
+    apply: (persisted) => {
+      const arrs = ['ownedProperties', 'estateAgentProperties', 'auctionProperties'];
+      arrs.forEach(k => {
+        if (Array.isArray(persisted[k])) {
+          persisted[k] = persisted[k].map((p: any) => ({
+            ...p,
+            city: p?.city || 'middlesbrough',
+          }));
+        }
+      });
+    },
+  },
 ];
+
 
 function migrateState(persisted: any): GameState {
   const initial = createInitialState();
