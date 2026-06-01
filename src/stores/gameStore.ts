@@ -824,7 +824,16 @@ export const useGameStore = create<GameState & GameActions>()(
           return total + Math.floor((property.value * 0.004) / 12);
         }, 0);
         const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
-        const totalExpenses = mortgagePayments + councilTax + insurance;
+        // Phase 4 #2 — Leasehold service charge + ground rent (monthly slice of annual cost).
+        const leaseholdCosts = newOwnedProperties.reduce((total, property) => {
+          if (!property.isLeasehold) return total;
+          const sc = property.serviceChargePctAnnual
+            ? Math.floor((property.value * property.serviceChargePctAnnual) / 12)
+            : 0;
+          const gr = property.groundRentPennies ? Math.floor(property.groundRentPennies / 12) : 0;
+          return total + sc + gr;
+        }, 0);
+        const totalExpenses = mortgagePayments + councilTax + insurance + leaseholdCosts;
         const netIncome = monthlyIncome - totalExpenses;
 
         // Update mortgage balances + capture this month's actual interest portion
