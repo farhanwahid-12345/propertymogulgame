@@ -29,6 +29,7 @@ import {
   getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
 } from '@/lib/engine/financials';
 import { generateRandomProperty, generateMarketProperty, deriveSqft } from '@/lib/engine/market';
+import { getUnlockedCities } from '@/lib/engine/cities';
 import {
   calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
 } from '@/lib/mortgageEligibility';
@@ -4725,7 +4726,7 @@ export const useGameStore = create<GameState & GameActions>()(
             const targetPrice = priceFloor + gameRandom() * (priceFloor * 0.5);
             const adjusted = Math.max(priceFloor, Math.min(max, Math.floor(targetPrice / 100_000) * 100_000));
             // Phase 4 #3 — spread new stock across unlocked cities.
-            const unlocked = (await import('@/lib/engine/cities')).getUnlockedCities(prev.level);
+            const unlocked = getUnlockedCities(prev.level);
             const pickedCity = unlocked[Math.floor(gameRandom() * unlocked.length)]?.id;
             const prop = generateRandomProperty(prev.level, pickedCity);
             prop.price = adjusted;
