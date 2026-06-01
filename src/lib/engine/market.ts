@@ -118,8 +118,8 @@ function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fu
 }
 
 /** Wrap `generateRandomProperty` to occasionally list pre-furnished stock with bumped price & rent. */
-export function generateMarketProperty(level: number): Property {
-  const base = generateRandomProperty(level);
+export function generateMarketProperty(level: number, cityId?: CityId): Property {
+  const base = generateRandomProperty(level, cityId);
   const roll = rollListingFurnishing();
   if (roll.tier === 'unfurnished') return base;
   const tempForFurniture = { ...base, furnishingTier: roll.tier, furnishingMonthsRemaining: roll.monthsRemaining };
