@@ -47,6 +47,8 @@ interface Props {
     slotIndex?: number,
   ) => void;
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Phase 4 #2 — title-split a converted flat into its own leasehold property. */
+  onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
 }
 
 export function MultiUnitSlots({
@@ -67,6 +69,7 @@ export function MultiUnitSlots({
   cancelEviction,
   applyRentIncrease,
   furnishingTier,
+  onSplitFlatUnit,
 }: Props) {
   const label = subtype === 'hmo' ? 'Room' : 'Unit';
   const occupied = slots.filter(s => s.tenant).length;
