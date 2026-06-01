@@ -4724,7 +4724,10 @@ export const useGameStore = create<GameState & GameActions>()(
             const priceFloor = Math.max(toPennies(40000), min);
             const targetPrice = priceFloor + gameRandom() * (priceFloor * 0.5);
             const adjusted = Math.max(priceFloor, Math.min(max, Math.floor(targetPrice / 100_000) * 100_000));
-            const prop = generateRandomProperty(prev.level);
+            // Phase 4 #3 — spread new stock across unlocked cities.
+            const unlocked = (await import('@/lib/engine/cities')).getUnlockedCities(prev.level);
+            const pickedCity = unlocked[Math.floor(gameRandom() * unlocked.length)]?.id;
+            const prop = generateRandomProperty(prev.level, pickedCity);
             prop.price = adjusted;
             prop.value = adjusted;
             prop.monthlyIncome = Math.floor((adjusted * (6 + gameRandom() * 9) / 100) / 12);
