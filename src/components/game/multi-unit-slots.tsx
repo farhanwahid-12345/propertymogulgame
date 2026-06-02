@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { TenantSelector, type Tenant } from "@/components/game/tenant-selector";
 import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
+import { TitleSplitDialog } from "@/components/game/title-split-dialog";
 import { Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getMarketRentPounds } from "@/lib/engine/market";
+
 
 
 export interface MultiUnitSlot {
