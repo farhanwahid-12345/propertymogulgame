@@ -512,5 +512,7 @@ export function useGameState() {
     dismissTenantConcern,
     submitPlanningApplication,
     acknowledgePlanningDecision,
+    splitFlatUnit: store.splitFlatUnit,
+
   };
 }
