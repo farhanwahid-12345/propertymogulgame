@@ -561,6 +561,35 @@ export function EstateAgentWindow({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
+            {unlockedCities.length > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  size="sm"
+                  variant={cityFilter === 'all' ? 'default' : 'outline'}
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setCityFilter('all')}
+                >
+                  All cities ({availableProperties.length})
+                </Button>
+                {unlockedCities.map((c) => {
+                  const count = availableProperties.filter(
+                    (p) => (p.city ?? 'middlesbrough') === c.id
+                  ).length;
+                  return (
+                    <Button
+                      key={c.id}
+                      size="sm"
+                      variant={cityFilter === c.id ? 'default' : 'outline'}
+                      className="h-7 text-xs px-2.5"
+                      onClick={() => setCityFilter(c.id)}
+                    >
+                      {c.name} ({count})
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+
             {(levelRestrictedCount > 0 || unaffordableCount > 0) && (
               <div className="flex flex-col gap-1 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                 {levelRestrictedCount > 0 && (
