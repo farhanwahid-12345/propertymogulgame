@@ -135,7 +135,10 @@ interface PropertyCardProps {
   hasActiveDebtRecovery?: boolean;
   /** File a county-court claim for back-rent (£325 fee). */
   onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
+  /** Phase 4 #2 — title-split a converted flat into its own leasehold property. */
+  onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
 }
+
 
 const PropertyTypeIcon = {
   residential: Home,
@@ -189,7 +192,9 @@ export const PropertyCard = memo(function PropertyCard({
   multiUnitSlots,
   hasActiveDebtRecovery = false,
   onSendToCourt,
+  onSplitFlatUnit,
 }: PropertyCardProps) {
+
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
   const [showMonthlyCosts, setShowMonthlyCosts] = useState(false);
@@ -323,7 +328,13 @@ export const PropertyCard = memo(function PropertyCard({
             </Badge>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
+        <p className="text-xs text-muted-foreground">
+          {property.neighborhood}
+          {property.city && property.city !== 'middlesbrough' && (
+            <span className="ml-1 text-muted-foreground/70">· {property.city.charAt(0).toUpperCase() + property.city.slice(1)}</span>
+          )}
+        </p>
+
         {/* Sqft + concern chips row */}
         {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0 || (property.furnishingTier && property.furnishingTier !== 'unfurnished')) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -571,7 +582,9 @@ export const PropertyCard = memo(function PropertyCard({
                       cancelEviction={cancelEviction}
                       applyRentIncrease={applyRentIncrease}
                       furnishingTier={(property as any).furnishingTier}
+                      onSplitFlatUnit={onSplitFlatUnit}
                     />
+
                   ) : (
                     onSelectTenant && (
                       <TenantSelector

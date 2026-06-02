@@ -14,6 +14,8 @@ import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import { computeErcRate } from "@/lib/engine/constants";
+import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+
 
 interface PropertyOffer {
   id: string;
@@ -145,6 +147,10 @@ export function EstateAgentWindow({
 
   // Item #10: sort for the Buy tab.
   const [buySort, setBuySort] = useState<'price-asc' | 'price-desc' | 'yield-asc' | 'yield-desc' | 'rent-asc' | 'rent-desc'>('price-asc');
+  // Phase 4 #3 — city filter for Buy tab. 'all' shows every unlocked city.
+  const [cityFilter, setCityFilter] = useState<CityId | 'all'>('all');
+  const unlockedCities = getUnlockedCities(level);
+
 
 
   // Get level value range for filtering
@@ -191,11 +197,15 @@ export function EstateAgentWindow({
     return property.value >= levelMin && property.value <= levelMax;
   };
 
-  // Filter properties by BOTH level range AND affordability
-  const levelFilteredProperties = availableProperties.filter(isWithinLevelRange);
+  // Filter properties by BOTH level range AND affordability AND city
+  const cityFilteredProperties = cityFilter === 'all'
+    ? availableProperties
+    : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
+  const levelFilteredProperties = cityFilteredProperties.filter(isWithinLevelRange);
   const affordableProperties = levelFilteredProperties.filter(calculateAffordability);
-  const levelRestrictedCount = availableProperties.length - levelFilteredProperties.length;
+  const levelRestrictedCount = cityFilteredProperties.length - levelFilteredProperties.length;
   const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
+
 
   // Reset negotiation when selecting a new property
   const resetNegotiation = () => {
@@ -551,6 +561,35 @@ export function EstateAgentWindow({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
+            {unlockedCities.length > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  size="sm"
+                  variant={cityFilter === 'all' ? 'default' : 'outline'}
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setCityFilter('all')}
+                >
+                  All cities ({availableProperties.length})
+                </Button>
+                {unlockedCities.map((c) => {
+                  const count = availableProperties.filter(
+                    (p) => (p.city ?? 'middlesbrough') === c.id
+                  ).length;
+                  return (
+                    <Button
+                      key={c.id}
+                      size="sm"
+                      variant={cityFilter === c.id ? 'default' : 'outline'}
+                      className="h-7 text-xs px-2.5"
+                      onClick={() => setCityFilter(c.id)}
+                    >
+                      {c.name} ({count})
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+
             {(levelRestrictedCount > 0 || unaffordableCount > 0) && (
               <div className="flex flex-col gap-1 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                 {levelRestrictedCount > 0 && (
@@ -612,7 +651,10 @@ export function EstateAgentWindow({
                 >
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
-                    <div className="text-[11px] text-muted-foreground leading-tight">{property.neighborhood}</div>
+                    <div className="text-[11px] text-muted-foreground leading-tight">
+                      {property.neighborhood} · {getCityConfig(property.city).name}
+                    </div>
+
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Price</span>

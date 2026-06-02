@@ -111,3 +111,9 @@ Stopping here for your review — awaiting approval before starting Phase 1.
 - #2 Title-split flats: new store action `splitFlatUnit(propertyId, slotIndex, groundRentMode)` spawns standalone leasehold flat (+8% per-unit value, parent value adjusted down), reindexes remaining slots, migrates sitting tenant, removes parent when last unit is split. Charges £600 solicitor fee. New `Property` fields: `titleSplitOf`, `flatUnitId`, `isLeasehold`, `serviceChargePctAnnual` (2-5%), `groundRentPennies` (peppercorn £10 or 0.5%/yr). Service charge + ground rent rolled into monthly `totalExpenses` cashflow. UI: inline "Title-split this flat" button on flats in `MultiUnitSlots` (window.confirm for ground-rent mode).
 - Migration v16→v17 backfills `city='middlesbrough'`. `CURRENT_VERSION = 17`.
 - Deferred to follow-up: city-selector Tabs in estate-agent & auction buy panels, full ground-rent picker dialog, per-city street/neighborhood display polish on property cards. Property-card → MultiUnitSlots wiring of `onSplitFlatUnit` so the button surfaces in-game.
+
+## Phase 4 — follow-up (DONE)
+- Title-split: replaced `window.confirm` with proper `TitleSplitDialog` (radio picker, fee disclosure, estimated annual ground rent). Wired `splitFlatUnit` through `useGameState` → `PortfolioGrid` → `PropertyCard` → `MultiUnitSlots`, so the button now actually surfaces on owned flats.
+- Multi-city UI: added city filter chips above the Estate Agent Buy list and the Auction House Buy list (only shown when more than one city is unlocked). Property listings and the owned-card header now display `Neighborhood · City` so generated stock reads correctly.
+- Tests bumped to expect `CURRENT_VERSION = 17`. 160/161 passing (the lone failure is the pre-existing Phase 5 refurb-clears assertion, unchanged by this work).
+

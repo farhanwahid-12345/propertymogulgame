@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/game/property-card";
 import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+
 
 interface SellerBid {
   bidder: string;
@@ -66,6 +68,14 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
   const [watchingIndex, setWatchingIndex] = useState<number | null>(null);
+  // Phase 4 #3 — city filter for the auction Buy list.
+  const [cityFilter, setCityFilter] = useState<CityId | 'all'>('all');
+  const unlockedCities = getUnlockedCities(level);
+  const filteredAuctionProperties = cityFilter === 'all'
+    ? auctionProperties
+    : auctionProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
+
+
   
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
@@ -636,8 +646,36 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                   <Gavel className="h-5 w-5" />
                   Available Auction Properties
                 </h3>
+                {unlockedCities.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button
+                      size="sm"
+                      variant={cityFilter === 'all' ? 'default' : 'outline'}
+                      className="h-7 text-xs px-2.5"
+                      onClick={() => setCityFilter('all')}
+                    >
+                      All ({auctionProperties.length})
+                    </Button>
+                    {unlockedCities.map((c) => {
+                      const count = auctionProperties.filter(
+                        (p) => (p.city ?? 'middlesbrough') === c.id
+                      ).length;
+                      return (
+                        <Button
+                          key={c.id}
+                          size="sm"
+                          variant={cityFilter === c.id ? 'default' : 'outline'}
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => setCityFilter(c.id)}
+                        >
+                          {c.name} ({count})
+                        </Button>
+                      );
+                    })}
+                  </div>
+                )}
                 <div className="grid gap-3 max-h-96 overflow-y-auto">
-                  {auctionProperties.map((property) => (
+                  {filteredAuctionProperties.map((property) => (
                     <Card 
                       key={property.id} 
                       className="cursor-pointer transition-colors border-orange-500/30 hover:border-orange-500/50"
@@ -646,7 +684,10 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <h4 className="font-semibold">{property.name}</h4>
-                            <p className="text-sm text-muted-foreground">{property.neighborhood}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {property.neighborhood} · {getCityConfig(property.city).name}
+                            </p>
+
                             <Badge variant="outline" className="mt-1">
                               {property.type}
                             </Badge>
