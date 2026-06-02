@@ -192,7 +192,9 @@ export const PropertyCard = memo(function PropertyCard({
   multiUnitSlots,
   hasActiveDebtRecovery = false,
   onSendToCourt,
+  onSplitFlatUnit,
 }: PropertyCardProps) {
+
   const [isLoading, setIsLoading] = useState(false);
   const [showMortgageOptions, setShowMortgageOptions] = useState(false);
   const [showMonthlyCosts, setShowMonthlyCosts] = useState(false);
