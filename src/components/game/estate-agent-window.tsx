@@ -651,7 +651,10 @@ export function EstateAgentWindow({
                 >
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
-                    <div className="text-[11px] text-muted-foreground leading-tight">{property.neighborhood}</div>
+                    <div className="text-[11px] text-muted-foreground leading-tight">
+                      {property.neighborhood} · {getCityConfig(property.city).name}
+                    </div>
+
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Price</span>
