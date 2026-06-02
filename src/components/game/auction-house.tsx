@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Property } from "@/components/game/property-card";
 import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+
 
 interface SellerBid {
   bidder: string;
