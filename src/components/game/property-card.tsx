@@ -135,7 +135,10 @@ interface PropertyCardProps {
   hasActiveDebtRecovery?: boolean;
   /** File a county-court claim for back-rent (£325 fee). */
   onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
+  /** Phase 4 #2 — title-split a converted flat into its own leasehold property. */
+  onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
 }
+
 
 const PropertyTypeIcon = {
   residential: Home,
