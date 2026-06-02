@@ -147,6 +147,10 @@ export function EstateAgentWindow({
 
   // Item #10: sort for the Buy tab.
   const [buySort, setBuySort] = useState<'price-asc' | 'price-desc' | 'yield-asc' | 'yield-desc' | 'rent-asc' | 'rent-desc'>('price-asc');
+  // Phase 4 #3 — city filter for Buy tab. 'all' shows every unlocked city.
+  const [cityFilter, setCityFilter] = useState<CityId | 'all'>('all');
+  const unlockedCities = getUnlockedCities(level);
+
 
 
   // Get level value range for filtering
