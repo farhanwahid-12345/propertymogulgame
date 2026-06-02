@@ -14,6 +14,8 @@ import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import { computeErcRate } from "@/lib/engine/constants";
+import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+
 
 interface PropertyOffer {
   id: string;
