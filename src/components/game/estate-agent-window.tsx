@@ -197,11 +197,15 @@ export function EstateAgentWindow({
     return property.value >= levelMin && property.value <= levelMax;
   };
 
-  // Filter properties by BOTH level range AND affordability
-  const levelFilteredProperties = availableProperties.filter(isWithinLevelRange);
+  // Filter properties by BOTH level range AND affordability AND city
+  const cityFilteredProperties = cityFilter === 'all'
+    ? availableProperties
+    : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
+  const levelFilteredProperties = cityFilteredProperties.filter(isWithinLevelRange);
   const affordableProperties = levelFilteredProperties.filter(calculateAffordability);
-  const levelRestrictedCount = availableProperties.length - levelFilteredProperties.length;
+  const levelRestrictedCount = cityFilteredProperties.length - levelFilteredProperties.length;
   const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
+
 
   // Reset negotiation when selecting a new property
   const resetNegotiation = () => {
