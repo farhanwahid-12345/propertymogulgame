@@ -328,7 +328,13 @@ export const PropertyCard = memo(function PropertyCard({
             </Badge>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">{property.neighborhood}</p>
+        <p className="text-xs text-muted-foreground">
+          {property.neighborhood}
+          {property.city && property.city !== 'middlesbrough' && (
+            <span className="ml-1 text-muted-foreground/70">· {property.city.charAt(0).toUpperCase() + property.city.slice(1)}</span>
+          )}
+        </p>
+
         {/* Sqft + concern chips row */}
         {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0 || (property.furnishingTier && property.furnishingTier !== 'unfurnished')) && (
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
