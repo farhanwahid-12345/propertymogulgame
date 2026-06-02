@@ -576,7 +576,9 @@ export const PropertyCard = memo(function PropertyCard({
                       cancelEviction={cancelEviction}
                       applyRentIncrease={applyRentIncrease}
                       furnishingTier={(property as any).furnishingTier}
+                      onSplitFlatUnit={onSplitFlatUnit}
                     />
+
                   ) : (
                     onSelectTenant && (
                       <TenantSelector
