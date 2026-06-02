@@ -68,6 +68,14 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   const [guidePrice, setGuidePrice] = useState("");
   const [activeTab, setActiveTab] = useState("buy");
   const [watchingIndex, setWatchingIndex] = useState<number | null>(null);
+  // Phase 4 #3 — city filter for the auction Buy list.
+  const [cityFilter, setCityFilter] = useState<CityId | 'all'>('all');
+  const unlockedCities = getUnlockedCities(level);
+  const filteredAuctionProperties = cityFilter === 'all'
+    ? auctionProperties
+    : auctionProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
+
+
   
   // Live auction state
   const [liveAuction, setLiveAuction] = useState<LiveAuction | null>(null);
