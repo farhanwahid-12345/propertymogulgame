@@ -124,8 +124,10 @@ Stopping here for your review — awaiting approval before starting Phase 1.
 - Fixed pre-existing `phase1V5Verification.test.ts` assertion that explicitly capped `runMigrations` at v15 while expecting `_version === 17`; now omits the explicit cap so `CURRENT_VERSION` is used.
 - Tests: **176/176 passing** (was 160/161). No persisted-shape change; no new migration.
 
-### Phase 5 follow-up (deferred)
-- Move action logic — not just selectors — out of `gameStore.ts` into the slice files, one domain at a time (renovation → portfolio → tenant → financial → conveyancing → market). Each step lands behind green tests; persisted shape must remain identical.
-- Extend `gameStore.test.ts` with end-to-end month-end / conveyancing happy-path & chain-collapse / credit-score transition coverage once the relevant slices are extracted and easier to drive in isolation.
+### Phase 5 follow-up (in progress)
+- **Renovation slice extracted (DONE)**: `startRenovation`, `upgradeCondition`, `furnishProperty`, `submitPlanningApplication`, `submitBatchPlanningApplications`, `acknowledgePlanningDecision`, `dismissPlanningCelebration`, `clearPlanningCelebrations`, `dismissPlanningRefusal`, `clearPlanningRefusals` now live in `src/stores/slices/renovationActions.ts` behind a `createRenovationActions(set, get)` factory and are spread into the store literal — gameStore.ts shrunk by ~555 lines (5,332 → 4,778). Behaviour and persisted shape unchanged. New `src/stores/slices/renovationActions.test.ts` adds 7 tests (wiring, no-op guards, real upgrade/furnish flow, tenant-in-place block). Suite: **183/183 green** (was 176).
+- Remaining slices to extract (each behind green tests, no persisted-shape change): portfolio → tenant → financial → conveyancing → market.
+- Extend `gameStore.test.ts` with end-to-end month-end / conveyancing happy-path & chain-collapse / credit-score transition coverage once those slices are extracted and easier to drive in isolation.
+
 
 
