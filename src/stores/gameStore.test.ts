@@ -80,9 +80,9 @@ describe('gameStore — simple mutators', () => {
     expect(useGameStore.getState().isPaused).toBe(false);
   });
 
-  it('setEntityType switches sole_trader ↔ ltd_company', () => {
-    useGameStore.getState().setEntityType('ltd_company');
-    expect(useGameStore.getState().entityType).toBe('ltd_company');
+  it('setEntityType switches sole_trader ↔ ltd', () => {
+    useGameStore.getState().setEntityType('ltd');
+    expect(useGameStore.getState().entityType).toBe('ltd');
   });
 
   it('clockTick decrements timeUntilNextMonth without going below zero', () => {
