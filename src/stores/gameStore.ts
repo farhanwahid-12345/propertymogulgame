@@ -57,6 +57,7 @@ import {
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
   sanitizeTenantConcern, mergeConcernsById, sanitizeOffer, sanitizePropertyListing,
 } from './sanitizers';
+import { createRenovationActions } from './slices/renovationActions';
 
 // ─── Actions interface ───────────────────────────────────
 interface GameActions {
