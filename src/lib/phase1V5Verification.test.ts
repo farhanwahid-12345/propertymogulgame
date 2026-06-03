@@ -51,7 +51,7 @@ describe('Phase 1 (v5) — wiring', () => {
       { from: 13, to: 14, describe: 't', apply: (p) => { p.b = 2; } },
       { from: 14, to: 15, describe: 't', apply: (p) => { p.c = 3; } },
     ];
-    runMigrations(persisted, steps, 15);
+    runMigrations(persisted, steps);
     expect(persisted._version).toBe(17);
     expect(persisted).toMatchObject({ a: 1, b: 2, c: 3 });
   });
