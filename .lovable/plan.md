@@ -78,4 +78,20 @@ Order (per the document, by self-containment):
 - **Test budget**: Phase 2 adds ~12+ store-level tests; Phase 3 adds smoke coverage as needed but should not require schema-level additions.
 - **Stopping point**: after each sub-phase (1, 2a, 2b, 2c, 3a…3e) the suite must be green before the next begins.
 
-Awaiting your approval before starting Phase 1.
+
+---
+
+## Status (post-implementation)
+
+**Phase 1 — DONE.** Root cause was that `property-card.tsx`'s single-tenant rent-increase + eviction block (~lines 700–751) rendered alongside `MultiUnitSlots` for any HMO/flats property where a `currentTenant` was set, so the dialog was given `property.monthlyIncome` (combined total) as the per-slot rent floor and rejected every realistic raise. Gated the block with `!(multiUnitSlots && multiUnitSlots.length > 0)` so multi-unit rent increases now go exclusively through `MultiUnitSlots`, which already passes the matched slot's `slot.rentPounds` and threads `slotIndex` into `applyRentIncrease`.
+
+**Phase 2 — DONE.** Added `src/stores/gameStoreStateMachine.test.ts` with 11 new tests covering:
+- Eviction state machine: `landlord_sale` happy-path creates `pendingEviction`; `rent_arrears` without ≥2 default events is rejected; `rent_arrears` with default events succeeds; `cancelEviction` removes only the matching entry; duplicate notice on same slot is refused.
+- `processMonthEnd`: no-op when `timeUntilNextMonth > 0`; advances `monthsPlayed` when 0; credits cash when a paying low-risk tenant is in place; accumulates `arrearsPennies` when the missed-rent roll fires (high-risk + seed loop).
+- Credit score: stays inside `[300, 850]`; mortgage-serviced + healthy cash + low LTV does not regress.
+All seeded paths use `withSeed`. Suite: **194/194 green** (was 183/183).
+
+**Phase 3a — DONE (market replenishment).** Extracted `replenishMarket` (98 lines) into `src/stores/slices/marketActions.ts` behind a `createMarketActions(set, get)` factory, spread into the store literal. `gameStore.ts` shrunk from 4,778 → ~4,680 lines. Behaviour and persisted shape unchanged. Suite still 194/194 green.
+
+**Phase 3 remaining (deferred).** `processMarketUpdate` (395 lines) is intentionally left in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after the financial / portfolio / tenant slices are themselves extracted. The doc's recommended order (financial → portfolio → tenant → conveyancing) remains the path forward and is tracked as the next iteration of this plan.
+
