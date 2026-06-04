@@ -697,7 +697,12 @@ export const PropertyCard = memo(function PropertyCard({
                       )}
                     </div>
                   )}
-                  {currentTenant && !pendingEviction && evictTenant && (
+                  {/* Single-tenant rent + eviction controls.
+                       Hide for multi-unit (HMO/flats with >1 unit) — those are
+                       handled per-slot by MultiUnitSlots above, otherwise this
+                       dialog would pass property.monthlyIncome (the combined
+                       total) as the per-slot floor and reject all raises. */}
+                  {currentTenant && !pendingEviction && evictTenant && !(multiUnitSlots && multiUnitSlots.length > 0) && (
                     <div className="grid grid-cols-2 gap-2">
                       {applyRentIncrease && (
                         <RentNegotiationDialog
