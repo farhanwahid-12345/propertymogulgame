@@ -3656,6 +3656,8 @@ export const useGameStore = create<GameState & GameActions>()(
       // ─── RENOVATIONS ──────────────────────
       // ─── Renovation + planning actions (Phase 5 follow-up: extracted to slice)
       ...createRenovationActions(set as any, get as any),
+      // ─── Market replenishment (Phase 3a Outstanding Improvements: extracted to slice)
+      ...createMarketActions(set as any, get as any),
 
       // ─── MORTGAGES ─────────────────────────
       settleMortgage: (mortgagePropertyId, useCash = false, settlementPropertyId, partialAmount) => {
