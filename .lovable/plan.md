@@ -93,5 +93,9 @@ All seeded paths use `withSeed`. Suite: **194/194 green** (was 183/183).
 
 **Phase 3a — DONE (market replenishment).** Extracted `replenishMarket` (98 lines) into `src/stores/slices/marketActions.ts` behind a `createMarketActions(set, get)` factory, spread into the store literal. `gameStore.ts` shrunk from 4,778 → ~4,680 lines. Behaviour and persisted shape unchanged. Suite still 194/194 green.
 
-**Phase 3 remaining (deferred).** `processMarketUpdate` (395 lines) is intentionally left in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after the financial / portfolio / tenant slices are themselves extracted. The doc's recommended order (financial → portfolio → tenant → conveyancing) remains the path forward and is tracked as the next iteration of this plan.
+**Phase 3b — DONE (financial slice).** Extracted ~440 lines (mortgages, loans, overdraft, cash mutators) into `src/stores/slices/financialActions.ts`. Suite 194/194 green.
+
+**Phase 3c — DONE (portfolio slice).** Extracted ~454 lines (buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale, listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice, setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer, reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter) into `src/stores/slices/portfolioActions.ts` behind a `createPortfolioActions(set, get)` factory. `gameStore.ts` is now 3,838 lines (down from 4,287). Behaviour and persisted shape unchanged. Suite 194/194 green.
+
+**Phase 3 remaining (deferred).** `processMarketUpdate` (395 lines) is intentionally left in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after the tenant / conveyancing slices are themselves extracted. Next: **3d tenant slice** (selectTenant, rent collection, arrears, satisfaction, concerns, evictions, deposit disputes).
 
