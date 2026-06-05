@@ -59,6 +59,7 @@ import {
 } from './sanitizers';
 import { createRenovationActions } from './slices/renovationActions';
 import { createMarketActions } from './slices/marketActions';
+import { createFinancialActions } from './slices/financialActions';
 
 // ─── Actions interface ───────────────────────────────────
 interface GameActions {
