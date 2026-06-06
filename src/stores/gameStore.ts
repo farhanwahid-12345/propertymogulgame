@@ -61,6 +61,8 @@ import { createRenovationActions } from './slices/renovationActions';
 import { createMarketActions } from './slices/marketActions';
 import { createFinancialActions } from './slices/financialActions';
 import { createPortfolioActions } from './slices/portfolioActions';
+import { createTenantActions } from './slices/tenantActions';
+import { createConveyancingActions } from './slices/conveyancingActions';
 
 // ─── Actions interface ───────────────────────────────────
 interface GameActions {
