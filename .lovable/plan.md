@@ -97,5 +97,9 @@ All seeded paths use `withSeed`. Suite: **194/194 green** (was 183/183).
 
 **Phase 3c — DONE (portfolio slice).** Extracted ~454 lines (buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale, listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice, setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer, reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter) into `src/stores/slices/portfolioActions.ts` behind a `createPortfolioActions(set, get)` factory. `gameStore.ts` is now 3,838 lines (down from 4,287). Behaviour and persisted shape unchanged. Suite 194/194 green.
 
-**Phase 3 remaining (deferred).** `processMarketUpdate` (395 lines) is intentionally left in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after the tenant / conveyancing slices are themselves extracted. Next: **3d tenant slice** (selectTenant, rent collection, arrears, satisfaction, concerns, evictions, deposit disputes).
+**Phase 3 remaining (deferred).** `processMarketUpdate` (~395 lines) stays in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after a dedicated time/orchestrator slice is carved out.
+
+**Phase 3d — DONE (tenant slice).** Extracted `selectTenant`, `applyRentIncrease`, `evictTenant`, `cancelEviction`, `disputeDeposit`, `dismissDispute` into `src/stores/slices/tenantActions.ts` behind `createTenantActions(set, get)`. Suite 194/194 green.
+
+**Phase 3e — DONE (conveyancing slice, partial).** Extracted `withdrawFromConveyancing` (buy+sell abort flow with chain-collapse fee and inventory re-instatement) into `src/stores/slices/conveyancingActions.ts` behind `createConveyancingActions(set, get)`. The monthly conveyancing progression remains inside `processMarketUpdate` pending its own split. `gameStore.ts` is now ~3,388 lines (down from 4,778 at the start of Phase 3). Suite 194/194 green.
 
