@@ -97,7 +97,7 @@ All seeded paths use `withSeed`. Suite: **194/194 green** (was 183/183).
 
 **Phase 3c — DONE (portfolio slice).** Extracted ~454 lines (buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale, listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice, setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer, reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter) into `src/stores/slices/portfolioActions.ts` behind a `createPortfolioActions(set, get)` factory. `gameStore.ts` is now 3,838 lines (down from 4,287). Behaviour and persisted shape unchanged. Suite 194/194 green.
 
-**Phase 3 remaining (deferred).** `processMarketUpdate` (~395 lines) stays in-store for now — it cross-cuts tax, renovation completion, reputation, credit, and macro-event scheduling, so it will land cleanly only after a dedicated time/orchestrator slice is carved out.
+**Phase 3 remaining — DONE (orchestrator slice).** Extracted `processMarketUpdate` (~395 lines) and `processCounterResponses` (~30 lines) into `src/stores/slices/orchestratorActions.ts` behind `createOrchestratorActions(set, get)`. Covers renovation completion + reputation, listing offer generation, sale→conveyancing hand-off, void period expiry, damage-concern generation, loan-rate drift, and buyer-counter resolution. `gameStore.ts` is now **2,962 lines** (down from 4,778 at Phase 3 start; ~38% reduction). Suite 194/194 green.
 
 **Phase 3d — DONE (tenant slice).** Extracted `selectTenant`, `applyRentIncrease`, `evictTenant`, `cancelEviction`, `disputeDeposit`, `dismissDispute` into `src/stores/slices/tenantActions.ts` behind `createTenantActions(set, get)`. Suite 194/194 green.
 
