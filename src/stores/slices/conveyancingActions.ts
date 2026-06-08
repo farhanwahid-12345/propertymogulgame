@@ -5,7 +5,10 @@
  * core monthly conveyancing progression still lives inside
  * `processMarketUpdate` and will be migrated when that orchestrator is split.
  */
+import type { Conveyancing, PropertyListing, PropertyOffer } from '@/types/game';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
+import { gameRandom } from '@/lib/rng';
+import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 import { showToast, debit, credit } from '../storeHelpers';
 
 type SetFn = (partial: any) => void;
