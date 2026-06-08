@@ -1,105 +1,73 @@
-# Execution Plan — Outstanding Improvements
+# Execution Plan — Complete the Monolithic Store Split
 
-Three outstanding items from the document, ordered low-risk → high-risk so each phase ships green before the next begins.
-
----
-
-## Phase 1 — Fix Flat/HMO Rent Increase Bug (Doc #1)
-
-Small, surgical bug fix. Lands first so we have a clean baseline before the testing/refactor work.
-
-**Changes**
-- `src/components/game/property-card.tsx` (~lines 706, 759): when `subtype === 'hmo'` or (`subtype === 'flats'` and `subtypeUnits > 1`), pass the matched tenant's `rentPennies / 100` (filtered by `propertyId` + `slotIndex`) as `currentRent` to `RentNegotiationDialog`, instead of `property.monthlyIncome`.
-- Thread `slotIndex` through the `applyRentIncrease` call in **both** the single-tenant and multi-unit branches so the store updates the correct unit.
-- Cross-check: a prior memory note says this was already addressed via `MultiUnitSlots` — verify whether the bug still surfaces on the two property-card call sites the document calls out, and only edit what's still broken. If already fixed, document the no-op and move on.
-
-**Verification**
-- New regression test in an appropriate `phaseXVerification.test.ts` (or a new `rentIncreaseSlot.test.ts`) that drives a flats property with two slots at different rents and asserts the per-slot rent flows through correctly.
-- Manual: in preview, attempt a Section 13 raise on a single flat unit at a rent below the property's total income — should no longer reject.
+The attached doc lists **one outstanding item**: finish the `gameStore.ts` split. It breaks down into three sequenced steps. Each phase ends with a green test suite (currently 194/194) before the next begins. Persisted save shape stays unchanged throughout.
 
 ---
 
-## Phase 2 — Month-End / Eviction / Credit Store Tests (Doc #2)
+## Phase 1 — Extract `processMonthEnd` into `monthEndActions.ts` (highest priority)
 
-Lock down behaviour **before** moving code, so the Phase 3 refactor has a safety net.
+`processMonthEnd` is ~2,056 lines and 69% of `gameStore.ts`. This is the single biggest win.
 
-**Add to `src/stores/gameStore.test.ts`** (all seeded via `withSeed()`):
+**Steps**
+1. Create `src/stores/slices/monthEndActions.ts` exporting `createMonthEndActions(set, get)`, mirroring the existing slice pattern (`renovationActions.ts`, `orchestratorActions.ts`).
+2. Move the `processMonthEnd` body **verbatim** — no logic, variable, or shape changes. Pure relocation.
+3. Convert any direct `this`/closure references into `get()` reads and `set(...)` writes, matching how `orchestratorActions.ts` does it.
+4. In `gameStore.ts`, import and spread: `...createMonthEndActions(set as any, get as any)`.
+5. Run full suite; manual smoke in preview (buy → let → tick a month → evict).
 
-Sub-phase 2a — Month-end cashflow
-- Paying tenant → cash increases by rent after tick.
-- Tenant in arrears → cash unchanged, `arrearsPennies` increases correctly.
-- Arrears cleared → full `arrearsPennies` paid back lump-sum and resets to 0.
-- Mortgage payment deducted from cash on monthly tick.
-- Missed mortgage payment (insufficient cash) → credit score decreases.
-
-Sub-phase 2b — Eviction state machine
-- `serveEvictionNotice` creates a `pendingEviction` entry with correct `propertyId` + `slotIndex`.
-- `cancelEviction` removes the correct entry.
-- After notice period expires on a monthly tick, tenant is removed and property becomes vacant.
-- `evictForArrears` on a property with no arrears is rejected and creates no entry.
-
-Sub-phase 2c — Credit score
-- All mortgages serviced → score unchanged across N months.
-- One missed payment → score drops by the documented penalty amount.
-
-**Approach**: follow the existing `gameStore.test.ts` pattern — `useGameStore.setState()` to set scenarios, call actions, then assert from `getState()`. Drive `advanceMonth()` directly; no clock mocking.
-
-**Exit criteria**: full suite green (currently 183/183 → target ~195+).
+**Exit criteria**: 194/194 green, `gameStore.ts` drops by ~2,000 lines.
 
 ---
 
-## Phase 3 — Incremental Monolithic Store Split (Doc #3)
+## Phase 2 — Complete `conveyancingActions.ts`
 
-Migrate the remaining ~4,200 lines out of `gameStore.ts` into populated slice files. **One slice at a time**, behind the Phase 2 tests, with the persisted shape held constant so no new migration is required.
+Currently only `withdrawFromConveyancing` (55 lines) lives there. The full sale/listing lifecycle is still inline.
 
-Order (per the document, by self-containment):
+**Sub-phase 2a — Sale completion handlers**
+- Migrate `handleEstateAgentSale`, `handleAuctionSale` (these touch conveyancing hand-off and cashflow on completion).
 
-- **3a. `marketSlice.ts`** — estate agent + auction generation/refresh, city-based stock spread, market trend updates, needsRefurb auction discounting.
-- **3b. `financialSlice.ts`** — cash, overdraft, credit score updates, monthly P&L, tax hooks (Section 24, SDLT, CGT), mortgage payment/ERC/payoff tracking, loan tracking/repayment.
-- **3c. `portfolioSlice.ts`** — `ownedProperties` array, market value/appreciation tick, condition decay, `internalSqft`, EPC + MEES enforcement, `sale_lock`/`relet_lock`.
-- **3d. `tenantSlice.ts`** — `selectTenant`, rent collection + arrears, satisfaction updates, concerns lifecycle, eviction serve/cancel/expiry, deposit disputes.
-- **3e. `conveyancingSlice.ts`** — buy + sell lifecycle, chain collapse, completion cashflow (deposit, mortgage draw, fees).
+**Sub-phase 2b — Listing lifecycle**
+- Migrate `listPropertyForSale`, `cancelPropertyListing`, `updatePropertyListingPrice`, `reducePriceOnListing`.
 
-**Conventions**
-- Each slice exports a `createXxxActions(set, get)` factory, mirroring the existing `renovationActions.ts` pattern.
-- Cross-slice reads via `get()` only — no direct imports between slice files.
-- `gameStore.ts` becomes a thin composer: top-level state shape, the monthly clock tick that fans out across slices, and `persist` config.
-- **Persisted shape unchanged** — no new migration, no `CURRENT_VERSION` bump.
-- After each sub-phase: app boots, full test suite green, manual smoke (buy → let → tick → evict) in preview before the next sub-phase.
+**Sub-phase 2c — Offer & counter flow**
+- Migrate `addOfferToListing`, `rejectPropertyOffer`, `counterOffer`, `acceptBuyerCounter`, `rejectBuyerCounter`.
 
-**Exit criteria**: `gameStore.ts` reduced to a thin composer (target < ~500 lines), every domain owned by its slice, full suite green.
+> Note: these currently live in `portfolioActions.ts` per the prior phase 3c. The doc explicitly asks them to be regrouped into `conveyancingActions.ts` since they drive the sale conveyancing flow. Confirm with a quick smoke (list → receive offer → counter → accept → conveyancing → completion) after each sub-phase.
+
+**Exit criteria after 2c**: `gameStore.ts` contains only — initial state object, persist config, slice imports + spreads, `clockTick` (calling `processMonthEnd` + `processMarketUpdate`), and `resetGame`. Suite still 194/194.
 
 ---
 
-## Cross-cutting notes
+## Phase 3 — Populate the four state-shape slice files
 
-- **No new persisted keys** — Phase 3 explicitly preserves the save shape.
-- **No new third-party deps.**
-- **Test budget**: Phase 2 adds ~12+ store-level tests; Phase 3 adds smoke coverage as needed but should not require schema-level additions.
-- **Stopping point**: after each sub-phase (1, 2a, 2b, 2c, 3a…3e) the suite must be green before the next begins.
+Lower priority; finishes the intended architecture. Each file gains selectors + any state-initialisation helpers for its domain.
 
+**3a — `portfolioSlice.ts`**: selectors for `ownedProperties`, property lock helpers, EPC band selectors.
+
+**3b — `tenantSlice.ts`**: selectors for `tenants`, arrears helpers, satisfaction selectors.
+
+**3c — `marketSlice.ts`**: selectors for `estateAgentProperties` and `auctionProperties`, plus market-trend selectors.
+
+**3d — `bankingSlice.ts`**: selectors for `cash`, `overdraft`, `creditScore`, `mortgages`, `loans` (extend the existing thin file).
+
+For each: add the selectors, refactor a couple of consuming components to use them (sanity-check ergonomics), keep the rest as a follow-up. Tests stay green.
 
 ---
 
-## Status (post-implementation)
+## Target end state
 
-**Phase 1 — DONE.** Root cause was that `property-card.tsx`'s single-tenant rent-increase + eviction block (~lines 700–751) rendered alongside `MultiUnitSlots` for any HMO/flats property where a `currentTenant` was set, so the dialog was given `property.monthlyIncome` (combined total) as the per-slot rent floor and rejected every realistic raise. Gated the block with `!(multiUnitSlots && multiUnitSlots.length > 0)` so multi-unit rent increases now go exclusively through `MultiUnitSlots`, which already passes the matched slot's `slot.rentPounds` and threads `slotIndex` into `applyRentIncrease`.
+- `gameStore.ts` < 300 lines: state shape + persist config + slice composition + `clockTick` + `resetGame`.
+- All domain logic owned by slice files.
+- Persisted save shape unchanged (no migration bump).
+- 194/194 tests green at every phase boundary.
 
-**Phase 2 — DONE.** Added `src/stores/gameStoreStateMachine.test.ts` with 11 new tests covering:
-- Eviction state machine: `landlord_sale` happy-path creates `pendingEviction`; `rent_arrears` without ≥2 default events is rejected; `rent_arrears` with default events succeeds; `cancelEviction` removes only the matching entry; duplicate notice on same slot is refused.
-- `processMonthEnd`: no-op when `timeUntilNextMonth > 0`; advances `monthsPlayed` when 0; credits cash when a paying low-risk tenant is in place; accumulates `arrearsPennies` when the missed-rent roll fires (high-risk + seed loop).
-- Credit score: stays inside `[300, 850]`; mortgage-serviced + healthy cash + low LTV does not regress.
-All seeded paths use `withSeed`. Suite: **194/194 green** (was 183/183).
+---
 
-**Phase 3a — DONE (market replenishment).** Extracted `replenishMarket` (98 lines) into `src/stores/slices/marketActions.ts` behind a `createMarketActions(set, get)` factory, spread into the store literal. `gameStore.ts` shrunk from 4,778 → ~4,680 lines. Behaviour and persisted shape unchanged. Suite still 194/194 green.
+## Technical notes
 
-**Phase 3b — DONE (financial slice).** Extracted ~440 lines (mortgages, loans, overdraft, cash mutators) into `src/stores/slices/financialActions.ts`. Suite 194/194 green.
+- Follow the existing factory signature: `export function createXxxActions(set: SetFn, get: GetFn) { return { ... } }`.
+- Cross-slice reads via `get()` only — no direct slice-to-slice imports.
+- No new third-party deps. No new persisted keys.
+- Stopping point after each sub-phase (1, 2a, 2b, 2c, 3a, 3b, 3c, 3d).
 
-**Phase 3c — DONE (portfolio slice).** Extracted ~454 lines (buyProperty, buyPropertyAtPrice, sellProperty, handleEstateAgentSale, handleAuctionSale, listPropertyForSale, cancelPropertyListing, updatePropertyListingPrice, setAutoAcceptThreshold, addOfferToListing, rejectPropertyOffer, counterOffer, reducePriceOnListing, acceptBuyerCounter, rejectBuyerCounter) into `src/stores/slices/portfolioActions.ts` behind a `createPortfolioActions(set, get)` factory. `gameStore.ts` is now 3,838 lines (down from 4,287). Behaviour and persisted shape unchanged. Suite 194/194 green.
-
-**Phase 3 remaining — DONE (orchestrator slice).** Extracted `processMarketUpdate` (~395 lines) and `processCounterResponses` (~30 lines) into `src/stores/slices/orchestratorActions.ts` behind `createOrchestratorActions(set, get)`. Covers renovation completion + reputation, listing offer generation, sale→conveyancing hand-off, void period expiry, damage-concern generation, loan-rate drift, and buyer-counter resolution. `gameStore.ts` is now **2,962 lines** (down from 4,778 at Phase 3 start; ~38% reduction). Suite 194/194 green.
-
-**Phase 3d — DONE (tenant slice).** Extracted `selectTenant`, `applyRentIncrease`, `evictTenant`, `cancelEviction`, `disputeDeposit`, `dismissDispute` into `src/stores/slices/tenantActions.ts` behind `createTenantActions(set, get)`. Suite 194/194 green.
-
-**Phase 3e — DONE (conveyancing slice, partial).** Extracted `withdrawFromConveyancing` (buy+sell abort flow with chain-collapse fee and inventory re-instatement) into `src/stores/slices/conveyancingActions.ts` behind `createConveyancingActions(set, get)`. The monthly conveyancing progression remains inside `processMarketUpdate` pending its own split. `gameStore.ts` is now ~3,388 lines (down from 4,778 at the start of Phase 3). Suite 194/194 green.
-
+Awaiting your approval before starting Phase 1.
