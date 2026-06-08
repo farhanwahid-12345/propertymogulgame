@@ -14,9 +14,9 @@ export const usePropertyLocks = () => useGameStore((s) => s.propertyLocks);
 export const usePropertyLocksByProperty = (propertyId: string) =>
   useGameStore((s) => (s.propertyLocks as PropertyLock[]).filter((l) => l.propertyId === propertyId));
 
-export const useIsPropertyLocked = (propertyId: string, lockType?: PropertyLock['type']) =>
+export const useIsPropertyLocked = (propertyId: string, reason?: PropertyLock['reason']) =>
   useGameStore((s) => (s.propertyLocks as PropertyLock[]).some(
-    (l) => l.propertyId === propertyId && (lockType ? l.type === lockType : true)
+    (l) => l.propertyId === propertyId && (reason ? l.reason === reason : true)
   ));
 
 // EPC selectors
