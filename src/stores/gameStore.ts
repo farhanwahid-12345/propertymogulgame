@@ -64,6 +64,7 @@ import { createPortfolioActions } from './slices/portfolioActions';
 import { createTenantActions } from './slices/tenantActions';
 import { createConveyancingActions } from './slices/conveyancingActions';
 import { createOrchestratorActions } from './slices/orchestratorActions';
+import { createMonthEndActions } from './slices/monthEndActions';
 
 // ─── Actions interface ───────────────────────────────────
 interface GameActions {
