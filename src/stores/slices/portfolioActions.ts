@@ -245,5 +245,109 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
     },
 
     // Sale conveyancing lifecycle moved to conveyancingActions.ts (Outstanding Improvements Phase 2).
+
+    // ─── Outstanding Improvements v4 Step 2: title-split + auction removal ───
+    removeAuctionProperty: (propertyId: string) => set((s: any) => ({
+      auctionProperties: s.auctionProperties.filter((p: any) => p.id !== propertyId),
+      estateAgentProperties: s.estateAgentProperties.filter((p: any) => p.id !== propertyId),
+    })),
+
+    splitFlatUnit: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => {
+      const prev = get();
+      const parent = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!parent) return;
+      if (parent.subtype !== 'flats') {
+        showToast("Cannot Split", "Only converted-flat properties can have units split off.", "destructive");
+        return;
+      }
+      const units = Math.max(1, parent.subtypeUnits ?? 1);
+      if (units <= 0) return;
+      const splitFee = SOLICITOR_FEES;
+      if (!debit(prev, splitFee)) {
+        showToast("Insufficient Funds", `Need £${fromPennies(splitFee).toLocaleString()} for solicitor fees to split the title.`, "destructive");
+        return;
+      }
+
+      const perUnitValue = Math.round(parent.value / units);
+      const splitUnitValue = Math.round(perUnitValue * 1.08);
+      const remainingValue = Math.max(0, parent.value - perUnitValue);
+
+      const slotTenant = prev.tenants.find((t: any) => t.propertyId === propertyId && t.slotIndex === slotIndex);
+      const slotRentPennies = slotTenant?.rentPennies ?? Math.round(parent.monthlyIncome / units);
+
+      const serviceChargePct = 0.02 + gameRandom() * 0.03;
+      const groundRentPennies = groundRentMode === 'peppercorn'
+        ? 1000
+        : Math.round(splitUnitValue * 0.005);
+
+      const newId = `split_${propertyId}_${slotIndex}_${Date.now()}`;
+      const newFlat: Property = {
+        ...parent,
+        id: newId,
+        name: `${parent.name} — Flat ${slotIndex + 1}`,
+        price: splitUnitValue,
+        value: splitUnitValue,
+        marketValue: splitUnitValue,
+        monthlyIncome: slotRentPennies,
+        subtype: 'standard',
+        subtypeUnits: undefined,
+        owned: true,
+        titleSplitOf: parent.id,
+        flatUnitId: slotIndex,
+        isLeasehold: true,
+        serviceChargePctAnnual: serviceChargePct,
+        groundRentPennies,
+        completedRenovationIds: [],
+        renovationCompletionMonths: {},
+        totalRenovationSpendPennies: 0,
+      };
+
+      const remainingUnits = units - 1;
+      const removingParent = remainingUnits <= 0;
+
+      const reindexedTenants = prev.tenants
+        .filter((t: any) => !(t.propertyId === propertyId && t.slotIndex === slotIndex))
+        .map((t: any) => {
+          if (t.propertyId !== propertyId) return t;
+          if (t.slotIndex > slotIndex) return { ...t, slotIndex: t.slotIndex - 1 };
+          return t;
+        });
+
+      let migratedTenant: PropertyTenant | null = null;
+      if (slotTenant) {
+        migratedTenant = {
+          ...slotTenant,
+          propertyId: newId,
+          slotIndex: 0,
+          rentPennies: slotRentPennies,
+        };
+      }
+
+      const updatedOwned: Property[] = [];
+      for (const p of prev.ownedProperties) {
+        if (p.id !== propertyId) { updatedOwned.push(p); continue; }
+        if (removingParent) continue;
+        updatedOwned.push({
+          ...p,
+          value: remainingValue,
+          marketValue: remainingValue,
+          subtypeUnits: remainingUnits,
+          monthlyIncome: Math.max(0, p.monthlyIncome - slotRentPennies),
+        });
+      }
+      updatedOwned.push(newFlat);
+
+      set({
+        ownedProperties: updatedOwned,
+        tenants: migratedTenant
+          ? [...reindexedTenants, migratedTenant]
+          : reindexedTenants,
+      });
+
+      showToast(
+        "Title Split Complete",
+        `Flat ${slotIndex + 1} is now its own leasehold property. Service charge ${(serviceChargePct * 100).toFixed(1)}%/yr; ground rent £${fromPennies(groundRentPennies).toLocaleString()}/yr.`,
+      );
+    },
   };
 }
