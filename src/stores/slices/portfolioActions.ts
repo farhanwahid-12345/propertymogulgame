@@ -5,7 +5,7 @@
  * store literal stays a thin composer. Behaviour and persisted shape are
  * unchanged. Cross-slice reads via `get()` only.
  */
-import type { Conveyancing, PropertyListing } from '@/types/game';
+import type { Conveyancing, Property, PropertyListing, PropertyTenant } from '@/types/game';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { SOLICITOR_FEES, MORTGAGE_PROVIDERS } from '@/lib/engine/constants';
 import {
