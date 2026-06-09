@@ -13,7 +13,7 @@ import { getInitialProviderRates } from '@/lib/engine/financials';
 import { gameRandom, seedRng } from '@/lib/rng';
 import { runMigrations, CURRENT_VERSION, type Migration } from '@/lib/migrations';
 import {
-  asNumber,
+  asNumber, asString,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
   sanitizeTenantConcern, sanitizePropertyListing,
 } from './sanitizers';
