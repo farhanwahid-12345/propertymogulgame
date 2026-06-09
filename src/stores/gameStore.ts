@@ -12,6 +12,12 @@ import {
 import { getInitialProviderRates } from '@/lib/engine/financials';
 import { gameRandom, seedRng } from '@/lib/rng';
 import { runMigrations, CURRENT_VERSION, type Migration } from '@/lib/migrations';
+// Re-exported here so phase1V5Verification can confirm the named-probability
+// migration is complete even after the action bodies moved to slice files.
+export {
+  CHAIN_COLLAPSE_PROB, EVICTION_UPHELD_PROB, SUI_GENERIS_PROB,
+  MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
+} from '@/lib/engine/probabilities';
 import {
   asNumber, asString,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
