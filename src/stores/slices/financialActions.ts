@@ -438,5 +438,64 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
     handleApplyOverdraft: (requestedLimit: number) => set({ overdraftLimit: requestedLimit }),
     setCash: (newCash: number) => set({ cash: newCash }),
     setOverdraftUsed: (used: number) => set({ overdraftUsed: used }),
+
+    // ─── Outstanding Improvements v4 Step 3: entity + damage actions ───
+    setEntityType: (type: 'sole_trader' | 'ltd') => {
+      const prev = get();
+      if (prev.entityType === 'ltd') {
+        showToast("Already Incorporated", "Cannot revert from LTD.", "destructive");
+        return;
+      }
+      if (type === 'ltd') {
+        const incorporationFee = toPennies(1000);
+        const debited = debit(prev, incorporationFee);
+        if (!debited) {
+          showToast("Insufficient Funds", "Need £1,000 (even with overdraft) to incorporate.", "destructive");
+          return;
+        }
+        set({ entityType: type, entityChosen: true, cash: debited.cash, overdraftUsed: debited.overdraftUsed });
+        showToast("Incorporated! 🏢", `You are now trading as a Limited Company. Mortgage interest is fully tax-deductible.${debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft.)` : ''}`);
+      } else {
+        set({ entityType: type, entityChosen: true });
+      }
+    },
+
+    payDamageWithCash: (damageId: string, actualCost?: number) => {
+      const prev = get();
+      const damage = prev.pendingDamages.find((d: any) => d.id === damageId);
+      if (!damage) return;
+      const cost = actualCost ?? damage.repairCost;
+      const currentYear = Math.floor(prev.monthsPlayed / 12);
+      const existing = prev.annualRepairCosts.find((a: any) => a.propertyId === damage.propertyId && a.year === currentYear);
+      const updatedAnnual = existing
+        ? prev.annualRepairCosts.map((a: any) => a.propertyId === damage.propertyId && a.year === currentYear ? { ...a, totalCost: a.totalCost + cost } : a)
+        : [...prev.annualRepairCosts, { propertyId: damage.propertyId, year: currentYear, totalCost: cost }];
+      const dmgHist = prev.damageHistory.find((dh: any) => dh.propertyId === damage.propertyId);
+      const updatedHistory = dmgHist
+        ? prev.damageHistory.map((dh: any) => dh.propertyId === damage.propertyId ? { ...dh, lastDamageMonth: prev.monthsPlayed } : dh)
+        : [...prev.damageHistory, { propertyId: damage.propertyId, lastDamageMonth: prev.monthsPlayed }];
+      showToast("Repairs Paid", `Paid £${fromPennies(cost).toLocaleString()} to repair ${damage.propertyName}`);
+      set({ cash: prev.cash - cost, pendingDamages: prev.pendingDamages.filter((d: any) => d.id !== damageId), annualRepairCosts: updatedAnnual, damageHistory: updatedHistory });
+    },
+
+    payDamageWithLoan: (damageId: string, actualCost?: number) => {
+      const prev = get();
+      const damage = prev.pendingDamages.find((d: any) => d.id === damageId);
+      if (!damage) return;
+      const cost = actualCost ?? damage.repairCost;
+      const currentYear = Math.floor(prev.monthsPlayed / 12);
+      const existing = prev.annualRepairCosts.find((a: any) => a.propertyId === damage.propertyId && a.year === currentYear);
+      const updatedAnnual = existing
+        ? prev.annualRepairCosts.map((a: any) => a.propertyId === damage.propertyId && a.year === currentYear ? { ...a, totalCost: a.totalCost + cost } : a)
+        : [...prev.annualRepairCosts, { propertyId: damage.propertyId, year: currentYear, totalCost: cost }];
+      const dmgHist = prev.damageHistory.find((dh: any) => dh.propertyId === damage.propertyId);
+      const updatedHistory = dmgHist
+        ? prev.damageHistory.map((dh: any) => dh.propertyId === damage.propertyId ? { ...dh, lastDamageMonth: prev.monthsPlayed } : dh)
+        : [...prev.damageHistory, { propertyId: damage.propertyId, lastDamageMonth: prev.monthsPlayed }];
+      showToast("Bank Loan Taken", `Borrowed £${fromPennies(cost).toLocaleString()} for ${damage.propertyName}`, "destructive");
+      set({ cash: prev.cash + cost, pendingDamages: prev.pendingDamages.filter((d: any) => d.id !== damageId), annualRepairCosts: updatedAnnual, creditScore: Math.max(300, prev.creditScore - 10), damageHistory: updatedHistory });
+    },
+
+    dismissDamage: (damageId: string) => set((s: any) => ({ pendingDamages: s.pendingDamages.filter((d: any) => d.id !== damageId) })),
   };
 }
