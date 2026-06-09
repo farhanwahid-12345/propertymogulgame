@@ -162,7 +162,7 @@ interface GameActions {
 }
 
 // ─── Initial state ────────────────────────────────────────
-function createInitialState(): GameState {
+export function createInitialState(): GameState {
   // v4 #11 — jitter marketValue ±15% so asking ≠ true market on the static catalogue too.
   const withMarketJitter = AVAILABLE_PROPERTIES.map(p => ({
     ...p,
