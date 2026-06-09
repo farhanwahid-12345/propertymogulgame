@@ -1,61 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type {
-  GameState, Property, Mortgage, PropertyTenant, VoidPeriod,
-  PropertyListing, PropertyOffer, Renovation,
-  PropertyDamage, MacroEconomicEvent, Conveyancing, TaxRecord, TenantEvent,
-  EntityType, PropertyCondition, EvictionGround, PendingEviction, PropertyLock,
-  DepositDispute, PlanningApplication,
-} from '@/types/game';
+import type { GameState, Property, EntityType, EvictionGround, PropertyCondition, PropertyOffer } from '@/types/game';
 import type { Tenant } from '@/components/game/tenant-selector';
-import { RENOVATION_OPTIONS, type RenovationType } from '@/components/game/renovation-dialog';
-import { toPennies, fromPennies } from '@/lib/formatCurrency';
+import { type RenovationType } from '@/components/game/renovation-dialog';
+import { toPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
-import { playGavel, playLevelUp, playPaper, playConcernChime, playWarning } from '@/lib/sound';
 import {
-  INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE, COUNCIL_TAX_BAND_D,
-  CORPORATION_TAX_RATE, SOLICITOR_FEES, ESTATE_AGENT_RATE, AUCTION_SELLER_FEE,
-  MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS,
-  ERC_PERCENT, ERC_WINDOW_MONTHS, LOAN_PRODUCTS, EICR_COST_PENNIES, computeErcRate,
-  conditionTierFromScore, scoreFromConditionTier,
-  TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
-  CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH,
-  CONCERN_RESOLVE_CONDITION_LIFT,
-  getCeilingPrice,
+  INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE,
+  AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS, LOAN_PRODUCTS,
 } from '@/lib/engine/constants';
-import {
-  calculateStampDuty, calculateDTI, fluctuateProviderRates, getInitialProviderRates,
-  getPropertyValueRangeForLevel, getMaxPropertiesForLevel, getAvailablePropertyTypes,
-  getMaxPropertyValue, getRequiredNetWorth, getFurnitureValuePennies, getFurnishingCostPerSqft,
-} from '@/lib/engine/financials';
-import { generateRandomProperty, generateMarketProperty, deriveSqft } from '@/lib/engine/market';
-import { getUnlockedCities } from '@/lib/engine/cities';
-import {
-  calculateMortgageEligibility, getMaxLTVForCreditScore, calculateMonthlyPayment as calcPayment,
-} from '@/lib/mortgageEligibility';
-import {
-  calculateIncomeTax, calculateCorporationTax, calculateCGT,
-  getConditionRentMultiplier, getDepreciationMonths, getConditionUpgradeCost,
-  getConditionValueUplift, projectAnnualTax,
-} from '@/lib/engine/taxation';
-import { calcTenantRent, getFurnishingRentMultiplier, getConditionRentMultiplierShared } from '@/lib/tenantRent';
-import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, scaleRenovationForProperty, applyCeilingDiminishingReturns, canUpgradeToPremium, isConditionUpgradeRenovation, isFullyUpgraded, isDeductibleRevenueRenovation } from '@/lib/engine/renovation';
-import { getEffectiveProviderRate } from '@/lib/mortgageEligibility';
-import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
-import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
+import { getInitialProviderRates } from '@/lib/engine/financials';
 import { gameRandom, seedRng } from '@/lib/rng';
 import { runMigrations, CURRENT_VERSION, type Migration } from '@/lib/migrations';
 import {
-  CHAIN_COLLAPSE_PROB, SUI_GENERIS_PROB, EVICTION_UPHELD_PROB,
-  MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
-} from '@/lib/engine/probabilities';
-
-// ─── Helpers ──────────────────────────────────────────────
-import { showToast, debit, debitStrict, credit, calcDeposit } from './storeHelpers';
-import {
-  asNumber, asString,
+  asNumber,
   sanitizeProperty, sanitizeTenantRecord, sanitizeRenovation,
-  sanitizeTenantConcern, mergeConcernsById, sanitizeOffer, sanitizePropertyListing,
+  sanitizeTenantConcern, sanitizePropertyListing,
 } from './sanitizers';
 import { createRenovationActions } from './slices/renovationActions';
 import { createMarketActions } from './slices/marketActions';
