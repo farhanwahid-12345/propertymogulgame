@@ -12,6 +12,13 @@ import { fromPennies } from '@/lib/formatCurrency';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { gameRandom } from '@/lib/rng';
 import { showToast, debit, calcDeposit } from '../storeHelpers';
+import {
+  CONCERN_RESOLVE_CONDITION_LIFT,
+  CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT,
+  MAX_TOPUP_POINTS_PER_MONTH,
+  conditionTierFromScore,
+  scoreFromConditionTier,
+} from '@/lib/engine/constants';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
