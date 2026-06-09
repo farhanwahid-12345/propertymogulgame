@@ -1,73 +1,104 @@
-# Execution Plan — Complete the Monolithic Store Split
+# Final Store Refactor — gameStore.ts < 300 lines
 
-The attached doc lists **one outstanding item**: finish the `gameStore.ts` split. It breaks down into three sequenced steps. Each phase ends with a green test suite (currently 194/194) before the next begins. Persisted save shape stays unchanged throughout.
+The doc identifies **24 inline actions (~660 lines)** still living in `gameStore.ts` that need to move into slice files. After this work, `gameStore.ts` is just state shape + persist config + slice composition.
 
----
-
-## Phase 1 — Extract `processMonthEnd` into `monthEndActions.ts` (highest priority)
-
-`processMonthEnd` is ~2,056 lines and 69% of `gameStore.ts`. This is the single biggest win.
-
-**Steps**
-1. Create `src/stores/slices/monthEndActions.ts` exporting `createMonthEndActions(set, get)`, mirroring the existing slice pattern (`renovationActions.ts`, `orchestratorActions.ts`).
-2. Move the `processMonthEnd` body **verbatim** — no logic, variable, or shape changes. Pure relocation.
-3. Convert any direct `this`/closure references into `get()` reads and `set(...)` writes, matching how `orchestratorActions.ts` does it.
-4. In `gameStore.ts`, import and spread: `...createMonthEndActions(set as any, get as any)`.
-5. Run full suite; manual smoke in preview (buy → let → tick a month → evict).
-
-**Exit criteria**: 194/194 green, `gameStore.ts` drops by ~2,000 lines.
+Each step ends with a green test suite (194/194) and a manual smoke before the next begins. No logic changes — pure relocation. Persisted save shape unchanged.
 
 ---
 
-## Phase 2 — Complete `conveyancingActions.ts`
+## Step 1 — Extend `tenantActions.ts` (6 actions, ~262 lines)
 
-Currently only `withdrawFromConveyancing` (55 lines) lives there. The full sale/listing lifecycle is still inline.
+Move verbatim into existing `createTenantActions` factory:
 
-**Sub-phase 2a — Sale completion handlers**
-- Migrate `handleEstateAgentSale`, `handleAuctionSale` (these touch conveyancing hand-off and cashflow on completion).
+- `sendArrearsToCourt` (69) — court proceedings, CourtCase record, fee debit
+- `issueLetterBeforeAction` (28) — pre-court letter, sets `letterSent` flag
+- `escalateToHighCourt` (39) — upgrade county → high court, fee
+- `resolveTenantConcern` (62) — resolve concern, satisfaction delta, repair cost
+- `dismissTenantConcern` (6) — dismiss + small reputation hit
+- `topUpCondition` (62) — spend cash to restore property condition
 
-**Sub-phase 2b — Listing lifecycle**
-- Migrate `listPropertyForSale`, `cancelPropertyListing`, `updatePropertyListingPrice`, `reducePriceOnListing`.
+These already read tenant/property state via `get()`. No interface changes — already declared in `GameStore` type.
 
-**Sub-phase 2c — Offer & counter flow**
-- Migrate `addOfferToListing`, `rejectPropertyOffer`, `counterOffer`, `acceptBuyerCounter`, `rejectBuyerCounter`.
-
-> Note: these currently live in `portfolioActions.ts` per the prior phase 3c. The doc explicitly asks them to be regrouped into `conveyancingActions.ts` since they drive the sale conveyancing flow. Confirm with a quick smoke (list → receive offer → counter → accept → conveyancing → completion) after each sub-phase.
-
-**Exit criteria after 2c**: `gameStore.ts` contains only — initial state object, persist config, slice imports + spreads, `clockTick` (calling `processMonthEnd` + `processMarketUpdate`), and `resetGame`. Suite still 194/194.
+**Exit:** tests green, smoke: arrears → letter → court → high court; resolve and dismiss a concern; top up a dilapidated property.
 
 ---
 
-## Phase 3 — Populate the four state-shape slice files
+## Step 2 — Extend `portfolioActions.ts` (2 actions, ~111 lines)
 
-Lower priority; finishes the intended architecture. Each file gains selectors + any state-initialisation helpers for its domain.
+- `splitFlatUnit` (103) — title-split a multi-unit slot; service charge, ground rent, value update, remove original when all units split
+- `removeAuctionProperty` (8) — drop a lot from auction stock
 
-**3a — `portfolioSlice.ts`**: selectors for `ownedProperties`, property lock helpers, EPC band selectors.
-
-**3b — `tenantSlice.ts`**: selectors for `tenants`, arrears helpers, satisfaction selectors.
-
-**3c — `marketSlice.ts`**: selectors for `estateAgentProperties` and `auctionProperties`, plus market-trend selectors.
-
-**3d — `bankingSlice.ts`**: selectors for `cash`, `overdraft`, `creditScore`, `mortgages`, `loans` (extend the existing thin file).
-
-For each: add the selectors, refactor a couple of consuming components to use them (sanity-check ergonomics), keep the rest as a follow-up. Tests stay green.
+**Exit:** tests green, smoke: split a flat unit; trigger an auction removal path.
 
 ---
 
-## Target end state
+## Step 3 — Extend `financialActions.ts` (4 actions, ~60 lines)
 
-- `gameStore.ts` < 300 lines: state shape + persist config + slice composition + `clockTick` + `resetGame`.
-- All domain logic owned by slice files.
-- Persisted save shape unchanged (no migration bump).
-- 194/194 tests green at every phase boundary.
+- `setEntityType` (21) — sole trader vs LTD, incorporation fee
+- `payDamageWithCash` (18) — settle pending damage from cash
+- `payDamageWithLoan` (18) — create loan to cover damage, wire repayment
+- `dismissDamage` (3) — drop a damage entry
+
+**Exit:** tests green, smoke: pick entity, then pay one damage with cash and one with a loan.
+
+---
+
+## Step 4 — Create `gameControlActions.ts` (12 actions, ~125 lines)
+
+New file following the existing factory pattern:
+
+```ts
+import type { SetFn, GetFn } from '../gameStore';
+export function createGameControlActions(set: SetFn, get: GetFn) {
+  return { /* ... */ };
+}
+```
+
+Move:
+
+- `clockTick` (1)
+- `resetGame` (9) — clears persisted storage
+- `setGameSpeed` (5) — 0.5×/1×/2×/4×
+- `togglePause` (4)
+- `setPaused` (4) — used by modal-queue auto-pause
+- `approvePendingTransaction` (24) — fires side effects, unpause if queue empty
+- `approveAllPendingTransactions` (37) — drain queue, unpause on complete
+- `dismissChainCollapseEvent` (10)
+- `dismissAllChainCollapseEvents` (10)
+- `dismissPayoffEvent` (5)
+- `dismissAllPayoffEvents` (8)
+- `markEconomicEventsSeen` (8)
+
+Wire into `gameStore.ts`:
+```ts
+import { createGameControlActions } from './slices/gameControlActions';
+// inside create():
+...createGameControlActions(set as any, get as any),
+```
+
+**Exit:** tests green, smoke: pause/resume, change speed, approve a pending tx, dismiss a chain collapse + payoff event, tick a month.
+
+---
+
+## Target end state for `gameStore.ts`
+
+Contains only:
+
+- `GameState` / `GameStore` interfaces
+- `initialState` object
+- `sanitizeAndMerge` helper + persist migration config
+- ~8 slice imports
+- ~8 slice spreads inside `create()`
+
+**Target: < 300 lines.** No new persisted keys. No migration bump. 194/194 green at every step boundary.
 
 ---
 
 ## Technical notes
 
-- Follow the existing factory signature: `export function createXxxActions(set: SetFn, get: GetFn) { return { ... } }`.
-- Cross-slice reads via `get()` only — no direct slice-to-slice imports.
-- No new third-party deps. No new persisted keys.
-- Stopping point after each sub-phase (1, 2a, 2b, 2c, 3a, 3b, 3c, 3d).
+- Follow existing factory signature: `createXxxActions(set, get)`.
+- Cross-slice reads via `get()` only — no slice-to-slice imports.
+- Move bodies verbatim; convert any `this`/closure references to `get()`/`set()`.
+- Stopping points after each step (1, 2, 3, 4) for review.
 
-Awaiting your approval before starting Phase 1.
+Awaiting your approval before starting Step 1.
