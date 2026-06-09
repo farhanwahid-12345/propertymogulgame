@@ -409,5 +409,252 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         set({ depositDisputes: prev.depositDisputes.filter((d: any) => d.id !== disputeId) });
       }
     },
+
+    // ─── Outstanding Improvements v4 Step 1: migrated from gameStore.ts ───
+
+    resolveTenantConcern: (concernId: string) => {
+      const prev = get();
+      const concerns = prev.tenantConcerns || [];
+      const concern = concerns.find((c: any) => c.id === concernId && !c.resolvedMonth);
+      if (!concern) return;
+      const debited = debit(prev, concern.resolveCost);
+      if (!debited) {
+        showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} (even with overdraft) to resolve.`, "destructive");
+        return;
+      }
+      const updatedTenants = prev.tenants.map((t: any) =>
+        t.propertyId === concern.propertyId
+          ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
+          : t
+      );
+      const lift = CONCERN_RESOLVE_CONDITION_LIFT[concern.category] ?? 3;
+      const updatedOwned = prev.ownedProperties.map((p: any) => {
+        if (p.id !== concern.propertyId) return p;
+        const score = Math.max(0, Math.min(100, (p.conditionScore ?? scoreFromConditionTier(p.condition)) + lift));
+        return { ...p, conditionScore: score, condition: conditionTierFromScore(score) };
+      });
+
+      let updatedAnnual = prev.annualRepairCosts;
+      let updatedHistory = prev.damageHistory;
+      if (concern.source === 'damage') {
+        const currentYear = Math.floor(prev.monthsPlayed / 12);
+        const existing = prev.annualRepairCosts.find((a: any) => a.propertyId === concern.propertyId && a.year === currentYear);
+        updatedAnnual = existing
+          ? prev.annualRepairCosts.map((a: any) =>
+              a.propertyId === concern.propertyId && a.year === currentYear
+                ? { ...a, totalCost: a.totalCost + concern.resolveCost }
+                : a
+            )
+          : [...prev.annualRepairCosts, { propertyId: concern.propertyId, year: currentYear, totalCost: concern.resolveCost }];
+        const dmgHist = prev.damageHistory.find((dh: any) => dh.propertyId === concern.propertyId);
+        updatedHistory = dmgHist
+          ? prev.damageHistory.map((dh: any) =>
+              dh.propertyId === concern.propertyId
+                ? { ...dh, lastDamageMonth: prev.monthsPlayed }
+                : dh
+            )
+          : [...prev.damageHistory, { propertyId: concern.propertyId, lastDamageMonth: prev.monthsPlayed }];
+        showToast("🔧 Damage Repaired", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} on repairs.`);
+      } else {
+        showToast("Concern Resolved ✅", `Spent £${fromPennies(concern.resolveCost).toLocaleString()} — tenant happier.`);
+      }
+
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        tenants: updatedTenants,
+        ownedProperties: updatedOwned,
+        annualRepairCosts: updatedAnnual,
+        damageHistory: updatedHistory,
+        tenantConcerns: concerns.map((c: any) =>
+          c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
+        ),
+      });
+    },
+
+    topUpCondition: (propertyId: string, pointsRequested: number) => {
+      const prev = get();
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!property) return;
+      const currentScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
+      const headroomToCap = Math.max(0, 100 - currentScore);
+      const monthlyUsed = (property.conditionLastTopUpMonth === prev.monthsPlayed)
+        ? (property.conditionTopUpPointsThisMonth ?? 0) : 0;
+      const monthlyHeadroom = Math.max(0, MAX_TOPUP_POINTS_PER_MONTH - monthlyUsed);
+      const pts = Math.max(0, Math.min(pointsRequested, headroomToCap, monthlyHeadroom));
+      if (pts <= 0) {
+        showToast("Nothing to do", "Already at the cap (100) or this month's spend limit reached.");
+        return;
+      }
+      const sqft = Math.max(400, property.internalSqft ?? 900);
+      const cost = Math.max(1, Math.round(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * sqft * pts / 100));
+      const debited = debit(prev, cost);
+      if (!debited) {
+        showToast("Insufficient Funds", `Need £${fromPennies(cost).toLocaleString()} (even with overdraft) for ${pts} points of repairs.`, "destructive");
+        return;
+      }
+      const newScore = Math.min(100, currentScore + pts);
+      const newMonthlyUsed = monthlyUsed + pts;
+      const updated = prev.ownedProperties.map((p: any) =>
+        p.id !== propertyId ? p : ({
+          ...p,
+          conditionScore: newScore,
+          condition: conditionTierFromScore(newScore),
+          conditionLastTopUpMonth: prev.monthsPlayed,
+          conditionTopUpPointsThisMonth: newMonthlyUsed,
+        })
+      );
+
+      let absorbedConcerns = 0;
+      let updatedConcerns = prev.tenantConcerns;
+      if (newScore >= 80 && currentScore < 80) {
+        updatedConcerns = (prev.tenantConcerns || []).map((c: any) => {
+          if (
+            c && !c.resolvedMonth && c.propertyId === propertyId &&
+            c.source !== 'damage' &&
+            (c.category === 'maintenance' || c.category === 'mould')
+          ) {
+            absorbedConcerns += 1;
+            return { ...c, resolvedMonth: prev.monthsPlayed };
+          }
+          return c;
+        });
+      }
+
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        ownedProperties: updated,
+        tenantConcerns: updatedConcerns,
+      });
+      const absorbedSuffix = absorbedConcerns > 0
+        ? ` Cleared ${absorbedConcerns} lingering concern${absorbedConcerns > 1 ? 's' : ''}.`
+        : '';
+      showToast("🛠 Repairs", `${property.name}: +${pts} condition (£${fromPennies(cost).toLocaleString()}).${absorbedSuffix}`);
+    },
+
+    dismissTenantConcern: (_concernId: string) => {
+      showToast("Concern Snoozed", "It'll keep nagging until resolved.");
+    },
+
+    sendArrearsToCourt: (propertyId: string, slotIndex: number = 0) => {
+      const s = get();
+      const tenant = s.tenants.find((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+      const prop = s.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!tenant || !prop) {
+        showToast("Cannot file claim", "Tenant or property not found.", "destructive");
+        return;
+      }
+      const arrearsMonths = tenant.arrearsMonths ?? 0;
+      const arrearsPennies = tenant.arrearsPennies ?? 0;
+      if (arrearsMonths < 2 || arrearsPennies <= 0) {
+        showToast("Not eligible", "Tenant needs at least 2 months of arrears to file in court.", "destructive");
+        return;
+      }
+      const existing = (s.debtRecoveryCases || []).find((c: any) => c.propertyId === propertyId && c.tenantName === tenant.tenant.name && c.status === 'in_court');
+      if (existing) {
+        showToast("Already filed", "A court case is already in progress for this tenant.", "destructive");
+        return;
+      }
+      const FILING_FEE = 32500;
+      const debited = debit(s, FILING_FEE);
+      if (!debited) {
+        showToast("Insufficient funds", "You need £325 (incl. overdraft) to file the claim.", "destructive");
+        return;
+      }
+      const lbaBonus = (tenant.letterBeforeActionMonth !== undefined
+        && s.monthsPlayed - tenant.letterBeforeActionMonth <= 6) ? 0.12 : 0;
+      const roll = gameRandom();
+      const recoveredCutoff = 0.55 + lbaBonus;
+      const partialCutoff = 0.85 + (lbaBonus * 0.5);
+      const status: 'recovered' | 'partial' | 'unrecoverable' =
+        roll < recoveredCutoff ? 'recovered' : roll < partialCutoff ? 'partial' : 'unrecoverable';
+      const resolveMonth = s.monthsPlayed + 6 + Math.floor(gameRandom() * 7);
+      const newCase: any = {
+        id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${gameRandom().toString(36).slice(2, 6)}`,
+        propertyId,
+        propertyName: prop.name,
+        tenantName: tenant.tenant.name,
+        originalArrearsPennies: arrearsPennies,
+        filedMonth: s.monthsPlayed,
+        resolveMonth,
+        status: 'in_court' as const,
+        recoveryFeePct: 0.25,
+      };
+      newCase._predeterminedStatus = status;
+
+      const newTenants = s.tenants.map((t: any) =>
+        t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+          ? { ...t, arrearsMonths: 0, arrearsPennies: 0 }
+          : t,
+      );
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        tenants: newTenants,
+        debtRecoveryCases: [...(s.debtRecoveryCases || []), newCase],
+        opsFlashAt: Date.now(),
+      });
+      showToast("⚖️ Claim filed", `£325 filing fee paid. Expect a decision in 6–12 months for ${tenant.tenant.name} (£${fromPennies(arrearsPennies).toLocaleString()} owed).`);
+    },
+
+    issueLetterBeforeAction: (propertyId: string, slotIndex: number = 0) => {
+      const s = get();
+      const tenant = s.tenants.find((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+      if (!tenant) { showToast("Cannot send letter", "Tenant not found.", "destructive"); return; }
+      if ((tenant.arrearsMonths ?? 0) < 1) {
+        showToast("Not needed", "Tenant has no arrears.", "destructive"); return;
+      }
+      if (tenant.letterBeforeActionMonth !== undefined) {
+        showToast("Already sent", "A Letter Before Action has already been issued.", "destructive"); return;
+      }
+      const FEE = 5000;
+      const debited = debit(s, FEE);
+      if (!debited) { showToast("Insufficient funds", "Need £50 (incl. overdraft) to issue the letter.", "destructive"); return; }
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        tenants: s.tenants.map((t: any) =>
+          t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
+            ? { ...t, letterBeforeActionMonth: s.monthsPlayed }
+            : t,
+        ),
+      });
+      showToast("📨 Letter Before Action sent", `Formal demand issued to ${tenant.tenant.name}. CCJ filings within 6 months get a recovery boost.`);
+    },
+
+    escalateToHighCourt: (caseId: string) => {
+      const s = get();
+      const cases = s.debtRecoveryCases || [];
+      const idx = cases.findIndex((c: any) => c.id === caseId);
+      if (idx < 0) { showToast("Case not found", "Cannot escalate.", "destructive"); return; }
+      const c = cases[idx];
+      if (c.status !== 'partial' && c.status !== 'unrecoverable') {
+        showToast("Not eligible", "Only partial / unrecoverable CCJs can be escalated to HCE.", "destructive"); return;
+      }
+      if (c.escalatedToHighCourtMonth !== undefined) {
+        showToast("Already escalated", "This case is already with the High Court.", "destructive"); return;
+      }
+      const fee = 7100 + Math.round(c.originalArrearsPennies * 0.075);
+      const debited = debit(s, fee);
+      if (!debited) { showToast("Insufficient funds", `Need £${fromPennies(fee).toLocaleString()} (incl. overdraft).`, "destructive"); return; }
+      const residual = Math.max(0, c.originalArrearsPennies - (c.netRecoveredPennies ?? 0));
+      const willRecover = gameRandom() < 0.4;
+      const hceExpected = willRecover ? Math.round(residual * (0.7 + gameRandom() * 0.2)) : 0;
+      const updated = [...cases];
+      updated[idx] = {
+        ...c,
+        escalatedToHighCourtMonth: s.monthsPlayed,
+        hceExpectedRecoveryPennies: hceExpected,
+        hceResolveMonth: s.monthsPlayed + 3,
+        hceResolved: false,
+      };
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        debtRecoveryCases: updated,
+      });
+      showToast("⚖️ Escalated to High Court", `£${fromPennies(fee).toLocaleString()} HCE fee paid. Decision in 3 months.`);
+    },
   };
 }
