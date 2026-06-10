@@ -418,6 +418,31 @@ export const PropertyCard = memo(function PropertyCard({
                 ⚖️ Send to court
               </Button>
             )}
+            {property.isManaged && (
+              <Badge variant="outline" className="text-[10px] border-sky-400/40 text-sky-300 bg-sky-500/10" title={`Managed by ${property.agentTier ?? 'standard'} agent (${Math.round((property.agentFeePct ?? 0.10) * 100)}% fee)`}>
+                🧑‍💼 Managed
+              </Badge>
+            )}
+            {property.hasRentGuarantee && (
+              <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10" title="Rent Guarantee Insurance active (3% of rent)">
+                🛡️ RGI
+              </Badge>
+            )}
+            {property.subtype === 'hmo' && property.hmoLicenceStatus && property.hmoLicenceStatus !== 'none' && (
+              <Badge variant="outline" className={cn(
+                "text-[10px]",
+                property.hmoLicenceStatus === 'licensed' ? "border-green-400/40 text-green-300" :
+                property.hmoLicenceStatus === 'applied' ? "border-amber-400/40 text-amber-300" :
+                "border-red-400/40 text-red-300",
+              )} title={`HMO Licence: ${property.hmoLicenceStatus}${property.hmoLicenceExpiresMonth ? ` — expires Mo ${property.hmoLicenceExpiresMonth}` : ''}`}>
+                📄 {property.hmoLicenceStatus}
+              </Badge>
+            )}
+            {property.subtype === 'hmo' && (!property.hmoLicenceStatus || property.hmoLicenceStatus === 'none' || property.hmoLicenceStatus === 'expired') && applyForHmoLicence && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10" onClick={() => applyForHmoLicence(property.id)}>
+                Apply HMO licence
+              </Button>
+            )}
           </div>
         )}
       </CardHeader>
