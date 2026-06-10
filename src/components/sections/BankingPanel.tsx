@@ -19,6 +19,9 @@ const LoansPanel = lazy(() =>
 const TaxBreakdown = lazy(() =>
   import("@/components/game/tax-breakdown").then((m) => ({ default: m.TaxBreakdown })),
 );
+const PerformanceChart = lazy(() =>
+  import("@/components/game/performance-chart").then((m) => ({ default: m.PerformanceChart })),
+);
 
 type GameState = ReturnType<typeof useGameState>;
 
