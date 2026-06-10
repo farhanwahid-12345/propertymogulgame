@@ -19,6 +19,9 @@ const LoansPanel = lazy(() =>
 const TaxBreakdown = lazy(() =>
   import("@/components/game/tax-breakdown").then((m) => ({ default: m.TaxBreakdown })),
 );
+const PerformanceChart = lazy(() =>
+  import("@/components/game/performance-chart").then((m) => ({ default: m.PerformanceChart })),
+);
 
 type GameState = ReturnType<typeof useGameState>;
 
@@ -220,6 +223,19 @@ export function TaxInlineButton({ gameState }: { gameState: GameState }) {
         lossesAppliedThisYearPennies={(gameState as any).lossesAppliedThisYear || 0}
         lossesGeneratedThisYearPennies={(gameState as any).lossesGeneratedThisYear || 0}
       />
+    </InlineDialogButton>
+  );
+}
+
+export function PerformanceInlineButton() {
+  return (
+    <InlineDialogButton
+      id="section-performance"
+      label="📈 Performance"
+      summary="Portfolio chart"
+      title="Portfolio Performance"
+    >
+      <PerformanceChart />
     </InlineDialogButton>
   );
 }

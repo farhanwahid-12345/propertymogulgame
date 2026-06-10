@@ -19,7 +19,7 @@ import { EpcTutorialDialog } from "@/components/game/epc-tutorial-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
-import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInlineButton } from "@/components/sections/BankingPanel";
+import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInlineButton, PerformanceInlineButton } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
@@ -183,6 +183,7 @@ const Index = () => {
                     />
                     <LoansInlineButton gameState={gameState} />
                     <TaxInlineButton gameState={gameState} />
+                    <PerformanceInlineButton />
                   </>
                 )}
                 <OperationsInlineButton gameState={gameState} />

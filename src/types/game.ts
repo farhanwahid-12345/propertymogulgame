@@ -123,6 +123,35 @@ export interface Property {
   serviceChargePctAnnual?: number;
   /** Phase 4 #2 — fixed annual ground rent (pennies). Peppercorn = 1000 (£10). */
   groundRentPennies?: number;
+  // ─── Phase 2 (v5) — Letting Agent ─────────────────────────
+  /** True when a letting agent manages this property. Auto-resolves concerns; deducts fee from rent. */
+  isManaged?: boolean;
+  /** Agent service tier. Premium = higher fee, faster concern resolution. */
+  agentTier?: 'standard' | 'premium';
+  /** Decimal fee on collected rent (e.g. 0.10 = 10%). */
+  agentFeePct?: number;
+  // ─── Phase 2 (v5) — Rent Guarantee Insurance ──────────────
+  /** True when an RGI policy is active. 3% premium; pays out on arrears / void. */
+  hasRentGuarantee?: boolean;
+  /** monthsPlayed snapshot when policy was taken out (30-day waiting period). */
+  rentGuaranteeStartMonth?: number;
+  // ─── Phase 2 (v5) — HMO Licensing ─────────────────────────
+  /** HMO licence status. Only meaningful when subtype === 'hmo'. */
+  hmoLicenceStatus?: 'none' | 'applied' | 'licensed' | 'expired';
+  /** monthsPlayed snapshot when licence application was filed. */
+  hmoLicenceAppliedMonth?: number;
+  /** monthsPlayed when licence expires (typically applied + 60). */
+  hmoLicenceExpiresMonth?: number;
+}
+
+/** Phase 2 (v5) — monthly portfolio performance snapshot for the Bank chart. */
+export interface PortfolioSnapshot {
+  month: number;
+  netWorth: number;          // pennies
+  cashflow: number;          // pennies (net of month)
+  rentalIncome: number;      // pennies
+  mortgagePayments: number;  // pennies
+  propertyCount: number;
 }
 
 
@@ -521,6 +550,8 @@ export interface GameState {
   goalAchievedAt?: number;
   /** Phase 3 #6 — has the MEES/EPC contextual tutorial been shown yet? */
   seenEpcTutorial?: boolean;
+  /** Phase 2 (v5) — rolling monthly snapshots for the Bank performance chart. Capped at 60. */
+  monthlySnapshots?: PortfolioSnapshot[];
 }
 
 /** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */

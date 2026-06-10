@@ -73,6 +73,14 @@ export interface Property {
   isLeasehold?: boolean;
   serviceChargePctAnnual?: number;
   groundRentPennies?: number;
+  // Phase 2 (v5)
+  isManaged?: boolean;
+  agentTier?: 'standard' | 'premium';
+  agentFeePct?: number;
+  hasRentGuarantee?: boolean;
+  rentGuaranteeStartMonth?: number;
+  hmoLicenceStatus?: 'none' | 'applied' | 'licensed' | 'expired';
+  hmoLicenceExpiresMonth?: number;
 }
 
 
@@ -205,6 +213,9 @@ export const PropertyCard = memo(function PropertyCard({
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
   const topUpCondition = useGameStore(s => s.topUpCondition);
+  const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
+  const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
+  const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
     : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
@@ -407,6 +418,31 @@ export const PropertyCard = memo(function PropertyCard({
                 ⚖️ Send to court
               </Button>
             )}
+            {property.isManaged && (
+              <Badge variant="outline" className="text-[10px] border-sky-400/40 text-sky-300 bg-sky-500/10" title={`Managed by ${property.agentTier ?? 'standard'} agent (${Math.round((property.agentFeePct ?? 0.10) * 100)}% fee)`}>
+                🧑‍💼 Managed
+              </Badge>
+            )}
+            {property.hasRentGuarantee && (
+              <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300 bg-emerald-500/10" title="Rent Guarantee Insurance active (3% of rent)">
+                🛡️ RGI
+              </Badge>
+            )}
+            {property.subtype === 'hmo' && property.hmoLicenceStatus && property.hmoLicenceStatus !== 'none' && (
+              <Badge variant="outline" className={cn(
+                "text-[10px]",
+                property.hmoLicenceStatus === 'licensed' ? "border-green-400/40 text-green-300" :
+                property.hmoLicenceStatus === 'applied' ? "border-amber-400/40 text-amber-300" :
+                "border-red-400/40 text-red-300",
+              )} title={`HMO Licence: ${property.hmoLicenceStatus}${property.hmoLicenceExpiresMonth ? ` — expires Mo ${property.hmoLicenceExpiresMonth}` : ''}`}>
+                📄 {property.hmoLicenceStatus}
+              </Badge>
+            )}
+            {property.subtype === 'hmo' && (!property.hmoLicenceStatus || property.hmoLicenceStatus === 'none' || property.hmoLicenceStatus === 'expired') && applyForHmoLicence && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10" onClick={() => applyForHmoLicence(property.id)}>
+                Apply HMO licence
+              </Button>
+            )}
           </div>
         )}
       </CardHeader>
@@ -524,6 +560,27 @@ export const PropertyCard = memo(function PropertyCard({
                     <span className={cn(netMonthlyIncome >= 0 ? "text-success" : "text-danger")}>
                       £{netMonthlyIncome.toLocaleString()}/mo
                     </span>
+                  </div>
+                  {(property.isManaged || property.hasRentGuarantee) && (
+                    <div className="text-[10px] text-muted-foreground italic pt-0.5">
+                      {property.isManaged && `− Agent fee (${Math.round((property.agentFeePct ?? 0.10) * 100)}% of rent)`}
+                      {property.isManaged && property.hasRentGuarantee && ' · '}
+                      {property.hasRentGuarantee && '− RGI premium (3% of rent)'}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 pt-1">
+                    {toggleLettingAgent && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleLettingAgent(property.id, 'standard')}>
+                        {property.isManaged ? '🧑‍💼 Dismiss agent' : '🧑‍💼 Hire agent (10%)'}
+                      </Button>
+                    )}
+                    {toggleRentGuarantee && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleRentGuarantee(property.id)}>
+                        {property.hasRentGuarantee ? '🛡️ Cancel RGI' : '🛡️ Add RGI (3%)'}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
