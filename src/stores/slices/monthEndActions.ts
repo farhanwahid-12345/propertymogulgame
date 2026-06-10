@@ -1864,6 +1864,18 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           }
           return existing;
         })(),
+        // Phase 2 (v5) — append performance snapshot (cap last 60).
+        monthlySnapshots: [
+          ...(((s as any).monthlySnapshots) || []),
+          {
+            month: newMonthNumber,
+            netWorth: netWorthFinal,
+            cashflow: totalInflows - totalOutflows,
+            rentalIncome: monthlyIncome,
+            mortgagePayments,
+            propertyCount: updatedOwnedProperties.length,
+          },
+        ].slice(-60),
       } as any));
     },
   };
