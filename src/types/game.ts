@@ -51,7 +51,6 @@ export interface Property {
   value: number; // pennies
   neighborhood: string;
   monthlyIncome: number; // pennies
-  image: string;
   owned?: boolean;
   marketTrend: "up" | "down" | "stable";
   mortgageRemaining?: number; // pennies

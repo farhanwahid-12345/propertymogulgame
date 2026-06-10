@@ -45,7 +45,7 @@ function makeProperty(overrides: Partial<Property> = {}): Property {
     neighborhood: 'Test',
     monthlyIncome: toPennies(800),
     baseRent: toPennies(800),
-    image: '',
+    
     marketTrend: 'stable',
     yield: 9,
     condition: 'standard',

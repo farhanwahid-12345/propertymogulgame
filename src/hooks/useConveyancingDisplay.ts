@@ -33,7 +33,7 @@ export function useConveyancingDisplay(
             value: purchasePounds,
             neighborhood: src?.neighborhood || "",
             monthlyIncome,
-            image: src?.image || "",
+
             owned: true,
             marketTrend: (src?.marketTrend || "stable") as "up" | "down" | "stable",
             condition: (src?.condition || "standard") as "dilapidated" | "standard" | "premium",

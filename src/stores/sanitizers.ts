@@ -37,7 +37,7 @@ export function sanitizeProperty(property: any): Property {
     value: asNumber(property?.value),
     neighborhood: asString(property?.neighborhood),
     monthlyIncome: asNumber(property?.monthlyIncome),
-    image: asString(property?.image),
+    
     marketTrend,
     condition,
     conditionScore,
