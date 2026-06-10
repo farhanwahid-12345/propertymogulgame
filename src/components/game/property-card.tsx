@@ -561,6 +561,27 @@ export const PropertyCard = memo(function PropertyCard({
                       £{netMonthlyIncome.toLocaleString()}/mo
                     </span>
                   </div>
+                  {(property.isManaged || property.hasRentGuarantee) && (
+                    <div className="text-[10px] text-muted-foreground italic pt-0.5">
+                      {property.isManaged && `− Agent fee (${Math.round((property.agentFeePct ?? 0.10) * 100)}% of rent)`}
+                      {property.isManaged && property.hasRentGuarantee && ' · '}
+                      {property.hasRentGuarantee && '− RGI premium (3% of rent)'}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5 pt-1">
+                    {toggleLettingAgent && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleLettingAgent(property.id, 'standard')}>
+                        {property.isManaged ? '🧑‍💼 Dismiss agent' : '🧑‍💼 Hire agent (10%)'}
+                      </Button>
+                    )}
+                    {toggleRentGuarantee && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleRentGuarantee(property.id)}>
+                        {property.hasRentGuarantee ? '🛡️ Cancel RGI' : '🛡️ Add RGI (3%)'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
