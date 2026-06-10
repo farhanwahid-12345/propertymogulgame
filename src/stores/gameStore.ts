@@ -404,6 +404,7 @@ export const migrationSteps: ReadonlyArray<Migration> = [
         }
       });
     },
+  },
   {
     from: 17, to: 18, describe: 'Phase 2 (v5) — letting agent / RGI / HMO licence fields + snapshots',
     apply: (persisted) => {
