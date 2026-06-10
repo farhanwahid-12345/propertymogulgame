@@ -289,6 +289,82 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         return total + (hasTenant && !isInVoid ? property.monthlyIncome : 0);
       }, 0);
 
+      // ── Phase 2 (v5) — Letting Agent fees ──
+      // Deduct agent fee only on properties where rent was actually received.
+      const lettingAgentFees = newOwnedProperties.reduce((total, property) => {
+        if (!property.isManaged || !property.agentFeePct) return total;
+        if (conveyancingPropertyIds.has(property.id)) return total;
+        if (missedRentPropertyIds.has(property.id)) return total;
+        const hasTenant = newTenants.some(t => t.propertyId === property.id);
+        const isInVoid = newVoidPeriods.some(vp =>
+          vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
+        );
+        if (!hasTenant || isInVoid) return total;
+        return total + Math.floor(property.monthlyIncome * property.agentFeePct);
+      }, 0);
+
+      // ── Phase 2 (v5) — Rent Guarantee Insurance premiums + payouts ──
+      let rentGuaranteePremiums = 0;
+      let rentGuaranteePayouts = 0;
+      newOwnedProperties.forEach((property) => {
+        if (!property.hasRentGuarantee) return;
+        const started = property.rentGuaranteeStartMonth ?? newMonthNumber;
+        // 3% premium charged from the month the policy was taken out
+        if (newMonthNumber >= started) {
+          rentGuaranteePremiums += Math.floor(property.monthlyIncome * 0.03);
+        }
+        // 1-month waiting period before claims pay out
+        if (newMonthNumber - started < 1) return;
+        if (conveyancingPropertyIds.has(property.id)) return;
+        const hasTenant = newTenants.some(t => t.propertyId === property.id);
+        const isInVoid = newVoidPeriods.some(vp =>
+          vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
+        );
+        // Pay out missed rent (full amount) on arrears
+        if (hasTenant && missedRentPropertyIds.has(property.id)) {
+          rentGuaranteePayouts += property.monthlyIncome;
+          showToast('RGI Payout 🛡️', `${property.name} — missed rent £${fromPennies(property.monthlyIncome).toLocaleString()} covered by insurance.`);
+        } else if (!hasTenant || isInVoid) {
+          // Void cover at 80% of expected rent
+          rentGuaranteePayouts += Math.floor(property.monthlyIncome * 0.8);
+        }
+      });
+
+      // ── Phase 2 (v5) — HMO licence transitions + fines ──
+      let hmoFines = 0;
+      newOwnedProperties = newOwnedProperties.map((property) => {
+        if (property.subtype !== 'hmo') return property;
+        let status = property.hmoLicenceStatus ?? 'none';
+        let expiresMonth = property.hmoLicenceExpiresMonth;
+        const appliedMonth = property.hmoLicenceAppliedMonth;
+        // Transition: applied → licensed after 2 months
+        if (status === 'applied' && typeof appliedMonth === 'number' && newMonthNumber - appliedMonth >= 2) {
+          status = 'licensed';
+          expiresMonth = newMonthNumber + 60; // 5-year licence
+          showToast('HMO Licence Issued ✅', `${property.name} — licence granted, valid 60 months.`);
+        }
+        // Auto-expire
+        if (status === 'licensed' && typeof expiresMonth === 'number' && newMonthNumber >= expiresMonth) {
+          status = 'expired';
+          showToast('HMO Licence Expired ⚠️', `${property.name} — renew to avoid fines.`, 'destructive');
+        }
+        // 2-month-before-expiry reminder
+        if (status === 'licensed' && typeof expiresMonth === 'number' && expiresMonth - newMonthNumber === 2) {
+          showToast('HMO Licence Renewal Due', `${property.name} — licence expires in 2 months.`);
+        }
+        // Fine: 3-month grace, then £500/mo + −2 rep (rep applied via reputationDelta after init)
+        if (status === 'none' || status === 'expired') {
+          const monthsOwned = newMonthNumber; // approximation — no precise purchase month tracked
+          if (status === 'expired' || monthsOwned >= 3) {
+            hmoFines += 50_000; // £500
+          }
+        }
+        return { ...property, hmoLicenceStatus: status, hmoLicenceExpiresMonth: expiresMonth };
+      });
+      if (hmoFines > 0) {
+        showToast('HMO Unlicensed Fine ⚠️', `£${fromPennies(hmoFines).toLocaleString()} fine for unlicensed HMO let.`, 'destructive');
+      }
+
       // Expenses
       const mortgagePayments = newMortgages.reduce((s, m) => s + m.monthlyPayment, 0);
       const councilTax = newOwnedProperties.reduce((total, property) => {
@@ -315,8 +391,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const gr = property.groundRentPennies ? Math.floor(property.groundRentPennies / 12) : 0;
         return total + sc + gr;
       }, 0);
-      const totalExpenses = mortgagePayments + councilTax + insurance + leaseholdCosts;
-      const netIncome = monthlyIncome - totalExpenses;
+      const totalExpenses = mortgagePayments + councilTax + insurance + leaseholdCosts
+        + lettingAgentFees + rentGuaranteePremiums + hmoFines;
+      const netIncome = monthlyIncome - totalExpenses + rentGuaranteePayouts;
 
       // Update mortgage balances + capture this month's actual interest portion
       // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
