@@ -227,6 +227,19 @@ export function TaxInlineButton({ gameState }: { gameState: GameState }) {
   );
 }
 
+export function PerformanceInlineButton() {
+  return (
+    <InlineDialogButton
+      id="section-performance"
+      label="📈 Performance"
+      summary="Portfolio chart"
+      title="Portfolio Performance"
+    >
+      <PerformanceChart />
+    </InlineDialogButton>
+  );
+}
+
 /** Bank tab body is now empty — all controls moved into the tab header row. */
 export function BankingPanel(_: BankingPanelProps) {
   return null;
