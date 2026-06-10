@@ -94,7 +94,6 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     marketValue,
     neighborhood,
     monthlyIncome: Math.max(toPennies(400), baseMonthlyIncome),
-    image: "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400&h=300&fit=crop",
     marketTrend: "stable",
     yield: averageYield,
     lastRentIncrease: 0,
