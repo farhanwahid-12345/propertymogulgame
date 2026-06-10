@@ -32,6 +32,7 @@ import { createConveyancingActions } from './slices/conveyancingActions';
 import { createOrchestratorActions } from './slices/orchestratorActions';
 import { createMonthEndActions } from './slices/monthEndActions';
 import { createGameControlActions } from './slices/gameControlActions';
+import { createPropertyManagementActions } from './slices/propertyManagementActions';
 
 // ─── Actions interface ───────────────────────────────────
 interface GameActions {
@@ -124,6 +125,10 @@ interface GameActions {
   escalateToHighCourt: (caseId: string) => void;
   // Phase 4 #2 — Title-split a converted flat into its own leasehold property
   splitFlatUnit: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
+  // Phase 2 (v5) — Letting Agent / Rent Guarantee / HMO Licensing
+  toggleLettingAgent: (propertyId: string, tier?: 'standard' | 'premium') => void;
+  toggleRentGuarantee: (propertyId: string) => void;
+  applyForHmoLicence: (propertyId: string) => void;
   // Game
   resetGame: () => void;
 }
@@ -209,6 +214,7 @@ export function createInitialState(): GameState {
     goalTarget: 500_000 * 100, // £500k net worth — first explicit endgame target
     goalAchievedAt: undefined,
     seenEpcTutorial: false,
+    monthlySnapshots: [],
   };
 }
 
@@ -398,6 +404,27 @@ export const migrationSteps: ReadonlyArray<Migration> = [
         }
       });
     },
+  {
+    from: 17, to: 18, describe: 'Phase 2 (v5) — letting agent / RGI / HMO licence fields + snapshots',
+    apply: (persisted) => {
+      const arrs = ['ownedProperties', 'estateAgentProperties', 'auctionProperties'];
+      arrs.forEach((k) => {
+        if (Array.isArray(persisted[k])) {
+          persisted[k] = persisted[k].map((p: any) => ({
+            ...p,
+            isManaged: Boolean(p?.isManaged),
+            agentTier: p?.agentTier === 'premium' ? 'premium' : p?.isManaged ? 'standard' : undefined,
+            agentFeePct: typeof p?.agentFeePct === 'number' ? p.agentFeePct : (p?.isManaged ? 0.10 : undefined),
+            hasRentGuarantee: Boolean(p?.hasRentGuarantee),
+            rentGuaranteeStartMonth: typeof p?.rentGuaranteeStartMonth === 'number' ? p.rentGuaranteeStartMonth : undefined,
+            hmoLicenceStatus: ['none', 'applied', 'licensed', 'expired'].includes(p?.hmoLicenceStatus) ? p.hmoLicenceStatus : 'none',
+            hmoLicenceAppliedMonth: typeof p?.hmoLicenceAppliedMonth === 'number' ? p.hmoLicenceAppliedMonth : undefined,
+            hmoLicenceExpiresMonth: typeof p?.hmoLicenceExpiresMonth === 'number' ? p.hmoLicenceExpiresMonth : undefined,
+          }));
+        }
+      });
+      if (!Array.isArray(persisted.monthlySnapshots)) persisted.monthlySnapshots = [];
+    },
   },
 ];
 
@@ -517,6 +544,7 @@ export const useGameStore = create<GameState & GameActions>()(
       ...createMarketActions(set as any, get as any),
       ...createFinancialActions(set as any, get as any),
       ...createGameControlActions(set as any, get as any),
+      ...createPropertyManagementActions(set as any, get as any),
 
     }),
     {
