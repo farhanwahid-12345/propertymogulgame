@@ -283,7 +283,7 @@ export function createConveyancingActions(set: SetFn, get: GetFn) {
         "destructive",
       );
       const reinstated = !prev.estateAgentProperties.find((p: any) => p.id === conv.propertyId)
-        ? [...prev.estateAgentProperties, { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: purchase, value: purchase, neighborhood: '', monthlyIncome: 0, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0 } as any]
+        ? [...prev.estateAgentProperties, { id: conv.propertyId, name: conv.propertyName, type: 'residential', price: purchase, value: purchase, neighborhood: '', monthlyIncome: 0, marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0 } as any]
         : prev.estateAgentProperties;
       set({
         cash: credited.cash,
