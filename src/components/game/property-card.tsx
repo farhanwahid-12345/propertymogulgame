@@ -73,6 +73,14 @@ export interface Property {
   isLeasehold?: boolean;
   serviceChargePctAnnual?: number;
   groundRentPennies?: number;
+  // Phase 2 (v5)
+  isManaged?: boolean;
+  agentTier?: 'standard' | 'premium';
+  agentFeePct?: number;
+  hasRentGuarantee?: boolean;
+  rentGuaranteeStartMonth?: number;
+  hmoLicenceStatus?: 'none' | 'applied' | 'licensed' | 'expired';
+  hmoLicenceExpiresMonth?: number;
 }
 
 
@@ -205,6 +213,9 @@ export const PropertyCard = memo(function PropertyCard({
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
   const topUpCondition = useGameStore(s => s.topUpCondition);
+  const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
+  const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
+  const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
     : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
