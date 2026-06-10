@@ -1363,8 +1363,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         });
       }
 
-      const totalOutflows = mortgagePayments; // tax/insurance/council go via pending approval queue
-      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth;
+      // Phase 2 (v5): include letting-agent fees, RGI premiums, HMO fines as outflows; RGI payouts as inflows.
+      const totalOutflows = mortgagePayments + lettingAgentFees + rentGuaranteePremiums + hmoFines;
+      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth + rentGuaranteePayouts;
       const netCashDelta = totalInflows - totalOutflows;
       let finalCash = prev.cash;
       let finalOverdraftUsed = prev.overdraftUsed;
