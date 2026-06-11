@@ -5,7 +5,7 @@
  * portfolio section without scrolling back to the top action row.
  * Hidden at md+ where the inline tabs are already in view.
  */
-import { Store, Landline, Building2, ArrowUp } from "lucide-react";
+import { Store, Landmark, Building2, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
