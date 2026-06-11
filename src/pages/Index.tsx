@@ -302,6 +302,7 @@ const Index = () => {
       />
 
       <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      <InstallPromptBanner sessionCount={parseInt(localStorage.getItem("pm_session_count") || "1", 10)} />
 
 
       <PlanningApprovedDialog />
