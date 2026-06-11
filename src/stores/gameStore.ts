@@ -5,6 +5,7 @@ import type { Tenant } from '@/components/game/tenant-selector';
 import { type RenovationType } from '@/components/game/renovation-dialog';
 import { toPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
+import { getActiveSlot, slotKey, migrateLegacySaveIntoSlot0, LEGACY_SAVE_KEY } from '@/lib/saveSlots';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE,
   AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS, LOAN_PRODUCTS,
