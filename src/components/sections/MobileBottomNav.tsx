@@ -64,7 +64,7 @@ export function MobileBottomNav({ activeTab, setActiveTab }: Props) {
         />
         <Btn
           label="Bank"
-          icon={Landline}
+          icon={Landmark}
           active={activeTab === "bank"}
           onClick={() => {
             setActiveTab("bank");
