@@ -1876,6 +1876,32 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
             propertyCount: updatedOwnedProperties.length,
           },
         ].slice(-60),
+        // Phase 4 (v5) — evaluate achievements against the new state snapshot.
+        achievements: (() => {
+          const prevUnlocked = (s as any).achievements || {};
+          const existingGoal = (s as any).goalAchievedAt;
+          const goalTarget = ((s as any).goalTarget ?? 0) as number;
+          const goalAchievedAtSnapshot =
+            (typeof existingGoal === 'number' && existingGoal > 0)
+              ? existingGoal
+              : (goalTarget > 0 && netWorthFinal >= goalTarget ? newMonthNumber : undefined);
+          const { unlocked, newlyUnlockedIds } = evaluateAchievements(
+            prevUnlocked,
+            {
+              ownedProperties: updatedOwnedProperties,
+              tenantHistory: newTenantHistory,
+              planningApplications: newPlanningApplications,
+              goalAchievedAt: goalAchievedAtSnapshot,
+            } as any,
+            newMonthNumber,
+            netWorthFinal,
+          );
+          for (const id of newlyUnlockedIds) {
+            const def = ACHIEVEMENTS.find(a => a.id === id);
+            if (def) showToast(`🏅 ${def.title}`, def.description);
+          }
+          return unlocked;
+        })(),
       } as any));
     },
   };
