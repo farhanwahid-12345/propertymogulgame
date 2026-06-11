@@ -22,6 +22,7 @@ import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
 import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInlineButton, PerformanceInlineButton } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { MobileBottomNav } from "@/components/sections/MobileBottomNav";
+import { InstallPromptBanner } from "@/components/InstallPromptBanner";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { usePropertyDebt } from "@/hooks/usePropertyDebt";
