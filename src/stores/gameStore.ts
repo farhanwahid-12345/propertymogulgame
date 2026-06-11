@@ -559,8 +559,16 @@ export const useGameStore = create<GameState & GameActions>()(
 
     }),
     {
-      name: 'propertyTycoonSave',
-      storage: createDebouncedStorage(2000),
+      name: LEGACY_SAVE_KEY,
+      // Phase 4 (v5) — slot-aware storage. Persist asks for the logical name
+      // `propertyTycoonSave`, the resolver rewrites it to `..._<activeSlot>`.
+      storage: (() => {
+        migrateLegacySaveIntoSlot0();
+        return createDebouncedStorage(2000, (name) => {
+          if (name !== LEGACY_SAVE_KEY) return name;
+          return slotKey(getActiveSlot());
+        });
+      })(),
       version: CURRENT_VERSION,
       migrate: (persisted: any, _version: number) => {
         // Always run migrateState — idempotent and repairs any stale field shape
