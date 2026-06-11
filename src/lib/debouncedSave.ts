@@ -15,16 +15,23 @@ export function flushPersistedSave() {
   try { activeFlush?.(); } catch { /* noop */ }
 }
 
-export function createDebouncedStorage(delayMs: number = 2000) {
+export function createDebouncedStorage(
+  delayMs: number = 2000,
+  /** Optional resolver — translates the logical name Zustand asks for into the
+   *  real localStorage key. Used by the multi-slot adapter (Phase 4) to suffix
+   *  the active slot index without touching the persist middleware config. */
+  resolveKey?: (name: string) => string,
+) {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pendingName: string | null = null;
   let pendingValue: string | null = null;
+  const resolve = (name: string) => (resolveKey ? resolveKey(name) : name);
 
   function flush() {
     if (timer) { clearTimeout(timer); timer = null; }
     if (pendingName !== null && pendingValue !== null) {
       try {
-        localStorage.setItem(pendingName, pendingValue);
+        localStorage.setItem(resolve(pendingName), pendingValue);
       } catch {
         // localStorage full or unavailable
       }
@@ -43,11 +50,10 @@ export function createDebouncedStorage(delayMs: number = 2000) {
 
   return {
     getItem(name: string) {
-      // Flush pending write for this key first so reads are consistent
       if (pendingName === name && pendingValue !== null) {
         flush();
       }
-      const raw = localStorage.getItem(name);
+      const raw = localStorage.getItem(resolve(name));
       if (!raw) return null;
       try {
         return JSON.parse(raw);
@@ -66,7 +72,7 @@ export function createDebouncedStorage(delayMs: number = 2000) {
       if (timer) { clearTimeout(timer); timer = null; }
       pendingName = null;
       pendingValue = null;
-      localStorage.removeItem(name);
+      localStorage.removeItem(resolve(name));
     },
   };
 }

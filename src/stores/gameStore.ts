@@ -5,6 +5,7 @@ import type { Tenant } from '@/components/game/tenant-selector';
 import { type RenovationType } from '@/components/game/renovation-dialog';
 import { toPennies } from '@/lib/formatCurrency';
 import { createDebouncedStorage } from '@/lib/debouncedSave';
+import { getActiveSlot, slotKey, migrateLegacySaveIntoSlot0, LEGACY_SAVE_KEY } from '@/lib/saveSlots';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE,
   AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS, LOAN_PRODUCTS,
@@ -215,6 +216,7 @@ export function createInitialState(): GameState {
     goalAchievedAt: undefined,
     seenEpcTutorial: false,
     monthlySnapshots: [],
+    achievements: {},
   };
 }
 
@@ -427,6 +429,14 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       if (!Array.isArray(persisted.monthlySnapshots)) persisted.monthlySnapshots = [];
     },
   },
+  {
+    from: 18, to: 19, describe: 'Phase 4 (v5) — achievements map',
+    apply: (persisted) => {
+      if (!persisted.achievements || typeof persisted.achievements !== 'object') {
+        persisted.achievements = {};
+      }
+    },
+  },
 ];
 
 
@@ -549,8 +559,16 @@ export const useGameStore = create<GameState & GameActions>()(
 
     }),
     {
-      name: 'propertyTycoonSave',
-      storage: createDebouncedStorage(2000),
+      name: LEGACY_SAVE_KEY,
+      // Phase 4 (v5) — slot-aware storage. Persist asks for the logical name
+      // `propertyTycoonSave`, the resolver rewrites it to `..._<activeSlot>`.
+      storage: (() => {
+        migrateLegacySaveIntoSlot0();
+        return createDebouncedStorage(2000, (name) => {
+          if (name !== LEGACY_SAVE_KEY) return name;
+          return slotKey(getActiveSlot());
+        });
+      })(),
       version: CURRENT_VERSION,
       migrate: (persisted: any, _version: number) => {
         // Always run migrateState — idempotent and repairs any stale field shape

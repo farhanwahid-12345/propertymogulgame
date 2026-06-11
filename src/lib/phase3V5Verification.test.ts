@@ -3,7 +3,7 @@ import { CURRENT_VERSION, runMigrations } from '@/lib/migrations';
 
 describe('Phase 3 — landlord reputation, goal target, EPC tutorial', () => {
   it('CURRENT_VERSION advanced to 16', () => {
-    expect(CURRENT_VERSION).toBe(18);
+    expect(CURRENT_VERSION).toBe(19);
   });
 
   it('v15→v16 migration backfills goalTarget and seenEpcTutorial', async () => {
@@ -12,7 +12,7 @@ describe('Phase 3 — landlord reputation, goal target, EPC tutorial', () => {
     runMigrations(persisted, migrationSteps, CURRENT_VERSION);
     expect(persisted.goalTarget).toBe(500_000 * 100);
     expect(persisted.seenEpcTutorial).toBe(false);
-    expect(persisted._version).toBe(18);
+    expect(persisted._version).toBe(19);
   });
 
   it('v15→v16 migration preserves existing goalTarget', async () => {

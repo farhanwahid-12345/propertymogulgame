@@ -552,6 +552,8 @@ export interface GameState {
   seenEpcTutorial?: boolean;
   /** Phase 2 (v5) — rolling monthly snapshots for the Bank performance chart. Capped at 60. */
   monthlySnapshots?: PortfolioSnapshot[];
+  /** Phase 4 (v5) — unlocked achievements. Map of achievement id → unlock month. */
+  achievements?: Record<string, number>;
 }
 
 /** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */
@@ -639,4 +641,4 @@ export interface TenantDeparture {
 }
 
 // Save version — increment when changing state shape
-export const SAVE_VERSION = 19;
+export const SAVE_VERSION = 20;
