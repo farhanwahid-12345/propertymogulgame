@@ -26,6 +26,7 @@ import {
   MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
 } from '@/lib/engine/probabilities';
 import { showToast, debit, credit } from '../storeHelpers';
+import { evaluateAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import { mergeConcernsById } from '../sanitizers';
 import type {
   Property, Mortgage, Conveyancing, TenantEvent, VoidPeriod, DepositDispute,
