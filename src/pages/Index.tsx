@@ -21,6 +21,7 @@ import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
 import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInlineButton, PerformanceInlineButton } from "@/components/sections/BankingPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
+import { MobileBottomNav } from "@/components/sections/MobileBottomNav";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { usePropertyDebt } from "@/hooks/usePropertyDebt";
@@ -135,7 +136,7 @@ const Index = () => {
         level={gameState.level}
       />
 
-      <div className="container mx-auto px-4 py-4 space-y-3 pb-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 space-y-3 pb-24 md:pb-6">
 
         <GameStats
           cash={gameState.cash}
@@ -298,6 +299,8 @@ const Index = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
       />
+
+      <MobileBottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
 
       <PlanningApprovedDialog />
