@@ -215,6 +215,7 @@ export function createInitialState(): GameState {
     goalAchievedAt: undefined,
     seenEpcTutorial: false,
     monthlySnapshots: [],
+    achievements: {},
   };
 }
 
