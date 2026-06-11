@@ -428,6 +428,14 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       if (!Array.isArray(persisted.monthlySnapshots)) persisted.monthlySnapshots = [];
     },
   },
+  {
+    from: 18, to: 19, describe: 'Phase 4 (v5) — achievements map',
+    apply: (persisted) => {
+      if (!persisted.achievements || typeof persisted.achievements !== 'object') {
+        persisted.achievements = {};
+      }
+    },
+  },
 ];
 
 
