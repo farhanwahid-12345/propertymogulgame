@@ -1893,6 +1893,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
               tenantHistory: newTenantHistory,
               planningApplications: newPlanningApplications,
               goalAchievedAt: goalAchievedAtSnapshot,
+              landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
+              reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries],
             } as any,
             newMonthNumber,
             netWorthFinal,

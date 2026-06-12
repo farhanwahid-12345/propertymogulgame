@@ -21,6 +21,7 @@ import {
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 import { gameRandom } from '@/lib/rng';
 import { showToast, debit } from '../storeHelpers';
+import { checkAndUnlockAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
@@ -337,11 +338,31 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
       }
       updatedOwned.push(newFlat);
 
+      const nextTenants = migratedTenant
+        ? [...reindexedTenants, migratedTenant]
+        : reindexedTenants;
+
+      // Achievement wiring — first successful title split unlocks
+      // title_splitter (and may unlock portfolio_* / multi_city if the new
+      // leasehold pushes counts/cities past a threshold).
+      const achievementSnapshot = {
+        ...prev,
+        ownedProperties: updatedOwned,
+        tenants: nextTenants,
+      };
+      const { unlocked, newlyUnlockedIds } = checkAndUnlockAchievements(achievementSnapshot);
+      const achievementsPatch = newlyUnlockedIds.length ? unlocked : undefined;
+      if (newlyUnlockedIds.length) {
+        for (const id of newlyUnlockedIds) {
+          const def = ACHIEVEMENTS.find(a => a.id === id);
+          if (def) showToast(`🏅 ${def.title}`, def.description);
+        }
+      }
+
       set({
         ownedProperties: updatedOwned,
-        tenants: migratedTenant
-          ? [...reindexedTenants, migratedTenant]
-          : reindexedTenants,
+        tenants: nextTenants,
+        ...(achievementsPatch ? { achievements: achievementsPatch } : {}),
       });
 
       showToast(

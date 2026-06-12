@@ -16,6 +16,7 @@ export type AchievementId =
   | 'portfolio_3'
   | 'portfolio_5'
   | 'portfolio_10'
+  | 'portfolio_12'
   | 'net_worth_100k'
   | 'net_worth_500k'
   | 'net_worth_1m'
@@ -25,7 +26,12 @@ export type AchievementId =
   | 'first_hmo_licence'
   | 'first_letting_agent'
   | 'first_rent_guarantee'
-  | 'goal_achieved';
+  | 'goal_achieved'
+  | 'debt_free'
+  | 'multi_city'
+  | 'perfect_landlord'
+  | 'court_win'
+  | 'title_splitter';
 
 export interface AchievementDef {
   id: AchievementId;
@@ -45,6 +51,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     test: ({ state }) => (state.ownedProperties?.length || 0) >= 5 },
   { id: 'portfolio_10', title: 'Tycoon', description: 'Own 10 properties simultaneously.', icon: '🏙️',
     test: ({ state }) => (state.ownedProperties?.length || 0) >= 10 },
+  { id: 'portfolio_12', title: 'Portfolio Mogul', description: 'Own 12 properties simultaneously.', icon: '🏰',
+    test: ({ state }) => (state.ownedProperties?.length || 0) >= 12 },
   { id: 'net_worth_100k', title: 'Six Figures', description: 'Reach £100,000 net worth.', icon: '💷',
     test: ({ netWorth }) => netWorth >= 100_000 * 100 },
   { id: 'net_worth_500k', title: 'Half a Million', description: 'Reach £500,000 net worth.', icon: '💰',
@@ -65,6 +73,16 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     test: ({ state }) => (state.ownedProperties || []).some((p: any) => p?.hasRentGuarantee) },
   { id: 'goal_achieved', title: 'Goal Reached', description: 'Hit your configured net-worth goal.', icon: '🎯',
     test: ({ state }) => typeof (state as any).goalAchievedAt === 'number' && (state as any).goalAchievedAt > 0 },
+  { id: 'debt_free', title: 'Debt Free', description: 'Pay off a mortgage in full.', icon: '✂️',
+    test: ({ state }) => ((state as any).reputationLog || []).some((e: any) => typeof e?.reason === 'string' && e.reason.startsWith('Paid off mortgage')) },
+  { id: 'multi_city', title: 'Multi-City', description: 'Own properties in 3 different cities simultaneously.', icon: '🗺️',
+    test: ({ state }) => new Set((state.ownedProperties || []).map((p: any) => p?.city || 'middlesbrough')).size >= 3 },
+  { id: 'perfect_landlord', title: 'Perfect Landlord', description: 'Reach 90 or above in landlord reputation.', icon: '⭐',
+    test: ({ state }) => ((state as any).landlordReputation || 0) >= 90 },
+  { id: 'court_win', title: 'Court Win', description: 'Win an eviction tribunal.', icon: '⚖️',
+    test: ({ state }) => ((state as any).reputationLog || []).some((e: any) => e?.reason === 'Tribunal sided with landlord' || e?.reason === 'Eviction tribunal upheld') },
+  { id: 'title_splitter', title: 'Title Splitter', description: 'Complete your first flat title split.', icon: '📐',
+    test: ({ state }) => (state.ownedProperties || []).some((p: any) => !!p?.titleSplitOf) },
 ];
 
 export interface EvaluateResult {
@@ -92,4 +110,22 @@ export function evaluateAchievements(
     }
   }
   return { unlocked, newlyUnlockedIds: newly };
+}
+
+/**
+ * Convenience helper for action slices: evaluates achievements against a
+ * partial state snapshot and surfaces toasts for newly-unlocked ids. Returns
+ * the updated `achievements` map so the caller can merge it into `set()`.
+ * Net-worth-dependent achievements are still resolved at month end.
+ */
+export function checkAndUnlockAchievements(
+  state: Partial<GameState> & { achievements?: Record<string, number>; monthsPlayed?: number },
+  netWorth = 0,
+): EvaluateResult {
+  return evaluateAchievements(
+    state.achievements,
+    state,
+    state.monthsPlayed ?? 0,
+    netWorth,
+  );
 }
