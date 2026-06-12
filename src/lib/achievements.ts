@@ -111,3 +111,21 @@ export function evaluateAchievements(
   }
   return { unlocked, newlyUnlockedIds: newly };
 }
+
+/**
+ * Convenience helper for action slices: evaluates achievements against a
+ * partial state snapshot and surfaces toasts for newly-unlocked ids. Returns
+ * the updated `achievements` map so the caller can merge it into `set()`.
+ * Net-worth-dependent achievements are still resolved at month end.
+ */
+export function checkAndUnlockAchievements(
+  state: Partial<GameState> & { achievements?: Record<string, number>; monthsPlayed?: number },
+  netWorth = 0,
+): EvaluateResult {
+  return evaluateAchievements(
+    state.achievements,
+    state,
+    state.monthsPlayed ?? 0,
+    netWorth,
+  );
+}
