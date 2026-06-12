@@ -12,6 +12,7 @@ import { fromPennies } from '@/lib/formatCurrency';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { gameRandom } from '@/lib/rng';
 import { showToast, debit, calcDeposit } from '../storeHelpers';
+import { checkAndUnlockAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import {
   CONCERN_RESOLVE_CONDITION_LIFT,
   CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT,
@@ -214,7 +215,43 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         `${reasonLabel}. New rent: £${fromPennies(newRentPennies).toLocaleString()}/mo${tribunalFeePennies > 0 ? ` (tribunal fee £${fromPennies(tribunalFeePennies).toLocaleString()})` : ''}.`
       );
 
-      set({ ...cashUpdate, ownedProperties: updatedProps, tenants: updatedTenants });
+      // Achievement wiring — tribunal won in landlord's favour pushes a
+      // reputationLog marker and triggers the court_win unlock immediately.
+      let achievementsPatch: Record<string, number> | undefined;
+      let extraRepLog: any[] = [];
+      if (outcome === 'tribunal_landlord') {
+        extraRepLog = [{
+          id: `rep_tribunal_win_${propertyId}_${prev.monthsPlayed}`,
+          month: prev.monthsPlayed,
+          reason: 'Tribunal sided with landlord',
+          delta: 0,
+          category: 'tribunal' as const,
+        }];
+        const snapshot = {
+          ...prev,
+          ownedProperties: updatedProps,
+          tenants: updatedTenants,
+          reputationLog: [...((prev as any).reputationLog || []), ...extraRepLog],
+        };
+        const { unlocked, newlyUnlockedIds } = checkAndUnlockAchievements(snapshot);
+        if (newlyUnlockedIds.length) {
+          for (const id of newlyUnlockedIds) {
+            const def = ACHIEVEMENTS.find(a => a.id === id);
+            if (def) showToast(`🏅 ${def.title}`, def.description);
+          }
+          achievementsPatch = unlocked;
+        }
+      }
+
+      set({
+        ...cashUpdate,
+        ownedProperties: updatedProps,
+        tenants: updatedTenants,
+        ...(extraRepLog.length
+          ? { reputationLog: [...(((prev as any).reputationLog) || []), ...extraRepLog].slice(-40) }
+          : {}),
+        ...(achievementsPatch ? { achievements: achievementsPatch } : {}),
+      });
     },
 
     evictTenant: (propertyId: string, ground: EvictionGround, slotIndex: number = 0) => {
