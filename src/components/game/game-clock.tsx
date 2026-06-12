@@ -61,11 +61,18 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
   if (inline) {
     return (
       <div className="flex items-center gap-3 w-full min-w-0">
-        <Clock className="h-4 w-4 text-primary shrink-0" />
+        <Clock className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
         <span className="font-semibold text-sm text-foreground tabular-nums shrink-0 w-[72px]">
           📅 {monthNames[month - 1]} {year}
         </span>
-        <div className="flex-1 bg-muted rounded-full h-2 min-w-[40px]">
+        <div
+          className="flex-1 bg-muted rounded-full h-2 min-w-[40px]"
+          role="progressbar"
+          aria-label="Progress toward next in-game month"
+          aria-valuenow={Math.round(progress)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <div
             className="bg-primary h-2 rounded-full transition-all duration-1000 "
             style={{ width: `${progress}%` }}
@@ -81,7 +88,7 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
   return (
     <div className="glass p-4">
       <div className="flex items-center gap-3">
-        <Clock className="h-5 w-5 text-primary" />
+        <Clock className="h-5 w-5 text-primary" aria-hidden="true" />
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <span className="font-semibold text-lg">
@@ -94,8 +101,15 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
               <SpeedSelector />
             </div>
           </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div 
+          <div
+            className="w-full bg-muted rounded-full h-2"
+            role="progressbar"
+            aria-label="Progress toward next in-game month"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
               className="bg-primary h-2 rounded-full transition-all duration-1000 "
               style={{ width: `${progress}%` }}
             />
@@ -105,3 +119,4 @@ export function GameClock({ monthsPlayed, timeUntilNextMonth, inline = false }: 
     </div>
   );
 }
+
