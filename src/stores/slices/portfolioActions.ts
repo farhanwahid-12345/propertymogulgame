@@ -21,6 +21,7 @@ import {
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 import { gameRandom } from '@/lib/rng';
 import { showToast, debit } from '../storeHelpers';
+import { checkAndUnlockAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
