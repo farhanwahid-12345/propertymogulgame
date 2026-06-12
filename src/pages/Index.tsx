@@ -27,6 +27,7 @@ import { AchievementsInlineButton } from "@/components/game/achievements-dialog"
 import { SaveSlotsInlineButton } from "@/components/game/save-slots-dialog";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { usePropertyDebt } from "@/hooks/usePropertyDebt";
 import { usePortfolioMetrics } from "@/hooks/usePortfolioMetrics";
 import { useConveyancingDisplay } from "@/hooks/useConveyancingDisplay";
@@ -100,8 +101,10 @@ function OnboardingGate({
 
 const Index = () => {
   useGameEngine();
+  useKeyboardShortcuts();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+
 
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
