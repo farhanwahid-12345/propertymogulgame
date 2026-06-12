@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Building2, User, Check, Home, Users, Wrench, PiggyBank,
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
+  ShoppingCart, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
@@ -34,7 +35,7 @@ const STEPS = [
   { icon: PiggyBank, title: "Profit",    body: "Bank monthly cashflow, refinance equity, or sell up. Mind your tax bill in April." },
 ];
 
-type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-bank' | 'tour-ops' | 'tour-alerts';
+type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-buying' | 'tour-bank' | 'tour-ops' | 'tour-monthend' | 'tour-alerts';
 
 interface TourStep {
   id: Stage;
@@ -51,11 +52,15 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   { id: 'tour-market', icon: Store,         title: "The Market", index: 1, tab: 'market', scrollId: 'section-tabs',
     body: "This is the Market tab — estate agent listings and the auction house. We've switched you here now so you can see what's for sale." },
-  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 2, tab: 'bank', scrollId: 'section-tabs',
+  { id: 'tour-buying', icon: ShoppingCart,  title: "Making an Offer", index: 2, tab: 'market', scrollId: 'section-market',
+    body: "Pick a property, make an offer (cash or mortgage), then wait through conveyancing. Solicitor fees and stamp duty apply on completion." },
+  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 3, tab: 'bank', scrollId: 'section-tabs',
     body: "The Bank tab covers mortgages, overdraft, loans and your tax bill. Refinance equity here to fund your next deposit." },
-  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 3, scrollId: 'section-ops',
+  { id: 'tour-ops',    icon: ClipboardList, title: "Operations", index: 4, scrollId: 'section-ops',
     body: "Conveyancing, renovations, planning permission and tenant concerns live in Operations. It flashes red when tenants raise a new concern — open it to act before satisfaction drops." },
-  { id: 'tour-alerts', icon: Bell,          title: "Action Required", index: 4, tab: 'market', scrollId: 'section-alerts',
+  { id: 'tour-monthend', icon: CalendarDays, title: "Month End", index: 5, scrollId: 'section-tabs',
+    body: "One in-game month takes 3 minutes at 1× speed. Press Space to pause, and 1–4 to change speed (0.5× / 1× / 2× / 4×). Rent, expenses, mortgages and tax all settle at month end." },
+  { id: 'tour-alerts', icon: Bell,          title: "Action Required", index: 6, tab: 'market', scrollId: 'section-alerts',
     body: "Evictions, deposit disputes and warnings appear under Action Required. Clear them before they drag your reputation down." },
 ];
 
