@@ -249,6 +249,7 @@ export function RentNegotiationDialog({
                       if (Number.isFinite(v)) setProposed(Math.max(minAllowed, Math.min(maxAllowed, v)));
                     }}
                     className="h-8 text-sm"
+                    aria-label="New monthly rent"
                   />
                 </div>
 

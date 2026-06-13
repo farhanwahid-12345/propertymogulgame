@@ -243,6 +243,7 @@ function LoanRow({ loan, onSettle }: { loan: any; onSettle: (amt?: number) => vo
           min={0}
           step={100}
           className="h-8 text-xs"
+          aria-label="Loan partial payment amount in pounds"
         />
         <Button
           size="sm"
