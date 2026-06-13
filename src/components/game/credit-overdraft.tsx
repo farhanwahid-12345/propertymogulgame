@@ -223,6 +223,7 @@ export function CreditOverdraft({
                         max={availableOverdraft}
                         step={100}
                         className="w-full"
+                        aria-label="Overdraft withdraw amount in pounds"
                       />
                       <Button 
                         size="sm" 
@@ -248,6 +249,7 @@ export function CreditOverdraft({
                         max={Math.min(cash, overdraftUsed)}
                         step={100}
                         className="w-full"
+                        aria-label="Overdraft repay amount in pounds"
                       />
                       <Button 
                         size="sm" 
@@ -286,6 +288,7 @@ export function CreditOverdraft({
                   max={Math.max(getMaxOverdraftEligible(netWorth), overdraftLimit)}
                   step={500}
                   className="w-full"
+                  aria-label="Requested overdraft limit in pounds"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>£0</span>

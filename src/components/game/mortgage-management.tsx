@@ -234,6 +234,7 @@ export function MortgageManagement({
                     max={Math.floor(selectedProperty.value * creditMaxLTV)}
                     step={1000}
                     className="w-full"
+                    aria-label="New loan amount in pounds"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Current: £{(selectedProperty.mortgageRemaining || 0).toLocaleString()}</span>
@@ -255,7 +256,7 @@ export function MortgageManagement({
                   <div>
                     <Label>Mortgage Provider</Label>
                     <Select value={singleProvider} onValueChange={setSingleProvider}>
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Mortgage provider">
                         <SelectValue placeholder="Choose provider..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -276,7 +277,7 @@ export function MortgageManagement({
                   <div>
                     <Label>Term (years)</Label>
                     <Select value={singleTermYears.toString()} onValueChange={(value) => setSingleTermYears(Number(value))}>
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Mortgage term in years">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -294,7 +295,7 @@ export function MortgageManagement({
                 <div>
                   <Label>Mortgage Type</Label>
                   <Select value={singleMortgageType} onValueChange={(value: 'repayment' | 'interest-only') => setSingleMortgageType(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Mortgage repayment type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -307,7 +308,7 @@ export function MortgageManagement({
                 <div>
                   <Label>Initial Fixed Term</Label>
                   <Select value={singleFixedTermYears.toString()} onValueChange={(value) => setSingleFixedTermYears(Number(value))}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Initial fixed rate term">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

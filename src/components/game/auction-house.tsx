@@ -475,7 +475,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <div>
                       <Label className="text-xs">Mortgage %</Label>
                       <Select value={selectedMortgagePercent.toString()} onValueChange={(v) => setSelectedMortgagePercent(Number(v))}>
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-8 text-xs" aria-label="Loan to value percentage">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -491,7 +491,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                       <div>
                         <Label className="text-xs">Provider</Label>
                         <Select value={selectedProviderId} onValueChange={setSelectedProviderId}>
-                          <SelectTrigger className="h-8 text-xs">
+                          <SelectTrigger className="h-8 text-xs" aria-label="Mortgage provider">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -510,7 +510,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                     <div>
                       <Label className="text-xs">Initial Fixed Term</Label>
                       <Select value={String(selectedFixedTermYears)} onValueChange={(v) => setSelectedFixedTermYears(Number(v))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-xs" aria-label="Initial fixed rate term"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="0">SVR / Tracker (variable)</SelectItem>
                           <SelectItem value="2">2-year fixed (−0.4%)</SelectItem>
@@ -582,6 +582,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             max={Math.min(maxBudget, liveAuction.property.value * 2)}
                             step={Math.max(1000, Math.floor(liveAuction.property.value * 0.005))}
                             className="w-full"
+                            aria-label="Your next bid in pounds"
                           />
                           <div className="grid grid-cols-2 gap-2">
                             <Button 
@@ -599,6 +600,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                                 value={userMaxAutoBid ?? ''}
                                 onChange={(e) => setUserMaxAutoBid(e.target.value ? Math.max(0, parseInt(e.target.value)) : null)}
                                 className="h-8 text-xs"
+                                aria-label="Maximum auto-bid in pounds"
                               />
                             </div>
                           </div>
@@ -814,6 +816,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           value={reservePrice}
                           onChange={(e) => setReservePrice(e.target.value)}
                           placeholder="Minimum acceptable price"
+                          aria-label="Reserve price in pounds"
                         />
                       </div>
                       <div>
@@ -823,6 +826,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                           value={guidePrice}
                           onChange={(e) => setGuidePrice(e.target.value)}
                           placeholder="Expected sale price"
+                          aria-label="Guide price in pounds"
                         />
                       </div>
                     </div>

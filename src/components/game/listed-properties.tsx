@@ -149,6 +149,7 @@ export function ListedProperties({ propertyListings, ownedProperties, onAcceptOf
                       value={thresholdValue}
                       onChange={(e) => setThresholdValue(e.target.value)}
                       className="h-7 w-28 text-xs"
+                      aria-label="Auto-accept offer threshold in pounds"
                     />
                     <Button size="sm" className="h-7 px-2 text-xs" onClick={() => handleSetThreshold(listing.propertyId)}>Set</Button>
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditingThreshold(null); setThresholdValue(""); }}>Cancel</Button>
