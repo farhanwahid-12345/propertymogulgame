@@ -485,17 +485,21 @@ export const PropertyCard = memo(function PropertyCard({
               variant="ghost"
               size="sm"
               onClick={() => setFinancialsExpanded(!financialsExpanded)}
+              aria-expanded={financialsExpanded}
+              aria-controls={`property-financials-${property.id}`}
               className="w-full justify-between text-[10px] h-6 px-2 text-muted-foreground hover:text-foreground"
             >
               <span className="flex items-center gap-1">
-                {financialsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {financialsExpanded ? <ChevronUp className="h-3 w-3" aria-hidden="true" /> : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                 {financialsExpanded ? 'Hide details' : 'Details'}
               </span>
               <span>Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
             </Button>
 
+
             {financialsExpanded && (
-              <div className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+              <div id={`property-financials-${property.id}`} className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Purchase price</span>
                   <span className="font-medium">£{property.price.toLocaleString()}</span>
@@ -691,7 +695,14 @@ export const PropertyCard = memo(function PropertyCard({
                               tenantSatisfaction >= 40 ? "text-amber-400 fill-amber-400/30" :
                               "text-red-400 fill-red-400/30"
                             )} />
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden"
+                              role="progressbar"
+                              aria-valuenow={Math.round(tenantSatisfaction)}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label="Tenant satisfaction"
+                            >
                               <div
                                 className={cn(
                                   "h-full transition-all",
@@ -702,6 +713,7 @@ export const PropertyCard = memo(function PropertyCard({
                                 style={{ width: `${tenantSatisfaction}%` }}
                               />
                             </div>
+
                             <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">
                               {Math.round(tenantSatisfaction)}%
                             </span>

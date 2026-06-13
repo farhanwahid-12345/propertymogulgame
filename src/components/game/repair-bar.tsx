@@ -32,9 +32,17 @@ export function RepairBar({ score, className, showLabel = true }: RepairBarProps
         <TooltipTrigger asChild>
           <div className={cn("flex items-center gap-2 px-1 cursor-help", className)}>
             <Wrench className={cn("h-3.5 w-3.5 shrink-0", iconClass)} />
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuenow={s}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Property condition: ${label}`}
+            >
               <div className={cn("h-full transition-all", colorClass)} style={{ width: `${s}%` }} />
             </div>
+
             {showLabel && (
               <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">{s}</span>
             )}
