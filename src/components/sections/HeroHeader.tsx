@@ -186,12 +186,20 @@ export function HeroHeader({
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
                       {goalAchievedAt ? `🏆 ${goal.label}` : `🎯 ${goal.label}`}
                     </span>
-                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={Math.floor(goalPct)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`Progress toward goal: ${goal.label}`}
+                    >
                       <div
                         className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all"
                         style={{ width: `${goalPct}%` }}
                       />
                     </div>
+
                     <span className="text-[10px] tabular-nums text-muted-foreground/80 shrink-0 w-8 text-right">
                       {Math.floor(goalPct)}%
                     </span>
