@@ -612,7 +612,7 @@ export function EstateAgentWindow({
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-muted-foreground">Sort</Label>
                 <Select value={buySort} onValueChange={(v) => setBuySort(v as any)}>
-                  <SelectTrigger className="h-7 w-[170px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 w-[170px] text-xs" aria-label="Sort properties by"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="price-asc">Price · low → high</SelectItem>
                     <SelectItem value="price-desc">Price · high → low</SelectItem>
@@ -749,6 +749,7 @@ export function EstateAgentWindow({
                                     min={0}
                                     max={maxLTVPercent}
                                     step={5}
+                                    aria-label="Loan to value percentage"
                                   />
                                 </>
                               )}
@@ -765,7 +766,7 @@ export function EstateAgentWindow({
                           <div className="space-y-2">
                             <Label>Mortgage Provider</Label>
                             <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                              <SelectTrigger>
+                              <SelectTrigger aria-label="Mortgage provider">
                                 <SelectValue placeholder="Select provider" />
                               </SelectTrigger>
                               <SelectContent>
@@ -790,12 +791,13 @@ export function EstateAgentWindow({
                               min={5}
                               max={30}
                               step={5}
+                              aria-label="Mortgage term in years"
                             />
                           </div>
                           <div className="space-y-2">
                             <Label>Mortgage Type</Label>
                             <Select value={mortgageType} onValueChange={(v: any) => setMortgageType(v)}>
-                              <SelectTrigger>
+                              <SelectTrigger aria-label="Mortgage repayment type">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -807,7 +809,7 @@ export function EstateAgentWindow({
                           <div className="space-y-2">
                             <Label>Initial Fixed Term</Label>
                             <Select value={String(fixedTermYears)} onValueChange={(v) => setFixedTermYears(Number(v))}>
-                              <SelectTrigger>
+                              <SelectTrigger aria-label="Fixed rate term in years">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -988,6 +990,7 @@ export function EstateAgentWindow({
                           min={Math.floor(selectedBuyProperty.value * 0.85)}
                           max={vendorCounterAmount}
                           step={1000}
+                          aria-label="Counter offer amount in pounds"
                         />
                       </div>
 
@@ -1071,6 +1074,7 @@ export function EstateAgentWindow({
                           min={Math.floor(selectedBuyProperty.value * 0.85)}
                           max={Math.floor(selectedBuyProperty.value * 1.05)}
                           step={1000}
+                          aria-label="Offer amount in pounds"
                         />
                         <div className="flex justify-between text-xs text-muted-foreground">
                           <span>{Math.round((offerAmount[0] / selectedBuyProperty.value) * 100)}% of market value</span>
@@ -1111,7 +1115,7 @@ export function EstateAgentWindow({
                         if (prop) setNewListingPrice(getSuggestedFloor(prop));
                       }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Select property to list">
                         <SelectValue placeholder="Choose a property" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1164,6 +1168,7 @@ export function EstateAgentWindow({
                             min={Math.floor(suggestedFloor * 0.85)}
                             max={Math.floor(suggestedFloor * 1.5)}
                             step={1000}
+                            aria-label="Asking price in pounds"
                           />
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>85% (£{Math.floor(suggestedFloor * 0.85).toLocaleString()})</span>
