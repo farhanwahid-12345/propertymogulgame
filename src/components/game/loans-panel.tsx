@@ -133,7 +133,7 @@ export function LoansPanel() {
               <div>
                 <Label>Loan type</Label>
                 <Select value={kind} onValueChange={(v) => setKind(v as LoanKind)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Loan type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="personal">{KIND_META.personal.label}</SelectItem>
                     <SelectItem value="business">{KIND_META.business.label}</SelectItem>
@@ -150,6 +150,7 @@ export function LoansPanel() {
                   onChange={(e) => setAmountStr(e.target.value)}
                   min={500}
                   step={500}
+                  aria-label="Loan amount in pounds"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Max for you: £{fromPennies(dynamicMax).toLocaleString()}
@@ -165,6 +166,7 @@ export function LoansPanel() {
                   min={product.minTermMonths}
                   max={product.maxTermMonths}
                   step={1}
+                  aria-label="Loan term in months"
                 />
               </div>
 

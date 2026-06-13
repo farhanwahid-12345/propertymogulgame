@@ -192,6 +192,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                   max={selectedProperty.value * 0.85}
                   step={1000}
                   className="w-full"
+                  aria-label="New loan amount in pounds"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Current: £{(selectedProperty.mortgageRemaining || 0).toLocaleString()}</span>
@@ -203,7 +204,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                 <div>
                   <Label>Mortgage Provider</Label>
                   <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Mortgage provider">
                       <SelectValue placeholder="Choose provider..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -219,7 +220,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
                 <div>
                   <Label>Term (years)</Label>
                   <Select value={termYears.toString()} onValueChange={(value) => setTermYears(Number(value))}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Mortgage term in years">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -237,7 +238,7 @@ export function MortgageRefinance({ ownedProperties, mortgageProviders, onRefina
               <div>
                 <Label>Mortgage Type</Label>
                 <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => setMortgageType(value)}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Mortgage repayment type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

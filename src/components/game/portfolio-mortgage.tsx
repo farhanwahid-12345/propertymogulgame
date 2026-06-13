@@ -246,6 +246,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
                   max={Math.floor(maxLoanAmount)}
                   step={5000}
                   className="w-full"
+                  aria-label="Portfolio loan amount in pounds"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>Current: £{totalCurrentMortgages.toLocaleString()}</span>
@@ -270,7 +271,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
                 <div>
                   <Label>Specialist Lender</Label>
                   <Select value={selectedProvider} onValueChange={(v) => { setRejectionReason(null); setSelectedProvider(v); }}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Specialist lender">
                       <SelectValue placeholder="Choose lender..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -291,7 +292,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
                 <div>
                   <Label>Term (years)</Label>
                   <Select value={termYears.toString()} onValueChange={(value) => { setRejectionReason(null); setTermYears(Number(value)); }}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Mortgage term in years">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -308,7 +309,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
               <div>
                 <Label>Mortgage Type</Label>
                 <Select value={mortgageType} onValueChange={(value: 'repayment' | 'interest-only') => { setRejectionReason(null); setMortgageType(value); }}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Mortgage repayment type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -321,7 +322,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
               <div>
                 <Label>Initial Fixed Term</Label>
                 <Select value={String(fixedTermYears)} onValueChange={(v) => { setRejectionReason(null); setFixedTermYears(Number(v)); }}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Initial fixed rate term">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
