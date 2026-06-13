@@ -138,7 +138,14 @@ export function MultiUnitSlots({
                     slot.satisfaction >= 40 ? "text-amber-400 fill-amber-400/30" :
                     "text-red-400 fill-red-400/30"
                   )} />
-                  <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="flex-1 h-1 bg-muted rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={Math.round(slot.satisfaction)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Tenant satisfaction"
+                  >
                     <div
                       className={cn(
                         "h-full",
@@ -149,6 +156,7 @@ export function MultiUnitSlots({
                       style={{ width: `${slot.satisfaction}%` }}
                     />
                   </div>
+
                   <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">
                     {Math.round(slot.satisfaction)}%
                   </span>
