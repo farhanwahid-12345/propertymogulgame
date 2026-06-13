@@ -485,14 +485,17 @@ export const PropertyCard = memo(function PropertyCard({
               variant="ghost"
               size="sm"
               onClick={() => setFinancialsExpanded(!financialsExpanded)}
+              aria-expanded={financialsExpanded}
+              aria-controls={`property-financials-${property.id}`}
               className="w-full justify-between text-[10px] h-6 px-2 text-muted-foreground hover:text-foreground"
             >
               <span className="flex items-center gap-1">
-                {financialsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {financialsExpanded ? <ChevronUp className="h-3 w-3" aria-hidden="true" /> : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                 {financialsExpanded ? 'Hide details' : 'Details'}
               </span>
               <span>Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
             </Button>
+
 
             {financialsExpanded && (
               <div className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
