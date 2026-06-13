@@ -695,7 +695,14 @@ export const PropertyCard = memo(function PropertyCard({
                               tenantSatisfaction >= 40 ? "text-amber-400 fill-amber-400/30" :
                               "text-red-400 fill-red-400/30"
                             )} />
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden"
+                              role="progressbar"
+                              aria-valuenow={Math.round(tenantSatisfaction)}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label="Tenant satisfaction"
+                            >
                               <div
                                 className={cn(
                                   "h-full transition-all",
@@ -706,6 +713,7 @@ export const PropertyCard = memo(function PropertyCard({
                                 style={{ width: `${tenantSatisfaction}%` }}
                               />
                             </div>
+
                             <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">
                               {Math.round(tenantSatisfaction)}%
                             </span>
