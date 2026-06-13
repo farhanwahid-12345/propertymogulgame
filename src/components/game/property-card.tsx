@@ -498,7 +498,8 @@ export const PropertyCard = memo(function PropertyCard({
 
 
             {financialsExpanded && (
-              <div className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+              <div id={`property-financials-${property.id}`} className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Purchase price</span>
                   <span className="font-medium">£{property.price.toLocaleString()}</span>
