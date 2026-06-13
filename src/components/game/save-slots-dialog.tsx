@@ -116,6 +116,7 @@ export function SaveSlotsInlineButton() {
                         onKeyDown={(e) => e.key === 'Enter' && commitRename()}
                         autoFocus
                         className="h-8 text-sm"
+                        aria-label="Save slot name"
                       />
                       <Button size="sm" onClick={commitRename}>Save</Button>
                       <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>

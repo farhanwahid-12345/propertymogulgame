@@ -1291,6 +1291,7 @@ export function EstateAgentWindow({
                                   value={editPrice}
                                   onChange={(e) => setEditPrice(e.target.value)}
                                   className="w-32"
+                                  aria-label="Edit asking price"
                                 />
                                 <Button size="sm" onClick={() => handleUpdatePrice(listing.propertyId)}>
                                   <Check className="h-4 w-4" />
@@ -1343,6 +1344,7 @@ export function EstateAgentWindow({
                                     onChange={(e) => setThresholdValue(e.target.value)}
                                     placeholder="Amount"
                                     className="w-32"
+                                    aria-label="Auto-accept offer threshold"
                                   />
                                   <Button size="sm" onClick={() => handleSetThreshold(listing.propertyId)}>
                                     <Check className="h-4 w-4" />
@@ -1433,6 +1435,7 @@ export function EstateAgentWindow({
                                                   onChange={(e) => setCounterAmount(e.target.value)}
                                                   placeholder="Your counter offer"
                                                   className="flex-1"
+                                                  aria-label="Counter offer amount"
                                                 />
                                                 <Button
                                                   size="sm"
@@ -1515,6 +1518,7 @@ export function EstateAgentWindow({
                                                   onChange={(e) => setCounterAmount(e.target.value)}
                                                   placeholder="Your counter offer"
                                                   className="flex-1"
+                                                  aria-label="Counter offer amount"
                                                 />
                                                 <Button
                                                   size="sm"

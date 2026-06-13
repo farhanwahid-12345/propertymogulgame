@@ -930,6 +930,7 @@ export function RenovationDialog({
                   step={1}
                   value={[conversionUnits]}
                   onValueChange={(v) => setConversionUnits(v[0])}
+                  aria-label={isFlats(selectedRenovation) ? 'Number of flats to create' : 'Number of rooms to create'}
                 />
                 <div className="text-[11px] text-muted-foreground">
                   Building can support {minUnits(selectedRenovation)}–{maxUnits(selectedRenovation)} {isFlats(selectedRenovation) ? 'flats' : 'rooms'} (based on {sqft.toLocaleString()} sqft).
