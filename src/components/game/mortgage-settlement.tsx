@@ -133,7 +133,7 @@ export function MortgageSettlement({
                     setSelectedMortgage(value);
                     setPartialAmount("");
                   }}>
-                    <SelectTrigger>
+                    <SelectTrigger aria-label="Mortgage to pay down">
                       <SelectValue placeholder="Choose mortgage..." />
                     </SelectTrigger>
                     <SelectContent>

@@ -238,6 +238,7 @@ export function RentNegotiationDialog({
                     step={5}
                     value={[proposed]}
                     onValueChange={(v) => setProposed(v[0])}
+                    aria-label="Proposed new monthly rent in pounds"
                   />
                   <Input
                     type="number"

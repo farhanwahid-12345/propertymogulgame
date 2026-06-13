@@ -912,6 +912,7 @@ export const PropertyCard = memo(function PropertyCard({
                     min={50}
                     step={5}
                     className="w-full"
+                    aria-label="Loan to value percentage"
                   />
                   <div className="text-sm text-muted-foreground space-y-1">
                     <div>Mortgage: £{mortgageAmount.toLocaleString()}</div>
@@ -925,7 +926,7 @@ export const PropertyCard = memo(function PropertyCard({
                       <div>
                         <Label className="text-sm font-medium">Term</Label>
                         <Select value={mortgageTermYears} onValueChange={setMortgageTermYears}>
-                          <SelectTrigger className="h-8">
+                          <SelectTrigger className="h-8" aria-label="Mortgage term in years">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
