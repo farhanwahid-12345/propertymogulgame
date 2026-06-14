@@ -94,7 +94,7 @@ describe('Phase 6 — migration runner (#23)', () => {
 
   it('CURRENT_VERSION matches the inline ladder in the store', () => {
     // Reminder: if the store bumps _version, bump this too and register the step.
-    expect(CURRENT_VERSION).toBe(19);
+    expect(CURRENT_VERSION).toBe(20);
   });
 });
 

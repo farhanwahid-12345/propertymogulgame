@@ -217,6 +217,8 @@ export function createInitialState(): GameState {
     seenEpcTutorial: false,
     monthlySnapshots: [],
     achievements: {},
+    annualAccounts: [],
+
   };
 }
 
@@ -437,7 +439,14 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       }
     },
   },
+  {
+    from: 19, to: 20, describe: 'Phase 4 (v5 statements) — annual accounts array',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.annualAccounts)) persisted.annualAccounts = [];
+    },
+  },
 ];
+
 
 
 function migrateState(persisted: any): GameState {

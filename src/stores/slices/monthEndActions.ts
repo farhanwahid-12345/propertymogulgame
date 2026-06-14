@@ -179,6 +179,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newTenants = [...prev.tenants];
       let newVoidPeriods = [...prev.voidPeriods];
       let newPropertyListings = [...prev.propertyListings];
+      // Phase 4 (v5 statements) — accumulate CGT realised this tax year.
+      let cgtThisYearAcc = (prev as any).cgtThisYearPennies ?? 0;
+      const cgtRecordsThisRun: import('@/types/game').TaxRecord[] = [];
+
 
       completedSells.forEach(conv => {
         const salePrice = conv.salePrice || 0;
@@ -234,6 +238,16 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         sellCash += net - cgtAmount;
+        if (cgtAmount > 0) {
+          cgtThisYearAcc += cgtAmount;
+          cgtRecordsThisRun.push({
+            month: prev.monthsPlayed,
+            type: 'cgt',
+            amount: cgtAmount,
+            description: `CGT on sale of ${conv.propertyName} — £${fromPennies(cgtAmount).toLocaleString()}`,
+          });
+        }
+
         newOwnedProperties = newOwnedProperties.filter(p => p.id !== conv.propertyId);
         newMortgages = newMortgages.filter(m => m.propertyId !== conv.propertyId);
         newTenants = newTenants.filter(t => t.propertyId !== conv.propertyId);
@@ -1228,11 +1242,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let finalYearlyMortgageInterest = accumulatedMortgageInterest;
       let finalYearlyDeductibleExpenses = accumulatedDeductibleExpenses;
       let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
-      let newTaxRecords = [...prev.taxRecords];
+      let newTaxRecords = [...prev.taxRecords, ...cgtRecordsThisRun];
       let newTotalTaxPaid = prev.totalTaxPaid;
       let newUnusedLosses = (prev as any).unusedLosses ?? 0;
       let newLossesApplied = (prev as any).lossesAppliedThisYear ?? 0;
       let newLossesGenerated = (prev as any).lossesGeneratedThisYear ?? 0;
+      // Phase 4 (v5 statements) — populated when an annual tax year closes below.
+      let newAnnualAccountRecord: import('@/types/game').AnnualAccountRecord | null = null;
+      let netProfitBeforeTaxForRecord = 0;
+
 
       if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
         if (prev.entityType === 'sole_trader') {
@@ -1291,13 +1309,38 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         newTotalTaxPaid += taxPaid;
+        // Phase 4 (v5 statements) — capture P&L portion of the just-closed
+        // tax year. Balance-sheet figures (cash, property value, debt) are
+        // filled in at the set() call below using the final post-month state.
+        netProfitBeforeTaxForRecord =
+          accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses;
+        newAnnualAccountRecord = {
+          year: currentTaxYear,
+          startMonth: prev.lastCorporationTaxMonth,
+          endMonth: newMonthNumber,
+          entityType: prev.entityType,
+          grossRent: accumulatedGrossRent,
+          mortgageInterest: accumulatedMortgageInterest,
+          allowableExpenses: accumulatedDeductibleExpenses,
+          netProfitBeforeTax: netProfitBeforeTaxForRecord,
+          taxPaid,
+          cgtPaid: cgtThisYearAcc,
+          // Filled in at set() time with final balance-sheet values.
+          cashAtYearEnd: 0,
+          propertyValueAtYearEnd: 0,
+          mortgageDebtAtYearEnd: 0,
+          loanDebtAtYearEnd: 0,
+          netWorthAtYearEnd: 0,
+        };
         // Reset all yearly accumulators
         finalYearlyProfit = 0;
         finalYearlyGrossRent = 0;
         finalYearlyMortgageInterest = 0;
         finalYearlyDeductibleExpenses = 0;
         lastCorpTaxMonth = newMonthNumber;
+        cgtThisYearAcc = 0;
       }
+
 
       // Cashflow: net inflows against outflows in a single operation so the
       // overdraft is only tapped when the month's RENT can't cover the
@@ -1905,6 +1948,27 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           }
           return unlocked;
         })(),
+        // Phase 4 (v5 statements) — append the just-closed annual account.
+        annualAccounts: (() => {
+          const existing = ((s as any).annualAccounts as import('@/types/game').AnnualAccountRecord[] | undefined) || [];
+          if (!newAnnualAccountRecord) return existing;
+          const propertyValueAtYearEnd = updatedOwnedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
+          const mortgageDebtAtYearEnd = finalMortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
+          const loanDebtAtYearEnd = updatedLoans.reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
+          return [
+            ...existing,
+            {
+              ...newAnnualAccountRecord,
+              cashAtYearEnd: finalCash,
+              propertyValueAtYearEnd,
+              mortgageDebtAtYearEnd,
+              loanDebtAtYearEnd,
+              netWorthAtYearEnd: netWorthFinal,
+            },
+          ];
+        })(),
+        cgtThisYearPennies: cgtThisYearAcc,
+
       } as any));
     },
   };
