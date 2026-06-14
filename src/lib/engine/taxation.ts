@@ -125,9 +125,9 @@ export function calculateCGT(
 // Condition rent multipliers
 export function getConditionRentMultiplier(condition: string): number {
   switch (condition) {
-    case 'premium': return 1.25;
+    case 'premium': return 1.10;
     case 'standard': return 1.0;
-    case 'dilapidated': return 0.70;
+    case 'dilapidated': return 0.85;
     default: return 1.0;
   }
 }
