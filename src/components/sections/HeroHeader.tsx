@@ -236,7 +236,7 @@ export function HeroHeader({
               <div className="glass rounded-full px-1.5 py-1 flex items-center">
                 <SpeedSelector compact={compact} />
               </div>
-              <div className="glass rounded-full px-1 py-0.5 flex items-center gap-0.5">
+              <div className="glass rounded-full px-1 py-0.5 flex items-center gap-0.5 flex-wrap">
                 <Button
                   size="sm"
                   variant="ghost"
