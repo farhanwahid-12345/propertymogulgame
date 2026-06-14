@@ -217,6 +217,8 @@ export function createInitialState(): GameState {
     seenEpcTutorial: false,
     monthlySnapshots: [],
     achievements: {},
+    annualAccounts: [],
+
   };
 }
 
