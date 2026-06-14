@@ -238,6 +238,16 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         sellCash += net - cgtAmount;
+        if (cgtAmount > 0) {
+          cgtThisYearAcc += cgtAmount;
+          cgtRecordsThisRun.push({
+            month: prev.monthsPlayed,
+            type: 'cgt',
+            amount: cgtAmount,
+            description: `CGT on sale of ${conv.propertyName} — £${fromPennies(cgtAmount).toLocaleString()}`,
+          });
+        }
+
         newOwnedProperties = newOwnedProperties.filter(p => p.id !== conv.propertyId);
         newMortgages = newMortgages.filter(m => m.propertyId !== conv.propertyId);
         newTenants = newTenants.filter(t => t.propertyId !== conv.propertyId);
