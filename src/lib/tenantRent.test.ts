@@ -29,7 +29,7 @@ describe("getFurnishingRentMultiplier", () => {
 describe("calcTenantRent — preview/store parity", () => {
   it("matches manual product of multipliers", () => {
     const baseRent = 1_000;
-    const expected = Math.floor(1_000 * 1.10 * 1.25 * 1.24); // premium tenant, premium condition, fully furnished (Phase 2 #6)
+    const expected = Math.floor(1_000 * 1.05 * 1.10 * 1.08); // premium tenant, premium condition, fully furnished
     expect(calcTenantRent(baseRent, { profile: "premium" }, "premium", "fully_furnished")).toBe(expected);
   });
   it("dilapidated drops below base rent", () => {
