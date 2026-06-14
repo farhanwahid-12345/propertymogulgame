@@ -64,6 +64,13 @@ export function AccountsPanel({ gameState }: { gameState: GameState }) {
           <PerformanceChart />
         </Suspense>
       </TabsContent>
+
+      <TabsContent value="statements" className="mt-3">
+        <Suspense fallback={<PanelSkeleton />}>
+          <AnnualAccountsStatement />
+        </Suspense>
+      </TabsContent>
+
     </Tabs>
   );
 }
