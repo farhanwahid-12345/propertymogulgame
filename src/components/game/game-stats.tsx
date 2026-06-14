@@ -253,12 +253,6 @@ export function GameStats({
             </div>
           </div>
 
-          {/* Level */}
-          <div className="border-l-4 border-[hsl(var(--stat-level))] pl-3">
-            <div className="text-xs text-muted-foreground">⭐ Level</div>
-            <div className="text-xl font-bold text-foreground">Level {level}</div>
-            <Progress value={experienceProgress} className="mt-1 h-1.5" />
-          </div>
         </div>
       </div>
 
