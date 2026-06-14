@@ -13,16 +13,16 @@ export interface TenantRentInput {
 
 /**
  * Profile-based rent multiplier. Mirrors the logic in `gameStore.selectTenant`.
- * - premium  → +10%
+ * - premium  → +5%
  * - standard → flat
- * - budget   → -10%
- * - risky    → +5% (premium for risk)
+ * - budget   → -5%
+ * - risky    → flat
  */
 export function getProfileRentMultiplier(profile: TenantRentInput["profile"]): number {
   switch (profile) {
-    case "premium": return 1.10;
-    case "budget":  return 0.90;
-    case "risky":   return 1.05;
+    case "premium": return 1.05;
+    case "budget":  return 0.95;
+    case "risky":   return 1.00;
     case "standard":
     default:        return 1.00;
   }
@@ -35,21 +35,20 @@ export function getProfileRentMultiplier(profile: TenantRentInput["profile"]): n
  */
 export function getConditionRentMultiplierShared(condition?: PropertyCondition): number {
   switch (condition) {
-    case "premium":      return 1.25;
-    case "dilapidated":  return 0.70;
+    case "premium":      return 1.10;
+    case "dilapidated":  return 0.85;
     case "standard":
     default:             return 1.00;
   }
 }
 
-/** Rent multiplier from furnishing tier. Defaults to unfurnished (1.0).
- *  Phase 2 item #6: doubled rent uplift so furniture ROI is meaningful. */
+/** Rent multiplier from furnishing tier. Defaults to unfurnished (1.0). */
 export function getFurnishingRentMultiplier(
   tier?: 'unfurnished' | 'part_furnished' | 'fully_furnished'
 ): number {
   switch (tier) {
-    case 'part_furnished':  return 1.10;
-    case 'fully_furnished': return 1.24;
+    case 'part_furnished':  return 1.04;
+    case 'fully_furnished': return 1.08;
     case 'unfurnished':
     default:                return 1.00;
   }

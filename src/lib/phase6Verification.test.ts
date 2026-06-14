@@ -10,13 +10,13 @@ import { getFurnishingRentMultiplier } from '@/lib/tenantRent';
 
 describe('Phase 6 verification', () => {
   describe('#4/#6 furniture realism', () => {
-    it('part-furnished cost is ~30% of legacy and rent uplift is 10%', () => {
+    it('part-furnished cost is ~30% of legacy and rent uplift is 4%', () => {
       expect(getFurnishingCostPerSqft('part_furnished')).toBe(2);
-      expect(getFurnishingRentMultiplier('part_furnished')).toBeCloseTo(1.10, 5);
+      expect(getFurnishingRentMultiplier('part_furnished')).toBeCloseTo(1.04, 5);
     });
-    it('fully-furnished cost is ~30% of legacy and rent uplift is 24%', () => {
+    it('fully-furnished cost is ~30% of legacy and rent uplift is 8%', () => {
       expect(getFurnishingCostPerSqft('fully_furnished')).toBe(5);
-      expect(getFurnishingRentMultiplier('fully_furnished')).toBeCloseTo(1.24, 5);
+      expect(getFurnishingRentMultiplier('fully_furnished')).toBeCloseTo(1.08, 5);
     });
     it('unfurnished is the baseline', () => {
       expect(getFurnishingCostPerSqft('unfurnished')).toBe(0);
