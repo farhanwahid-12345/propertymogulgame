@@ -9,6 +9,10 @@ const TaxBreakdown = lazy(() =>
 const PerformanceChart = lazy(() =>
   import("@/components/game/performance-chart").then((m) => ({ default: m.PerformanceChart })),
 );
+const AnnualAccountsStatement = lazy(() =>
+  import("@/components/game/annual-accounts-statement").then((m) => ({ default: m.AnnualAccountsStatement })),
+);
+
 
 type GameState = ReturnType<typeof useGameState>;
 
@@ -28,6 +32,13 @@ export function AccountsPanel({ gameState }: { gameState: GameState }) {
         >
           📈 Performance
         </TabsTrigger>
+        <TabsTrigger
+          value="statements"
+          className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none"
+        >
+          📑 Statements
+        </TabsTrigger>
+
       </TabsList>
 
       <TabsContent value="tax" className="mt-3">
@@ -53,6 +64,13 @@ export function AccountsPanel({ gameState }: { gameState: GameState }) {
           <PerformanceChart />
         </Suspense>
       </TabsContent>
+
+      <TabsContent value="statements" className="mt-3">
+        <Suspense fallback={<PanelSkeleton />}>
+          <AnnualAccountsStatement />
+        </Suspense>
+      </TabsContent>
+
     </Tabs>
   );
 }
