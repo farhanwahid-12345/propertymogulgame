@@ -575,6 +575,9 @@ export interface AnnualAccountRecord {
   mortgageDebtAtYearEnd: number;    // pennies
   loanDebtAtYearEnd: number;        // pennies
   netWorthAtYearEnd: number;        // pennies
+}
+
+
 
 
 /** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */
