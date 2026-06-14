@@ -22,9 +22,19 @@ export function AchievementsInlineButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="glass border-0 bg-white/[0.06] h-9 px-3 text-xs">
-          🏅 Achievements
-          <Badge variant="secondary" className="ml-2 text-[10px]">{unlockedCount}/{total}</Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full h-8 w-8 p-0 relative"
+          aria-label="Achievements"
+          title="Achievements"
+        >
+          <Trophy className="h-3.5 w-3.5" />
+          {unlockedCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-primary text-[8px] font-bold text-primary-foreground flex items-center justify-center leading-none">
+              {unlockedCount}
+            </span>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl glass border-white/10 bg-background/95">
