@@ -556,7 +556,10 @@ export interface GameState {
   achievements?: Record<string, number>;
   /** Phase 4 (v5 statements) — annual P&L + balance-sheet snapshots, one per tax year. */
   annualAccounts?: AnnualAccountRecord[];
+  /** Phase 4 (v5 statements) — CGT realised so far in the current tax year (pennies). Reset at year close. */
+  cgtThisYearPennies?: number;
 }
+
 
 /** Phase 4 (v5 statements) — P&L + balance-sheet snapshot for one tax year. */
 export interface AnnualAccountRecord {
