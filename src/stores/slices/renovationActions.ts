@@ -31,16 +31,8 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
     startRenovation: (propertyId: string, renovationType: RenovationType) => {
       const prev = get();
 
-      // Conversion-specific gates: must be vacant, and only one conversion per property.
+      // Conversion-specific gates: only one conversion per property.
       if (renovationType.category === 'conversion') {
-        if (prev.tenants.some((t: any) => t.propertyId === propertyId)) {
-          showToast(
-            "Conversion Blocked",
-            "Vacate every unit (serve eviction notice) before converting.",
-            "destructive",
-          );
-          return;
-        }
         const propertyForCheck = prev.ownedProperties.find((p: any) => p.id === propertyId);
         const subtype = propertyForCheck?.subtype;
         if (subtype && subtype !== 'standard') {
@@ -76,6 +68,18 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
         );
         if (!approved) {
           (get() as any).submitPlanningApplication(propertyId, renovationType);
+          return;
+        }
+      }
+
+      // Conversion works can only begin once every tenant has vacated.
+      if (renovationType.category === 'conversion') {
+        if (prev.tenants.some((t: any) => t.propertyId === propertyId)) {
+          showToast(
+            "Conversion Blocked",
+            "Vacate every unit (serve eviction notice) before converting.",
+            "destructive",
+          );
           return;
         }
       }
