@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { getMaxPropertiesForLevel, MAX_PROPERTIES_HARD_CAP } from "@/lib/engine/financials";
+import { getMaxPropertiesForLevel } from "@/lib/engine/financials";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 
 describe("Phase 3 v4 verification", () => {
-  it("#4 — hard cap of 12 properties regardless of level", () => {
-    expect(MAX_PROPERTIES_HARD_CAP).toBe(12);
+  it("#4 — property cap removed; returns Infinity regardless of level", () => {
     for (let level = 1; level <= 10; level++) {
-      expect(getMaxPropertiesForLevel(level)).toBe(12);
+      expect(getMaxPropertiesForLevel(level)).toBe(Infinity);
     }
   });
 
