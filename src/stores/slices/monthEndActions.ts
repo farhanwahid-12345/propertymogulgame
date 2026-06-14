@@ -1247,6 +1247,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newUnusedLosses = (prev as any).unusedLosses ?? 0;
       let newLossesApplied = (prev as any).lossesAppliedThisYear ?? 0;
       let newLossesGenerated = (prev as any).lossesGeneratedThisYear ?? 0;
+      // Phase 4 (v5 statements) — populated when an annual tax year closes below.
+      let newAnnualAccountRecord: import('@/types/game').AnnualAccountRecord | null = null;
+      let netProfitBeforeTaxForRecord = 0;
+
 
       if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
         if (prev.entityType === 'sole_trader') {
