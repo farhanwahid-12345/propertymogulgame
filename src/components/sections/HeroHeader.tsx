@@ -3,6 +3,8 @@ import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { ReputationBadge } from "@/components/game/reputation-badge";
+import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
+import { SaveSlotsInlineButton } from "@/components/game/save-slots-dialog";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
 import {
@@ -234,7 +236,7 @@ export function HeroHeader({
               <div className="glass rounded-full px-1.5 py-1 flex items-center">
                 <SpeedSelector compact={compact} />
               </div>
-              <div className="glass rounded-full px-1 py-0.5 flex items-center gap-0.5">
+              <div className="glass rounded-full px-1 py-0.5 flex items-center gap-0.5 flex-wrap">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -269,6 +271,8 @@ export function HeroHeader({
                   lastCorporationTaxMonth={lastCorporationTaxMonth}
                   entityType={entityType}
                 />
+                <AchievementsInlineButton />
+                <SaveSlotsInlineButton />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
