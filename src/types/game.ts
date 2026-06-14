@@ -554,7 +554,28 @@ export interface GameState {
   monthlySnapshots?: PortfolioSnapshot[];
   /** Phase 4 (v5) — unlocked achievements. Map of achievement id → unlock month. */
   achievements?: Record<string, number>;
+  /** Phase 4 (v5 statements) — annual P&L + balance-sheet snapshots, one per tax year. */
+  annualAccounts?: AnnualAccountRecord[];
 }
+
+/** Phase 4 (v5 statements) — P&L + balance-sheet snapshot for one tax year. */
+export interface AnnualAccountRecord {
+  year: number;                    // 1-indexed in-game tax year
+  startMonth: number;
+  endMonth: number;
+  entityType: EntityType;
+  grossRent: number;                // pennies
+  mortgageInterest: number;         // pennies
+  allowableExpenses: number;        // pennies
+  netProfitBeforeTax: number;       // pennies
+  taxPaid: number;                  // pennies — income tax or corp tax for this year
+  cgtPaid: number;                  // pennies — any CGT realised this year
+  cashAtYearEnd: number;            // pennies
+  propertyValueAtYearEnd: number;   // pennies, sum of all owned property values
+  mortgageDebtAtYearEnd: number;    // pennies
+  loanDebtAtYearEnd: number;        // pennies
+  netWorthAtYearEnd: number;        // pennies
+
 
 /** v3 #4 — mortgage or loan reached zero balance; surfaced as a confirmation modal. */
 export interface PayoffEvent {
