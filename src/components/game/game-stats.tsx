@@ -204,54 +204,58 @@ export function GameStats({
                 </PopoverContent>
               </Popover>
             </div>
-            <div className={cn("text-xl font-bold",
-              netMonthlyIncome >= 0 ? "text-success" : "text-danger"
-            )}>
-              £{netMonthlyIncome.toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              In: £{totalMonthlyIncome.toLocaleString()} | Out: £{totalMonthlyExpenses.toLocaleString()}
+            <div className="flex items-baseline justify-between">
+              <div className={cn("text-xl font-bold",
+                netMonthlyIncome >= 0 ? "text-success" : "text-danger"
+              )}>
+                £{netMonthlyIncome.toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                In: £{totalMonthlyIncome.toLocaleString()} | Out: £{totalMonthlyExpenses.toLocaleString()}
+              </div>
             </div>
           </div>
 
           {/* Portfolio & Credit */}
           <div className="border-l-4 border-[hsl(var(--stat-credit))] pl-3">
             <div className="text-xs text-muted-foreground">🏠 Portfolio</div>
-            <div className="text-xl font-bold text-foreground">
-              {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
-                <InfoTip text={TIP_TEXTS.CREDIT_SCORE} label="About credit score" />
-              </span>
-              {portfolioLTV > 0 && (
-                <span className={cn(
-                  "text-xs font-semibold inline-flex items-center gap-1",
-                  portfolioLTV > 80 ? "text-danger" :
-                  portfolioLTV > 60 ? "text-yellow-400" :
-                  "text-success"
-                )}>
-                  LTV: {portfolioLTV.toFixed(0)}%
-                  <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="text-xl font-bold text-foreground shrink-0">
+                {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                  Credit: <span className={getCreditScoreColor(creditScore)}>{creditScore}</span>
+                  <InfoTip text={TIP_TEXTS.CREDIT_SCORE} label="About credit score" />
                 </span>
-              )}
-              {totalMonthlyExpenses > 0 && (
-                <span className={cn(
-                  "text-xs font-semibold inline-flex items-center gap-1",
-                  dtiColor
-                )}>
-                  DTI: {Math.round(dtiRatio)}%
-                  <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
-                </span>
-              )}
-              <CreditImprovementGuide
-                creditScore={creditScore}
-                mortgageCount={ownedPropertiesCount}
-                monthsPlayed={monthsPlayed}
-                totalDebt={totalDebt}
-                cash={cash}
-              />
+                {portfolioLTV > 0 && (
+                  <span className={cn(
+                    "text-xs font-semibold inline-flex items-center gap-1",
+                    portfolioLTV > 80 ? "text-danger" :
+                    portfolioLTV > 60 ? "text-yellow-400" :
+                    "text-success"
+                  )}>
+                    LTV: {portfolioLTV.toFixed(0)}%
+                    <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
+                  </span>
+                )}
+                {totalMonthlyExpenses > 0 && (
+                  <span className={cn(
+                    "text-xs font-semibold inline-flex items-center gap-1",
+                    dtiColor
+                  )}>
+                    DTI: {Math.round(dtiRatio)}%
+                    <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
+                  </span>
+                )}
+                <CreditImprovementGuide
+                  creditScore={creditScore}
+                  mortgageCount={ownedPropertiesCount}
+                  monthsPlayed={monthsPlayed}
+                  totalDebt={totalDebt}
+                  cash={cash}
+                />
+              </div>
             </div>
           </div>
 
