@@ -1948,6 +1948,27 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           }
           return unlocked;
         })(),
+        // Phase 4 (v5 statements) — append the just-closed annual account.
+        annualAccounts: (() => {
+          const existing = ((s as any).annualAccounts as import('@/types/game').AnnualAccountRecord[] | undefined) || [];
+          if (!newAnnualAccountRecord) return existing;
+          const propertyValueAtYearEnd = updatedOwnedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
+          const mortgageDebtAtYearEnd = finalMortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
+          const loanDebtAtYearEnd = updatedLoans.reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
+          return [
+            ...existing,
+            {
+              ...newAnnualAccountRecord,
+              cashAtYearEnd: finalCash,
+              propertyValueAtYearEnd,
+              mortgageDebtAtYearEnd,
+              loanDebtAtYearEnd,
+              netWorthAtYearEnd: netWorthFinal,
+            },
+          ];
+        })(),
+        cgtThisYearPennies: cgtThisYearAcc,
+
       } as any));
     },
   };
