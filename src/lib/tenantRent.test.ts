@@ -7,9 +7,9 @@ import {
 } from "./tenantRent";
 
 describe("getProfileRentMultiplier", () => {
-  it("premium > risky > standard > budget", () => {
+  it("premium > standard = risky > budget", () => {
     expect(getProfileRentMultiplier("premium")).toBeGreaterThan(getProfileRentMultiplier("risky"));
-    expect(getProfileRentMultiplier("risky")).toBeGreaterThan(getProfileRentMultiplier("standard"));
+    expect(getProfileRentMultiplier("risky")).toBe(getProfileRentMultiplier("standard"));
     expect(getProfileRentMultiplier("standard")).toBeGreaterThan(getProfileRentMultiplier("budget"));
   });
 });
