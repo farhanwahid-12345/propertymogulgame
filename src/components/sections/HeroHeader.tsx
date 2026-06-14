@@ -3,6 +3,8 @@ import transporterBridgeHero from "@/assets/transporter-bridge-hero.jpg";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { ReputationBadge } from "@/components/game/reputation-badge";
+import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
+import { SaveSlotsInlineButton } from "@/components/game/save-slots-dialog";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
 import {
