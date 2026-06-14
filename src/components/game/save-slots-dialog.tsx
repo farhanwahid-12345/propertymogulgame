@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Save } from "lucide-react";
 import { useGameStore } from "@/stores/gameStore";
 import {
   SLOT_COUNT, type SlotIndex,
