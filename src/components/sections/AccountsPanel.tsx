@@ -9,6 +9,10 @@ const TaxBreakdown = lazy(() =>
 const PerformanceChart = lazy(() =>
   import("@/components/game/performance-chart").then((m) => ({ default: m.PerformanceChart })),
 );
+const AnnualAccountsStatement = lazy(() =>
+  import("@/components/game/annual-accounts-statement").then((m) => ({ default: m.AnnualAccountsStatement })),
+);
+
 
 type GameState = ReturnType<typeof useGameState>;
 
