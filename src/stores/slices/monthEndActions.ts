@@ -1242,7 +1242,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let finalYearlyMortgageInterest = accumulatedMortgageInterest;
       let finalYearlyDeductibleExpenses = accumulatedDeductibleExpenses;
       let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
-      let newTaxRecords = [...prev.taxRecords];
+      let newTaxRecords = [...prev.taxRecords, ...cgtRecordsThisRun];
       let newTotalTaxPaid = prev.totalTaxPaid;
       let newUnusedLosses = (prev as any).unusedLosses ?? 0;
       let newLossesApplied = (prev as any).lossesAppliedThisYear ?? 0;
