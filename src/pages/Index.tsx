@@ -175,6 +175,9 @@ const Index = () => {
                 <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
                   🏦 Bank
                 </TabsTrigger>
+                <TabsTrigger value="accounts" className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none">
+                  📊 Accounts
+                </TabsTrigger>
               </TabsList>
               <div className="ml-auto flex items-center flex-wrap gap-2 justify-end">
                 {activeTab === 'market' && (
@@ -188,8 +191,6 @@ const Index = () => {
                       totalPortfolioIncome={totalPortfolioIncome}
                     />
                     <LoansInlineButton gameState={gameState} />
-                    <TaxInlineButton gameState={gameState} />
-                    <PerformanceInlineButton />
                   </>
                 )}
                 <OperationsInlineButton gameState={gameState} />
@@ -200,6 +201,9 @@ const Index = () => {
 
           <TabsContent value="market" className="mt-0" />
           <TabsContent value="bank" className="mt-0" />
+          <TabsContent value="accounts" className="mt-0">
+            <AccountsPanel gameState={gameState} />
+          </TabsContent>
         </Tabs>
 
         {(() => {
