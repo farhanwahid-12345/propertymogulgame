@@ -271,6 +271,8 @@ export function HeroHeader({
                   lastCorporationTaxMonth={lastCorporationTaxMonth}
                   entityType={entityType}
                 />
+                <AchievementsInlineButton />
+                <SaveSlotsInlineButton />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
