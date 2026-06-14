@@ -179,6 +179,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newTenants = [...prev.tenants];
       let newVoidPeriods = [...prev.voidPeriods];
       let newPropertyListings = [...prev.propertyListings];
+      // Phase 4 (v5 statements) — accumulate CGT realised this tax year.
+      let cgtThisYearAcc = (prev as any).cgtThisYearPennies ?? 0;
+      const cgtRecordsThisRun: import('@/types/game').TaxRecord[] = [];
+
 
       completedSells.forEach(conv => {
         const salePrice = conv.salePrice || 0;
