@@ -52,7 +52,7 @@ describe('Phase 1 (v5) — wiring', () => {
       { from: 14, to: 15, describe: 't', apply: (p) => { p.c = 3; } },
     ];
     runMigrations(persisted, steps);
-    expect(persisted._version).toBe(19);
+    expect(persisted._version).toBe(20);
     expect(persisted).toMatchObject({ a: 1, b: 2, c: 3 });
   });
 
@@ -64,6 +64,6 @@ describe('Phase 1 (v5) — wiring', () => {
   });
 
   it('CURRENT_VERSION is 15 (rngSeed step)', () => {
-    expect(CURRENT_VERSION).toBe(19);
+    expect(CURRENT_VERSION).toBe(20);
   });
 });
