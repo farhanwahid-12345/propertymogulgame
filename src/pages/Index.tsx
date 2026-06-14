@@ -23,8 +23,6 @@ import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, TaxInli
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { MobileBottomNav } from "@/components/sections/MobileBottomNav";
 import { InstallPromptBanner } from "@/components/InstallPromptBanner";
-import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
-import { SaveSlotsInlineButton } from "@/components/game/save-slots-dialog";
 import { useGameState } from "@/hooks/useGameState";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
