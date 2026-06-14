@@ -192,8 +192,6 @@ const Index = () => {
                   </>
                 )}
                 <OperationsInlineButton gameState={gameState} />
-                <AchievementsInlineButton />
-                <SaveSlotsInlineButton />
               </div>
             </div>
           </div>
