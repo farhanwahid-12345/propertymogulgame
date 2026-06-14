@@ -1309,13 +1309,38 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         newTotalTaxPaid += taxPaid;
+        // Phase 4 (v5 statements) — capture P&L portion of the just-closed
+        // tax year. Balance-sheet figures (cash, property value, debt) are
+        // filled in at the set() call below using the final post-month state.
+        netProfitBeforeTaxForRecord =
+          accumulatedGrossRent - accumulatedMortgageInterest - accumulatedDeductibleExpenses;
+        newAnnualAccountRecord = {
+          year: currentTaxYear,
+          startMonth: prev.lastCorporationTaxMonth,
+          endMonth: newMonthNumber,
+          entityType: prev.entityType,
+          grossRent: accumulatedGrossRent,
+          mortgageInterest: accumulatedMortgageInterest,
+          allowableExpenses: accumulatedDeductibleExpenses,
+          netProfitBeforeTax: netProfitBeforeTaxForRecord,
+          taxPaid,
+          cgtPaid: cgtThisYearAcc,
+          // Filled in at set() time with final balance-sheet values.
+          cashAtYearEnd: 0,
+          propertyValueAtYearEnd: 0,
+          mortgageDebtAtYearEnd: 0,
+          loanDebtAtYearEnd: 0,
+          netWorthAtYearEnd: 0,
+        };
         // Reset all yearly accumulators
         finalYearlyProfit = 0;
         finalYearlyGrossRent = 0;
         finalYearlyMortgageInterest = 0;
         finalYearlyDeductibleExpenses = 0;
         lastCorpTaxMonth = newMonthNumber;
+        cgtThisYearAcc = 0;
       }
+
 
       // Cashflow: net inflows against outflows in a single operation so the
       // overdraft is only tapped when the month's RENT can't cover the
