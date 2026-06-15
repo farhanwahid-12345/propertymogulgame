@@ -13,6 +13,7 @@ import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { showToast, debit, debitStrict } from '../storeHelpers';
 import { gameRandom } from '@/lib/rng';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
+import { deriveSqft } from '@/lib/engine/market';
 import {
   scaleRenovationCost, scaleRenovationRent, scaleRenovationValue,
   scaleRenovationForProperty, isDeductibleRevenueRenovation,
@@ -88,7 +89,16 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
       const activeRenoIds = prev.renovations.filter((r: any) => r.propertyId === propertyId).map((r: any) => r.type.id);
       const completedRenoIds = (property?.completedRenovationIds || []);
       const effectiveSqft = property
-        ? getEffectiveInternalSqft(property.internalSqft, prev.planningApplications, propertyId, RENOVATION_OPTIONS, activeRenoIds, completedRenoIds)
+        ? getEffectiveInternalSqft(
+            property.internalSqft && property.internalSqft > 0
+              ? property.internalSqft
+              : deriveSqft({ type: property.type, value: fromPennies(property.value), internalSqft: property.internalSqft, plotSqft: property.plotSqft }).internalSqft,
+            prev.planningApplications,
+            propertyId,
+            RENOVATION_OPTIONS,
+            activeRenoIds,
+            completedRenoIds,
+          )
         : undefined;
       const scaleInputs = property
         ? { internalSqft: effectiveSqft, propertyValue: fromPennies(property.value) }
