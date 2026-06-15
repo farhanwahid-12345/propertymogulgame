@@ -78,7 +78,11 @@ interface HeadsOfTermsDialogProps {
   askingRentPennies: number;
   /** monthsPlayed snapshot for lease start/break-clause maths. */
   monthsPlayed: number;
-  onSign: (
+  /** Phase 3 — 'new' = letting a vacant unit; 'review' = contractual rent review on a sitting tenant. */
+  mode?: 'new' | 'review';
+  /** Phase 3 — current rent (pennies) at the moment of review (for delta display). Used only when mode='review'. */
+  currentRentPennies?: number;
+  onSign?: (
     propertyId: string,
     tenant: Tenant,
     terms: {
@@ -88,6 +92,8 @@ interface HeadsOfTermsDialogProps {
       breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
     },
   ) => void;
+  /** Phase 3 — settle a contractual rent review at the agreed rent. Called instead of onSign when mode='review'. */
+  onSettleReview?: (propertyId: string, agreedRentPennies: number) => void;
 }
 
 export function HeadsOfTermsDialog({
@@ -98,10 +104,17 @@ export function HeadsOfTermsDialog({
   tenant,
   askingRentPennies,
   monthsPlayed,
+  mode = 'new',
+  currentRentPennies,
   onSign,
+  onSettleReview,
 }: HeadsOfTermsDialogProps) {
+  const isReview = mode === 'review';
   const covenant = tenant?.covenantStrength ?? 50;
   const askingPounds = Math.round(fromPennies(askingRentPennies));
+  const currentRentPounds = currentRentPennies != null
+    ? Math.round(fromPennies(currentRentPennies))
+    : null;
 
   // ── Local negotiation state
   const [proposedRentPounds, setProposedRentPounds] = useState<number>(askingPounds);
@@ -128,8 +141,10 @@ export function HeadsOfTermsDialog({
   if (!tenant) return null;
 
   const proposedRentPennies = toPennies(proposedRentPounds);
+  // In review mode, "market" baseline = the proposed market uplift (askingRent);
+  // tenant tolerance is measured against that, same maths as new lets.
   const acceptanceChance = tenantAcceptanceChance(proposedRentPennies, askingRentPennies, covenant);
-  const termOk = tenantAcceptsTerm(termYears, covenant);
+  const termOk = isReview ? true : tenantAcceptsTerm(termYears, covenant);
 
   const covenantTone =
     covenant >= 80 ? 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10' :
@@ -163,6 +178,11 @@ export function HeadsOfTermsDialog({
 
   const handleSign = () => {
     const finalRentPounds = agreedRentPounds ?? proposedRentPounds;
+    if (isReview) {
+      onSettleReview?.(propertyId, toPennies(finalRentPounds));
+      onOpenChange(false);
+      return;
+    }
     const termMonths = termYears * 12;
     const breakAtMonth = monthsPlayed + Math.floor(termMonths / 2);
     const breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number } =
@@ -170,7 +190,7 @@ export function HeadsOfTermsDialog({
       breakChoice === 'tenant_mid' ? { type: 'tenant', atMonth: breakAtMonth } :
                                       { type: 'mutual', atMonth: breakAtMonth };
 
-    onSign(propertyId, tenant, {
+    onSign?.(propertyId, tenant, {
       agreedRentPennies: toPennies(finalRentPounds),
       termMonths,
       reviewFrequencyMonths: reviewYears * 12,
@@ -185,9 +205,19 @@ export function HeadsOfTermsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSignature className="h-5 w-5 text-amber-300" />
-            Heads of Terms — {propertyName}
+            {isReview ? 'Rent Review' : 'Heads of Terms'} — {propertyName}
           </DialogTitle>
         </DialogHeader>
+
+        {isReview && currentRentPounds != null && (
+          <div className="glass rounded-xl p-3 border border-sky-400/30 bg-sky-400/5 text-xs">
+            Contractual review due. Current rent <span className="font-semibold text-foreground">£{currentRentPounds.toLocaleString()}/mo</span>.
+            Suggested market rent <span className="font-semibold text-foreground">£{askingPounds.toLocaleString()}/mo</span> ({(((askingPounds - currentRentPounds) / Math.max(1, currentRentPounds)) * 100).toFixed(1)}%).
+            Lease length, break clause, and review frequency are fixed for this review.
+          </div>
+        )}
+
+
 
         {/* Tenant summary */}
         <div className="glass rounded-xl p-3 space-y-2">
@@ -244,6 +274,7 @@ export function HeadsOfTermsDialog({
           </div>
         </div>
 
+        {!isReview && (<>
         {/* Lease length */}
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
@@ -327,6 +358,8 @@ export function HeadsOfTermsDialog({
             })}
           </div>
         </div>
+        </>)}
+
 
         {/* Counter-offer / rejection feedback */}
         {stage === 'counter' && agreedRentPounds == null && tenantCounterPounds != null && (

@@ -220,11 +220,23 @@ export const PropertyCard = memo(function PropertyCard({
   // Phase 2 — Heads of Terms negotiation state for commercial vacancies.
   const [hotOpen, setHotOpen] = useState(false);
   const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
+  // Phase 3 — Rent-review dialog state for sitting commercial tenants.
+  const [reviewOpen, setReviewOpen] = useState(false);
   const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
+  const settleRentReview = useGameStore(s => (s as any).settleRentReview);
+  const pendingRentReview = useGameStore(s =>
+    ((s as any).pendingRentReviews || []).find((r: any) => r.propertyId === property.id),
+  );
+  const sittingCommercialTenant = useGameStore(s =>
+    property.type === 'commercial'
+      ? (s.tenants || []).find((t: any) => t.propertyId === property.id)?.tenant
+      : undefined,
+  );
   const topUpCondition = useGameStore(s => s.topUpCondition);
   const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
   const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
   const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
+
 
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
@@ -701,6 +713,37 @@ export const PropertyCard = memo(function PropertyCard({
                       onSign={(pid, t, terms) => signCommercialLease?.(pid, t, terms)}
                     />
                   )}
+
+                  {/* Phase 3 — Rent review due banner + dialog (commercial sitting tenants only) */}
+                  {property.type === 'commercial' && pendingRentReview && (
+                    <>
+                      <div className="glass rounded-xl p-3 border border-amber-400/40 bg-amber-400/10 flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                          <div className="font-semibold text-amber-200">📈 Rent review due</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Suggested market rent £{Math.round((pendingRentReview.proposedMarketRentPennies || 0) / 100).toLocaleString()}/mo (current £{Math.round((pendingRentReview.currentRentPennies || 0) / 100).toLocaleString()}/mo).
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setReviewOpen(true)}>
+                          Open Heads of Terms
+                        </Button>
+                      </div>
+                      <HeadsOfTermsDialog
+                        open={reviewOpen}
+                        onOpenChange={setReviewOpen}
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        tenant={sittingCommercialTenant ?? null}
+                        askingRentPennies={pendingRentReview.proposedMarketRentPennies}
+                        currentRentPennies={pendingRentReview.currentRentPennies}
+                        monthsPlayed={monthsPlayed}
+                        mode="review"
+                        onSettleReview={(pid, agreed) => settleRentReview?.(pid, agreed)}
+                      />
+                    </>
+                  )}
+
+
 
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">

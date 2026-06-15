@@ -1160,29 +1160,44 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
       }
 
-      // ── Commercial triennial rent reviews ──
-      // Every 36 months from the tenant's last review (or move-in), commercial
-      // leases reset to current market rent — bypassing the 3% Section-13 cap.
-      let commercialReviewCount = 0;
-      const commercialUplift = 0.0927; // 3 years compounded at 3%
-      newTenants = newTenants.map(t => {
+      // ── Commercial rent reviews ──
+      // On each lease's contractual review anniversary (`lease.reviewFrequencyMonths`),
+      // queue a `pendingRentReview` so the player can negotiate the new rent via
+      // Heads of Terms (review mode). NO auto-uplift is applied any more.
+      const existingPendingByProp = new Map<string, any>();
+      for (const r of ((prev as any).pendingRentReviews || [])) {
+        existingPendingByProp.set(r.propertyId, r);
+      }
+      const newlyQueuedReviews: any[] = [];
+      newTenants.forEach(t => {
         const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
-        if (!property || property.type !== 'commercial') return t;
-        const baseline = t.lastRentReviewMonth ?? t.moveInMonth ?? 0;
-        if (newMonthNumber - baseline < 36) return t;
-        const newBase = Math.floor((property.baseRent || property.monthlyIncome) * (1 + commercialUplift));
-        updatedOwnedProperties = updatedOwnedProperties.map(p =>
-          p.id === t.propertyId ? { ...p, baseRent: newBase, monthlyIncome: Math.floor(p.monthlyIncome * (1 + commercialUplift)), lastRentIncrease: newMonthNumber } : p
-        );
-        commercialReviewCount++;
-        return { ...t, lastRentReviewMonth: newMonthNumber };
+        if (!property || property.type !== 'commercial') return;
+        const lease = (property as any).commercialLease;
+        const freq = (lease && typeof lease.reviewFrequencyMonths === 'number' && lease.reviewFrequencyMonths > 0)
+          ? lease.reviewFrequencyMonths
+          : 36;
+        const baseline = t.lastRentReviewMonth ?? t.moveInMonth ?? lease?.startMonth ?? 0;
+        if (newMonthNumber - baseline < freq) return;
+        if (existingPendingByProp.has(property.id)) return;
+        // Suggested market uplift: 3% compounded over the review period.
+        const upliftFactor = Math.pow(1.03, freq / 12);
+        const currentRentPennies = (property.baseRent || property.monthlyIncome) * 100;
+        const proposedMarketRentPennies = Math.round(currentRentPennies * upliftFactor);
+        newlyQueuedReviews.push({
+          id: `rentreview_${property.id}_${newMonthNumber}`,
+          propertyId: property.id,
+          dueMonth: newMonthNumber,
+          currentRentPennies,
+          proposedMarketRentPennies,
+        });
       });
-      if (commercialReviewCount > 0) {
+      if (newlyQueuedReviews.length > 0) {
         showToast(
-          "Commercial rent review",
-          `${commercialReviewCount} commercial lease${commercialReviewCount === 1 ? '' : 's'} reviewed to market rate (+${(commercialUplift * 100).toFixed(1)}%).`
+          "Rent review due",
+          `${newlyQueuedReviews.length} commercial lease${newlyQueuedReviews.length === 1 ? '' : 's'} reached a contractual rent review — open Heads of Terms to negotiate.`,
         );
       }
+
 
       // v4 #3 — per-tenant arrears bookkeeping. Missed tenants accumulate
       // months + £ owed and the player receives NO rent that month. When the
@@ -1969,6 +1984,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ];
         })(),
         cgtThisYearPennies: cgtThisYearAcc,
+        pendingRentReviews: newlyQueuedReviews.length > 0
+          ? [...(((s as any).pendingRentReviews) || []), ...newlyQueuedReviews]
+          : ((s as any).pendingRentReviews || []),
 
       } as any));
     },
