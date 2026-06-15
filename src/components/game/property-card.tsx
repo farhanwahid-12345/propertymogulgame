@@ -682,6 +682,8 @@ export const PropertyCard = memo(function PropertyCard({
                         satisfactionReasons={tenantSatisfactionReasons}
                         furnishingTier={(property as any).furnishingTier}
                         propertyType={property.type}
+                        onCommercialApplicantSelected={(_pid, t) => { setHotApplicant(t); setHotOpen(true); }}
+
 
                       />
                     )
