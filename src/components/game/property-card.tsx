@@ -220,11 +220,23 @@ export const PropertyCard = memo(function PropertyCard({
   // Phase 2 — Heads of Terms negotiation state for commercial vacancies.
   const [hotOpen, setHotOpen] = useState(false);
   const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
+  // Phase 3 — Rent-review dialog state for sitting commercial tenants.
+  const [reviewOpen, setReviewOpen] = useState(false);
   const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
+  const settleRentReview = useGameStore(s => (s as any).settleRentReview);
+  const pendingRentReview = useGameStore(s =>
+    ((s as any).pendingRentReviews || []).find((r: any) => r.propertyId === property.id),
+  );
+  const sittingCommercialTenant = useGameStore(s =>
+    property.type === 'commercial'
+      ? (s.tenants || []).find((t: any) => t.propertyId === property.id)?.tenant
+      : undefined,
+  );
   const topUpCondition = useGameStore(s => s.topUpCondition);
   const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
   const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
   const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
+
 
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
