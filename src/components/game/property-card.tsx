@@ -222,10 +222,17 @@ export const PropertyCard = memo(function PropertyCard({
   const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
   // Phase 3 — Rent-review dialog state for sitting commercial tenants.
   const [reviewOpen, setReviewOpen] = useState(false);
+  // Phase 4 — Renewal dialog state for sitting commercial tenants.
+  const [renewalOpen, setRenewalOpen] = useState(false);
   const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
   const settleRentReview = useGameStore(s => (s as any).settleRentReview);
+  const renewCommercialLease = useGameStore(s => (s as any).renewCommercialLease);
+  const declineLeaseRenewal = useGameStore(s => (s as any).declineLeaseRenewal);
   const pendingRentReview = useGameStore(s =>
     ((s as any).pendingRentReviews || []).find((r: any) => r.propertyId === property.id),
+  );
+  const pendingLeaseRenewal = useGameStore(s =>
+    ((s as any).pendingLeaseRenewals || []).find((r: any) => r.propertyId === property.id),
   );
   const sittingCommercialTenant = useGameStore(s =>
     property.type === 'commercial'
