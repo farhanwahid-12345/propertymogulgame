@@ -146,6 +146,85 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
     },
 
+    // Phase 2 — Heads of Terms: sign a commercial lease at agreed terms.
+    signCommercialLease: (
+      propertyId: string,
+      tenant: any,
+      terms: {
+        agreedRentPennies: number;
+        termMonths: number;
+        reviewFrequencyMonths: number;
+        breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+      },
+    ) => {
+      const prev = get();
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!property) return;
+      if (property.type !== 'commercial') {
+        showToast("Not Commercial", "Heads of Terms only apply to commercial property.", "destructive"); return;
+      }
+      if (prev.conveyancing.some((c: any) => c.propertyId === propertyId)) {
+        showToast("In Conveyancing", "Cannot sign a lease during conveyancing.", "destructive"); return;
+      }
+      if (prev.tenants.some((t: any) => t.propertyId === propertyId)) {
+        showToast("Already Let", "This unit already has a tenant in place.", "destructive"); return;
+      }
+
+      const agreedRent = Math.max(1, Math.round(terms.agreedRentPennies));
+      const requiredDeposit = calcDeposit(agreedRent);
+      const startMonth = prev.monthsPlayed;
+      const lease = {
+        fri: true,
+        termMonths: terms.termMonths,
+        startMonth,
+        expiryMonth: startMonth + terms.termMonths,
+        reviewFrequencyMonths: terms.reviewFrequencyMonths,
+        breakClause: terms.breakClause,
+        conditionScoreAtLeaseStart: typeof property.conditionScore === 'number'
+          ? property.conditionScore
+          : scoreFromConditionTier(property.condition),
+        negotiatedRentPennies: agreedRent,
+      };
+
+      const rec: PropertyTenant = {
+        propertyId,
+        slotIndex: 0,
+        tenant,
+        rentMultiplier: tenant.rentMultiplier ?? 1,
+        startDate: Date.now(),
+        satisfaction: 80,
+        lastSatisfactionUpdate: prev.monthsPlayed,
+        satisfactionReasons: [],
+        moveInMonth: prev.monthsPlayed,
+        depositHeld: requiredDeposit,
+        rentPennies: agreedRent,
+      };
+      const updatedTenants = [...prev.tenants, rec];
+      const updatedVoids = prev.voidPeriods.filter((vp: any) => vp.propertyId !== propertyId);
+      const updatedProps = prev.ownedProperties.map((p: any) =>
+        p.id === propertyId
+          ? {
+              ...p,
+              commercialLease: lease,
+              monthlyIncome: agreedRent,
+              baseRent: agreedRent,
+              lastTenantChange: prev.monthsPlayed,
+              lastRentIncrease: prev.monthsPlayed,
+            }
+          : p,
+      );
+
+      const breakLabel = terms.breakClause.type === 'none'
+        ? 'no break clause'
+        : `${terms.breakClause.type} break @ month ${terms.breakClause.atMonth ?? '?'}`;
+      showToast(
+        "Heads of Terms Signed 📄",
+        `${tenant.companyName ?? tenant.name} — £${fromPennies(agreedRent).toLocaleString()}/mo on a ${Math.round(terms.termMonths / 12)}-yr FRI lease (${breakLabel}, ${terms.reviewFrequencyMonths}-mo reviews). 5-week deposit £${fromPennies(requiredDeposit).toLocaleString()} held.`,
+      );
+      set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+    },
+
+
     applyRentIncrease: (
       propertyId: string,
       newRentPennies: number,
