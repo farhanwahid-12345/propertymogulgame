@@ -78,7 +78,11 @@ interface HeadsOfTermsDialogProps {
   askingRentPennies: number;
   /** monthsPlayed snapshot for lease start/break-clause maths. */
   monthsPlayed: number;
-  onSign: (
+  /** Phase 3 — 'new' = letting a vacant unit; 'review' = contractual rent review on a sitting tenant. */
+  mode?: 'new' | 'review';
+  /** Phase 3 — current rent (pennies) at the moment of review (for delta display). Used only when mode='review'. */
+  currentRentPennies?: number;
+  onSign?: (
     propertyId: string,
     tenant: Tenant,
     terms: {
@@ -88,6 +92,8 @@ interface HeadsOfTermsDialogProps {
       breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
     },
   ) => void;
+  /** Phase 3 — settle a contractual rent review at the agreed rent. Called instead of onSign when mode='review'. */
+  onSettleReview?: (propertyId: string, agreedRentPennies: number) => void;
 }
 
 export function HeadsOfTermsDialog({
