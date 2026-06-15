@@ -11,7 +11,9 @@ import { RenovationDialog, RenovationType } from "@/components/game/renovation-d
 import { FurnishingDialog } from "@/components/game/furnishing-dialog";
 import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
+import { HeadsOfTermsDialog } from "@/components/game/heads-of-terms-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
