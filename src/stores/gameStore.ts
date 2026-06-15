@@ -233,6 +233,7 @@ export function createInitialState(): GameState {
     monthlySnapshots: [],
     achievements: {},
     annualAccounts: [],
+    pendingRentReviews: [],
 
   };
 }
