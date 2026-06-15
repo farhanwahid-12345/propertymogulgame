@@ -312,6 +312,8 @@ interface TenantSelectorProps {
   satisfactionReasons?: Array<{ reason: string; delta: number }>;
   /** Furnishing tier — feeds the rent preview so it matches what the tenant will pay. */
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
+  /** Phase 1 — when 'commercial', the applicant pool becomes company tenants with covenant strength. */
+  propertyType?: 'residential' | 'commercial' | 'luxury';
 }
 
 export function TenantSelector({
@@ -328,6 +330,7 @@ export function TenantSelector({
   currentSatisfaction,
   satisfactionReasons = [],
   furnishingTier,
+  propertyType,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -337,11 +340,17 @@ export function TenantSelector({
 
   useEffect(() => {
     if (isOpen) {
-      setTenantProfiles(generateTenantProfiles());
+      setTenantProfiles(
+        propertyType === 'commercial'
+          ? generateCommercialTenantProfiles()
+          : generateTenantProfiles(),
+      );
       setSelectedTenant(null);
       setScreened({});
     }
-  }, [isOpen]);
+  }, [isOpen, propertyType]);
+
+
 
   const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
 
