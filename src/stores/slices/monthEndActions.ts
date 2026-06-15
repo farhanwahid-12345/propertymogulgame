@@ -761,7 +761,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         else if (conditionScore < 50) chance += 0.02;
         else if (conditionScore >= 80) chance -= 0.015;
         if (t.tenant.profile === 'premium') chance += 0.015;
-        else if (t.tenant.profile === 'risky') chance -= 0.025;
+        else if (t.tenant.profile === 'risky') chance += 0.03;
         // 1-month grace after move-in — settling-in period, no surprise concerns
         if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
         chance = Math.max(0.005, chance);
