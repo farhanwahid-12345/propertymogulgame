@@ -114,6 +114,8 @@ export interface Property {
     conditionScoreAtLeaseStart: number;
     /** Phase 1 — final headline rent agreed with the tenant, in pennies. */
     negotiatedRentPennies: number;
+    /** Phase 4 — set when the tenant has declined to renew; lease will terminate at expiry. */
+    endingAtExpiry?: boolean;
   };
 
   /** Phase 5 #16 — auction lot is missing kitchen/bathroom or otherwise
