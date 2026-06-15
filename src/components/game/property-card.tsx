@@ -674,6 +674,8 @@ export const PropertyCard = memo(function PropertyCard({
                         currentSatisfaction={tenantSatisfaction}
                         satisfactionReasons={tenantSatisfactionReasons}
                         furnishingTier={(property as any).furnishingTier}
+                        propertyType={property.type}
+
                       />
                     )
                   )}

@@ -106,7 +106,16 @@ export interface Property {
     expiryMonth: number;
     /** monthsPlayed snapshot when 6-month renewal warning was last surfaced. */
     renewalWarnedMonth?: number;
+    /** Phase 1 — months between contractual upward-only rent reviews (typically 60). */
+    reviewFrequencyMonths: number;
+    /** Phase 1 — tenant/mutual break clause. `atMonth` is the in-game month it can be exercised. */
+    breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+    /** Phase 1 — condition score (0–100) recorded at lease commencement (used at expiry dilapidations check). */
+    conditionScoreAtLeaseStart: number;
+    /** Phase 1 — final headline rent agreed with the tenant, in pennies. */
+    negotiatedRentPennies: number;
   };
+
   /** Phase 5 #16 — auction lot is missing kitchen/bathroom or otherwise
    *  uninhabitable. Standard BTL mortgages are refused; only bridging finance
    *  can complete the purchase until the property is renovated. */
