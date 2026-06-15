@@ -601,7 +601,8 @@ export function TenantSelector({
             onClick={handleSelectTenant}
             disabled={!selectedTenant || (typeof conditionScore === 'number' && conditionScore < (TENANT_MIN_CONDITION[selectedTenant?.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0))}
           >
-            Select Tenant
+            {propertyType === 'commercial' ? 'Open Heads of Terms' : 'Select Tenant'}
+
           </Button>
         </div>
           </>
