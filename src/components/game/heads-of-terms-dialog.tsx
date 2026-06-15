@@ -118,8 +118,10 @@ export function HeadsOfTermsDialog({
   currentRentPennies,
   onSign,
   onSettleReview,
+  onRenew,
 }: HeadsOfTermsDialogProps) {
   const isReview = mode === 'review';
+  const isRenewal = mode === 'renewal';
   const covenant = tenant?.covenantStrength ?? 50;
   const askingPounds = Math.round(fromPennies(askingRentPennies));
   const currentRentPounds = currentRentPennies != null
