@@ -217,10 +217,15 @@ export const PropertyCard = memo(function PropertyCard({
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  // Phase 2 — Heads of Terms negotiation state for commercial vacancies.
+  const [hotOpen, setHotOpen] = useState(false);
+  const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
+  const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
   const topUpCondition = useGameStore(s => s.topUpCondition);
   const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
   const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
   const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
+
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
     : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
