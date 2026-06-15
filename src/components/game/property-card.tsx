@@ -145,6 +145,8 @@ interface PropertyCardProps {
   onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
   /** Phase 4 #2 — title-split a converted flat into its own leasehold property. */
   onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
+  /** Active tenant concerns across portfolio — used to compute longstanding ASB. */
+  tenantConcerns?: Array<{ propertyId: string; category: string; raisedMonth: number; resolvedMonth?: number }>;
 }
 
 
