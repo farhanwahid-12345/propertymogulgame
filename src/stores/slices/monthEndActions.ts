@@ -769,7 +769,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (gameRandom() >= chance) return;
 
         // When repair bar is low, bias toward maintenance/mould/safety templates
-        const pool = conditionScore < 50
+        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.6;
+        const pool = riskyAsbBias
+          ? CONCERN_TEMPLATES.filter(t => t.category === 'noise' || t.category === 'safety')
+          : conditionScore < 50
           ? CONCERN_TEMPLATES.filter(t => t.category === 'maintenance' || t.category === 'mould' || t.category === 'safety')
           : CONCERN_TEMPLATES;
         const tpl = pool[Math.floor(gameRandom() * pool.length)];
