@@ -202,12 +202,17 @@ export function HeadsOfTermsDialog({
       breakChoice === 'tenant_mid' ? { type: 'tenant', atMonth: breakAtMonth } :
                                       { type: 'mutual', atMonth: breakAtMonth };
 
-    onSign?.(propertyId, tenant, {
+    const terms = {
       agreedRentPennies: toPennies(finalRentPounds),
       termMonths,
       reviewFrequencyMonths: reviewYears * 12,
       breakClause,
-    });
+    };
+    if (isRenewal) {
+      onRenew?.(propertyId, terms);
+    } else {
+      onSign?.(propertyId, tenant, terms);
+    }
     onOpenChange(false);
   };
 
@@ -217,7 +222,7 @@ export function HeadsOfTermsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSignature className="h-5 w-5 text-amber-300" />
-            {isReview ? 'Rent Review' : 'Heads of Terms'} — {propertyName}
+            {isReview ? 'Rent Review' : isRenewal ? 'Lease Renewal' : 'Heads of Terms'} — {propertyName}
           </DialogTitle>
         </DialogHeader>
 
