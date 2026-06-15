@@ -13,6 +13,7 @@ import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { showToast, debit, debitStrict } from '../storeHelpers';
 import { gameRandom } from '@/lib/rng';
 import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
+import { deriveSqft } from '@/lib/engine/market';
 import {
   scaleRenovationCost, scaleRenovationRent, scaleRenovationValue,
   scaleRenovationForProperty, isDeductibleRevenueRenovation,
