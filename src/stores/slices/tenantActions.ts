@@ -269,7 +269,9 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     },
 
 
+    applyRentIncrease: (
       propertyId: string,
+
       newRentPennies: number,
       outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant',
       tribunalFeePennies: number,
