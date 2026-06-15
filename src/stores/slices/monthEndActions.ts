@@ -126,18 +126,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
         const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
         const effectiveRent = advertisedRent;
-        // Phase 4 #13 — initialise commercial FRI lease + use class on
-        // settlement. Preserve `type` explicitly so commercial never silently
-        // flips to residential.
+        // Phase 1 — commercial properties complete vacant: no lease until a
+        // company tenant signs heads of terms. Use class still rolled on settlement.
         const isCommercial = prop.type === 'commercial';
-        const commercialLeaseInit = isCommercial
-          ? {
-              fri: true,
-              termMonths: 60,
-              startMonth: newMonthNumber,
-              expiryMonth: newMonthNumber + 60,
-            }
-          : undefined;
         const useClassInit = isCommercial
           ? (gameRandom() < SUI_GENERIS_PROB ? 'sui_generis' as const : 'E' as const)
           : undefined;
@@ -150,9 +141,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           yield: effectiveYield,
           monthlyIncome: effectiveRent,
           lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
-          ...(commercialLeaseInit ? { commercialLease: commercialLeaseInit } : {}),
           ...(useClassInit ? { useClass: useClassInit } : {}),
+          // Commercial purchased properties start with NO lease (vacant).
+          ...(isCommercial ? { commercialLease: undefined } : {}),
         };
+
         newOwnedProperties.push(purchased);
 
         newEstateAgent = newEstateAgent.filter(p => p.id !== conv.propertyId);
