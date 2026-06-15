@@ -571,6 +571,8 @@ export interface GameState {
   cgtThisYearPennies?: number;
   /** Phase 3 (commercial) — outstanding rent reviews queued for player negotiation. */
   pendingRentReviews?: PendingRentReview[];
+  /** Phase 4 (commercial) — interested-renewal HoT prompts queued for player negotiation. */
+  pendingLeaseRenewals?: PendingLeaseRenewal[];
 }
 
 /** Phase 3 (commercial) — a contractual rent review that's come due and is
@@ -584,6 +586,18 @@ export interface PendingRentReview {
   currentRentPennies: number;
   /** Suggested upward market rent (pennies/mo) — basis for the player's opening offer. */
   proposedMarketRentPennies: number;
+}
+
+/** Phase 4 (commercial) — a renewal offer awaiting Heads of Terms negotiation. */
+export interface PendingLeaseRenewal {
+  id: string;
+  propertyId: string;
+  /** monthsPlayed when the renewal interest was registered. */
+  raisedMonth: number;
+  /** The lease's contracted expiry month (renewal must be agreed before this). */
+  expiryMonth: number;
+  /** Current rent (pennies/mo) — basis for the player's opening offer. */
+  currentRentPennies: number;
 }
 
 
