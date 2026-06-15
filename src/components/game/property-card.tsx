@@ -145,6 +145,8 @@ interface PropertyCardProps {
   onSendToCourt?: (propertyId: string, slotIndex?: number) => void;
   /** Phase 4 #2 — title-split a converted flat into its own leasehold property. */
   onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
+  /** Active tenant concerns across portfolio — used to compute longstanding ASB. */
+  tenantConcerns?: Array<{ propertyId: string; category: string; raisedMonth: number; resolvedMonth?: number }>;
 }
 
 
@@ -201,6 +203,7 @@ export const PropertyCard = memo(function PropertyCard({
   hasActiveDebtRecovery = false,
   onSendToCourt,
   onSplitFlatUnit,
+  tenantConcerns = [],
 }: PropertyCardProps) {
 
   const [isLoading, setIsLoading] = useState(false);
@@ -818,7 +821,7 @@ export const PropertyCard = memo(function PropertyCard({
                         tenantName={currentTenant.name}
                         tenantProfile={currentTenant.profile}
                         rentArrearsCount={rentArrearsCount}
-                        hasLongstandingASB={false}
+                        hasLongstandingASB={tenantConcerns.some(c => c.propertyId === property.id && !c.resolvedMonth && (c.category === 'noise' || c.category === 'safety') && (monthsPlayed - c.raisedMonth) >= 1)}
                         onEvict={evictTenant}
                       />
                     </div>

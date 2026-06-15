@@ -761,7 +761,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         else if (conditionScore < 50) chance += 0.02;
         else if (conditionScore >= 80) chance -= 0.015;
         if (t.tenant.profile === 'premium') chance += 0.015;
-        else if (t.tenant.profile === 'risky') chance -= 0.025;
+        else if (t.tenant.profile === 'risky') chance += 0.03;
         // 1-month grace after move-in — settling-in period, no surprise concerns
         if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
         chance = Math.max(0.005, chance);
@@ -769,7 +769,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (gameRandom() >= chance) return;
 
         // When repair bar is low, bias toward maintenance/mould/safety templates
-        const pool = conditionScore < 50
+        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.6;
+        const pool = riskyAsbBias
+          ? CONCERN_TEMPLATES.filter(t => t.category === 'noise' || t.category === 'safety')
+          : conditionScore < 50
           ? CONCERN_TEMPLATES.filter(t => t.category === 'maintenance' || t.category === 'mould' || t.category === 'safety')
           : CONCERN_TEMPLATES;
         const tpl = pool[Math.floor(gameRandom() * pool.length)];

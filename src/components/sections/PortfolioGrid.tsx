@@ -200,6 +200,7 @@ export function PortfolioGrid({
               hasActiveDebtRecovery={((gameState as any).debtRecoveryCases || []).some((c: any) => c.propertyId === property.id && c.status === 'in_court')}
               onSendToCourt={(gameState as any).sendArrearsToCourt}
               onSplitFlatUnit={(gameState as any).splitFlatUnit}
+              tenantConcerns={gameState.tenantConcerns || []}
             />
 
           );
