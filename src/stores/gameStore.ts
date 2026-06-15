@@ -74,6 +74,10 @@ interface GameActions {
       breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
     },
   ) => void;
+  /** Phase 3 (commercial) — settle a pending rent review at an agreed rent. */
+  settleRentReview: (propertyId: string, agreedRentPennies: number) => void;
+
+
 
   applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number, slotIndex?: number) => void;
   evictTenant: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
