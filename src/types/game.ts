@@ -567,6 +567,21 @@ export interface GameState {
   annualAccounts?: AnnualAccountRecord[];
   /** Phase 4 (v5 statements) — CGT realised so far in the current tax year (pennies). Reset at year close. */
   cgtThisYearPennies?: number;
+  /** Phase 3 (commercial) — outstanding rent reviews queued for player negotiation. */
+  pendingRentReviews?: PendingRentReview[];
+}
+
+/** Phase 3 (commercial) — a contractual rent review that's come due and is
+ *  awaiting the player to open Heads of Terms (review mode) and settle. */
+export interface PendingRentReview {
+  id: string;
+  propertyId: string;
+  /** monthsPlayed when the review fell due (lease anniversary). */
+  dueMonth: number;
+  /** Rent in place immediately before the review (pennies/mo). */
+  currentRentPennies: number;
+  /** Suggested upward market rent (pennies/mo) — basis for the player's opening offer. */
+  proposedMarketRentPennies: number;
 }
 
 
