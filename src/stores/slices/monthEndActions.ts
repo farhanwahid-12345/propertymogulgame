@@ -1502,7 +1502,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let updatedNextInsuranceDueMonth = nextInsuranceDueMonth;
       let updatedLastInsuranceWarnedMonth = lastInsuranceWarnedMonth;
       const annualInsurancePennies = newOwnedProperties.reduce(
-        (t, p) => t + Math.floor(p.value * 0.004),
+        (t, p) => {
+          if (p.type === 'commercial' && (p as any).commercialLease?.fri === true) return t;
+          return t + Math.floor(p.value * 0.004);
+        },
         0,
       );
       if (annualInsurancePennies > 0) {
