@@ -396,7 +396,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // and routed through the pending-approval queue. We still compute the
       // monthly accrual here for cashflow projections; the actual debit
       // happens once per 12 months below.
+      // Phase 6 — FRI commercial leases: the "I" stands for Insuring, so the
+      // tenant carries buildings insurance. Exclude those from landlord accrual.
       const monthlyInsuranceAccrual = newOwnedProperties.reduce((total, property) => {
+        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return total;
         return total + Math.floor((property.value * 0.004) / 12);
       }, 0);
       const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
