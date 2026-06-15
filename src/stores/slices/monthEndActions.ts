@@ -396,7 +396,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // and routed through the pending-approval queue. We still compute the
       // monthly accrual here for cashflow projections; the actual debit
       // happens once per 12 months below.
+      // Phase 6 — FRI commercial leases: the "I" stands for Insuring, so the
+      // tenant carries buildings insurance. Exclude those from landlord accrual.
       const monthlyInsuranceAccrual = newOwnedProperties.reduce((total, property) => {
+        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return total;
         return total + Math.floor((property.value * 0.004) / 12);
       }, 0);
       const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
@@ -538,6 +541,12 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         return p;
       }).map(p => {
         const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
+        // Phase 6 — under an active FRI commercial lease, maintenance and condition
+        // are the tenant's responsibility. Landlord-side decay is suspended.
+        const friActive = p.type === 'commercial' && (p as any).commercialLease?.fri === true;
+        if (friActive) {
+          return { ...p, monthsSinceLastRenovation: newMonthsSince };
+        }
         // ── Continuous repair-bar decay ──
         const tenantHere = newTenants.find(t => t.propertyId === p.id);
         const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
@@ -754,6 +763,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (!ownedIdsForConcerns.has(t.propertyId)) return;
         if (inConveyancingIds.has(t.propertyId)) return;
         if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
+        // Phase 6 — FRI commercial leases: tenant handles all maintenance, so the
+        // landlord never sees concerns/repair bills from leased commercial units.
+        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return;
 
         const conditionScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
         let chance = 0.035;
@@ -1490,7 +1502,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let updatedNextInsuranceDueMonth = nextInsuranceDueMonth;
       let updatedLastInsuranceWarnedMonth = lastInsuranceWarnedMonth;
       const annualInsurancePennies = newOwnedProperties.reduce(
-        (t, p) => t + Math.floor(p.value * 0.004),
+        (t, p) => {
+          if (p.type === 'commercial' && (p as any).commercialLease?.fri === true) return t;
+          return t + Math.floor(p.value * 0.004);
+        },
         0,
       );
       if (annualInsurancePennies > 0) {
