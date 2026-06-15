@@ -170,6 +170,92 @@ const generateTenantProfiles = (): Tenant[] => {
   ];
 };
 
+// --- Commercial tenant generation (Phase 1) ----------------------------------
+
+const COMMERCIAL_SECTORS = [
+  'retail', 'logistics', 'professional_services', 'hospitality', 'healthcare',
+] as const;
+type CommercialSector = typeof COMMERCIAL_SECTORS[number];
+
+const COMPANY_NAME_POOL: Record<CommercialSector, string[]> = {
+  retail: [
+    "Bridge St Boutique Ltd", "Northfield Convenience Ltd", "Acklam Records & Books Ltd",
+    "Linthorpe Cycle Co Ltd", "Marton Florists Ltd", "Teesside Toy Emporium Ltd",
+  ],
+  logistics: [
+    "Northfield Logistics Ltd", "Tees Valley Freight Ltd", "Ironworks Distribution Ltd",
+    "Cleveland Couriers Ltd", "Riverside Storage Solutions Ltd",
+  ],
+  professional_services: [
+    "Linthorpe Legal Partners LLP", "Albert Road Accountants Ltd", "Boro Architects Ltd",
+    "Cleveland Consulting Group Ltd", "Tees Tech Advisory Ltd",
+  ],
+  hospitality: [
+    "The Transporter Café Ltd", "Acklam Tap & Kitchen Ltd", "Riverside Bistro Ltd",
+    "Bridge St Coffee Co Ltd", "Marton Park Inn Ltd",
+  ],
+  healthcare: [
+    "Bridge St Dental Practice Ltd", "Linthorpe Physiotherapy Ltd", "Northfield Pharmacy Ltd",
+    "Marton Family Clinic Ltd", "Acklam Vision Centre Ltd",
+  ],
+};
+
+const COMMERCIAL_DESCRIPTIONS: Record<CommercialSector, string[]> = {
+  retail: ["High-street retailer expanding into a second unit", "Independent shop with 6 years' trading history"],
+  logistics: ["Last-mile delivery operator seeking warehouse space", "Regional haulier on a 5-year growth plan"],
+  professional_services: ["Established practice relocating from serviced offices", "Boutique advisory firm with blue-chip clients"],
+  hospitality: ["Independent operator opening a second site", "Café chain with three profitable locations"],
+  healthcare: ["Private clinic expanding into the area", "NHS-contracted provider taking on new premises"],
+};
+
+const pickWeightedCovenant = (): number => {
+  const r = Math.random();
+  // ~70% mid (40–80), ~15% weak (20–40), ~10% strong (80–95), ~5% very weak (<20)
+  if (r < 0.05) return randInt(10, 19);
+  if (r < 0.20) return randInt(20, 39);
+  if (r < 0.90) return randInt(40, 80);
+  return randInt(81, 95);
+};
+
+const covenantToProfile = (cov: number): Tenant['profile'] =>
+  cov >= 80 ? 'premium' : cov >= 55 ? 'standard' : cov >= 30 ? 'budget' : 'risky';
+
+const generateCommercialTenantProfiles = (): Tenant[] => {
+  const usedNames = new Set<string>();
+  const makeCompany = (i: number): Tenant => {
+    const sector = pick(COMMERCIAL_SECTORS as unknown as CommercialSector[]);
+    let companyName = pick(COMPANY_NAME_POOL[sector]);
+    let guard = 0;
+    while (usedNames.has(companyName) && guard++ < 8) companyName = pick(COMPANY_NAME_POOL[sector]);
+    usedNames.add(companyName);
+    const covenantStrength = pickWeightedCovenant();
+    const profile = covenantToProfile(covenantStrength);
+    // Map covenant → financial risk: stronger covenant ⇒ lower default & damage risk
+    const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
+    const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
+    const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3); // 0.85–1.25
+    return {
+      id: `commercial_${i}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+      name: companyName,
+      companyName,
+      covenantStrength,
+      sector,
+      profile,
+      creditScore: 400 + Math.round(covenantStrength * 4),
+      monthlyIncome: 5000 + covenantStrength * 200, // implied trading turnover indicator
+      employmentStatus: sector.replace('_', ' '),
+      rentMultiplier,
+      defaultRisk,
+      damageRisk,
+      description: pick(COMMERCIAL_DESCRIPTIONS[sector]),
+      traits: [],
+    };
+  };
+  return Array.from({ length: randInt(4, 6) }, (_, i) => makeCompany(i));
+};
+
+
+
 // --- Star rating helper ---
 
 const StarRating = ({ value, max = 5, label }: { value: number; max?: number; label: string }) => {
