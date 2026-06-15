@@ -274,6 +274,7 @@ export function HeadsOfTermsDialog({
           </div>
         </div>
 
+        {!isReview && (<>
         {/* Lease length */}
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
