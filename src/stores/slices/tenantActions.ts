@@ -224,8 +224,51 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
     },
 
+    // Phase 3 — settle a pending commercial rent review at the agreed rent.
+    settleRentReview: (propertyId: string, agreedRentPennies: number) => {
+      const prev = get();
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!property || property.type !== 'commercial') {
+        showToast("Not Commercial", "Rent reviews only apply to commercial leases.", "destructive"); return;
+      }
+      const pending = (prev.pendingRentReviews || []).find((r: any) => r.propertyId === propertyId);
+      if (!pending) {
+        showToast("No review due", "There is no outstanding rent review for this property.", "destructive"); return;
+      }
+      const agreed = Math.max(1, Math.round(agreedRentPennies));
 
-    applyRentIncrease: (
+      const updatedProps = prev.ownedProperties.map((p: any) =>
+        p.id === propertyId
+          ? {
+              ...p,
+              monthlyIncome: agreed,
+              baseRent: agreed,
+              lastRentIncrease: prev.monthsPlayed,
+              commercialLease: p.commercialLease
+                ? { ...p.commercialLease, negotiatedRentPennies: agreed }
+                : p.commercialLease,
+            }
+          : p,
+      );
+
+      const updatedTenants = prev.tenants.map((t: any) =>
+        t.propertyId === propertyId
+          ? { ...t, lastRentReviewMonth: prev.monthsPlayed, rentPennies: agreed }
+          : t,
+      );
+
+      const remainingReviews = (prev.pendingRentReviews || []).filter((r: any) => r.id !== pending.id);
+      const deltaPct = pending.currentRentPennies > 0
+        ? ((agreed - pending.currentRentPennies) / pending.currentRentPennies) * 100
+        : 0;
+      showToast(
+        "Rent review settled",
+        `${property.name} reviewed to £${fromPennies(agreed).toLocaleString()}/mo (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%).`,
+      );
+      set({ tenants: updatedTenants, ownedProperties: updatedProps, pendingRentReviews: remainingReviews });
+    },
+
+
       propertyId: string,
       newRentPennies: number,
       outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant',
