@@ -331,15 +331,6 @@ export const PropertyCard = memo(function PropertyCard({
                 ⏳ {conveyancingStatus === 'buying' ? 'Buying' : 'Selling'} (Mo {conveyancingCompletion})
               </Badge>
             )}
-            {property.epcRating && (
-              <Badge className={cn("text-[10px]",
-                ['A','B','C'].includes(property.epcRating) ? "bg-green-500/20 text-green-400 border-green-500/30" :
-                ['D','E'].includes(property.epcRating) ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
-                "bg-red-500/20 text-red-400 border-red-500/30"
-              )}>
-                EPC {property.epcRating}
-              </Badge>
-            )}
             {/* Repair Bar replaces 3-tier condition badge — surfaced in body */}
             {property.marketTrend === "up" ? (
               <TrendingUp className="h-4 w-4 text-success" />
@@ -357,6 +348,14 @@ export const PropertyCard = memo(function PropertyCard({
             <span className="ml-1 text-muted-foreground/70">· {property.city.charAt(0).toUpperCase() + property.city.slice(1)}</span>
           )}
         </p>
+        {property.epcRating && ['D','E','F','G'].includes(property.epcRating) && monthsPlayed >= 48 && (
+          <p className={cn(
+            "text-xs font-medium mt-1",
+            ['F','G'].includes(property.epcRating) ? "text-red-400" : "text-amber-400"
+          )}>
+            ⚠️ EPC below C — cannot be re-let after month 60. Renovate to improve.
+          </p>
+        )}
 
         {/* Sqft + concern chips row */}
         {(property.internalSqft || activeConcernCount > 0 || property.subtype || currentTenant || rentArrearsCount > 0 || (property.furnishingTier && property.furnishingTier !== 'unfurnished')) && (
