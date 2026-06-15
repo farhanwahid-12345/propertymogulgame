@@ -1214,6 +1214,22 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // original purchase price, only `marketValue` drifts (the "asking" signal),
       // while booked `value` (used for net worth) is held at the cap.
       updatedOwnedProperties = updatedOwnedProperties.map(property => {
+        // Phase 5 — commercial properties with an active FRI lease are valued on
+        // an income-cap basis (annual rent ÷ implied yield). Stronger covenant
+        // and longer remaining term compress the yield → higher value.
+        const lease = (property as any).commercialLease;
+        if (property.type === 'commercial' && lease) {
+          const tenantRec = newTenants.find(t => t.propertyId === property.id);
+          const cov = (tenantRec?.tenant as any)?.covenantStrength ?? 50;
+          const remainingMonths = Math.max(0, (lease.expiryMonth ?? 0) - newMonthNumber);
+          const rawYield = 0.10 - (cov / 1000) - (remainingMonths / 6000);
+          const impliedYield = Math.min(0.12, Math.max(0.05, rawYield));
+          const annualRent = (property.monthlyIncome || 0) * 12;
+          const capValue = impliedYield > 0 ? Math.round(annualRent / impliedYield) : property.value;
+          // Light noise so net worth isn't perfectly static between events.
+          const noisy = Math.round(capValue * (1 + (gameRandom() - 0.5) * 0.004));
+          return { ...property, value: noisy, marketValue: noisy };
+        }
         // Condition-aware mean drift: premium appreciates faster, dilapidated decays
         const meanByCondition =
           property.condition === 'premium'     ? 0.0030 :
