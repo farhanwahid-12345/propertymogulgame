@@ -246,6 +246,7 @@ export function createInitialState(): GameState {
     achievements: {},
     annualAccounts: [],
     pendingRentReviews: [],
+    pendingLeaseRenewals: [],
 
   };
 }
