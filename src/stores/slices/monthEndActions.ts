@@ -1514,7 +1514,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // Phase 2 (v5): include letting-agent fees, RGI premiums, HMO fines as outflows; RGI payouts as inflows.
       const totalOutflows = mortgagePayments + lettingAgentFees + rentGuaranteePremiums + hmoFines;
-      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth + rentGuaranteePayouts;
+      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth + rentGuaranteePayouts + dilapidationsRecovered;
       const netCashDelta = totalInflows - totalOutflows;
       let finalCash = prev.cash;
       let finalOverdraftUsed = prev.overdraftUsed;
