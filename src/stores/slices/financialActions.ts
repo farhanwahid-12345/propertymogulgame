@@ -298,17 +298,31 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const existingLoanPayments = ((prev as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
       const monthlyNetRent = Math.max(0, monthlyRent - monthlyMortgage - existingLoanPayments);
       const creditFactor = Math.max(0.5, Math.min(1.4, prev.creditScore / 700));
-      const reputationFactor = Math.max(0.4, Math.min(1.5, ((prev.landlordReputation ?? 50)) / 60));
+      // Phase E: widen reputation swing on investor/business borrowing power
+      const reputationFactor = Math.max(0.25, Math.min(2.5, ((prev.landlordReputation ?? 50)) / 60));
+      // Track record: profitable years from annualAccounts history
+      const profitableYears = ((prev as any).annualAccounts || [])
+        .filter((a: any) => (a?.netProfitBeforeTax ?? 0) > 0).length;
+      const trackRecordFactor = Math.min(1.4, 0.8 + profitableYears * 0.08);
+      // Financial health: creditScore + DTI combined
+      const dtiForHealth = monthlyRent > 0
+        ? (monthlyMortgage + existingLoanPayments) / monthlyRent
+        : 1;
+      const healthFactor = (prev.creditScore >= 750 && dtiForHealth < 0.35) ? 1.3
+        : (prev.creditScore >= 650 && dtiForHealth < 0.5) ? 1.0
+        : 0.7;
       // Credit-tier hard-cap multiplier on top of creditFactor
       const creditTierMult =
         prev.creditScore < 500 ? 0.4 :
         prev.creditScore < 650 ? 0.7 :
         prev.creditScore < 750 ? 1.0 : 1.25;
+      const investorTotalFactor = Math.max(0.15, Math.min(4.0, reputationFactor * trackRecordFactor * healthFactor));
+      const businessTotalFactor = Math.max(0.15, Math.min(4.0, trackRecordFactor * healthFactor));
       const dynamicCap = kind === 'personal'
         ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 6) * creditFactor)
         : kind === 'business'
-          ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 12 * 4) * creditFactor)
-          : Math.floor(product.hardCapPennies * reputationFactor);
+          ? Math.floor(Math.min(product.hardCapPennies * creditTierMult, monthlyNetRent * 12 * 4) * creditFactor * businessTotalFactor)
+          : Math.floor(product.hardCapPennies * investorTotalFactor);
       if (amount > dynamicCap) {
         showToast("Loan Too Large", `Max £${fromPennies(Math.max(0, dynamicCap)).toLocaleString()} for your profile.`, "destructive"); return;
       }
@@ -321,11 +335,17 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const creditPenalty = kind === 'investor' ? 0
         : prev.creditScore >= 800 ? -0.005 : prev.creditScore >= 650 ? 0 : prev.creditScore >= 500 ? 0.01 : 0.02;
       const reputationRateAdj = kind === 'investor'
-        ? Math.max(-0.05, Math.min(0.06, (60 - (prev.landlordReputation ?? 50)) * 0.002))
+        ? Math.max(-0.08, Math.min(0.10, (60 - (prev.landlordReputation ?? 50)) * 0.002))
+        : 0;
+      // Phase E: track record / health also nudge APR for investor & business
+      const factorRateAdj = (kind === 'investor' || kind === 'business')
+        ? Math.max(-0.04, Math.min(0.05,
+            ((1 - trackRecordFactor) * 0.1) + ((1 - healthFactor) * 0.1)
+          ))
         : 0;
       const spread = kind === 'investor' ? product.baseSpread
         : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
-      const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj);
+      const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj + factorRateAdj);
       const monthlyRate = rate / 12;
       const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 
