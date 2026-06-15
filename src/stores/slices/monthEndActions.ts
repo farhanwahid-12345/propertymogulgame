@@ -538,6 +538,12 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         return p;
       }).map(p => {
         const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
+        // Phase 6 — under an active FRI commercial lease, maintenance and condition
+        // are the tenant's responsibility. Landlord-side decay is suspended.
+        const friActive = p.type === 'commercial' && (p as any).commercialLease?.fri === true;
+        if (friActive) {
+          return { ...p, monthsSinceLastRenovation: newMonthsSince };
+        }
         // ── Continuous repair-bar decay ──
         const tenantHere = newTenants.find(t => t.propertyId === p.id);
         const wearKey = tenantHere ? (tenantHere.tenant.profile as 'premium'|'standard'|'budget'|'risky') : 'vacant';
