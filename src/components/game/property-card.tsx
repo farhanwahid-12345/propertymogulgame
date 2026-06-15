@@ -11,7 +11,9 @@ import { RenovationDialog, RenovationType } from "@/components/game/renovation-d
 import { FurnishingDialog } from "@/components/game/furnishing-dialog";
 import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
+import { HeadsOfTermsDialog } from "@/components/game/heads-of-terms-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { calculateMortgageEligibility } from "@/lib/mortgageEligibility";
@@ -215,10 +217,15 @@ export const PropertyCard = memo(function PropertyCard({
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [mortgageTermYears, setMortgageTermYears] = useState("25");
   const [mortgageType, setMortgageType] = useState<'repayment' | 'interest-only'>('repayment');
+  // Phase 2 — Heads of Terms negotiation state for commercial vacancies.
+  const [hotOpen, setHotOpen] = useState(false);
+  const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
+  const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
   const topUpCondition = useGameStore(s => s.topUpCondition);
   const toggleLettingAgent = useGameStore(s => (s as any).toggleLettingAgent);
   const toggleRentGuarantee = useGameStore(s => (s as any).toggleRentGuarantee);
   const applyForHmoLicence = useGameStore(s => (s as any).applyForHmoLicence);
+
   const conditionScore = typeof property.conditionScore === 'number'
     ? property.conditionScore
     : (property.condition === 'premium' ? 85 : property.condition === 'dilapidated' ? 25 : 60);
@@ -675,10 +682,26 @@ export const PropertyCard = memo(function PropertyCard({
                         satisfactionReasons={tenantSatisfactionReasons}
                         furnishingTier={(property as any).furnishingTier}
                         propertyType={property.type}
+                        onCommercialApplicantSelected={(_pid, t) => { setHotApplicant(t); setHotOpen(true); }}
+
 
                       />
                     )
                   )}
+                  {/* Phase 2 — Heads of Terms dialog (commercial only) */}
+                  {property.type === 'commercial' && (
+                    <HeadsOfTermsDialog
+                      open={hotOpen}
+                      onOpenChange={setHotOpen}
+                      propertyId={property.id}
+                      propertyName={property.name}
+                      tenant={hotApplicant}
+                      askingRentPennies={(property.baseRent || property.monthlyIncome) * 100}
+                      monthsPlayed={monthsPlayed}
+                      onSign={(pid, t, terms) => signCommercialLease?.(pid, t, terms)}
+                    />
+                  )}
+
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">
                     <div className="flex-1">

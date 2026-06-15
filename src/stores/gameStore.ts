@@ -64,6 +64,17 @@ interface GameActions {
   rejectBuyerCounter: (propertyId: string, offerId: string, newCounterAmount: number) => void;
   // Tenants
   selectTenant: (propertyId: string, tenant: Tenant, slotIndex?: number) => void;
+  signCommercialLease: (
+    propertyId: string,
+    tenant: Tenant,
+    terms: {
+      agreedRentPennies: number;
+      termMonths: number;
+      reviewFrequencyMonths: number;
+      breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+    },
+  ) => void;
+
   applyRentIncrease: (propertyId: string, newRentPennies: number, outcome: 'accepted' | 'counter_accepted' | 'tribunal_landlord' | 'tribunal_tenant', tribunalFeePennies: number, slotIndex?: number) => void;
   evictTenant: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
   cancelEviction: (propertyId: string, slotIndex?: number) => void;

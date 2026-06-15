@@ -314,7 +314,10 @@ interface TenantSelectorProps {
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   /** Phase 1 — when 'commercial', the applicant pool becomes company tenants with covenant strength. */
   propertyType?: 'residential' | 'commercial' | 'luxury';
+  /** Phase 2 — when set, commercial applicants route to Heads of Terms instead of direct placement. */
+  onCommercialApplicantSelected?: (propertyId: string, tenant: Tenant) => void;
 }
+
 
 export function TenantSelector({
   propertyId,
@@ -331,6 +334,7 @@ export function TenantSelector({
   satisfactionReasons = [],
   furnishingTier,
   propertyType,
+  onCommercialApplicantSelected,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -362,12 +366,17 @@ export function TenantSelector({
   }, []);
 
   const handleSelectTenant = useCallback(() => {
-    if (selectedTenant) {
+    if (!selectedTenant) return;
+    // Phase 2 — commercial flow: hand off to HoT negotiation instead of placing immediately.
+    if (propertyType === 'commercial' && onCommercialApplicantSelected) {
+      onCommercialApplicantSelected(propertyId, selectedTenant);
+    } else {
       onSelectTenant(propertyId, selectedTenant);
-      setIsOpen(false);
-      setSelectedTenant(null);
     }
-  }, [selectedTenant, onSelectTenant, propertyId]);
+    setIsOpen(false);
+    setSelectedTenant(null);
+  }, [selectedTenant, onSelectTenant, onCommercialApplicantSelected, propertyId, propertyType]);
+
 
   // Robust base rent fallback: baseRent → derive from value × yield/12
   let displayBaseRent = baseRent > 0 ? baseRent : 0;
@@ -592,7 +601,8 @@ export function TenantSelector({
             onClick={handleSelectTenant}
             disabled={!selectedTenant || (typeof conditionScore === 'number' && conditionScore < (TENANT_MIN_CONDITION[selectedTenant?.profile as keyof typeof TENANT_MIN_CONDITION] ?? 0))}
           >
-            Select Tenant
+            {propertyType === 'commercial' ? 'Open Heads of Terms' : 'Select Tenant'}
+
           </Button>
         </div>
           </>
