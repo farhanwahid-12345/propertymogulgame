@@ -116,22 +116,19 @@ function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fu
   return { tier: 'unfurnished' };
 }
 
-/** Wrap `generateRandomProperty` to occasionally list pre-furnished stock with bumped price & rent. */
+/** Wrap `generateRandomProperty` to occasionally list pre-furnished stock with bumped price. */
 export function generateMarketProperty(level: number, cityId?: CityId): Property {
   const base = generateRandomProperty(level, cityId);
   const roll = rollListingFurnishing();
   if (roll.tier === 'unfurnished') return base;
   const tempForFurniture = { ...base, furnishingTier: roll.tier, furnishingMonthsRemaining: roll.monthsRemaining };
   const furniturePennies = getFurnitureValuePennies(tempForFurniture);
-  const rentMult = getFurnishingRentMultiplier(roll.tier);
   const bumpedPrice = base.price + furniturePennies;
   const bumpedValue = base.value + furniturePennies;
-  const bumpedRent = Math.floor(base.monthlyIncome * rentMult);
   return {
     ...base,
     price: bumpedPrice,
     value: bumpedValue,
-    monthlyIncome: bumpedRent,
     furnishingTier: roll.tier,
     furnishingMonthsRemaining: roll.monthsRemaining,
   };
