@@ -265,16 +265,25 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newDefaultEvents: TenantEvent[] = [];
       prev.tenants.forEach(t => {
         if (conveyancingPropertyIds.has(t.propertyId)) return;
-        const risk = (t.tenant as any).defaultRisk ?? 5;
-        // Phase 4 #11 — high-risk tenants double their arrears probability.
-        const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
-        const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
-        const monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+        const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+        let monthlyP: number;
+        if (prop?.type === 'commercial') {
+          // Phase 5 — covenant-driven reliability for commercial tenants.
+          const cov = (t.tenant as any).covenantStrength ?? 50;
+          monthlyP = Math.min(0.15, Math.max(0.001, ((100 - cov) / 100) * 0.15));
+        } else {
+          const risk = (t.tenant as any).defaultRisk ?? 5;
+          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
+          const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+        }
         if (gameRandom() < monthlyP) {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
           missedTenantKeys.add(key);
           missedRentPropertyIds.add(t.propertyId);
-          const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+
+
           newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
           // Item 2: throttle toasts to max 1 per ~3 months per tenant.
           const lastToast = t.lastDefaultToastMonth ?? -999;
@@ -1205,6 +1214,22 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // original purchase price, only `marketValue` drifts (the "asking" signal),
       // while booked `value` (used for net worth) is held at the cap.
       updatedOwnedProperties = updatedOwnedProperties.map(property => {
+        // Phase 5 — commercial properties with an active FRI lease are valued on
+        // an income-cap basis (annual rent ÷ implied yield). Stronger covenant
+        // and longer remaining term compress the yield → higher value.
+        const lease = (property as any).commercialLease;
+        if (property.type === 'commercial' && lease) {
+          const tenantRec = newTenants.find(t => t.propertyId === property.id);
+          const cov = (tenantRec?.tenant as any)?.covenantStrength ?? 50;
+          const remainingMonths = Math.max(0, (lease.expiryMonth ?? 0) - newMonthNumber);
+          const rawYield = 0.10 - (cov / 1000) - (remainingMonths / 6000);
+          const impliedYield = Math.min(0.12, Math.max(0.05, rawYield));
+          const annualRent = (property.monthlyIncome || 0) * 12;
+          const capValue = impliedYield > 0 ? Math.round(annualRent / impliedYield) : property.value;
+          // Light noise so net worth isn't perfectly static between events.
+          const noisy = Math.round(capValue * (1 + (gameRandom() - 0.5) * 0.004));
+          return { ...property, value: noisy, marketValue: noisy };
+        }
         // Condition-aware mean drift: premium appreciates faster, dilapidated decays
         const meanByCondition =
           property.condition === 'premium'     ? 0.0030 :
