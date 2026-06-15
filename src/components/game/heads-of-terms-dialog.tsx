@@ -78,8 +78,8 @@ interface HeadsOfTermsDialogProps {
   askingRentPennies: number;
   /** monthsPlayed snapshot for lease start/break-clause maths. */
   monthsPlayed: number;
-  /** Phase 3 — 'new' = letting a vacant unit; 'review' = contractual rent review on a sitting tenant. */
-  mode?: 'new' | 'review';
+  /** Phase 3/4 — 'new' = letting a vacant unit; 'review' = rent review on a sitting tenant; 'renewal' = new term for a sitting tenant. */
+  mode?: 'new' | 'review' | 'renewal';
   /** Phase 3 — current rent (pennies) at the moment of review (for delta display). Used only when mode='review'. */
   currentRentPennies?: number;
   onSign?: (
@@ -94,6 +94,16 @@ interface HeadsOfTermsDialogProps {
   ) => void;
   /** Phase 3 — settle a contractual rent review at the agreed rent. Called instead of onSign when mode='review'. */
   onSettleReview?: (propertyId: string, agreedRentPennies: number) => void;
+  /** Phase 4 — sign a renewal HoT for a sitting commercial tenant. Called instead of onSign when mode='renewal'. */
+  onRenew?: (
+    propertyId: string,
+    terms: {
+      agreedRentPennies: number;
+      termMonths: number;
+      reviewFrequencyMonths: number;
+      breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+    },
+  ) => void;
 }
 
 export function HeadsOfTermsDialog({
@@ -108,8 +118,10 @@ export function HeadsOfTermsDialog({
   currentRentPennies,
   onSign,
   onSettleReview,
+  onRenew,
 }: HeadsOfTermsDialogProps) {
   const isReview = mode === 'review';
+  const isRenewal = mode === 'renewal';
   const covenant = tenant?.covenantStrength ?? 50;
   const askingPounds = Math.round(fromPennies(askingRentPennies));
   const currentRentPounds = currentRentPennies != null
@@ -190,12 +202,17 @@ export function HeadsOfTermsDialog({
       breakChoice === 'tenant_mid' ? { type: 'tenant', atMonth: breakAtMonth } :
                                       { type: 'mutual', atMonth: breakAtMonth };
 
-    onSign?.(propertyId, tenant, {
+    const terms = {
       agreedRentPennies: toPennies(finalRentPounds),
       termMonths,
       reviewFrequencyMonths: reviewYears * 12,
       breakClause,
-    });
+    };
+    if (isRenewal) {
+      onRenew?.(propertyId, terms);
+    } else {
+      onSign?.(propertyId, tenant, terms);
+    }
     onOpenChange(false);
   };
 
@@ -205,7 +222,7 @@ export function HeadsOfTermsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSignature className="h-5 w-5 text-amber-300" />
-            {isReview ? 'Rent Review' : 'Heads of Terms'} — {propertyName}
+            {isReview ? 'Rent Review' : isRenewal ? 'Lease Renewal' : 'Heads of Terms'} — {propertyName}
           </DialogTitle>
         </DialogHeader>
 

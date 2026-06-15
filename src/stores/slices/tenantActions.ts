@@ -268,6 +268,73 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       set({ tenants: updatedTenants, ownedProperties: updatedProps, pendingRentReviews: remainingReviews });
     },
 
+    // Phase 4 — sign a renewal Heads of Terms for a sitting commercial tenant.
+    renewCommercialLease: (
+      propertyId: string,
+      terms: {
+        agreedRentPennies: number;
+        termMonths: number;
+        reviewFrequencyMonths: number;
+        breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+      },
+    ) => {
+      const prev = get();
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!property || property.type !== 'commercial') {
+        showToast("Not Commercial", "Renewals only apply to commercial leases.", "destructive"); return;
+      }
+      const tenantRec = prev.tenants.find((t: any) => t.propertyId === propertyId);
+      if (!tenantRec) {
+        showToast("No sitting tenant", "There is no tenant to renew.", "destructive"); return;
+      }
+      const agreed = Math.max(1, Math.round(terms.agreedRentPennies));
+      const startMonth = prev.monthsPlayed;
+      const newLease = {
+        fri: true,
+        termMonths: terms.termMonths,
+        startMonth,
+        expiryMonth: startMonth + terms.termMonths,
+        reviewFrequencyMonths: terms.reviewFrequencyMonths,
+        breakClause: terms.breakClause,
+        conditionScoreAtLeaseStart: typeof property.conditionScore === 'number'
+          ? property.conditionScore
+          : scoreFromConditionTier(property.condition),
+        negotiatedRentPennies: agreed,
+      };
+      const updatedProps = prev.ownedProperties.map((p: any) =>
+        p.id === propertyId
+          ? { ...p, commercialLease: newLease, monthlyIncome: agreed, baseRent: agreed, lastRentIncrease: startMonth }
+          : p,
+      );
+      const updatedTenants = prev.tenants.map((t: any) =>
+        t.propertyId === propertyId
+          ? { ...t, lastRentReviewMonth: startMonth, rentPennies: agreed }
+          : t,
+      );
+      const remainingRenewals = ((prev as any).pendingLeaseRenewals || []).filter((r: any) => r.propertyId !== propertyId);
+      showToast(
+        "Lease Renewed 📄",
+        `${(tenantRec.tenant.companyName ?? tenantRec.tenant.name)} re-signed for ${Math.round(terms.termMonths / 12)} years at £${fromPennies(agreed).toLocaleString()}/mo.`,
+      );
+      set({ ownedProperties: updatedProps, tenants: updatedTenants, pendingLeaseRenewals: remainingRenewals });
+    },
+
+    // Phase 4 — player declines a renewal; lease will end at expiry.
+    declineLeaseRenewal: (propertyId: string) => {
+      const prev = get();
+      const updatedProps = prev.ownedProperties.map((p: any) =>
+        p.id === propertyId && p.commercialLease
+          ? { ...p, commercialLease: { ...p.commercialLease, endingAtExpiry: true } }
+          : p,
+      );
+      const remainingRenewals = ((prev as any).pendingLeaseRenewals || []).filter((r: any) => r.propertyId !== propertyId);
+      showToast("Renewal Declined", "Lease will terminate at expiry. Dilapidations claim assessed on hand-back.");
+      set({ ownedProperties: updatedProps, pendingLeaseRenewals: remainingRenewals });
+    },
+
+
+
+
 
     applyRentIncrease: (
       propertyId: string,

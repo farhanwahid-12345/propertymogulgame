@@ -222,10 +222,17 @@ export const PropertyCard = memo(function PropertyCard({
   const [hotApplicant, setHotApplicant] = useState<Tenant | null>(null);
   // Phase 3 — Rent-review dialog state for sitting commercial tenants.
   const [reviewOpen, setReviewOpen] = useState(false);
+  // Phase 4 — Renewal dialog state for sitting commercial tenants.
+  const [renewalOpen, setRenewalOpen] = useState(false);
   const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
   const settleRentReview = useGameStore(s => (s as any).settleRentReview);
+  const renewCommercialLease = useGameStore(s => (s as any).renewCommercialLease);
+  const declineLeaseRenewal = useGameStore(s => (s as any).declineLeaseRenewal);
   const pendingRentReview = useGameStore(s =>
     ((s as any).pendingRentReviews || []).find((r: any) => r.propertyId === property.id),
+  );
+  const pendingLeaseRenewal = useGameStore(s =>
+    ((s as any).pendingLeaseRenewals || []).find((r: any) => r.propertyId === property.id),
   );
   const sittingCommercialTenant = useGameStore(s =>
     property.type === 'commercial'
@@ -742,6 +749,42 @@ export const PropertyCard = memo(function PropertyCard({
                       />
                     </>
                   )}
+
+                  {/* Phase 4 — Lease renewal interest banner + dialog (commercial sitting tenants only) */}
+                  {property.type === 'commercial' && pendingLeaseRenewal && (
+                    <>
+                      <div className="glass rounded-xl p-3 border border-emerald-400/40 bg-emerald-400/10 flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                          <div className="font-semibold text-emerald-200">🤝 Tenant wants to renew</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Lease expires month {pendingLeaseRenewal.expiryMonth}. Current rent £{Math.round((pendingLeaseRenewal.currentRentPennies || 0) / 100).toLocaleString()}/mo.
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => setRenewalOpen(true)}>
+                            Negotiate
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => declineLeaseRenewal?.(property.id)}>
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                      <HeadsOfTermsDialog
+                        open={renewalOpen}
+                        onOpenChange={setRenewalOpen}
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        tenant={sittingCommercialTenant ?? null}
+                        askingRentPennies={pendingLeaseRenewal.currentRentPennies}
+                        monthsPlayed={monthsPlayed}
+                        mode="renewal"
+                        onRenew={(pid, terms) => renewCommercialLease?.(pid, terms)}
+                      />
+                    </>
+                  )}
+
+
+
 
 
 

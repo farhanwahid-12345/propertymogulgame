@@ -11,6 +11,7 @@ import {
   AUCTION_SELLER_FEE, MORTGAGE_PROVIDERS, MONTH_DURATION_SECONDS, EICR_COST_PENNIES,
   conditionTierFromScore, scoreFromConditionTier,
   TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
+  CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT,
 } from '@/lib/engine/constants';
 import {
   calculateDTI, fluctuateProviderRates, getRequiredNetWorth, getFurnitureValuePennies,
@@ -858,19 +859,107 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // Phase 4 #13 — commercial lease renewal warning 6 months before expiry.
       // Fired once per lease via the renewalWarnedMonth marker on the property.
+      // Phase 4 (this iteration): also rolls the tenant's renewal interest based on
+      // covenantStrength. Interested ⇒ queue a pendingLeaseRenewal HoT. Not
+      // interested ⇒ stamp endingAtExpiry so the lease terminates on expiryMonth.
+      const existingRenewalsByProp = new Set<string>(
+        ((prev as any).pendingLeaseRenewals || []).map((r: any) => r.propertyId),
+      );
+      const newlyQueuedRenewals: any[] = [];
       updatedOwnedProperties = updatedOwnedProperties.map(p => {
         const lease = p.commercialLease;
         if (!lease || p.type !== 'commercial') return p;
         const monthsToExpiry = lease.expiryMonth - newMonthNumber;
         if (monthsToExpiry === 6 && lease.renewalWarnedMonth !== newMonthNumber) {
-          showToast(
-            "Commercial Lease Renewal Due",
-            `${p.name} — FRI lease expires in 6 months (month ${lease.expiryMonth}). Negotiate renewal or expect a void.`,
-          );
+          const tenantRec = newTenants.find(t => t.propertyId === p.id);
+          const covenant = (tenantRec?.tenant as any)?.covenantStrength ?? 50;
+          // P(interested) = clamp(0.3 + covenant/200, 0.3, 0.85)
+          const interestedP = Math.min(0.85, Math.max(0.3, 0.3 + covenant / 200));
+          const interested = gameRandom() < interestedP;
+          if (interested && !existingRenewalsByProp.has(p.id)) {
+            const currentRentPennies = (p.baseRent || p.monthlyIncome) * 100;
+            newlyQueuedRenewals.push({
+              id: `renewal_${p.id}_${newMonthNumber}`,
+              propertyId: p.id,
+              raisedMonth: newMonthNumber,
+              expiryMonth: lease.expiryMonth,
+              currentRentPennies,
+            });
+            showToast(
+              "Renewal Interest 📄",
+              `${p.name} — tenant is keen to extend. Open Heads of Terms to negotiate a new term.`,
+            );
+            return { ...p, commercialLease: { ...lease, renewalWarnedMonth: newMonthNumber } };
+          }
+          if (!interested) {
+            showToast(
+              "Tenant Not Renewing ⚠️",
+              `${p.name} — tenant has indicated they will vacate at expiry (month ${lease.expiryMonth}). Dilapidations will be assessed on hand-back.`,
+              "destructive",
+            );
+            return { ...p, commercialLease: { ...lease, renewalWarnedMonth: newMonthNumber, endingAtExpiry: true } };
+          }
           return { ...p, commercialLease: { ...lease, renewalWarnedMonth: newMonthNumber } };
         }
         return p;
       });
+
+      // Phase 4 — lease expiry: terminate non-renewing leases, claim dilapidations.
+      let dilapidationsRecovered = 0;
+      const propertiesToVacate: string[] = [];
+      updatedOwnedProperties = updatedOwnedProperties.map(p => {
+        const lease = p.commercialLease;
+        if (!lease || p.type !== 'commercial') return p;
+        const expired = newMonthNumber >= lease.expiryMonth;
+        if (!expired) return p;
+        // If the player negotiated a renewal already, renewCommercialLease would
+        // have replaced the lease and reset expiryMonth — we wouldn't reach here.
+        const tenantRec = newTenants.find(t => t.propertyId === p.id);
+        const sqft = Math.max(400, p.internalSqft ?? 900);
+        const currentScore = typeof p.conditionScore === 'number'
+          ? p.conditionScore
+          : scoreFromConditionTier(p.condition);
+        const deltaPoints = Math.max(0, (lease.conditionScoreAtLeaseStart ?? currentScore) - currentScore);
+        const dilapsPennies = deltaPoints > 0
+          ? Math.max(0, Math.round(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * sqft * deltaPoints / 100))
+          : 0;
+        if (dilapsPennies > 0) {
+          dilapidationsRecovered += dilapsPennies;
+          const companyName = (tenantRec?.tenant as any)?.companyName ?? tenantRec?.tenant?.name ?? 'former tenant';
+          showToast(
+            "Dilapidations Recovered 💷",
+            `£${fromPennies(dilapsPennies).toLocaleString()} recovered from ${companyName} for condition restoration at ${p.name}.`,
+          );
+        } else {
+          showToast(
+            "Lease Ended",
+            `${p.name} — lease expired; property handed back in original condition. No dilapidations claim.`,
+          );
+        }
+        propertiesToVacate.push(p.id);
+        if (tenantRec) {
+          newTenantHistory.push({
+            id: `dep_${p.id}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
+            propertyId: p.id,
+            propertyName: p.name,
+            tenantName: (tenantRec.tenant as any)?.companyName ?? tenantRec.tenant?.name ?? 'Commercial tenant',
+            reason: 'end_of_tenancy',
+            month: newMonthNumber,
+            detail: dilapsPennies > 0
+              ? `Dilapidations £${fromPennies(dilapsPennies).toLocaleString()}`
+              : 'Lease expiry',
+          });
+        }
+        return { ...p, commercialLease: undefined, monthlyIncome: 0 };
+      });
+      if (propertiesToVacate.length > 0) {
+        newTenants = newTenants.filter(t => !propertiesToVacate.includes(t.propertyId));
+        propertiesToVacate.forEach(pid => {
+          newVoidPeriods.push({ propertyId: pid, startDate: Date.now(), endDate: Date.now() });
+        });
+      }
+
+
 
 
       // Only toast for concerns that will actually appear in the feed
@@ -1425,7 +1514,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // Phase 2 (v5): include letting-agent fees, RGI premiums, HMO fines as outflows; RGI payouts as inflows.
       const totalOutflows = mortgagePayments + lettingAgentFees + rentGuaranteePremiums + hmoFines;
-      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth + rentGuaranteePayouts;
+      const totalInflows = monthlyIncome + sellCash + conveyancingCashReturn + evictionDepositRefund + arrearsRepaidThisMonth + rentGuaranteePayouts + dilapidationsRecovered;
       const netCashDelta = totalInflows - totalOutflows;
       let finalCash = prev.cash;
       let finalOverdraftUsed = prev.overdraftUsed;
@@ -1987,6 +2076,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingRentReviews: newlyQueuedReviews.length > 0
           ? [...(((s as any).pendingRentReviews) || []), ...newlyQueuedReviews]
           : ((s as any).pendingRentReviews || []),
+        pendingLeaseRenewals: newlyQueuedRenewals.length > 0
+          ? [...(((s as any).pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
+          : ((s as any).pendingLeaseRenewals || []),
+
+
 
       } as any));
     },

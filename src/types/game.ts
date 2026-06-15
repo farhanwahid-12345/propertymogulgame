@@ -114,6 +114,8 @@ export interface Property {
     conditionScoreAtLeaseStart: number;
     /** Phase 1 — final headline rent agreed with the tenant, in pennies. */
     negotiatedRentPennies: number;
+    /** Phase 4 — set when the tenant has declined to renew; lease will terminate at expiry. */
+    endingAtExpiry?: boolean;
   };
 
   /** Phase 5 #16 — auction lot is missing kitchen/bathroom or otherwise
@@ -569,6 +571,8 @@ export interface GameState {
   cgtThisYearPennies?: number;
   /** Phase 3 (commercial) — outstanding rent reviews queued for player negotiation. */
   pendingRentReviews?: PendingRentReview[];
+  /** Phase 4 (commercial) — interested-renewal HoT prompts queued for player negotiation. */
+  pendingLeaseRenewals?: PendingLeaseRenewal[];
 }
 
 /** Phase 3 (commercial) — a contractual rent review that's come due and is
@@ -582,6 +586,18 @@ export interface PendingRentReview {
   currentRentPennies: number;
   /** Suggested upward market rent (pennies/mo) — basis for the player's opening offer. */
   proposedMarketRentPennies: number;
+}
+
+/** Phase 4 (commercial) — a renewal offer awaiting Heads of Terms negotiation. */
+export interface PendingLeaseRenewal {
+  id: string;
+  propertyId: string;
+  /** monthsPlayed when the renewal interest was registered. */
+  raisedMonth: number;
+  /** The lease's contracted expiry month (renewal must be agreed before this). */
+  expiryMonth: number;
+  /** Current rent (pennies/mo) — basis for the player's opening offer. */
+  currentRentPennies: number;
 }
 
 
