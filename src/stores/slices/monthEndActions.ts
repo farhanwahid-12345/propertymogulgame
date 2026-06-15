@@ -282,7 +282,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
           missedTenantKeys.add(key);
           missedRentPropertyIds.add(t.propertyId);
-          const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+
+
           newDefaultEvents.push({ propertyId: t.propertyId, type: 'default', amount: prop?.monthlyIncome || 0, month: newMonthNumber });
           // Item 2: throttle toasts to max 1 per ~3 months per tenant.
           const lastToast = t.lastDefaultToastMonth ?? -999;
