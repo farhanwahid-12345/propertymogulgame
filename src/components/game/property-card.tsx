@@ -315,6 +315,15 @@ export const PropertyCard = memo(function PropertyCard({
           <div className="flex items-center gap-2">
             <span className="text-lg">{typeEmoji[propertyType]}</span>
             <CardTitle className="text-base">{property.name}</CardTitle>
+            {property.epcRating && (
+              <Badge className={cn("text-xs px-1.5 py-0.5",
+                ['A','B','C'].includes(property.epcRating) ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                ['D','E'].includes(property.epcRating) ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
+                "bg-red-500/20 text-red-400 border-red-500/30"
+              )}>
+                EPC {property.epcRating}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {isInConveyancing && (
