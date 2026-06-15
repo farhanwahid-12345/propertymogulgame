@@ -265,11 +265,19 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newDefaultEvents: TenantEvent[] = [];
       prev.tenants.forEach(t => {
         if (conveyancingPropertyIds.has(t.propertyId)) return;
-        const risk = (t.tenant as any).defaultRisk ?? 5;
-        // Phase 4 #11 — high-risk tenants double their arrears probability.
-        const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
-        const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
-        const monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+        const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
+        let monthlyP: number;
+        if (prop?.type === 'commercial') {
+          // Phase 5 — covenant-driven reliability for commercial tenants.
+          const cov = (t.tenant as any).covenantStrength ?? 50;
+          monthlyP = Math.min(0.15, Math.max(0.001, ((100 - cov) / 100) * 0.15));
+        } else {
+          const risk = (t.tenant as any).defaultRisk ?? 5;
+          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
+          const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
+          monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+        }
         if (gameRandom() < monthlyP) {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
           missedTenantKeys.add(key);
