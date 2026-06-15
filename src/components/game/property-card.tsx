@@ -821,7 +821,7 @@ export const PropertyCard = memo(function PropertyCard({
                         tenantName={currentTenant.name}
                         tenantProfile={currentTenant.profile}
                         rentArrearsCount={rentArrearsCount}
-                        hasLongstandingASB={false}
+                        hasLongstandingASB={tenantConcerns.some(c => c.propertyId === property.id && !c.resolvedMonth && (c.category === 'noise' || c.category === 'safety') && (monthsPlayed - c.raisedMonth) >= 1)}
                         onEvict={evictTenant}
                       />
                     </div>
