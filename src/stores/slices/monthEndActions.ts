@@ -760,6 +760,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (!ownedIdsForConcerns.has(t.propertyId)) return;
         if (inConveyancingIds.has(t.propertyId)) return;
         if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
+        // Phase 6 — FRI commercial leases: tenant handles all maintenance, so the
+        // landlord never sees concerns/repair bills from leased commercial units.
+        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return;
 
         const conditionScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
         let chance = 0.035;
