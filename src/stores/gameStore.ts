@@ -76,6 +76,18 @@ interface GameActions {
   ) => void;
   /** Phase 3 (commercial) — settle a pending rent review at an agreed rent. */
   settleRentReview: (propertyId: string, agreedRentPennies: number) => void;
+  /** Phase 4 (commercial) — sign a renewal Heads of Terms (sitting tenant stays, lease re-issued). */
+  renewCommercialLease: (
+    propertyId: string,
+    terms: {
+      agreedRentPennies: number;
+      termMonths: number;
+      reviewFrequencyMonths: number;
+      breakClause: { type: 'none' | 'tenant' | 'mutual'; atMonth?: number };
+    },
+  ) => void;
+  /** Phase 4 (commercial) — player declines a renewal interest; lease will end at expiry. */
+  declineLeaseRenewal: (propertyId: string) => void;
 
 
 
