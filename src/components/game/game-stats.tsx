@@ -148,9 +148,9 @@ export function GameStats({
                 </Popover>
               )}
             </div>
-            <div className="flex items-baseline justify-between">
-              <div className="text-xl font-bold text-foreground">£{netWorth.toLocaleString()}</div>
-              <div className="text-xs text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
+            <div className="flex items-baseline gap-4">
+              <div className="text-3xl lg:text-4xl font-bold text-foreground">£{netWorth.toLocaleString()}</div>
+              <div className="text-base text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
             </div>
           </div>
 
@@ -204,13 +204,13 @@ export function GameStats({
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="flex items-baseline justify-between">
-              <div className={cn("text-xl font-bold",
+            <div className="flex items-baseline gap-4">
+              <div className={cn("text-3xl lg:text-4xl font-bold",
                 netMonthlyIncome >= 0 ? "text-success" : "text-danger"
               )}>
                 £{netMonthlyIncome.toLocaleString()}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-base text-muted-foreground">
                 In: £{totalMonthlyIncome.toLocaleString()} | Out: £{totalMonthlyExpenses.toLocaleString()}
               </div>
             </div>
@@ -219,8 +219,8 @@ export function GameStats({
           {/* Portfolio & Credit */}
           <div className="border-l-4 border-[hsl(var(--stat-credit))] pl-3">
             <div className="text-xs text-muted-foreground">🏠 Portfolio</div>
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="text-xl font-bold text-foreground shrink-0">
+            <div className="flex items-baseline gap-4">
+              <div className="text-3xl lg:text-4xl font-bold text-foreground shrink-0">
                 {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
