@@ -714,6 +714,37 @@ export const PropertyCard = memo(function PropertyCard({
                     />
                   )}
 
+                  {/* Phase 3 — Rent review due banner + dialog (commercial sitting tenants only) */}
+                  {property.type === 'commercial' && pendingRentReview && (
+                    <>
+                      <div className="glass rounded-xl p-3 border border-amber-400/40 bg-amber-400/10 flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                          <div className="font-semibold text-amber-200">📈 Rent review due</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Suggested market rent £{Math.round((pendingRentReview.proposedMarketRentPennies || 0) / 100).toLocaleString()}/mo (current £{Math.round((pendingRentReview.currentRentPennies || 0) / 100).toLocaleString()}/mo).
+                          </div>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => setReviewOpen(true)}>
+                          Open Heads of Terms
+                        </Button>
+                      </div>
+                      <HeadsOfTermsDialog
+                        open={reviewOpen}
+                        onOpenChange={setReviewOpen}
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        tenant={sittingCommercialTenant ?? null}
+                        askingRentPennies={pendingRentReview.proposedMarketRentPennies}
+                        currentRentPennies={pendingRentReview.currentRentPennies}
+                        monthsPlayed={monthsPlayed}
+                        mode="review"
+                        onSettleReview={(pid, agreed) => settleRentReview?.(pid, agreed)}
+                      />
+                    </>
+                  )}
+
+
+
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
