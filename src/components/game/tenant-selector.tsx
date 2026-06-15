@@ -111,7 +111,14 @@ export interface Tenant {
   damageRisk: number;
   description: string;
   traits: TenantTrait[];
+  /** Phase 1 — commercial tenants only: registered company name. */
+  companyName?: string;
+  /** Phase 1 — commercial tenants only: covenant strength 0–100 (financial standing). */
+  covenantStrength?: number;
+  /** Phase 1 — commercial tenants only: sector tag for flavour & risk weighting. */
+  sector?: 'retail' | 'logistics' | 'professional_services' | 'hospitality' | 'healthcare';
 }
+
 
 // --- Generation ---
 
