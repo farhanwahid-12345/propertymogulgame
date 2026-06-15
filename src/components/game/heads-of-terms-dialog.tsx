@@ -358,6 +358,8 @@ export function HeadsOfTermsDialog({
             })}
           </div>
         </div>
+        </>)}
+
 
         {/* Counter-offer / rejection feedback */}
         {stage === 'counter' && agreedRentPounds == null && tenantCounterPounds != null && (
