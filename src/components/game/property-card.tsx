@@ -203,6 +203,7 @@ export const PropertyCard = memo(function PropertyCard({
   hasActiveDebtRecovery = false,
   onSendToCourt,
   onSplitFlatUnit,
+  tenantConcerns = [],
 }: PropertyCardProps) {
 
   const [isLoading, setIsLoading] = useState(false);
