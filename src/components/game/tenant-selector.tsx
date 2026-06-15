@@ -314,7 +314,10 @@ interface TenantSelectorProps {
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished';
   /** Phase 1 — when 'commercial', the applicant pool becomes company tenants with covenant strength. */
   propertyType?: 'residential' | 'commercial' | 'luxury';
+  /** Phase 2 — when set, commercial applicants route to Heads of Terms instead of direct placement. */
+  onCommercialApplicantSelected?: (propertyId: string, tenant: Tenant) => void;
 }
+
 
 export function TenantSelector({
   propertyId,
