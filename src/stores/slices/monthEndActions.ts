@@ -1984,6 +1984,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ];
         })(),
         cgtThisYearPennies: cgtThisYearAcc,
+        pendingRentReviews: newlyQueuedReviews.length > 0
+          ? [...(((s as any).pendingRentReviews) || []), ...newlyQueuedReviews]
+          : ((s as any).pendingRentReviews || []),
 
       } as any));
     },
