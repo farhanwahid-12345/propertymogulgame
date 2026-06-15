@@ -11,6 +11,7 @@ import {
   AUCTION_SELLER_FEE, MORTGAGE_PROVIDERS, MONTH_DURATION_SECONDS, EICR_COST_PENNIES,
   conditionTierFromScore, scoreFromConditionTier,
   TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
+  CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT,
 } from '@/lib/engine/constants';
 import {
   calculateDTI, fluctuateProviderRates, getRequiredNetWorth, getFurnitureValuePennies,
