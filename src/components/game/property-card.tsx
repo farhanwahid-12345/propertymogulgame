@@ -688,6 +688,20 @@ export const PropertyCard = memo(function PropertyCard({
                       />
                     )
                   )}
+                  {/* Phase 2 — Heads of Terms dialog (commercial only) */}
+                  {property.type === 'commercial' && (
+                    <HeadsOfTermsDialog
+                      open={hotOpen}
+                      onOpenChange={setHotOpen}
+                      propertyId={property.id}
+                      propertyName={property.name}
+                      tenant={hotApplicant}
+                      askingRentPennies={(property.baseRent || property.monthlyIncome) * 100}
+                      monthsPlayed={monthsPlayed}
+                      onSign={(pid, t, terms) => signCommercialLease?.(pid, t, terms)}
+                    />
+                  )}
+
                   {/* Repair Bar + quick top-up */}
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
