@@ -1254,8 +1254,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newAnnualAccountRecord: import('@/types/game').AnnualAccountRecord | null = null;
       let netProfitBeforeTaxForRecord = 0;
 
+      // Phase F fix: fire the rollover on EVERY 12-month boundary crossed,
+      // not just on April. The previous `isApril` gate meant year records
+      // only landed when the game-month happened to be April AND the tax
+      // year had advanced — which in practice only ever produced "Year 1".
+      void isApril;
+      if (currentTaxYear > lastTaxYear) {
 
-      if (isApril && currentTaxYear > lastTaxYear && accumulatedGrossRent > 0) {
         if (prev.entityType === 'sole_trader') {
           // Sole trader: rental income MINUS deductible expenses (NOT mortgage
           // interest — Section 24 turns interest into a 20% tax credit only).
