@@ -2076,6 +2076,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingRentReviews: newlyQueuedReviews.length > 0
           ? [...(((s as any).pendingRentReviews) || []), ...newlyQueuedReviews]
           : ((s as any).pendingRentReviews || []),
+        pendingLeaseRenewals: newlyQueuedRenewals.length > 0
+          ? [...(((s as any).pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
+          : ((s as any).pendingLeaseRenewals || []),
+
+
 
       } as any));
     },
