@@ -586,6 +586,19 @@ export interface GameState {
   pendingPoliceLetters?: PoliceLetter[];
   /** Phase 5 #13 — debt-recovery case IDs queued for the resolution pop-up. */
   pendingCourtResolutions?: string[];
+  /** Phase 7 #16 — overdraft prompt queued during a fresh distress episode. */
+  pendingOverdraftPrompt?: { eligibleLimit: number; month: number } | null;
+  /** Phase 7 #16 — monthsPlayed when overdraft prompt last fired (once per distress episode). */
+  overdraftPromptedMonth?: number;
+  /** Phase 7 #16 — snapshot recorded at the moment of bankruptcy for the end-game modal. */
+  bankruptcySummary?: {
+    month: number;
+    totalDebt: number;          // pennies
+    propertiesLostCount: number;
+    remainingCash: number;      // pennies (may be negative)
+  } | null;
+  /** Phase 7 #18 — chronological log of completed loans, with on-time flag. */
+  loanPayoffHistory?: Array<{ id: string; kind: 'personal' | 'business' | 'investor' | 'bridging'; repaidOnSchedule: boolean; month: number }>;
 }
 
 export interface PoliceLetter {
