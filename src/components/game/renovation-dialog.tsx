@@ -348,8 +348,15 @@ export function RenovationDialog({
   const epcMultiplierFor = (r: RenovationType): number => {
     if (r.id !== 'epc_upgrade') return 1;
     const target = selectedRenovation?.id === 'epc_upgrade' ? epcTarget : nextBandUp(currentEpc);
-    // 1 jump = 1.0×, 2 = 1.5×, 3 = 2.0× …
+    // 1 jump = 1.0×, 2 = 1.5×, 3 = 2.0× …  (kept for rent/value uplift scaling)
     return 0.5 + 0.5 * bandJumps(target);
+  };
+
+  /** Item 10 — EPC upgrade cost: £2,500 per band jump × (internalSqft/800).
+   *  Returns pounds. Independent of the base RenovationType.cost. */
+  const epcCostPoundsFor = (target: string): number => {
+    const sqftScale = Math.max(0.5, (internalSqft ?? 800) / 800);
+    return Math.round(2500 * bandJumps(target) * sqftScale);
   };
 
 
