@@ -152,8 +152,8 @@ export function GameStats({
               )}
             </div>
             <div className="flex items-baseline gap-4">
-              <div className="text-3xl lg:text-4xl font-bold text-foreground">£{netWorth.toLocaleString()}</div>
-              <div className="text-base text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
+              <div className="text-xl lg:text-2xl font-semibold text-foreground">£{netWorth.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
             </div>
           </div>
 
