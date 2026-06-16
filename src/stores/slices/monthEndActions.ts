@@ -318,10 +318,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           monthlyP = Math.min(0.15, Math.max(0.001, ((100 - cov) / 100) * 0.15));
         } else {
           const risk = (t.tenant as any).defaultRisk ?? 5;
-          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          // Phase 5 #12 — risky tenants miss rent ~20%/mo (≈ 2–3 times/yr).
           const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
           const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
-          monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+          monthlyP = isHighRisk ? Math.min(0.45, Math.max(0.20, baseP * 2.5)) : baseP;
         }
         if (gameRandom() < monthlyP) {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
@@ -821,7 +821,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         else if (conditionScore < 50) chance += 0.02;
         else if (conditionScore >= 80) chance -= 0.015;
         if (t.tenant.profile === 'premium') chance += 0.015;
-        else if (t.tenant.profile === 'risky') chance += 0.03;
+        else if (t.tenant.profile === 'risky') chance += 0.08;
         // 1-month grace after move-in — settling-in period, no surprise concerns
         if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
         chance = Math.max(0.005, chance);
@@ -829,7 +829,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (gameRandom() >= chance) return;
 
         // When repair bar is low, bias toward maintenance/mould/safety templates
-        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.6;
+        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.85;
         const pool = riskyAsbBias
           ? CONCERN_TEMPLATES.filter(t => t.category === 'noise' || t.category === 'safety')
           : conditionScore < 50
