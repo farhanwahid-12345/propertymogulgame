@@ -30,7 +30,7 @@ export interface Conveyancing {
     /** 0 = SVR/tracker, 2/5/10 = initial fixed-rate term in years. */
     fixedTermYears?: number;
   };
-  cashHeld: number; // pennies - cash locked in escrow
+  cashHeld: number; // pennies - cash locked in conveyancing
   isAuction?: boolean;
   buyerOffer?: any; // for selling via estate agent
   /** Snapshot of the yield shown at the estate agent at offer-time —
