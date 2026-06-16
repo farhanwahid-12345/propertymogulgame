@@ -582,6 +582,33 @@ export const PropertyCard = memo(function PropertyCard({
                       <span className="font-medium">£{monthlyMortgagePayment.toLocaleString()}</span>
                     </div>
                   )}
+                  {propertyMortgage && (() => {
+                    // Item 11 — fixed-rate status line.
+                    const m = propertyMortgage as any;
+                    if (!m.fixedTermYears || !m.fixedRate) {
+                      return (
+                        <div className="text-[10px] text-muted-foreground pl-1">
+                          Variable rate
+                        </div>
+                      );
+                    }
+                    const startMonth = m.startMonth ?? 0;
+                    const fixedEndMonth = startMonth + m.fixedTermYears * 12;
+                    const remaining = fixedEndMonth - (monthsPlayed ?? 0);
+                    if (remaining > 0) {
+                      const ratePct = (m.fixedRate * 100).toFixed(2);
+                      return (
+                        <div className="text-[10px] text-blue-400 pl-1">
+                          Fixed rate: {ratePct}% — {remaining} month{remaining !== 1 ? 's' : ''} remaining
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="text-[10px] text-amber-400 pl-1">
+                        Variable rate (fixed period ended)
+                      </div>
+                    );
+                  })()}
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>− Insurance (0.4%)</span>
                     <span className="font-medium">£{Math.round(monthlyInsurance).toLocaleString()}</span>
