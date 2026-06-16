@@ -18,6 +18,8 @@ import { PayoffEventsModal } from "@/components/game/payoff-events-modal";
 import { EpcTutorialDialog } from "@/components/game/epc-tutorial-dialog";
 import { PoliceLetterDialog } from "@/components/game/police-letter-dialog";
 import { CourtResolutionModal } from "@/components/game/court-resolution-modal";
+import { OverdraftPromptDialog } from "@/components/game/overdraft-prompt-dialog";
+import { BankruptcyDialog } from "@/components/game/bankruptcy-dialog";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -324,6 +326,8 @@ const Index = () => {
       <EpcTutorialDialog />
       <PoliceLetterDialog />
       <CourtResolutionModal />
+      <OverdraftPromptDialog />
+      <BankruptcyDialog />
     </div>
   );
 };
