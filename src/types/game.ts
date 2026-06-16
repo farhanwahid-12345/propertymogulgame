@@ -327,6 +327,12 @@ export interface PlanningApplication {
   /** monthsPlayed when the player saw the decision toast — used to hide the
    *  refused entry from the tracker after 1 month. */
   acknowledgedMonth?: number;
+  /** Phase 6 #15 — sqft uplift snapshot from the renovation type at submission. */
+  sqftAdded?: number;
+  /** Phase 6 #15 — true once the sqft uplift has been baked into the property's
+   *  internalSqft at planning approval, so completion (and the display helper)
+   *  must not add it again. */
+  sqftAppliedAtPlanning?: boolean;
 }
 
 /** Player-raised dispute over a withheld portion of a tenant's deposit (TDS adjudication). */
