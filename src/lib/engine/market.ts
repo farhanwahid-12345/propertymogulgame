@@ -91,19 +91,58 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
   }
 
   const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
-  const marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
+  let marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
+
+  let finalPrice = price;
+  let finalValue = value;
+  let finalYield = averageYield;
+  let finalMonthlyIncome = Math.max(toPennies(400), baseMonthlyIncome);
+  let commercialLease: Property['commercialLease'] | undefined;
+  let sittingTenant: Property['sittingTenant'] | undefined;
+
+  // Phase 3 — ~50% of commercial listings carry a sitting tenant + active FRI
+  // lease. Price is recomputed via income-capitalisation off the implied yield.
+  if (type === 'commercial' && Math.random() < 0.5) {
+    sittingTenant = generateSittingCommercialTenant(city.id as any);
+    const covenantStrength = sittingTenant.covenantStrength ?? 50;
+    const remainingTermMonths = 6 + Math.floor(Math.random() * 79); // 6–84
+    const reviewFrequencyMonths = Math.random() < 0.5 ? 36 : 60;
+    const elapsed = Math.floor(Math.random() * 24); // already-served portion
+    const termMonths = remainingTermMonths + elapsed;
+    const negotiatedRentPennies = Math.max(toPennies(400), baseMonthlyIncome);
+    const impliedYield = impliedCommercialYield(covenantStrength, remainingTermMonths);
+    const incomePrice = Math.round((negotiatedRentPennies * 12) / impliedYield);
+    finalPrice = Math.max(toPennies(40_000), Math.round(incomePrice / 100_000) * 100_000);
+    finalValue = finalPrice;
+    marketValue = finalPrice;
+    finalYield = impliedYield * 100;
+    finalMonthlyIncome = negotiatedRentPennies;
+    // startMonth/expiryMonth are placeholders measured in "months-from-now"
+    // (negative start). They get rewritten on conveyancing-complete so that
+    // remainingMonths = expiryMonth - currentMonthsPlayed stays correct.
+    commercialLease = {
+      fri: true,
+      termMonths,
+      startMonth: -elapsed,
+      expiryMonth: remainingTermMonths,
+      reviewFrequencyMonths,
+      breakClause: { type: 'none' },
+      conditionScoreAtLeaseStart: condition === 'premium' ? 85 : condition === 'dilapidated' ? 35 : 65,
+      negotiatedRentPennies,
+    };
+  }
 
   return {
     id,
     name: `${houseNumber} ${streetName}`,
     type,
-    price,
-    value,
+    price: finalPrice,
+    value: finalValue,
     marketValue,
     neighborhood,
-    monthlyIncome: Math.max(toPennies(400), baseMonthlyIncome),
+    monthlyIncome: finalMonthlyIncome,
     marketTrend: "stable",
-    yield: averageYield,
+    yield: finalYield,
     lastRentIncrease: 0,
     condition,
     monthsSinceLastRenovation: 0,
@@ -112,6 +151,8 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     subtype: 'standard',
     epcRating,
     city: city.id,
+    ...(commercialLease ? { commercialLease } : {}),
+    ...(sittingTenant ? { sittingTenant } : {}),
   };
 }
 
