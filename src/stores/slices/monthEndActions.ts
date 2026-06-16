@@ -318,10 +318,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           monthlyP = Math.min(0.15, Math.max(0.001, ((100 - cov) / 100) * 0.15));
         } else {
           const risk = (t.tenant as any).defaultRisk ?? 5;
-          // Phase 4 #11 — high-risk tenants double their arrears probability.
+          // Phase 5 #12 — risky tenants miss rent ~20%/mo (≈ 2–3 times/yr).
           const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
           const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
-          monthlyP = isHighRisk ? Math.min(0.45, baseP * 2) : baseP;
+          monthlyP = isHighRisk ? Math.min(0.45, Math.max(0.20, baseP * 2.5)) : baseP;
         }
         if (gameRandom() < monthlyP) {
           const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
@@ -786,6 +786,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       ];
 
       const newConcerns: import('@/types/game').TenantConcern[] = [];
+      // Phase 5 #12 — ASB letters from the local council when risky tenants trigger noise/safety concerns.
+      const newPoliceLetters: Array<{ id: string; propertyId: string; propertyName: string; tenantName: string; city?: string; concernCategory: string; description: string; month: number; concernId: string }> = [];
       const existingActiveByProp = new Map<string, number>();
       const prevConcerns = prev.tenantConcerns || [];
       prevConcerns.filter(c => !c.resolvedMonth).forEach(c => {
@@ -821,7 +823,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         else if (conditionScore < 50) chance += 0.02;
         else if (conditionScore >= 80) chance -= 0.015;
         if (t.tenant.profile === 'premium') chance += 0.015;
-        else if (t.tenant.profile === 'risky') chance += 0.03;
+        else if (t.tenant.profile === 'risky') chance += 0.08;
         // 1-month grace after move-in — settling-in period, no surprise concerns
         if ((t.moveInMonth ?? 0) >= newMonthNumber - 1) return;
         chance = Math.max(0.005, chance);
@@ -829,7 +831,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (gameRandom() >= chance) return;
 
         // When repair bar is low, bias toward maintenance/mould/safety templates
-        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.6;
+        const riskyAsbBias = t.tenant.profile === 'risky' && gameRandom() < 0.85;
         const pool = riskyAsbBias
           ? CONCERN_TEMPLATES.filter(t => t.category === 'noise' || t.category === 'safety')
           : conditionScore < 50
@@ -841,8 +843,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const pct = lo + gameRandom() * (hi - lo);
         const cost = Math.max(toPennies(150), Math.min(toPennies(3000), Math.round(property.value * pct)));
         const penaltyMod = t.tenant.profile === 'premium' ? 1 : t.tenant.profile === 'budget' ? 0.7 : 1;
+        const concernId = `concern_${newMonthNumber}_${t.propertyId}_${gameRandom().toString(36).slice(2, 7)}`;
         newConcerns.push({
-          id: `concern_${newMonthNumber}_${t.propertyId}_${gameRandom().toString(36).slice(2, 7)}`,
+          id: concernId,
           propertyId: t.propertyId,
           tenantProfile: t.tenant.profile as any,
           category: tpl.category,
@@ -851,6 +854,20 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           resolveCost: cost,
           satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
         });
+        // Phase 5 #12 — risky tenant + noise/safety concern triggers an official council letter (once per concern).
+        if (riskyAsbBias && (tpl.category === 'noise' || tpl.category === 'safety')) {
+          newPoliceLetters.push({
+            id: `letter_${concernId}`,
+            concernId,
+            propertyId: property.id,
+            propertyName: property.name,
+            tenantName: t.tenant.name,
+            city: (property as any).city,
+            concernCategory: tpl.category,
+            description: desc,
+            month: newMonthNumber,
+          });
+        }
         existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
       });
 
@@ -2059,6 +2076,16 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
         opsFlashAt: opsFlashAtNew,
         debtRecoveryCases: trimmedCases,
+        // Phase 5 #14 — persist this month's defaults so eviction checks (recentDefaults < 2) actually pass.
+        tenantEvents: [...prev.tenantEvents, ...newDefaultEvents].slice(-24),
+        // Phase 5 #12 — append new ASB police letters for the in-game dialog.
+        pendingPoliceLetters: newPoliceLetters.length > 0
+          ? [...(((s as any).pendingPoliceLetters) || []), ...newPoliceLetters]
+          : ((s as any).pendingPoliceLetters || []),
+        // Phase 5 #13 — surface case resolutions as a pop-up.
+        pendingCourtResolutions: resolvedCases.length > 0
+          ? [...(((s as any).pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
+          : ((s as any).pendingCourtResolutions || []),
         projectedTaxPennies: newProjectedTaxPennies,
         projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         pendingTransactions: [

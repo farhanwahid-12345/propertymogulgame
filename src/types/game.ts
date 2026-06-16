@@ -576,7 +576,24 @@ export interface GameState {
   pendingRentReviews?: PendingRentReview[];
   /** Phase 4 (commercial) — interested-renewal HoT prompts queued for player negotiation. */
   pendingLeaseRenewals?: PendingLeaseRenewal[];
+  /** Phase 5 #12 — official ASB letters queued for player acknowledgement. */
+  pendingPoliceLetters?: PoliceLetter[];
+  /** Phase 5 #13 — debt-recovery case IDs queued for the resolution pop-up. */
+  pendingCourtResolutions?: string[];
 }
+
+export interface PoliceLetter {
+  id: string;
+  concernId: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  city?: string;
+  concernCategory: string;
+  description: string;
+  month: number;
+}
+
 
 /** Phase 3 (commercial) — a contractual rent review that's come due and is
  *  awaiting the player to open Heads of Terms (review mode) and settle. */

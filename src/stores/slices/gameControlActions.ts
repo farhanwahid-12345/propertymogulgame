@@ -129,6 +129,16 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       set({ payoffEvents: [] });
     },
 
+    dismissPoliceLetter: (id: string) => {
+      const s: any = get();
+      set({ pendingPoliceLetters: (s.pendingPoliceLetters || []).filter((l: any) => l.id !== id) });
+    },
+
+    dismissCourtResolution: (caseId: string) => {
+      const s: any = get();
+      set({ pendingCourtResolutions: (s.pendingCourtResolutions || []).filter((id: string) => id !== caseId) });
+    },
+
     markEconomicEventsSeen: (ids: string[]) => {
       if (!ids || ids.length === 0) return;
       const s = get();
