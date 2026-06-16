@@ -146,6 +146,8 @@ interface GameActions {
   // v3 #4 — mortgage / loan payoff modal acknowledgement
   dismissPayoffEvent: (id: string) => void;
   dismissAllPayoffEvents: () => void;
+  dismissPoliceLetter: (id: string) => void;
+  dismissCourtResolution: (caseId: string) => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
@@ -247,6 +249,9 @@ export function createInitialState(): GameState {
     annualAccounts: [],
     pendingRentReviews: [],
     pendingLeaseRenewals: [],
+    pendingPoliceLetters: [],
+    pendingCourtResolutions: [],
+
 
   };
 }
