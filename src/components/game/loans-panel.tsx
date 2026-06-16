@@ -33,18 +33,21 @@ export function LoansPanel() {
 
   const reputation = ((store as any).landlordReputation ?? 50) as number;
 
-  // Dynamic APR: market rate + current spread + credit penalty
-  // (Phase 3 #1a — investor uses fixed product spread + reputation-based rate adjustment).
+  // Dynamic APR breakdown — exposed in the dialog so the player sees every component.
   const creditPenalty = kind === 'investor'
     ? 0
     : store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
   const reputationRateAdj = kind === 'investor'
     ? Math.max(-0.05, Math.min(0.06, (60 - reputation) * 0.002))
     : 0;
+  // Phase 7 #18 — investor loyalty discount: −3% per on-time repaid loan, capped at −15%.
+  const onTimePayoffs = (((store as any).loanPayoffHistory) || []).filter((p: any) => p.repaidOnSchedule).length;
+  const loyaltyRateAdj = kind === 'investor' ? -Math.min(0.15, onTimePayoffs * 0.03) : 0;
   const spread = kind === 'investor'
     ? product.baseSpread
     : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
-  const rate = Math.max(0.02, store.currentMarketRate + spread + creditPenalty + reputationRateAdj);
+  const baseRate = store.currentMarketRate + spread;
+  const rate = Math.max(0.02, baseRate + creditPenalty + reputationRateAdj + loyaltyRateAdj);
 
   // Dynamic cap based on rent roll, debt service & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
@@ -184,6 +187,41 @@ export function LoansPanel() {
                     </span>
                   </div>
                 )}
+                {/* Phase 7 #18 — rate breakdown so the player sees every component */}
+                <div className="pt-1 border-t border-border/40 space-y-0.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base rate</span>
+                    <span>{(baseRate * 100).toFixed(2)}%</span>
+                  </div>
+                  {kind === 'investor' && reputationRateAdj !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reputation adj</span>
+                      <span className={reputationRateAdj < 0 ? 'text-success' : 'text-danger'}>
+                        {reputationRateAdj < 0 ? '−' : '+'}{Math.abs(reputationRateAdj * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {creditPenalty !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Credit adj</span>
+                      <span className={creditPenalty < 0 ? 'text-success' : 'text-danger'}>
+                        {creditPenalty < 0 ? '−' : '+'}{Math.abs(creditPenalty * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {kind === 'investor' && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Loyalty discount ({onTimePayoffs}× on-time)</span>
+                      <span className={loyaltyRateAdj < 0 ? 'text-success' : 'text-muted-foreground'}>
+                        {loyaltyRateAdj < 0 ? `−${Math.abs(loyaltyRateAdj * 100).toFixed(2)}%` : '0.00%'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1 border-t border-border/40">
+                    <span className="font-semibold">Final rate</span>
+                    <strong>{(rate * 100).toFixed(2)}% APR</strong>
+                  </div>
+                </div>
               </div>
 
               {eligibilityIssue && (

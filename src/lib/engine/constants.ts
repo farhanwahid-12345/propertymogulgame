@@ -7,7 +7,55 @@ export const INITIAL_CASH = toPennies(100_000);
 export const EXPERIENCE_BASE = 1000;
 export const MORTGAGE_INTEREST_RATE = 0.055;
 export const BASE_MARKET_RATE = 0.035;
+/** Legacy flat Band-D rate (kept as fallback for properties with no city). */
 export const COUNCIL_TAX_BAND_D = toPennies(150);
+
+/** Phase 7 #17 — real 2024/25 council-tax Band D annual rates by city, in £ (pounds). */
+export type CityId = 'middlesbrough' | 'leeds' | 'manchester' | 'london';
+export const COUNCIL_TAX_BAND_D_ANNUAL: Record<CityId, number> = {
+  middlesbrough: 2290, // £2,290/yr Band D
+  leeds: 1950,
+  manchester: 1850,
+  london: 1600,        // approximate inner-London average
+};
+
+/** Council-tax band multipliers (× Band D). UK statutory ratios. */
+const BAND_MULTIPLIERS: Record<'A'|'B'|'C'|'D'|'E'|'F'|'G'|'H', number> = {
+  A: 6/9, B: 7/9, C: 8/9, D: 9/9, E: 11/9, F: 13/9, G: 15/9, H: 18/9,
+};
+
+/** Derive the council-tax band letter from current property value (£). */
+export function getCouncilTaxBand(valueInPounds: number): 'A'|'B'|'C'|'D'|'E'|'F'|'G'|'H' {
+  if (valueInPounds < 80_000)  return 'A';
+  if (valueInPounds < 120_000) return 'B';
+  if (valueInPounds < 160_000) return 'C';
+  if (valueInPounds < 220_000) return 'D';
+  if (valueInPounds < 320_000) return 'E';
+  if (valueInPounds < 420_000) return 'F';
+  if (valueInPounds < 650_000) return 'G';
+  return 'H';
+}
+
+/**
+ * Monthly council-tax charge for a property, in pennies.
+ * Vacant properties get a 50% discount for the first 6 months, then pay full rate.
+ * Occupied properties pay nothing (the tenant settles council tax in this game).
+ */
+export function computeMonthlyCouncilTaxPennies(args: {
+  valuePounds: number;
+  city?: CityId;
+  isOccupied: boolean;
+  /** True if the property is inside an active "void" window (recently vacated). */
+  isInVoidDiscountWindow: boolean;
+}): number {
+  if (args.isOccupied) return 0;
+  const cityRate = COUNCIL_TAX_BAND_D_ANNUAL[args.city ?? 'middlesbrough'] ?? COUNCIL_TAX_BAND_D_ANNUAL.middlesbrough;
+  const band = getCouncilTaxBand(args.valuePounds);
+  const annualPounds = cityRate * BAND_MULTIPLIERS[band];
+  const monthlyPennies = Math.round((annualPounds * 100) / 12);
+  return args.isInVoidDiscountWindow ? Math.round(monthlyPennies * 0.5) : monthlyPennies;
+}
+
 export const CORPORATION_TAX_RATE = 0.19;
 export const SOLICITOR_FEES = toPennies(600);
 export const ESTATE_AGENT_RATE = 0.015;

@@ -139,6 +139,20 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       set({ pendingCourtResolutions: (s.pendingCourtResolutions || []).filter((id: string) => id !== caseId) });
     },
 
+    acceptOverdraftPrompt: () => {
+      const s: any = get();
+      const prompt = s.pendingOverdraftPrompt;
+      if (!prompt) return;
+      set({
+        overdraftLimit: Math.max(s.overdraftLimit || 0, prompt.eligibleLimit),
+        pendingOverdraftPrompt: null,
+      });
+    },
+
+    dismissOverdraftPrompt: () => {
+      set({ pendingOverdraftPrompt: null });
+    },
+
     markEconomicEventsSeen: (ids: string[]) => {
       if (!ids || ids.length === 0) return;
       const s = get();

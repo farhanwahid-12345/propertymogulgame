@@ -8,6 +8,7 @@ import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
 import {
   BASE_MARKET_RATE, COUNCIL_TAX_BAND_D, SOLICITOR_FEES, ESTATE_AGENT_RATE,
+  computeMonthlyCouncilTaxPennies,
   AUCTION_SELLER_FEE, MORTGAGE_PROVIDERS, MONTH_DURATION_SECONDS, EICR_COST_PENNIES,
   conditionTierFromScore, scoreFromConditionTier,
   TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
@@ -435,7 +436,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const isInVoid = newVoidPeriods.some(vp =>
           vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
         );
-        return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
+        // Phase 7 #17 — banded council tax by city/value; 50% discount only inside the void window.
+        return total + computeMonthlyCouncilTaxPennies({
+          valuePounds: Math.round((property.value || 0) / 100),
+          city: (property as any).city,
+          isOccupied: hasTenant,
+          isInVoidDiscountWindow: !hasTenant && isInVoid,
+        });
       }, 0);
       // v3 #2 — landlord insurance is billed ANNUALLY (0.4% of property value)
       // and routed through the pending-approval queue. We still compute the
@@ -1757,6 +1764,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const prevLoans = allPrevLoans.filter((l: any) => l.kind !== 'bridging');
       const prevBridges = allPrevLoans.filter((l: any) => l.kind === 'bridging');
       const updatedLoans: import('@/types/game').Loan[] = [];
+      // Phase 7 #18 — track loans repaid this month for the loyalty discount.
+      const loanPayoffsThisMonth: Array<{ id: string; kind: 'personal'|'business'|'investor'|'bridging'; repaidOnSchedule: boolean; month: number }> = [];
       prevLoans.forEach(l => {
         const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
         const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
@@ -1770,6 +1779,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           // 12-month on-time streak → +5 credit
           if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
           if (newBal <= 0) {
+            const repaidOnSchedule = l.lastMissedMonth === undefined;
+            loanPayoffsThisMonth.push({ id: l.id, kind: l.kind as any, repaidOnSchedule, month: newMonthNumber });
             newPayoffEvents.push({
               id: `payoff-loan-${l.id}-${newMonthNumber}`,
               kind: 'loan',
@@ -1895,9 +1906,23 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
 
       let isBankrupt = false;
+      // Phase 7 #16 — overdraft prompt: fires once at the start of a fresh distress
+      // episode when the player has no overdraft and is eligible (creditScore > 580).
+      let newOverdraftPrompt: { eligibleLimit: number; month: number } | null = (prev as any).pendingOverdraftPrompt ?? null;
+      let newOverdraftPromptedMonth: number = (prev as any).overdraftPromptedMonth ?? -999;
       if (inDistress) {
         const months = (newArrears?.monthsBehind ?? 0) + 1;
         if (!newArrears) {
+          // Stage 0 — try the overdraft prompt before the warning toast.
+          const noOverdraft = (prev.overdraftLimit || 0) === 0;
+          const eligible = prev.creditScore > 580;
+          const monthsSinceLastPrompt = newMonthNumber - newOverdraftPromptedMonth;
+          if (noOverdraft && eligible && monthsSinceLastPrompt >= 12 && !newOverdraftPrompt) {
+            // Eligible limit scales with credit score (between £2.5k and £15k).
+            const tier = prev.creditScore >= 750 ? 15000 : prev.creditScore >= 680 ? 10000 : prev.creditScore >= 620 ? 5000 : 2500;
+            newOverdraftPrompt = { eligibleLimit: tier * 100, month: newMonthNumber };
+            newOverdraftPromptedMonth = newMonthNumber;
+          }
           newArrears = { startMonth: newMonthNumber, monthsBehind: 1 };
           showToast("⚠️ Cashflow Warning", "Your expenses exceed income and your cash buffer is gone. Sell, refinance, or raise rent — or the bailiffs will be called next month.", "destructive");
         } else if (months >= 2 && !newArrears.forcedAuctionPropertyId && !newArrears.courtOrderMonth) {
@@ -1918,9 +1943,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           newArrears = { ...newArrears, monthsBehind: months };
         }
       } else {
-        // Recovered — clear arrears
+        // Recovered — clear arrears + reset distress-episode prompt gate
         if (newArrears) {
           showToast("✅ Arrears Cleared", "Cashflow back in the black — court action paused.");
+          newOverdraftPromptedMonth = -999;
         }
         newArrears = null;
       }
@@ -1929,7 +1955,18 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       if (!isBankrupt && netWorthFinal < 0 && updatedOwnedProperties.length === 0 && exhausted) {
         isBankrupt = true;
       }
+      // Phase 7 #16 — snapshot at the moment of bankruptcy for the end-game modal.
+      let newBankruptcySummary = (prev as any).bankruptcySummary ?? null;
       if (isBankrupt && !prev.isBankrupt) {
+        const totalDebt = loanDebtFinal
+          + finalMortgages.reduce((s, m) => s + (m.remainingBalance || 0), 0)
+          + finalOverdraftUsed;
+        newBankruptcySummary = {
+          month: newMonthNumber,
+          totalDebt,
+          propertiesLostCount: (prev.ownedProperties?.length || 0) - updatedOwnedProperties.length,
+          remainingCash: finalCash - finalOverdraftUsed,
+        };
         showToast("💀 BANKRUPTCY!", "Court ordered insolvency — game over.", "destructive");
       }
 
@@ -2103,6 +2140,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingCourtResolutions: resolvedCases.length > 0
           ? [...(((s as any).pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
           : ((s as any).pendingCourtResolutions || []),
+        // Phase 7 #16 — overdraft prompt + bankruptcy snapshot
+        pendingOverdraftPrompt: newOverdraftPrompt,
+        overdraftPromptedMonth: newOverdraftPromptedMonth,
+        bankruptcySummary: newBankruptcySummary,
+        // Phase 7 #18 — track repaid loans for investor loyalty discount.
+        loanPayoffHistory: [
+          ...(((s as any).loanPayoffHistory) || []),
+          ...loanPayoffsThisMonth,
+        ].slice(-50),
         projectedTaxPennies: newProjectedTaxPennies,
         projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         pendingTransactions: [

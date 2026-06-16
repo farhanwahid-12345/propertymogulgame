@@ -343,9 +343,15 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
             ((1 - trackRecordFactor) * 0.1) + ((1 - healthFactor) * 0.1)
           ))
         : 0;
+      // Phase 7 #18 — investor loyalty: every on-time repaid loan = −3% rate, capped at −15%.
+      const onTimeLoans = ((prev as any).loanPayoffHistory || [])
+        .filter((p: any) => p.repaidOnSchedule).length;
+      const loyaltyRateAdj = kind === 'investor'
+        ? -Math.min(0.15, onTimeLoans * 0.03)
+        : 0;
       const spread = kind === 'investor' ? product.baseSpread
         : ((prev.currentLoanRates as any)[kind] ?? product.baseSpread);
-      const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj + factorRateAdj);
+      const rate = Math.max(0.02, prev.currentMarketRate + spread + creditPenalty + reputationRateAdj + factorRateAdj + loyaltyRateAdj);
       const monthlyRate = rate / 12;
       const monthlyPayment = Math.round((amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -termMonths)));
 
@@ -442,10 +448,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
           l.id === loanId ? { ...l, remainingBalance: newBalance, monthlyPayment: newMonthly } : l
         );
       }
+      // Phase 7 #18 — log on-time payoff if loan never missed a scheduled payment.
+      const prevHistory = ((prev as any).loanPayoffHistory || []) as any[];
+      const newHistory = fullSettle
+        ? [...prevHistory, { id: loan.id, kind: loan.kind, repaidOnSchedule: loan.lastMissedMonth === undefined, month: prev.monthsPlayed }].slice(-50)
+        : prevHistory;
       set({
         cash: debited.cash, overdraftUsed: debited.overdraftUsed,
         loans: updatedLoans,
         creditScore: Math.min(850, prev.creditScore + (fullSettle ? 3 : 1)),
+        loanPayoffHistory: newHistory,
       } as any);
       showToast(
         fullSettle ? "Loan Settled ✓" : "Partial Payment ✓",
