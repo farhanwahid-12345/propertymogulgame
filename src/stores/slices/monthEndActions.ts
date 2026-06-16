@@ -1902,9 +1902,23 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
 
       let isBankrupt = false;
+      // Phase 7 #16 — overdraft prompt: fires once at the start of a fresh distress
+      // episode when the player has no overdraft and is eligible (creditScore > 580).
+      let newOverdraftPrompt: { eligibleLimit: number; month: number } | null = (prev as any).pendingOverdraftPrompt ?? null;
+      let newOverdraftPromptedMonth: number = (prev as any).overdraftPromptedMonth ?? -999;
       if (inDistress) {
         const months = (newArrears?.monthsBehind ?? 0) + 1;
         if (!newArrears) {
+          // Stage 0 — try the overdraft prompt before the warning toast.
+          const noOverdraft = (prev.overdraftLimit || 0) === 0;
+          const eligible = prev.creditScore > 580;
+          const monthsSinceLastPrompt = newMonthNumber - newOverdraftPromptedMonth;
+          if (noOverdraft && eligible && monthsSinceLastPrompt >= 12 && !newOverdraftPrompt) {
+            // Eligible limit scales with credit score (between £2.5k and £15k).
+            const tier = prev.creditScore >= 750 ? 15000 : prev.creditScore >= 680 ? 10000 : prev.creditScore >= 620 ? 5000 : 2500;
+            newOverdraftPrompt = { eligibleLimit: tier * 100, month: newMonthNumber };
+            newOverdraftPromptedMonth = newMonthNumber;
+          }
           newArrears = { startMonth: newMonthNumber, monthsBehind: 1 };
           showToast("⚠️ Cashflow Warning", "Your expenses exceed income and your cash buffer is gone. Sell, refinance, or raise rent — or the bailiffs will be called next month.", "destructive");
         } else if (months >= 2 && !newArrears.forcedAuctionPropertyId && !newArrears.courtOrderMonth) {
@@ -1925,9 +1939,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           newArrears = { ...newArrears, monthsBehind: months };
         }
       } else {
-        // Recovered — clear arrears
+        // Recovered — clear arrears + reset distress-episode prompt gate
         if (newArrears) {
           showToast("✅ Arrears Cleared", "Cashflow back in the black — court action paused.");
+          newOverdraftPromptedMonth = -999;
         }
         newArrears = null;
       }
@@ -1936,7 +1951,18 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       if (!isBankrupt && netWorthFinal < 0 && updatedOwnedProperties.length === 0 && exhausted) {
         isBankrupt = true;
       }
+      // Phase 7 #16 — snapshot at the moment of bankruptcy for the end-game modal.
+      let newBankruptcySummary = (prev as any).bankruptcySummary ?? null;
       if (isBankrupt && !prev.isBankrupt) {
+        const totalDebt = loanDebtFinal
+          + finalMortgages.reduce((s, m) => s + (m.remainingBalance || 0), 0)
+          + finalOverdraftUsed;
+        newBankruptcySummary = {
+          month: newMonthNumber,
+          totalDebt,
+          propertiesLostCount: (prev.ownedProperties?.length || 0) - updatedOwnedProperties.length,
+          remainingCash: finalCash - finalOverdraftUsed,
+        };
         showToast("💀 BANKRUPTCY!", "Court ordered insolvency — game over.", "destructive");
       }
 
