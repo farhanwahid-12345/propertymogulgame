@@ -269,9 +269,13 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         return;
       }
 
+      // Phase 8 #20 — split-out flats command a 20% premium over a simple per-unit
+      // slice of the parent block value. Both the new leasehold flat AND each
+      // remaining (still-undivided) unit are revalued at this premium.
       const perUnitValue = Math.round(parent.value / units);
-      const splitUnitValue = Math.round(perUnitValue * 1.08);
-      const remainingValue = Math.max(0, parent.value - perUnitValue);
+      const splitUnitValue = Math.round(perUnitValue * 1.20);
+      const remainingUnits = units - 1;
+      const remainingValue = Math.max(0, Math.round(perUnitValue * 1.20) * remainingUnits);
 
       const slotTenant = prev.tenants.find((t: any) => t.propertyId === propertyId && t.slotIndex === slotIndex);
       const slotRentPennies = slotTenant?.rentPennies ?? Math.round(parent.monthlyIncome / units);
@@ -280,6 +284,13 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
       const groundRentPennies = groundRentMode === 'peppercorn'
         ? 1000
         : Math.round(splitUnitValue * 0.005);
+
+      // Phase 8 #20 — split sqft cleanly between the new flat and the remaining parent.
+      const parentSqft = parent.internalSqft ?? 0;
+      const newFlatSqft = parentSqft > 0 ? Math.round(parentSqft / units) : undefined;
+      const remainingParentSqft = parentSqft > 0 && newFlatSqft != null
+        ? Math.max(0, parentSqft - newFlatSqft)
+        : parent.internalSqft;
 
       const newId = `split_${propertyId}_${slotIndex}_${Date.now()}`;
       const newFlat: Property = {
@@ -298,6 +309,8 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         isLeasehold: true,
         serviceChargePctAnnual: serviceChargePct,
         groundRentPennies,
+        groundRentRecipientId: parent.id,
+        internalSqft: newFlatSqft,
         completedRenovationIds: [],
         renovationCompletionMonths: {},
         totalRenovationSpendPennies: 0,
