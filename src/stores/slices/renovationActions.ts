@@ -312,6 +312,7 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
         approvalProb: prob,
         approved,
         refusalReason,
+        sqftAdded: (renovationType as any).sqftAdded as number | undefined,
       };
 
       showToast(
@@ -417,6 +418,7 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
           approvalProb: prob,
           approved,
           refusalReason,
+          sqftAdded: (r as any).sqftAdded as number | undefined,
         } as PlanningApplication;
       });
 

@@ -95,10 +95,16 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
             : updatedProperties[idx].monthlyIncome + actualRentGain;
 
           const sqftAdded = (renovation.type as any).sqftAdded as number | undefined;
+          // Phase 6 #15 — if the sqft uplift was already baked into the property
+          // at planning approval, do not add it again at completion.
+          const planningApp = (prev.planningApplications || []).find(
+            (a: any) => a.propertyId === propRecord.id && a.renovationTypeId === renovation.type.id,
+          );
+          const alreadyAppliedAtPlanning = (planningApp as any)?.sqftAppliedAtPlanning === true;
           const currentSqftSafe = updatedProperties[idx].internalSqft && updatedProperties[idx].internalSqft! > 0
             ? updatedProperties[idx].internalSqft!
             : deriveSqft({ type: updatedProperties[idx].type, value: fromPennies(updatedProperties[idx].value), internalSqft: updatedProperties[idx].internalSqft, plotSqft: updatedProperties[idx].plotSqft }).internalSqft;
-          const sqftUpdate = sqftAdded && sqftAdded > 0 && valueMult > 0
+          const sqftUpdate = sqftAdded && sqftAdded > 0 && valueMult > 0 && !alreadyAppliedAtPlanning
             ? {
                 internalSqft: currentSqftSafe + sqftAdded,
                 plotSqft: updatedProperties[idx].plotSqft || 0,

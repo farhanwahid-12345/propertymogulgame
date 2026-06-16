@@ -1207,9 +1207,24 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newlyRefusedPlanningIds: string[] = [];
       newPlanningApplications = newPlanningApplications.map(app => {
         if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
-          const resolved = { ...app, status: app.approved ? 'approved' as const : 'refused' as const };
           const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
           if (app.approved) {
+            // Phase 6 #15 — bake the sqft uplift into the property at approval so the
+            // displayed footprint doesn't dip back down while works are underway.
+            const sqftAdded = (app as any).sqftAdded as number | undefined;
+            let sqftAppliedAtPlanning = (app as any).sqftAppliedAtPlanning === true;
+            if (sqftAdded && sqftAdded > 0 && !sqftAppliedAtPlanning) {
+              const idx = updatedOwnedProperties.findIndex(p => p.id === app.propertyId);
+              if (idx >= 0) {
+                const base = updatedOwnedProperties[idx].internalSqft || 0;
+                updatedOwnedProperties[idx] = {
+                  ...updatedOwnedProperties[idx],
+                  internalSqft: base + sqftAdded,
+                };
+                sqftAppliedAtPlanning = true;
+              }
+            }
+            const resolved = { ...app, status: 'approved' as const, sqftAppliedAtPlanning };
             newlyApprovedPlanningIds.push(app.id);
             playLevelUp();
             showToast(
@@ -1217,7 +1232,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
               `${app.renovationName} on ${propName} cleared the LPA. Start work from the renovation menu.`,
             );
             flashOps();
+            return resolved;
           } else {
+            const resolved = { ...app, status: 'refused' as const };
             newlyRefusedPlanningIds.push(app.id);
             showToast(
               "Planning Refused ❌",
@@ -1233,8 +1250,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
               untilMonth: newMonthNumber + 6,
               renovationTypeId: app.renovationTypeId,
             });
+            return resolved;
           }
-          return resolved;
         }
         return app;
       });
