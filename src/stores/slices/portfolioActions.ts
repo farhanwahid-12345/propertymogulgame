@@ -372,16 +372,28 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         }
       }
 
+      const freeholdRetained = !removingParent;
+      const showWashExplainer = freeholdRetained && !prev.seenGroundRentExplainer;
+
       set({
         ownedProperties: updatedOwned,
         tenants: nextTenants,
         ...(achievementsPatch ? { achievements: achievementsPatch } : {}),
+        ...(showWashExplainer ? { seenGroundRentExplainer: true } : {}),
       });
 
       showToast(
         "Title Split Complete",
         `Flat ${slotIndex + 1} is now its own leasehold property. Service charge ${(serviceChargePct * 100).toFixed(1)}%/yr; ground rent £${fromPennies(groundRentPennies).toLocaleString()}/yr.`,
       );
+
+      if (showWashExplainer) {
+        const annualGroundRentPounds = fromPennies(groundRentPennies);
+        showToast(
+          "Ground Rent Note",
+          `You now hold both the freehold and leasehold. Ground rent of £${annualGroundRentPounds.toLocaleString()}/yr is payable to yourself while you own both. This expense becomes real if you sell the freehold.`,
+        );
+      }
     },
   };
 }
