@@ -8,6 +8,7 @@ import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { playGavel, playLevelUp, playPaper, playConcernChime } from '@/lib/sound';
 import {
   BASE_MARKET_RATE, COUNCIL_TAX_BAND_D, SOLICITOR_FEES, ESTATE_AGENT_RATE,
+  computeMonthlyCouncilTaxPennies,
   AUCTION_SELLER_FEE, MORTGAGE_PROVIDERS, MONTH_DURATION_SECONDS, EICR_COST_PENNIES,
   conditionTierFromScore, scoreFromConditionTier,
   TENANT_WEAR_MULTIPLIER, BASE_CONDITION_DECAY, CONDITION_DECAY_FLOOR,
@@ -435,7 +436,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const isInVoid = newVoidPeriods.some(vp =>
           vp.propertyId === property.id && currentTime >= vp.startDate && currentTime <= vp.endDate
         );
-        return total + (!hasTenant || isInVoid ? COUNCIL_TAX_BAND_D : 0);
+        // Phase 7 #17 — banded council tax by city/value; 50% discount only inside the void window.
+        return total + computeMonthlyCouncilTaxPennies({
+          valuePounds: Math.round((property.value || 0) / 100),
+          city: (property as any).city,
+          isOccupied: hasTenant,
+          isInVoidDiscountWindow: !hasTenant && isInVoid,
+        });
       }, 0);
       // v3 #2 — landlord insurance is billed ANNUALLY (0.4% of property value)
       // and routed through the pending-approval queue. We still compute the
