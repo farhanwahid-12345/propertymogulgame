@@ -377,6 +377,8 @@ interface TenantSelectorProps {
   propertyType?: 'residential' | 'commercial' | 'luxury';
   /** Phase 2 — when set, commercial applicants route to Heads of Terms instead of direct placement. */
   onCommercialApplicantSelected?: (propertyId: string, tenant: Tenant) => void;
+  /** Item 2 — property city, drives the commercial applicant pool. */
+  city?: 'middlesbrough' | 'leeds' | 'manchester' | 'london';
 }
 
 
