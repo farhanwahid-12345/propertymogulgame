@@ -1023,6 +1023,7 @@ export const PropertyCard = memo(function PropertyCard({
                       propertyLocks={propertyLocks}
                       hasTenant={hasAnyTenant || !!currentTenant}
                       currentEpc={property.epcRating}
+                      isLeasehold={property.isLeasehold}
 
                     />
                   )}
