@@ -675,9 +675,15 @@ export function EstateAgentWindow({
                     <span className="text-muted-foreground">Base Rent</span>
                     <span className="text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
                   </div>
+                  {(property as any).commercialLease && (property as any).sittingTenant && (
+                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-blue-500/50 text-blue-300">
+                      🏢 Tenanted · FRI lease
+                    </Badge>
+                  )}
                 </Card>
               ))}
             </div>
+
 
             {selectedBuyProperty && (
               <Card className="mt-4">
