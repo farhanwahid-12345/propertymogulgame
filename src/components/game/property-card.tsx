@@ -12,6 +12,8 @@ import { FurnishingDialog } from "@/components/game/furnishing-dialog";
 import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
 import { HeadsOfTermsDialog } from "@/components/game/heads-of-terms-dialog";
+import { CourtClaimDialog } from "@/components/game/court-claim-dialog";
+import { CourtProgressDialog } from "@/components/game/court-progress-dialog";
 import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -436,24 +438,47 @@ export const PropertyCard = memo(function PropertyCard({
                 💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
               </Badge>
             )}
-            {hasActiveDebtRecovery && (
-              <Badge variant="outline" className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10" title="Debt-recovery case in court">
-                ⚖️ In court
-              </Badge>
-            )}
-            {rentArrearsCount >= 2 && !hasActiveDebtRecovery && onSendToCourt && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10"
-                onClick={() => {
-                  if (window.confirm(`File a county-court claim against the tenant?\n\n• Filing fee: £325\n• Resolution: 6–12 months\n• Agency keeps 25% of recovered amount\n\nThis clears arrears off the books while the case is in progress.`)) {
-                    onSendToCourt(property.id, 0);
+            {hasActiveDebtRecovery && (() => {
+              const activeCase = ((useGameStore.getState() as any).debtRecoveryCases || [])
+                .find((c: any) => c.propertyId === property.id && c.status === 'in_court');
+              if (!activeCase) {
+                return (
+                  <Badge variant="outline" className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10" title="Debt-recovery case in court">
+                    ⚖️ In court
+                  </Badge>
+                );
+              }
+              return (
+                <CourtProgressDialog
+                  caseRecord={activeCase}
+                  currentMonth={monthsPlayed ?? 0}
+                  trigger={
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20"
+                      title="View court case details"
+                    >
+                      ⚖️ In court
+                    </Badge>
                   }
-                }}
-              >
-                ⚖️ Send to court
-              </Button>
+                />
+              );
+            })()}
+            {rentArrearsCount >= 2 && !hasActiveDebtRecovery && onSendToCourt && (
+              <CourtClaimDialog
+                tenantName={currentTenant?.name ?? 'tenant'}
+                arrearsPounds={Math.round((arrearsPenniesTotal ?? 0) / 100)}
+                onConfirm={() => onSendToCourt(property.id, 0)}
+                trigger={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10"
+                  >
+                    ⚖️ Send to court
+                  </Button>
+                }
+              />
             )}
             {property.isManaged && (
               <Badge variant="outline" className="text-[10px] border-sky-400/40 text-sky-300 bg-sky-500/10" title={`Managed by ${property.agentTier ?? 'standard'} agent (${Math.round((property.agentFeePct ?? 0.10) * 100)}% fee)`}>

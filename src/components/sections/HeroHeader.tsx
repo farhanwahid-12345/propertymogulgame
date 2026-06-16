@@ -291,17 +291,22 @@ export function HeroHeader({
                       Replay tour
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => {
-                        if (window.confirm("Reset the game? All progress will be lost.")) {
-                          resetGame();
-                        }
-                      }}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset game
-                    </DropdownMenuItem>
+                    <ConfirmDialog
+                      title="Reset the game?"
+                      description="All progress will be lost. This cannot be undone."
+                      confirmLabel="Reset"
+                      destructive
+                      onConfirm={() => resetGame()}
+                      trigger={
+                        <DropdownMenuItem
+                          onSelect={(e) => e.preventDefault()}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reset game
+                        </DropdownMenuItem>
+                      }
+                    />
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
