@@ -163,6 +163,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           yield: effectiveYield,
           monthlyIncome: purchasedMonthlyIncome,
           lastRentIncrease: newMonthNumber, baseRent: purchasedMonthlyIncome,
+          // Item 9 — explicitly carry EPC from the listing (fallback 'D' for legacy listings without one).
+          epcRating: (prop as any).epcRating ?? 'D',
           ...(useClassInit ? { useClass: useClassInit } : {}),
           // Commercial: preserve transferred lease if present; otherwise vacant.
           ...(isCommercial ? { commercialLease: transferredLease } : {}),

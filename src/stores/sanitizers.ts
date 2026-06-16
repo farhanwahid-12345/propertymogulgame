@@ -60,6 +60,8 @@ export function sanitizeProperty(property: any): Property {
     isLeasehold: Boolean(property?.isLeasehold),
     serviceChargePctAnnual: typeof property?.serviceChargePctAnnual === 'number' ? property.serviceChargePctAnnual : undefined,
     groundRentPennies: typeof property?.groundRentPennies === 'number' ? property.groundRentPennies : undefined,
+    // Item 9 — legacy saves may lack epcRating; default to 'D' so the badge always renders.
+    epcRating: (['A','B','C','D','E','F','G'].includes(property?.epcRating) ? property.epcRating : 'D') as Property['epcRating'],
   };
 }
 
