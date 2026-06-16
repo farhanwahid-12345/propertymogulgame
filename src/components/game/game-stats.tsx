@@ -208,12 +208,12 @@ export function GameStats({
               </Popover>
             </div>
             <div className="flex items-baseline gap-4">
-              <div className={cn("text-3xl lg:text-4xl font-bold",
+              <div className={cn("text-xl lg:text-2xl font-semibold",
                 netMonthlyIncome >= 0 ? "text-success" : "text-danger"
               )}>
                 £{netMonthlyIncome.toLocaleString()}
               </div>
-              <div className="text-base text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 In: £{totalMonthlyIncome.toLocaleString()} | Out: £{totalMonthlyExpenses.toLocaleString()}
               </div>
             </div>
