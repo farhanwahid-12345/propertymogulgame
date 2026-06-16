@@ -691,6 +691,9 @@ export function EstateAgentWindow({
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {(selectedBuyProperty as any).commercialLease && (selectedBuyProperty as any).sittingTenant && (
+                    <TenantInPlaceBlock property={selectedBuyProperty as any} />
+                  )}
                   {/* Negotiation history */}
                   {negotiationHistory.length > 0 && (
                     <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
