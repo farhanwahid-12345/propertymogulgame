@@ -456,6 +456,7 @@ export function useGameState() {
       furnitureValue,
       renovationWIP,
       conveyancingHeld: inflightBuyCapital,
+      conveyancingPropertyEquity: inflightPropertyEquity,
       mortgageDebt: totalMortgageDebt,
       loanDebt: totalLoanBalanceEarly,
       overdraftUsed,
