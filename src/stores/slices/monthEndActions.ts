@@ -1764,6 +1764,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const prevLoans = allPrevLoans.filter((l: any) => l.kind !== 'bridging');
       const prevBridges = allPrevLoans.filter((l: any) => l.kind === 'bridging');
       const updatedLoans: import('@/types/game').Loan[] = [];
+      // Phase 7 #18 — track loans repaid this month for the loyalty discount.
+      const loanPayoffsThisMonth: Array<{ id: string; kind: 'personal'|'business'|'investor'|'bridging'; repaidOnSchedule: boolean; month: number }> = [];
       prevLoans.forEach(l => {
         const monthlyInterest = Math.round(l.remainingBalance * (l.interestRate / 12));
         const principalPaid = Math.max(0, l.monthlyPayment - monthlyInterest);
@@ -1777,6 +1779,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           // 12-month on-time streak → +5 credit
           if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
           if (newBal <= 0) {
+            const repaidOnSchedule = l.lastMissedMonth === undefined;
+            loanPayoffsThisMonth.push({ id: l.id, kind: l.kind as any, repaidOnSchedule, month: newMonthNumber });
             newPayoffEvents.push({
               id: `payoff-loan-${l.id}-${newMonthNumber}`,
               kind: 'loan',
