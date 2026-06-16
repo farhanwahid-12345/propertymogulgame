@@ -187,6 +187,41 @@ export function LoansPanel() {
                     </span>
                   </div>
                 )}
+                {/* Phase 7 #18 — rate breakdown so the player sees every component */}
+                <div className="pt-1 border-t border-border/40 space-y-0.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Base rate</span>
+                    <span>{(baseRate * 100).toFixed(2)}%</span>
+                  </div>
+                  {kind === 'investor' && reputationRateAdj !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Reputation adj</span>
+                      <span className={reputationRateAdj < 0 ? 'text-success' : 'text-danger'}>
+                        {reputationRateAdj < 0 ? '−' : '+'}{Math.abs(reputationRateAdj * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {creditPenalty !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Credit adj</span>
+                      <span className={creditPenalty < 0 ? 'text-success' : 'text-danger'}>
+                        {creditPenalty < 0 ? '−' : '+'}{Math.abs(creditPenalty * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {kind === 'investor' && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Loyalty discount ({onTimePayoffs}× on-time)</span>
+                      <span className={loyaltyRateAdj < 0 ? 'text-success' : 'text-muted-foreground'}>
+                        {loyaltyRateAdj < 0 ? `−${Math.abs(loyaltyRateAdj * 100).toFixed(2)}%` : '0.00%'}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1 border-t border-border/40">
+                    <span className="font-semibold">Final rate</span>
+                    <strong>{(rate * 100).toFixed(2)}% APR</strong>
+                  </div>
+                </div>
               </div>
 
               {eligibilityIssue && (
