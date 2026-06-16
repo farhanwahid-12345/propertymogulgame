@@ -91,6 +91,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newMortgages = [...prev.mortgages];
       let newEstateAgent = [...prev.estateAgentProperties];
       let newAuction = [...prev.auctionProperties];
+      const transferredSittingTenants: any[] = [];
 
       completedBuys.forEach(conv => {
         // Find the property from market lists
