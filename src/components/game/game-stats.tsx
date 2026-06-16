@@ -101,7 +101,7 @@ export function GameStats({
     <div className="space-y-3 animate-fade-in">
 
       {/* Main Stats Bar */}
-      <div className="glass p-4">
+      <div className="glass p-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Net Worth */}
           <div className="border-l-4 border-[hsl(var(--stat-money))] pl-3">
