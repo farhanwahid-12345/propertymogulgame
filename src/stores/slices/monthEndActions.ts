@@ -786,6 +786,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       ];
 
       const newConcerns: import('@/types/game').TenantConcern[] = [];
+      // Phase 5 #12 — ASB letters from the local council when risky tenants trigger noise/safety concerns.
+      const newPoliceLetters: Array<{ id: string; propertyId: string; propertyName: string; tenantName: string; city?: string; concernCategory: string; description: string; month: number; concernId: string }> = [];
       const existingActiveByProp = new Map<string, number>();
       const prevConcerns = prev.tenantConcerns || [];
       prevConcerns.filter(c => !c.resolvedMonth).forEach(c => {
@@ -841,8 +843,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const pct = lo + gameRandom() * (hi - lo);
         const cost = Math.max(toPennies(150), Math.min(toPennies(3000), Math.round(property.value * pct)));
         const penaltyMod = t.tenant.profile === 'premium' ? 1 : t.tenant.profile === 'budget' ? 0.7 : 1;
+        const concernId = `concern_${newMonthNumber}_${t.propertyId}_${gameRandom().toString(36).slice(2, 7)}`;
         newConcerns.push({
-          id: `concern_${newMonthNumber}_${t.propertyId}_${gameRandom().toString(36).slice(2, 7)}`,
+          id: concernId,
           propertyId: t.propertyId,
           tenantProfile: t.tenant.profile as any,
           category: tpl.category,
@@ -851,6 +854,20 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           resolveCost: cost,
           satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
         });
+        // Phase 5 #12 — risky tenant + noise/safety concern triggers an official council letter (once per concern).
+        if (riskyAsbBias && (tpl.category === 'noise' || tpl.category === 'safety')) {
+          newPoliceLetters.push({
+            id: `letter_${concernId}`,
+            concernId,
+            propertyId: property.id,
+            propertyName: property.name,
+            tenantName: t.tenant.name,
+            city: (property as any).city,
+            concernCategory: tpl.category,
+            description: desc,
+            month: newMonthNumber,
+          });
+        }
         existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
       });
 
