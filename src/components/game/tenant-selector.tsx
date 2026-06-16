@@ -116,7 +116,10 @@ export interface Tenant {
   /** Phase 1 — commercial tenants only: covenant strength 0–100 (financial standing). */
   covenantStrength?: number;
   /** Phase 1 — commercial tenants only: sector tag for flavour & risk weighting. */
-  sector?: 'retail' | 'logistics' | 'professional_services' | 'hospitality' | 'healthcare';
+  sector?: 'retail' | 'logistics' | 'professional_services' | 'hospitality' | 'healthcare'
+    | 'tech' | 'media' | 'finance' | 'legal' | 'student_accom' | 'coworking' | 'corporate';
+  /** Item 2 — commercial tenants only: true if drawn from the national/multinational pool. */
+  isNational?: boolean;
 }
 
 
