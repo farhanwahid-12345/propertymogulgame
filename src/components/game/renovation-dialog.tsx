@@ -477,13 +477,14 @@ export function RenovationDialog({
         ...( { subtypeUnits: u } as any ),
       } as RenovationType;
     } else if (selectedRenovation.id === 'epc_upgrade') {
-      // Item #1: scale cost/rent/value by band-jump count and persist target band.
+      // Item 10 — cost = £2,500/band × (internalSqft/800); rent/value uplift still
+      // scales with band-jump count via the legacy multiplier.
       const jumps = bandJumps(epcTarget);
       const mult = 0.5 + 0.5 * jumps;
       toSubmit = {
         ...selectedRenovation,
         name: `EPC Upgrade → ${epcTarget}`,
-        cost: Math.round(selectedRenovation.cost * mult),
+        cost: epcCostPoundsFor(epcTarget),
         rentIncrease: Math.round(selectedRenovation.rentIncrease * mult),
         valueIncrease: Math.round(selectedRenovation.valueIncrease * mult),
         ...( { epcTarget } as any ),
