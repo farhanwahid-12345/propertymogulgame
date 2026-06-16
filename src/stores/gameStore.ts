@@ -148,6 +148,8 @@ interface GameActions {
   dismissAllPayoffEvents: () => void;
   dismissPoliceLetter: (id: string) => void;
   dismissCourtResolution: (caseId: string) => void;
+  acceptOverdraftPrompt: () => void;
+  dismissOverdraftPrompt: () => void;
   markEconomicEventsSeen: (ids: string[]) => void;
   // Debt recovery
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
