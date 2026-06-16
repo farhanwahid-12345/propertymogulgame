@@ -461,7 +461,14 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const sc = property.serviceChargePctAnnual
           ? Math.floor((property.value * property.serviceChargePctAnnual) / 12)
           : 0;
-        const gr = property.groundRentPennies ? Math.floor(property.groundRentPennies / 12) : 0;
+        // Phase 8 #20 — if the player also owns the freehold (groundRentRecipientId
+        // matches an owned property), the ground rent is a wash. Skip the cash hit.
+        const recipientOwnedHere = property.groundRentRecipientId
+          ? newOwnedProperties.some(p => p.id === property.groundRentRecipientId)
+          : false;
+        const gr = !recipientOwnedHere && property.groundRentPennies
+          ? Math.floor(property.groundRentPennies / 12)
+          : 0;
         return total + sc + gr;
       }, 0);
       const totalExpenses = mortgagePayments + councilTax + insurance + leaseholdCosts
