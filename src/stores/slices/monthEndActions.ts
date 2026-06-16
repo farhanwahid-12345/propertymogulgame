@@ -213,7 +213,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // Complete sell conveyancing — remove property, add cash
       let sellCash = 0;
-      let newTenants = [...prev.tenants];
+      let newTenants = [...prev.tenants, ...transferredSittingTenants];
       let newVoidPeriods = [...prev.voidPeriods];
       let newPropertyListings = [...prev.propertyListings];
       // Phase 4 (v5 statements) — accumulate CGT realised this tax year.
