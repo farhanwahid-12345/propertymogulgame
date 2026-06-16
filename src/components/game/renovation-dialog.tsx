@@ -84,6 +84,8 @@ interface RenovationDialogProps {
   propertyLocks?: Array<{ propertyId: string; reason: string; untilMonth: number; renovationTypeId?: string }>;
   /** Item #1: current EPC band — gates target-band selector on EPC upgrade. */
   currentEpc?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  /** Phase 8 #21 — leasehold properties can only do glazing, central heating, and EPC. */
+  isLeasehold?: boolean;
 }
 
 
