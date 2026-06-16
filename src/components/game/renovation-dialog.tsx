@@ -592,6 +592,12 @@ export function RenovationDialog({
 
         
         <div className="space-y-6">
+          {isLeasehold && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <span className="font-semibold">Leasehold property — </span>
+              Leasehold properties can only be improved with double glazing, central heating, and EPC upgrades. Structural works and conversions require freehold ownership.
+            </div>
+          )}
           {Object.entries(groupedRenovations).map(([category, renovations]) => (
             <div key={category}>
               <h3 className="text-lg font-semibold mb-3 capitalize">{category}</h3>
