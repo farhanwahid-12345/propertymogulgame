@@ -36,6 +36,27 @@ export function PortfolioGrid({
     return null;
   }
 
+  const [sortKey, setSortKey] = useState<SortKey>("value-desc");
+
+  const displayedOwnedProperties = useMemo(() => {
+    const list = [...sortedOwnedProperties];
+    const cmp = (a: any, b: any) => {
+      switch (sortKey) {
+        case "value-desc": return (b.value ?? 0) - (a.value ?? 0);
+        case "value-asc": return (a.value ?? 0) - (b.value ?? 0);
+        case "yield-desc": return (b.yield ?? 0) - (a.yield ?? 0);
+        case "yield-asc": return (a.yield ?? 0) - (b.yield ?? 0);
+        case "rent-desc": return (b.monthlyIncome ?? 0) - (a.monthlyIncome ?? 0);
+        case "rent-asc": return (a.monthlyIncome ?? 0) - (b.monthlyIncome ?? 0);
+        case "gain": return ((b.value ?? 0) - (b.price ?? 0)) - ((a.value ?? 0) - (a.price ?? 0));
+        case "loss": return ((a.value ?? 0) - (a.price ?? 0)) - ((b.value ?? 0) - (b.price ?? 0));
+        default: return 0;
+      }
+    };
+    list.sort(cmp);
+    return list;
+  }, [sortedOwnedProperties, sortKey]);
+
   return (
     <div className="glass p-3 animate-fade-in">
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
