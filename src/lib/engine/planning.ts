@@ -87,7 +87,7 @@ export function computePlanningApprovalProbability(
  */
 export function getEffectiveInternalSqft(
   internalSqft: number | undefined,
-  planningApplications: Array<{ propertyId: string; renovationTypeId: string; status: string }> | undefined,
+  planningApplications: Array<{ propertyId: string; renovationTypeId: string; status: string; sqftAppliedAtPlanning?: boolean }> | undefined,
   propertyId: string,
   renovationOptions: Array<{ id: string; sqftAdded?: number }>,
   activeRenovationIds: string[] = [],
@@ -100,6 +100,10 @@ export function getEffectiveInternalSqft(
     .reduce((sum, a) => {
       const r = renovationOptions.find(o => o.id === a.renovationTypeId);
       if (!r || !r.sqftAdded) return sum;
+      // Phase 6 #15 — once the uplift has been baked into base internalSqft at
+      // approval, skip it here to avoid double-counting (regardless of whether
+      // the renovation is active or already completed).
+      if (a.sqftAppliedAtPlanning) return sum;
       if (activeRenovationIds.includes(r.id) || completedRenovationIds.includes(r.id)) return sum;
       return sum + (r.sqftAdded || 0);
     }, 0);
