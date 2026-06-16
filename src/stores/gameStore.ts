@@ -253,6 +253,10 @@ export function createInitialState(): GameState {
     pendingLeaseRenewals: [],
     pendingPoliceLetters: [],
     pendingCourtResolutions: [],
+    pendingOverdraftPrompt: null,
+    overdraftPromptedMonth: -999,
+    bankruptcySummary: null,
+    loanPayoffHistory: [],
 
 
   };
