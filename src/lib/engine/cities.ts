@@ -86,9 +86,9 @@ export const CITIES: Record<CityId, CityConfig> = {
     id: 'middlesbrough',
     name: 'Middlesbrough',
     unlockLevel: 1,
-    valueRange: { min: 40_000, max: 1_000_000 },
-    yieldRange: { min: 8, max: 14 },
-    monthlyAppreciation: 0.0015, // ~1.8%/yr — slow
+    valueRange: { min: 60_000, max: 180_000 },
+    yieldRange: { min: 6.5, max: 9.5 },
+    monthlyAppreciation: 0.002, // ~2.4%/yr
     typeMix: { residential: 0.70, commercial: 0.18, luxury: 0.12 },
     streets: MIDDLESBROUGH_STREETS,
     neighborhoods: MIDDLESBROUGH_NEIGHBORHOODS,
@@ -96,10 +96,10 @@ export const CITIES: Record<CityId, CityConfig> = {
   leeds: {
     id: 'leeds',
     name: 'Leeds',
-    unlockLevel: 3,
-    valueRange: { min: 80_000, max: 1_500_000 },
-    yieldRange: { min: 8, max: 10 },
-    monthlyAppreciation: 0.0030, // ~3.6%/yr — medium
+    unlockLevel: 1,
+    valueRange: { min: 130_000, max: 400_000 },
+    yieldRange: { min: 4.5, max: 7.0 },
+    monthlyAppreciation: 0.003, // ~3.6%/yr
     typeMix: { residential: 0.65, commercial: 0.20, luxury: 0.15 },
     streets: LEEDS_STREETS,
     neighborhoods: LEEDS_NEIGHBORHOODS,
@@ -107,10 +107,10 @@ export const CITIES: Record<CityId, CityConfig> = {
   manchester: {
     id: 'manchester',
     name: 'Manchester',
-    unlockLevel: 4,
-    valueRange: { min: 100_000, max: 2_000_000 },
-    yieldRange: { min: 6, max: 8 },
-    monthlyAppreciation: 0.0035, // ~4.2%/yr — medium
+    unlockLevel: 1,
+    valueRange: { min: 160_000, max: 550_000 },
+    yieldRange: { min: 4.0, max: 6.5 },
+    monthlyAppreciation: 0.0035, // ~4.2%/yr
     typeMix: { residential: 0.60, commercial: 0.22, luxury: 0.18 },
     streets: MANCHESTER_STREETS,
     neighborhoods: MANCHESTER_NEIGHBORHOODS,
@@ -118,10 +118,10 @@ export const CITIES: Record<CityId, CityConfig> = {
   london: {
     id: 'london',
     name: 'London',
-    unlockLevel: 5,
-    valueRange: { min: 250_000, max: 50_000_000 },
-    yieldRange: { min: 3, max: 5 },
-    monthlyAppreciation: 0.0055, // ~6.6%/yr — fast
+    unlockLevel: 1,
+    valueRange: { min: 380_000, max: 1_500_000 },
+    yieldRange: { min: 2.5, max: 4.5 },
+    monthlyAppreciation: 0.004, // ~4.8%/yr
     typeMix: { residential: 0.55, commercial: 0.22, luxury: 0.23 },
     streets: LONDON_STREETS,
     neighborhoods: LONDON_NEIGHBORHOODS,
