@@ -1,8 +1,15 @@
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PropertyCard } from "@/components/game/property-card";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
+type SortKey =
+  | "value-desc" | "value-asc"
+  | "yield-desc" | "yield-asc"
+  | "rent-desc" | "rent-asc"
+  | "gain" | "loss";
 
 interface PortfolioGridProps {
   gameState: GameState;
@@ -28,6 +35,27 @@ export function PortfolioGrid({
   if (gameState.ownedProperties.length === 0 && conveyancingBuyProperties.length === 0) {
     return null;
   }
+
+  const [sortKey, setSortKey] = useState<SortKey>("value-desc");
+
+  const displayedOwnedProperties = useMemo(() => {
+    const list = [...sortedOwnedProperties];
+    const cmp = (a: any, b: any) => {
+      switch (sortKey) {
+        case "value-desc": return (b.value ?? 0) - (a.value ?? 0);
+        case "value-asc": return (a.value ?? 0) - (b.value ?? 0);
+        case "yield-desc": return (b.yield ?? 0) - (a.yield ?? 0);
+        case "yield-asc": return (a.yield ?? 0) - (b.yield ?? 0);
+        case "rent-desc": return (b.monthlyIncome ?? 0) - (a.monthlyIncome ?? 0);
+        case "rent-asc": return (a.monthlyIncome ?? 0) - (b.monthlyIncome ?? 0);
+        case "gain": return ((b.value ?? 0) - (b.price ?? 0)) - ((a.value ?? 0) - (a.price ?? 0));
+        case "loss": return ((a.value ?? 0) - (a.price ?? 0)) - ((b.value ?? 0) - (b.price ?? 0));
+        default: return 0;
+      }
+    };
+    list.sort(cmp);
+    return list;
+  }, [sortedOwnedProperties, sortKey]);
 
   return (
     <div className="glass p-3 animate-fade-in">
@@ -65,7 +93,29 @@ export function PortfolioGrid({
         </div>
       </div>
 
+      {gameState.ownedProperties.length > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-muted-foreground">Sort</span>
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+            <SelectTrigger className="h-7 w-[200px] text-xs" aria-label="Sort properties by">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="value-desc">Value (high–low)</SelectItem>
+              <SelectItem value="value-asc">Value (low–high)</SelectItem>
+              <SelectItem value="yield-desc">Yield (high–low)</SelectItem>
+              <SelectItem value="yield-asc">Yield (low–high)</SelectItem>
+              <SelectItem value="rent-desc">Rent (high–low)</SelectItem>
+              <SelectItem value="rent-asc">Rent (low–high)</SelectItem>
+              <SelectItem value="gain">Value gain</SelectItem>
+              <SelectItem value="loss">Value loss</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+
 
         {conveyancingBuyProperties.map((property) => {
           const conv = (gameState.conveyancing || []).find((c) => c.propertyId === property.id);
@@ -82,7 +132,7 @@ export function PortfolioGrid({
           );
         })}
 
-        {sortedOwnedProperties.map((property) => {
+        {displayedOwnedProperties.map((property) => {
           const conv = (gameState.conveyancing || []).find((c) => c.propertyId === property.id);
           const propertyDebt = getDebtForProperty(property.id);
           const propertyLTV = property.value > 0 ? (propertyDebt / property.value) * 100 : 0;

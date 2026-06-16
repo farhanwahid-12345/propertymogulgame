@@ -661,9 +661,21 @@ export function EstateAgentWindow({
                     <span className="text-muted-foreground">Price</span>
                     <span className="font-bold">£{property.value.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-xs items-center">
                     <span className="text-muted-foreground">Type</span>
-                    <span className="font-medium capitalize">{property.type}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium capitalize">{property.type}</span>
+                      <Badge
+                        variant="outline"
+                        className={
+                          (property as any).isLeasehold
+                            ? "text-[10px] py-0 px-1.5 border-amber-500/50 text-amber-300 bg-amber-500/10"
+                            : "text-[10px] py-0 px-1.5 border-emerald-500/50 text-emerald-300 bg-emerald-500/10"
+                        }
+                      >
+                        {(property as any).isLeasehold ? "Leasehold" : "Freehold"}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex justify-between text-xs items-center">
                     <span className="text-muted-foreground">Avg Yield</span>

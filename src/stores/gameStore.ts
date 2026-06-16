@@ -257,6 +257,7 @@ export function createInitialState(): GameState {
     overdraftPromptedMonth: -999,
     bankruptcySummary: null,
     loanPayoffHistory: [],
+    seenGroundRentExplainer: false,
 
 
   };
