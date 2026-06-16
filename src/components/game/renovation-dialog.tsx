@@ -547,7 +547,12 @@ export function RenovationDialog({
   };
 
 
-  const groupedRenovations = RENOVATION_OPTIONS.reduce((acc, renovation) => {
+  // Phase 8 #21 — leasehold properties may only have glazing, central heating, EPC.
+  const LEASEHOLD_ALLOWED_RENO_IDS = new Set(['double_glazing', 'central_heating', 'epc_upgrade']);
+  const availableRenovations = isLeasehold
+    ? RENOVATION_OPTIONS.filter(r => LEASEHOLD_ALLOWED_RENO_IDS.has(r.id))
+    : RENOVATION_OPTIONS;
+  const groupedRenovations = availableRenovations.reduce((acc, renovation) => {
     if (!acc[renovation.category]) acc[renovation.category] = [];
     acc[renovation.category].push(renovation);
     return acc;
