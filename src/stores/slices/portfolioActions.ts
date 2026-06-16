@@ -316,7 +316,6 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         totalRenovationSpendPennies: 0,
       };
 
-      const remainingUnits = units - 1;
       const removingParent = remainingUnits <= 0;
 
       const reindexedTenants = prev.tenants
