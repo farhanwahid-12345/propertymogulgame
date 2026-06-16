@@ -573,6 +573,8 @@ export interface GameState {
   goalAchievedAt?: number;
   /** Phase 3 #6 — has the MEES/EPC contextual tutorial been shown yet? */
   seenEpcTutorial?: boolean;
+  /** Phase 8 #20 — one-time toast when player first splits a flat (explains ground-rent wash). */
+  seenGroundRentExplainer?: boolean;
   /** Phase 2 (v5) — rolling monthly snapshots for the Bank performance chart. Capped at 60. */
   monthlySnapshots?: PortfolioSnapshot[];
   /** Phase 4 (v5) — unlocked achievements. Map of achievement id → unlock month. */
