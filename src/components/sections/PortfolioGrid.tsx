@@ -1,8 +1,15 @@
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PropertyCard } from "@/components/game/property-card";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
+type SortKey =
+  | "value-desc" | "value-asc"
+  | "yield-desc" | "yield-asc"
+  | "rent-desc" | "rent-asc"
+  | "gain" | "loss";
 
 interface PortfolioGridProps {
   gameState: GameState;
