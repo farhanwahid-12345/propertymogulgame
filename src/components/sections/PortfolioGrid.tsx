@@ -132,7 +132,7 @@ export function PortfolioGrid({
           );
         })}
 
-        {sortedOwnedProperties.map((property) => {
+        {displayedOwnedProperties.map((property) => {
           const conv = (gameState.conveyancing || []).find((c) => c.propertyId === property.id);
           const propertyDebt = getDebtForProperty(property.id);
           const propertyLTV = property.value > 0 ? (propertyDebt / property.value) * 100 : 0;
