@@ -346,6 +346,7 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
           marketValue: remainingValue,
           subtypeUnits: remainingUnits,
           monthlyIncome: Math.max(0, p.monthlyIncome - slotRentPennies),
+          internalSqft: remainingParentSqft,
         });
       }
       updatedOwned.push(newFlat);
