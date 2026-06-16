@@ -18,6 +18,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
 import { replayTour } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/game/confirm-dialog";
 import type {
   Conveyancing,
   Renovation,

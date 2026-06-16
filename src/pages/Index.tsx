@@ -16,6 +16,8 @@ import { PendingTransactionsDialog } from "@/components/game/pending-transaction
 import { ChainCollapseModal } from "@/components/game/chain-collapse-modal";
 import { PayoffEventsModal } from "@/components/game/payoff-events-modal";
 import { EpcTutorialDialog } from "@/components/game/epc-tutorial-dialog";
+import { PoliceLetterDialog } from "@/components/game/police-letter-dialog";
+import { CourtResolutionModal } from "@/components/game/court-resolution-modal";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -320,6 +322,8 @@ const Index = () => {
       <ChainCollapseModal />
       <PayoffEventsModal />
       <EpcTutorialDialog />
+      <PoliceLetterDialog />
+      <CourtResolutionModal />
     </div>
   );
 };
