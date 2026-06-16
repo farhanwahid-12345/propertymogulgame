@@ -93,7 +93,29 @@ export function PortfolioGrid({
         </div>
       </div>
 
+      {gameState.ownedProperties.length > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-muted-foreground">Sort</span>
+          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+            <SelectTrigger className="h-7 w-[200px] text-xs" aria-label="Sort properties by">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="value-desc">Value (high–low)</SelectItem>
+              <SelectItem value="value-asc">Value (low–high)</SelectItem>
+              <SelectItem value="yield-desc">Yield (high–low)</SelectItem>
+              <SelectItem value="yield-asc">Yield (low–high)</SelectItem>
+              <SelectItem value="rent-desc">Rent (high–low)</SelectItem>
+              <SelectItem value="rent-asc">Rent (low–high)</SelectItem>
+              <SelectItem value="gain">Value gain</SelectItem>
+              <SelectItem value="loss">Value loss</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+
 
         {conveyancingBuyProperties.map((property) => {
           const conv = (gameState.conveyancing || []).find((c) => c.propertyId === property.id);
