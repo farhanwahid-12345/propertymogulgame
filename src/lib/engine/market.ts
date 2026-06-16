@@ -5,6 +5,14 @@ import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
 import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
 import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
 import { getCityConfig, pickTypeForCity, type CityId } from "./cities";
+import { generateSittingCommercialTenant } from "@/components/game/tenant-selector";
+
+/** Phase 3 — implied yield for an income-producing commercial property based on
+ *  covenant strength and remaining lease term. Clamped to 5–12%. */
+export function impliedCommercialYield(covenantStrength: number, remainingMonths: number): number {
+  const y = 0.10 - (covenantStrength / 1000) - (remainingMonths / 6000);
+  return Math.max(0.05, Math.min(0.12, y));
+}
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
  *  Cheaper stock yields more; prime stock yields less. ±1.5% jitter, clamped [2.5, 14]. */
