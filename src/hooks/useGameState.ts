@@ -104,12 +104,23 @@ export function useGameState() {
   const overdraftLimit = fromPennies(store.overdraftLimit);
   const overdraftUsed = fromPennies(store.overdraftUsed);
 
-  // Cash held in escrow on in-flight buys still belongs to the player —
-  // include it so net worth doesn't dip during conveyancing.
+  // Cash held on in-flight buys still belongs to the player (deposit + fees
+  // already debited). The mortgage advance is drawn at completion, so during
+  // conveyancing only the player's own cash sits with the solicitor.
    const conveyancingRaw = Array.isArray(store.conveyancing) ? store.conveyancing : [];
   const inflightBuyCapital = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
+  // Property equity locked in conveyancing: expected purchase price minus the
+  // mortgage that will be drawn against it. Counted as an asset so the
+  // breakdown reconciles to the headline net-worth figure during a purchase.
+  const inflightPropertyEquity = conveyancingRaw
+    .filter((c: any) => c.status === 'buying')
+    .reduce((sum: number, c: any) => {
+      const price = fromPennies(c.purchasePrice || 0);
+      const mortgage = fromPennies(c.mortgageData?.amount || 0);
+      return sum + Math.max(0, price - mortgage - fromPennies(c.cashHeld || 0));
+    }, 0);
   // Active renovations represent capital already spent that will convert to
   // property value on completion — treat as work-in-progress asset so net
   // worth doesn't artificially dip while renovations are underway.
