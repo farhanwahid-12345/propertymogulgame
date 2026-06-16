@@ -15,6 +15,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgag
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import { computeErcRate } from "@/lib/engine/constants";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
 
 
 interface PropertyOffer {
