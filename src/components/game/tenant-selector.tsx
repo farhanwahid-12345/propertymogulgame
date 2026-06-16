@@ -315,6 +315,41 @@ const generateCommercialTenantProfiles = (city: CityKey = 'middlesbrough'): Tena
   return results;
 };
 
+/**
+ * Phase 3 — pick a single sitting commercial tenant for a property listed for
+ * sale with a lease already in place. ~30% national / 70% local mix.
+ */
+export function generateSittingCommercialTenant(city: CityKey = 'middlesbrough'): Tenant {
+  const isNational = Math.random() < 0.3;
+  const pool = isNational ? NATIONAL_TENANT_POOL : (CITY_LOCAL_POOL[city] ?? CITY_LOCAL_POOL.middlesbrough);
+  const entry = pick(pool);
+  // Phase 3 spec — sitting tenants span covenant 35–90.
+  const covenantStrength = isNational
+    ? randInt(75, 90)
+    : Math.max(35, Math.min(90, pickCovenantInRange(CITY_COVENANT_RANGE[city] ?? CITY_COVENANT_RANGE.middlesbrough)));
+  const profile = covenantToProfile(covenantStrength);
+  const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
+  const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
+  const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3);
+  return {
+    id: `sitting_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    name: entry.name,
+    companyName: entry.name,
+    covenantStrength,
+    sector: entry.sector,
+    profile,
+    creditScore: 400 + Math.round(covenantStrength * 4),
+    monthlyIncome: 5000 + covenantStrength * 200,
+    employmentStatus: entry.sector.replace('_', ' '),
+    rentMultiplier,
+    defaultRisk,
+    damageRisk,
+    description: entry.description,
+    traits: [],
+    isNational,
+  };
+}
+
 
 
 // --- Star rating helper ---
