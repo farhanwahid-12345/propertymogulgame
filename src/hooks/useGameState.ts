@@ -111,15 +111,16 @@ export function useGameState() {
   const inflightBuyCapital = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
-  // Property equity locked in conveyancing: expected purchase price minus the
-  // mortgage that will be drawn against it. Counted as an asset so the
-  // breakdown reconciles to the headline net-worth figure during a purchase.
+  // Forward-looking equity in the in-flight property: expected purchase
+  // price less the mortgage that will be drawn at completion. Shown as a
+  // separate breakdown line so the player can see the deal's gross value,
+  // not just the cash currently with the solicitor.
   const inflightPropertyEquity = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => {
       const price = fromPennies(c.purchasePrice || 0);
       const mortgage = fromPennies(c.mortgageData?.amount || 0);
-      return sum + Math.max(0, price - mortgage - fromPennies(c.cashHeld || 0));
+      return sum + Math.max(0, price - mortgage);
     }, 0);
   // Active renovations represent capital already spent that will convert to
   // property value on completion — treat as work-in-progress asset so net
