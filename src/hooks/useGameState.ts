@@ -140,7 +140,7 @@ export function useGameState() {
     0,
   );
   const totalMortgageDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
-  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
+  // Net worth = cash + in-flight buying conveyancing cashHeld + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps. Subtracting mortgage
   // + loan balances stops the "free money" jump when a financed buy completes.
