@@ -15,6 +15,7 @@ import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgag
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import { computeErcRate } from "@/lib/engine/constants";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
 
 
 interface PropertyOffer {
@@ -674,9 +675,15 @@ export function EstateAgentWindow({
                     <span className="text-muted-foreground">Base Rent</span>
                     <span className="text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
                   </div>
+                  {(property as any).commercialLease && (property as any).sittingTenant && (
+                    <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-blue-500/50 text-blue-300">
+                      🏢 Tenanted · FRI lease
+                    </Badge>
+                  )}
                 </Card>
               ))}
             </div>
+
 
             {selectedBuyProperty && (
               <Card className="mt-4">
@@ -684,6 +691,9 @@ export function EstateAgentWindow({
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {(selectedBuyProperty as any).commercialLease && (selectedBuyProperty as any).sittingTenant && (
+                    <TenantInPlaceBlock property={selectedBuyProperty as any} />
+                  )}
                   {/* Negotiation history */}
                   {negotiationHistory.length > 0 && (
                     <div className="space-y-2 border rounded-lg p-3 bg-muted/30">

@@ -117,6 +117,9 @@ export interface Property {
     /** Phase 4 — set when the tenant has declined to renew; lease will terminate at expiry. */
     endingAtExpiry?: boolean;
   };
+  /** Phase 3 — sitting tenant attached to a market listing. Transferred to
+   *  the player's tenants list when the property completes conveyancing. */
+  sittingTenant?: Tenant;
 
   /** Phase 5 #16 — auction lot is missing kitchen/bathroom or otherwise
    *  uninhabitable. Standard BTL mortgages are refused; only bridging finance

@@ -91,6 +91,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newMortgages = [...prev.mortgages];
       let newEstateAgent = [...prev.estateAgentProperties];
       let newAuction = [...prev.auctionProperties];
+      const transferredSittingTenants: any[] = [];
 
       completedBuys.forEach(conv => {
         // Find the property from market lists
@@ -127,12 +128,32 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Yield = annual rent ÷ price paid × 100. With rent fixed, paying less ⇒ higher yield.
         const effectiveYield = paid > 0 ? (advertisedRent * 12 / paid) * 100 : (prop.yield ?? 7);
         const effectiveRent = advertisedRent;
-        // Phase 1 — commercial properties complete vacant: no lease until a
-        // company tenant signs heads of terms. Use class still rolled on settlement.
+        // Phase 1 — commercial properties complete vacant unless a sitting tenant
+        // + lease was attached to the listing (Phase 3 — tenanted commercial buys).
         const isCommercial = prop.type === 'commercial';
+        const inheritedLease = isCommercial ? (prop as any).commercialLease : undefined;
+        const inheritedSittingTenant = isCommercial ? (prop as any).sittingTenant : undefined;
+        const hasSittingTenant = !!(inheritedLease && inheritedSittingTenant);
+        // When a sitting tenant transfers, rewrite the lease's start/expiry months
+        // so the remaining term matches the current game month.
+        let transferredLease: any = undefined;
+        if (hasSittingTenant) {
+          const placeholderStart = inheritedLease.startMonth ?? 0;
+          const placeholderExpiry = inheritedLease.expiryMonth ?? inheritedLease.termMonths;
+          const remaining = Math.max(1, placeholderExpiry - placeholderStart);
+          const termMonths = inheritedLease.termMonths ?? remaining;
+          transferredLease = {
+            ...inheritedLease,
+            startMonth: newMonthNumber - (termMonths - remaining),
+            expiryMonth: newMonthNumber + remaining,
+          };
+        }
         const useClassInit = isCommercial
           ? (gameRandom() < SUI_GENERIS_PROB ? 'sui_generis' as const : 'E' as const)
           : undefined;
+        const purchasedMonthlyIncome = hasSittingTenant
+          ? (transferredLease.negotiatedRentPennies ?? effectiveRent)
+          : effectiveRent;
         const purchased: Property = {
           ...prop, owned: true, price: paid,
           type: prop.type,
@@ -140,14 +161,33 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           // marketValue tracks the listed value so the asking-side signal stays honest.
           marketValue: Math.max(settledValue, paid),
           yield: effectiveYield,
-          monthlyIncome: effectiveRent,
-          lastRentIncrease: newMonthNumber, baseRent: effectiveRent,
+          monthlyIncome: purchasedMonthlyIncome,
+          lastRentIncrease: newMonthNumber, baseRent: purchasedMonthlyIncome,
           ...(useClassInit ? { useClass: useClassInit } : {}),
-          // Commercial purchased properties start with NO lease (vacant).
-          ...(isCommercial ? { commercialLease: undefined } : {}),
+          // Commercial: preserve transferred lease if present; otherwise vacant.
+          ...(isCommercial ? { commercialLease: transferredLease } : {}),
+          // Strip listing-only sittingTenant field — it now lives in tenants slice.
+          sittingTenant: undefined,
         };
 
         newOwnedProperties.push(purchased);
+
+        if (hasSittingTenant) {
+          transferredSittingTenants.push({
+            propertyId: conv.propertyId,
+            slotIndex: 0,
+            tenant: inheritedSittingTenant,
+            rentMultiplier: inheritedSittingTenant.rentMultiplier ?? 1,
+            startDate: Date.now(),
+            satisfaction: 80,
+            lastSatisfactionUpdate: newMonthNumber,
+            satisfactionReasons: [],
+            moveInMonth: transferredLease.startMonth,
+            // Sitting tenants transfer without a new TDS deposit at completion.
+            depositHeld: 0,
+            rentPennies: transferredLease.negotiatedRentPennies,
+          });
+        }
 
         newEstateAgent = newEstateAgent.filter(p => p.id !== conv.propertyId);
         newAuction = newAuction.filter(p => p.id !== conv.propertyId);
@@ -165,12 +205,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
             fixedRate: fxYears && fxYears > 0 ? conv.mortgageData.interestRate : undefined,
           });
         }
-        showToast("Conveyancing Complete! 🏠", `${conv.propertyName} is now yours!`);
+        const tenantNote = hasSittingTenant
+          ? ` Sitting tenant ${inheritedSittingTenant.companyName} transferred — lease continues.`
+          : '';
+        showToast("Conveyancing Complete! 🏠", `${conv.propertyName} is now yours!${tenantNote}`);
       });
 
       // Complete sell conveyancing — remove property, add cash
       let sellCash = 0;
-      let newTenants = [...prev.tenants];
+      let newTenants = [...prev.tenants, ...transferredSittingTenants];
       let newVoidPeriods = [...prev.voidPeriods];
       let newPropertyListings = [...prev.propertyListings];
       // Phase 4 (v5 statements) — accumulate CGT realised this tax year.

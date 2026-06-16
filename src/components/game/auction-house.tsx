@@ -13,6 +13,7 @@ import { Property } from "@/components/game/property-card";
 import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
+import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
 
 
 interface SellerBid {
@@ -723,6 +724,11 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                             </span>
                           </div>
                         </div>
+
+                        {(property as any).commercialLease && (property as any).sittingTenant && (
+                          <TenantInPlaceBlock property={property as any} />
+                        )}
+
 
                         {selectedMortgagePercent > 0 && (
                           <div className="mt-2 text-xs text-blue-400 bg-blue-500/10 p-2 rounded">
