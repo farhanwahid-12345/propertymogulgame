@@ -137,6 +137,9 @@ export interface Property {
   serviceChargePctAnnual?: number;
   /** Phase 4 #2 — fixed annual ground rent (pennies). Peppercorn = 1000 (£10). */
   groundRentPennies?: number;
+  /** Phase 8 #20 — id of the freehold property the ground rent is payable to. If
+   *  the recipient is still in `ownedProperties`, ground rent is a wash (net zero). */
+  groundRentRecipientId?: string;
   // ─── Phase 2 (v5) — Letting Agent ─────────────────────────
   /** True when a letting agent manages this property. Auto-resolves concerns; deducts fee from rent. */
   isManaged?: boolean;
