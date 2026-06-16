@@ -127,7 +127,10 @@ export function GameStats({
                           <div className="flex justify-between"><span className="text-muted-foreground">Renovation in progress</span><span className="font-semibold">£{Math.round(netWorthBreakdown.renovationWIP).toLocaleString()}</span></div>
                         )}
                         {netWorthBreakdown.conveyancingHeld > 0 && (
-                          <div className="flex justify-between"><span className="text-muted-foreground">Conveyancing escrow</span><span className="font-semibold">£{Math.round(netWorthBreakdown.conveyancingHeld).toLocaleString()}</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Deposit held (in conveyancing)</span><span className="font-semibold">£{Math.round(netWorthBreakdown.conveyancingHeld).toLocaleString()}</span></div>
+                        )}
+                        {(netWorthBreakdown as any).conveyancingPropertyEquity > 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Property (in conveyancing)</span><span className="font-semibold">£{Math.round((netWorthBreakdown as any).conveyancingPropertyEquity).toLocaleString()}</span></div>
                         )}
                         {netWorthBreakdown.mortgageDebt > 0 && (
                           <div className="flex justify-between text-danger"><span>− Mortgage debt</span><span className="font-semibold">£{Math.round(netWorthBreakdown.mortgageDebt).toLocaleString()}</span></div>
