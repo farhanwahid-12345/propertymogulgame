@@ -223,8 +223,8 @@ export function GameStats({
           <div className="border-l-4 border-[hsl(var(--stat-credit))] pl-3">
             <div className="text-xs text-muted-foreground">🏠 Portfolio</div>
             <div className="flex items-baseline gap-4">
-              <div className="text-3xl lg:text-4xl font-bold text-foreground shrink-0">
-                {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
+              <div className="text-xl lg:text-2xl font-semibold text-foreground shrink-0">
+                {ownedPropertiesCount} <span className="text-xs font-normal text-muted-foreground">properties</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
