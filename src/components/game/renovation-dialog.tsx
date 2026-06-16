@@ -891,30 +891,43 @@ export function RenovationDialog({
         {selectedRenovation && (
           <div className="bg-muted p-4 rounded-lg mt-4 space-y-3">
             <h4 className="font-semibold">Renovation Summary</h4>
-            {selectedRenovation.id === 'epc_upgrade' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Current EPC: <span className="font-semibold text-foreground">{currentEpc ?? '—'}</span>
-                  </span>
-                  <label className="flex items-center gap-2 text-xs">
-                    Target band:
-                    <select
-                      value={epcTarget}
-                      onChange={(e) => setEpcTarget(e.target.value as any)}
-                      className="bg-background border border-border rounded px-2 py-1 text-sm"
-                    >
-                      {EPC_ORDER
-                        .filter(b => !currentEpc || EPC_ORDER.indexOf(b) > EPC_ORDER.indexOf(currentEpc))
-                        .map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </label>
+            {selectedRenovation.id === 'epc_upgrade' && (() => {
+              const atTop = currentEpc === 'A';
+              const sqftScale = Math.max(0.5, (internalSqft ?? 800) / 800);
+              const jumps = bandJumps(epcTarget);
+              const epcCostPounds = Math.round(2500 * jumps * sqftScale);
+              return (
+                <div className="space-y-2 rounded-md border border-border bg-background/40 p-3">
+                  <div className="text-base font-semibold">
+                    Current EPC: <span className="text-primary">{currentEpc ?? 'D'}</span>
+                  </div>
+                  {atTop ? (
+                    <div className="text-sm text-muted-foreground italic">
+                      Already at highest EPC rating — no further upgrade possible.
+                    </div>
+                  ) : (
+                    <>
+                      <label className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">Upgrade to:</span>
+                        <select
+                          value={epcTarget}
+                          onChange={(e) => setEpcTarget(e.target.value as any)}
+                          className="bg-background border border-border rounded px-2 py-1 text-sm"
+                        >
+                          {EPC_ORDER
+                            .filter(b => !currentEpc || EPC_ORDER.indexOf(b) > EPC_ORDER.indexOf(currentEpc))
+                            .map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                      </label>
+                      <div className="text-[11px] text-muted-foreground">
+                        {jumps} band jump{jumps > 1 ? 's' : ''} · £2,500/band × {sqftScale.toFixed(2)}× (sqft) = <span className="font-medium text-foreground">£{epcCostPounds.toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {bandJumps(epcTarget)} band jump{bandJumps(epcTarget) > 1 ? 's' : ''} — cost scales {(0.5 + 0.5 * bandJumps(epcTarget)).toFixed(1)}×.
-                </div>
-              </div>
-            )}
+              );
+            })()}
+
 
             {isConversion(selectedRenovation) && (
               <div className="space-y-2">
