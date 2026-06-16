@@ -327,6 +327,7 @@ export function RenovationDialog({
   propertyLocks = [],
   hasTenant = false,
   currentEpc,
+  isLeasehold = false,
 }: RenovationDialogProps) {
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
