@@ -434,7 +434,13 @@ export function RenovationDialog({
     if (!isConversion(r)) return 1;
     return selectedRenovation && selectedRenovation.id === r!.id ? conversionUnits : defaultUnits(r);
   };
-  const scaledCost = (r: RenovationType) => Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 50) * 50;
+  const scaledCost = (r: RenovationType) => {
+    if (r.id === 'epc_upgrade') {
+      const target = selectedRenovation?.id === 'epc_upgrade' ? epcTarget : nextBandUp(currentEpc);
+      return epcCostPoundsFor(target);
+    }
+    return Math.round(scaleRenovationCost(r.cost, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 50) * 50;
+  };
   const scaledRent = (r: RenovationType) => Math.round(scaleRenovationRent(r.rentIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 5) * 5;
   const scaledValue = (r: RenovationType) => Math.round(scaleRenovationValue(r.valueIncrease, scaleInputs) * conversionMult(r, previewUnits(r)) * epcMultiplierFor(r) / 100) * 100;
 
