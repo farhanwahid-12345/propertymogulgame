@@ -2076,6 +2076,16 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
         opsFlashAt: opsFlashAtNew,
         debtRecoveryCases: trimmedCases,
+        // Phase 5 #14 — persist this month's defaults so eviction checks (recentDefaults < 2) actually pass.
+        tenantEvents: [...prev.tenantEvents, ...newDefaultEvents].slice(-24),
+        // Phase 5 #12 — append new ASB police letters for the in-game dialog.
+        pendingPoliceLetters: newPoliceLetters.length > 0
+          ? [...(((s as any).pendingPoliceLetters) || []), ...newPoliceLetters]
+          : ((s as any).pendingPoliceLetters || []),
+        // Phase 5 #13 — surface case resolutions as a pop-up.
+        pendingCourtResolutions: resolvedCases.length > 0
+          ? [...(((s as any).pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
+          : ((s as any).pendingCourtResolutions || []),
         projectedTaxPennies: newProjectedTaxPennies,
         projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         pendingTransactions: [
