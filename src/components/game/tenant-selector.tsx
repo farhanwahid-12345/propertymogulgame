@@ -398,6 +398,7 @@ export function TenantSelector({
   furnishingTier,
   propertyType,
   onCommercialApplicantSelected,
+  city,
 }: TenantSelectorProps) {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -409,13 +410,13 @@ export function TenantSelector({
     if (isOpen) {
       setTenantProfiles(
         propertyType === 'commercial'
-          ? generateCommercialTenantProfiles()
+          ? generateCommercialTenantProfiles(city ?? 'middlesbrough')
           : generateTenantProfiles(),
       );
       setSelectedTenant(null);
       setScreened({});
     }
-  }, [isOpen, propertyType]);
+  }, [isOpen, propertyType, city]);
 
 
 
