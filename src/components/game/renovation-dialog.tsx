@@ -1192,9 +1192,10 @@ export function RenovationDialog({
               const app = selectedRenovation.requiresPlanning ? findApplication(selectedRenovation.id) : undefined;
               const needsApplication = selectedRenovation.requiresPlanning && app?.status !== 'approved';
               const fee = selectedRenovation.planningFee ?? 250;
-              const disabled = needsApplication
+              const epcBlocked = selectedRenovation.id === 'epc_upgrade' && currentEpc === 'A';
+              const disabled = epcBlocked || (needsApplication
                 ? playerCash < fee || app?.status === 'pending' || (inPlanningCooldown && app?.status !== 'approved')
-                : !canAfford(selectedRenovation);
+                : !canAfford(selectedRenovation));
               const label = needsApplication
                 ? `Submit Planning (£${fee.toLocaleString()})`
                 : 'Start Renovation';
