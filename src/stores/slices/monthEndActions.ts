@@ -2140,6 +2140,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingCourtResolutions: resolvedCases.length > 0
           ? [...(((s as any).pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
           : ((s as any).pendingCourtResolutions || []),
+        // Phase 7 #16 — overdraft prompt + bankruptcy snapshot
+        pendingOverdraftPrompt: newOverdraftPrompt,
+        overdraftPromptedMonth: newOverdraftPromptedMonth,
+        bankruptcySummary: newBankruptcySummary,
+        // Phase 7 #18 — track repaid loans for investor loyalty discount.
+        loanPayoffHistory: [
+          ...(((s as any).loanPayoffHistory) || []),
+          ...loanPayoffsThisMonth,
+        ].slice(-50),
         projectedTaxPennies: newProjectedTaxPennies,
         projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         pendingTransactions: [
