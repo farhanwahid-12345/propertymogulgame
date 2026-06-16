@@ -368,6 +368,18 @@ export const PropertyCard = memo(function PropertyCard({
             <Badge variant="outline" className="capitalize text-xs">
               {propertyType}
             </Badge>
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px] px-1.5 py-0",
+                property.isLeasehold
+                  ? "border-amber-400/40 text-amber-300 bg-amber-500/10"
+                  : "border-emerald-400/40 text-emerald-300 bg-emerald-500/10"
+              )}
+              title={property.isLeasehold ? "Leasehold title" : "Freehold title"}
+            >
+              {property.isLeasehold ? "Leasehold" : "Freehold"}
+            </Badge>
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
