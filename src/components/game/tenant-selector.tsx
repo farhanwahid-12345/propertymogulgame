@@ -170,88 +170,146 @@ const generateTenantProfiles = (): Tenant[] => {
   ];
 };
 
-// --- Commercial tenant generation (Phase 1) ----------------------------------
+// --- Commercial tenant generation (Phase 1, Item 2 — city-aware) ------------
 
 const COMMERCIAL_SECTORS = [
   'retail', 'logistics', 'professional_services', 'hospitality', 'healthcare',
+  'tech', 'media', 'finance', 'legal', 'student_accom', 'coworking', 'corporate',
 ] as const;
 type CommercialSector = typeof COMMERCIAL_SECTORS[number];
 
-const COMPANY_NAME_POOL: Record<CommercialSector, string[]> = {
-  retail: [
-    "Bridge St Boutique Ltd", "Northfield Convenience Ltd", "Acklam Records & Books Ltd",
-    "Linthorpe Cycle Co Ltd", "Marton Florists Ltd", "Teesside Toy Emporium Ltd",
+type CityKey = 'middlesbrough' | 'leeds' | 'manchester' | 'london';
+
+type LocalPoolEntry = { name: string; sector: CommercialSector; description: string };
+
+const CITY_LOCAL_POOL: Record<CityKey, LocalPoolEntry[]> = {
+  middlesbrough: [
+    { name: "Bridge St Boutique Ltd", sector: 'retail', description: "Independent high-street shop with 6 years' trading history" },
+    { name: "Northfield Convenience Ltd", sector: 'retail', description: "Local convenience store expanding into a second unit" },
+    { name: "Acklam Takeaway Co Ltd", sector: 'hospitality', description: "Independent takeaway with a loyal local following" },
+    { name: "Linthorpe Cycle Co Ltd", sector: 'retail', description: "Specialist independent retailer" },
+    { name: "Tees Valley Freight Ltd", sector: 'logistics', description: "Light-industrial last-mile depot operator" },
+    { name: "Ironworks Distribution Ltd", sector: 'logistics', description: "Regional haulier looking for warehouse space" },
+    { name: "Cleveland Couriers Ltd", sector: 'logistics', description: "Local courier needing a small distribution hub" },
+    { name: "Marton NHS Health Centre", sector: 'healthcare', description: "NHS-contracted primary care provider" },
+    { name: "Bridge St Dental Practice Ltd", sector: 'healthcare', description: "Independent dental practice" },
+    { name: "Northfield Pharmacy Ltd", sector: 'healthcare', description: "Community pharmacy under NHS contract" },
   ],
-  logistics: [
-    "Northfield Logistics Ltd", "Tees Valley Freight Ltd", "Ironworks Distribution Ltd",
-    "Cleveland Couriers Ltd", "Riverside Storage Solutions Ltd",
+  leeds: [
+    { name: "Park Row Legal Partners LLP", sector: 'legal', description: "Mid-tier law firm relocating from serviced offices" },
+    { name: "Wellington Place Accountants Ltd", sector: 'finance', description: "Regional accountancy practice" },
+    { name: "Yorkshire Wealth Advisors Ltd", sector: 'finance', description: "Independent financial advisory firm" },
+    { name: "Briggate Retail Group Ltd", sector: 'retail', description: "Regional retail chain with 12 stores" },
+    { name: "Headingley Student Living Ltd", sector: 'student_accom', description: "PBSA operator targeting Leeds Uni catchment" },
+    { name: "Hyde Park Student Homes Ltd", sector: 'student_accom', description: "Established student accommodation operator" },
+    { name: "Trinity Boutique Retail Ltd", sector: 'retail', description: "Premium fashion retailer" },
+    { name: "Kirkstall Legal Advisory Ltd", sector: 'legal', description: "Boutique commercial law firm" },
   ],
-  professional_services: [
-    "Linthorpe Legal Partners LLP", "Albert Road Accountants Ltd", "Boro Architects Ltd",
-    "Cleveland Consulting Group Ltd", "Tees Tech Advisory Ltd",
+  manchester: [
+    { name: "NorthQuarter Tech Ltd", sector: 'tech', description: "Growing SaaS company with Series A funding" },
+    { name: "MediaCityWorks Ltd", sector: 'media', description: "Independent media agency with blue-chip clients" },
+    { name: "Ancoats Digital Studio Ltd", sector: 'tech', description: "Digital product studio scaling its team" },
+    { name: "Spinningfields Coworking Ltd", sector: 'coworking', description: "Flexible workspace operator expanding footprint" },
+    { name: "Northern Quarter Restaurants Ltd", sector: 'hospitality', description: "Restaurant group with three profitable sites" },
+    { name: "Castlefield Hospitality Group Ltd", sector: 'hospitality', description: "Multi-site bar & restaurant operator" },
+    { name: "Deansgate Creative Agency Ltd", sector: 'media', description: "Brand & creative agency with national clients" },
+    { name: "Oxford Road Coworking Co Ltd", sector: 'coworking', description: "Independent flex-space operator" },
   ],
-  hospitality: [
-    "The Transporter Café Ltd", "Acklam Tap & Kitchen Ltd", "Riverside Bistro Ltd",
-    "Bridge St Coffee Co Ltd", "Marton Park Inn Ltd",
-  ],
-  healthcare: [
-    "Bridge St Dental Practice Ltd", "Linthorpe Physiotherapy Ltd", "Northfield Pharmacy Ltd",
-    "Marton Family Clinic Ltd", "Acklam Vision Centre Ltd",
+  london: [
+    { name: "Canary Wharf Capital Partners LLP", sector: 'finance', description: "Boutique investment management firm" },
+    { name: "City Square Asset Management Ltd", sector: 'finance', description: "FCA-regulated asset manager" },
+    { name: "Mayfair Holdings PLC", sector: 'corporate', description: "Blue-chip holding company HQ requirement" },
+    { name: "Shoreditch International Ltd", sector: 'corporate', description: "International corporate UK headquarters" },
+    { name: "Bond Street Luxury Retail Ltd", sector: 'retail', description: "International luxury retailer flagship" },
+    { name: "Knightsbridge Premium Goods Ltd", sector: 'retail', description: "High-end international retail brand" },
+    { name: "Threadneedle Financial Group PLC", sector: 'finance', description: "Institutional financial services firm" },
+    { name: "Soho Media House Ltd", sector: 'media', description: "Global media agency UK HQ" },
   ],
 };
 
-const COMMERCIAL_DESCRIPTIONS: Record<CommercialSector, string[]> = {
-  retail: ["High-street retailer expanding into a second unit", "Independent shop with 6 years' trading history"],
-  logistics: ["Last-mile delivery operator seeking warehouse space", "Regional haulier on a 5-year growth plan"],
-  professional_services: ["Established practice relocating from serviced offices", "Boutique advisory firm with blue-chip clients"],
-  hospitality: ["Independent operator opening a second site", "Café chain with three profitable locations"],
-  healthcare: ["Private clinic expanding into the area", "NHS-contracted provider taking on new premises"],
+const CITY_COVENANT_RANGE: Record<CityKey, [number, number]> = {
+  middlesbrough: [30, 60],
+  leeds: [45, 75],
+  manchester: [50, 80],
+  london: [65, 95],
 };
 
-const pickWeightedCovenant = (): number => {
-  const r = Math.random();
-  // ~70% mid (40–80), ~15% weak (20–40), ~10% strong (80–95), ~5% very weak (<20)
-  if (r < 0.05) return randInt(10, 19);
-  if (r < 0.20) return randInt(20, 39);
-  if (r < 0.90) return randInt(40, 80);
-  return randInt(81, 95);
-};
+const NATIONAL_TENANT_POOL: LocalPoolEntry[] = [
+  { name: "Costa Coffee Ltd", sector: 'hospitality', description: "National coffee chain — strong covenant, multi-site operator" },
+  { name: "Tesco Express Ltd", sector: 'retail', description: "National convenience retailer — institutional covenant" },
+  { name: "Sainsbury's Local Ltd", sector: 'retail', description: "National grocery chain — convenience format" },
+  { name: "Greggs PLC", sector: 'hospitality', description: "National food-to-go operator — listed PLC" },
+  { name: "DPD Parcel Services Ltd", sector: 'logistics', description: "National parcel network — institutional logistics covenant" },
+  { name: "DHL Supply Chain Ltd", sector: 'logistics', description: "Multinational logistics operator" },
+  { name: "NHS Property Services Ltd", sector: 'healthcare', description: "Government-backed healthcare estate provider" },
+  { name: "Boots UK Ltd", sector: 'healthcare', description: "National pharmacy & healthcare retailer" },
+  { name: "Regus Workspace Ltd", sector: 'coworking', description: "Multinational flexible workspace operator" },
+  { name: "WeWork UK Ltd", sector: 'coworking', description: "International coworking operator" },
+  { name: "Pret A Manger Ltd", sector: 'hospitality', description: "National food-to-go chain" },
+  { name: "Specsavers Optical Ltd", sector: 'healthcare', description: "National optical & healthcare retailer" },
+  { name: "WHSmith High Street Ltd", sector: 'retail', description: "National high-street retailer" },
+  { name: "Travelodge Hotels Ltd", sector: 'hospitality', description: "National budget hotel operator" },
+];
 
 const covenantToProfile = (cov: number): Tenant['profile'] =>
   cov >= 80 ? 'premium' : cov >= 55 ? 'standard' : cov >= 30 ? 'budget' : 'risky';
 
-const generateCommercialTenantProfiles = (): Tenant[] => {
+const pickCovenantInRange = ([lo, hi]: [number, number]): number => {
+  // Bias slightly toward the middle of the range.
+  const a = randInt(lo, hi), b = randInt(lo, hi);
+  return Math.round((a + b) / 2);
+};
+
+const generateCommercialTenantProfiles = (city: CityKey = 'middlesbrough'): Tenant[] => {
   const usedNames = new Set<string>();
-  const makeCompany = (i: number): Tenant => {
-    const sector = pick(COMMERCIAL_SECTORS as unknown as CommercialSector[]);
-    let companyName = pick(COMPANY_NAME_POOL[sector]);
-    let guard = 0;
-    while (usedNames.has(companyName) && guard++ < 8) companyName = pick(COMPANY_NAME_POOL[sector]);
-    usedNames.add(companyName);
-    const covenantStrength = pickWeightedCovenant();
+  const localPool = CITY_LOCAL_POOL[city] ?? CITY_LOCAL_POOL.middlesbrough;
+  const localRange = CITY_COVENANT_RANGE[city] ?? CITY_COVENANT_RANGE.middlesbrough;
+
+  const makeFromEntry = (entry: LocalPoolEntry, isNational: boolean, i: number): Tenant => {
+    const covenantStrength = isNational ? randInt(75, 95) : pickCovenantInRange(localRange);
     const profile = covenantToProfile(covenantStrength);
-    // Map covenant → financial risk: stronger covenant ⇒ lower default & damage risk
     const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
     const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
-    const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3); // 0.85–1.25
+    const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3);
     return {
       id: `commercial_${i}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
-      name: companyName,
-      companyName,
+      name: entry.name,
+      companyName: entry.name,
       covenantStrength,
-      sector,
+      sector: entry.sector,
       profile,
       creditScore: 400 + Math.round(covenantStrength * 4),
-      monthlyIncome: 5000 + covenantStrength * 200, // implied trading turnover indicator
-      employmentStatus: sector.replace('_', ' '),
+      monthlyIncome: 5000 + covenantStrength * 200,
+      employmentStatus: entry.sector.replace('_', ' '),
       rentMultiplier,
       defaultRisk,
       damageRisk,
-      description: pick(COMMERCIAL_DESCRIPTIONS[sector]),
+      description: entry.description,
       traits: [],
-    };
+      isNational,
+    } as Tenant;
   };
-  return Array.from({ length: randInt(4, 6) }, (_, i) => makeCompany(i));
+
+  const pickUnique = (pool: LocalPoolEntry[]): LocalPoolEntry | null => {
+    const available = pool.filter(e => !usedNames.has(e.name));
+    if (!available.length) return null;
+    const entry = pick(available);
+    usedNames.add(entry.name);
+    return entry;
+  };
+
+  const results: Tenant[] = [];
+  const localCount = randInt(3, 4);
+  for (let i = 0; i < localCount; i++) {
+    const entry = pickUnique(localPool);
+    if (entry) results.push(makeFromEntry(entry, false, i));
+  }
+  const nationalCount = randInt(1, 2);
+  for (let i = 0; i < nationalCount; i++) {
+    const entry = pickUnique(NATIONAL_TENANT_POOL);
+    if (entry) results.push(makeFromEntry(entry, true, localCount + i));
+  }
+  return results;
 };
 
 
