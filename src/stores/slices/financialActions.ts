@@ -448,10 +448,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
           l.id === loanId ? { ...l, remainingBalance: newBalance, monthlyPayment: newMonthly } : l
         );
       }
+      // Phase 7 #18 — log on-time payoff if loan never missed a scheduled payment.
+      const prevHistory = ((prev as any).loanPayoffHistory || []) as any[];
+      const newHistory = fullSettle
+        ? [...prevHistory, { id: loan.id, kind: loan.kind, repaidOnSchedule: loan.lastMissedMonth === undefined, month: prev.monthsPlayed }].slice(-50)
+        : prevHistory;
       set({
         cash: debited.cash, overdraftUsed: debited.overdraftUsed,
         loans: updatedLoans,
         creditScore: Math.min(850, prev.creditScore + (fullSettle ? 3 : 1)),
+        loanPayoffHistory: newHistory,
       } as any);
       showToast(
         fullSettle ? "Loan Settled ✓" : "Partial Payment ✓",
