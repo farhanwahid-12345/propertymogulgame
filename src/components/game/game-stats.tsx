@@ -101,7 +101,7 @@ export function GameStats({
     <div className="space-y-3 animate-fade-in">
 
       {/* Main Stats Bar */}
-      <div className="glass p-4">
+      <div className="glass p-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Net Worth */}
           <div className="border-l-4 border-[hsl(var(--stat-money))] pl-3">
@@ -127,7 +127,10 @@ export function GameStats({
                           <div className="flex justify-between"><span className="text-muted-foreground">Renovation in progress</span><span className="font-semibold">£{Math.round(netWorthBreakdown.renovationWIP).toLocaleString()}</span></div>
                         )}
                         {netWorthBreakdown.conveyancingHeld > 0 && (
-                          <div className="flex justify-between"><span className="text-muted-foreground">Conveyancing escrow</span><span className="font-semibold">£{Math.round(netWorthBreakdown.conveyancingHeld).toLocaleString()}</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Deposit held (in conveyancing)</span><span className="font-semibold">£{Math.round(netWorthBreakdown.conveyancingHeld).toLocaleString()}</span></div>
+                        )}
+                        {(netWorthBreakdown as any).conveyancingPropertyEquity > 0 && (
+                          <div className="flex justify-between"><span className="text-muted-foreground">Property (in conveyancing)</span><span className="font-semibold">£{Math.round((netWorthBreakdown as any).conveyancingPropertyEquity).toLocaleString()}</span></div>
                         )}
                         {netWorthBreakdown.mortgageDebt > 0 && (
                           <div className="flex justify-between text-danger"><span>− Mortgage debt</span><span className="font-semibold">£{Math.round(netWorthBreakdown.mortgageDebt).toLocaleString()}</span></div>
@@ -149,8 +152,8 @@ export function GameStats({
               )}
             </div>
             <div className="flex items-baseline gap-4">
-              <div className="text-3xl lg:text-4xl font-bold text-foreground">£{netWorth.toLocaleString()}</div>
-              <div className="text-base text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
+              <div className="text-xl lg:text-2xl font-semibold text-foreground">£{netWorth.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">Cash: £{cash.toLocaleString()}</div>
             </div>
           </div>
 
@@ -205,12 +208,12 @@ export function GameStats({
               </Popover>
             </div>
             <div className="flex items-baseline gap-4">
-              <div className={cn("text-3xl lg:text-4xl font-bold",
+              <div className={cn("text-xl lg:text-2xl font-semibold",
                 netMonthlyIncome >= 0 ? "text-success" : "text-danger"
               )}>
                 £{netMonthlyIncome.toLocaleString()}
               </div>
-              <div className="text-base text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 In: £{totalMonthlyIncome.toLocaleString()} | Out: £{totalMonthlyExpenses.toLocaleString()}
               </div>
             </div>
@@ -220,8 +223,8 @@ export function GameStats({
           <div className="border-l-4 border-[hsl(var(--stat-credit))] pl-3">
             <div className="text-xs text-muted-foreground">🏠 Portfolio</div>
             <div className="flex items-baseline gap-4">
-              <div className="text-3xl lg:text-4xl font-bold text-foreground shrink-0">
-                {ownedPropertiesCount} <span className="text-sm font-normal text-muted-foreground">properties</span>
+              <div className="text-xl lg:text-2xl font-semibold text-foreground shrink-0">
+                {ownedPropertiesCount} <span className="text-xs font-normal text-muted-foreground">properties</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 <span className="text-xs text-muted-foreground inline-flex items-center gap-1">

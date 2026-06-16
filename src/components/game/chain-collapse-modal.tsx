@@ -49,7 +49,7 @@ export function ChainCollapseModal() {
                 </div>
                 {e.cashReturned > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    £{fromPennies(e.cashReturned).toLocaleString()} held in escrow returned to cash.
+                    £{fromPennies(e.cashReturned).toLocaleString()} held in conveyancing returned to cash.
                   </p>
                 )}
               </CardContent>

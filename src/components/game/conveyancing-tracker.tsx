@@ -104,7 +104,7 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
                   )}
                   {isBuying && escrowPounds > 0 && (
                     <span className="text-muted-foreground">
-                      Escrow: <span className="text-yellow-400 font-medium">£{escrowPounds.toLocaleString()}</span>
+                      In conveyancing: <span className="text-yellow-400 font-medium">£{escrowPounds.toLocaleString()}</span>
                     </span>
                   )}
                 </div>

@@ -104,12 +104,24 @@ export function useGameState() {
   const overdraftLimit = fromPennies(store.overdraftLimit);
   const overdraftUsed = fromPennies(store.overdraftUsed);
 
-  // Cash held in escrow on in-flight buys still belongs to the player —
-  // include it so net worth doesn't dip during conveyancing.
+  // Cash held on in-flight buys still belongs to the player (deposit + fees
+  // already debited). The mortgage advance is drawn at completion, so during
+  // conveyancing only the player's own cash sits with the solicitor.
    const conveyancingRaw = Array.isArray(store.conveyancing) ? store.conveyancing : [];
   const inflightBuyCapital = conveyancingRaw
     .filter((c: any) => c.status === 'buying')
     .reduce((sum: number, c: any) => sum + fromPennies(c.cashHeld || 0), 0);
+  // Forward-looking equity in the in-flight property: expected purchase
+  // price less the mortgage that will be drawn at completion. Shown as a
+  // separate breakdown line so the player can see the deal's gross value,
+  // not just the cash currently with the solicitor.
+  const inflightPropertyEquity = conveyancingRaw
+    .filter((c: any) => c.status === 'buying')
+    .reduce((sum: number, c: any) => {
+      const price = fromPennies(c.purchasePrice || 0);
+      const mortgage = fromPennies(c.mortgageData?.amount || 0);
+      return sum + Math.max(0, price - mortgage);
+    }, 0);
   // Active renovations represent capital already spent that will convert to
   // property value on completion — treat as work-in-progress asset so net
   // worth doesn't artificially dip while renovations are underway.
@@ -128,7 +140,7 @@ export function useGameState() {
     0,
   );
   const totalMortgageDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
-  // Net worth = cash + in-flight buying escrow + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
+  // Net worth = cash + in-flight buying conveyancing cashHeld + renovation WIP + furniture value + Σ property value − Σ debt − overdraft drawn.
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps. Subtracting mortgage
   // + loan balances stops the "free money" jump when a financed buy completes.
@@ -444,6 +456,7 @@ export function useGameState() {
       furnitureValue,
       renovationWIP,
       conveyancingHeld: inflightBuyCapital,
+      conveyancingPropertyEquity: inflightPropertyEquity,
       mortgageDebt: totalMortgageDebt,
       loanDebt: totalLoanBalanceEarly,
       overdraftUsed,
