@@ -60,13 +60,35 @@ export function PortfolioGrid({
   return (
     <div className="glass p-3 animate-fade-in">
       <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-        <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-          Your Empire 🏰
-          <Badge variant="secondary" className="text-xs">
-            {gameState.ownedProperties.length}
-            {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
-          </Badge>
-        </h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            Your Empire 🏰
+            <Badge variant="secondary" className="text-xs">
+              {gameState.ownedProperties.length}
+              {conveyancingBuyProperties.length > 0 && ` (+${conveyancingBuyProperties.length} pending)`}
+            </Badge>
+          </h2>
+          {gameState.ownedProperties.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Sort</span>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                <SelectTrigger className="h-7 w-[180px] text-xs" aria-label="Sort properties by">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="value-desc">Value (high–low)</SelectItem>
+                  <SelectItem value="value-asc">Value (low–high)</SelectItem>
+                  <SelectItem value="yield-desc">Yield (high–low)</SelectItem>
+                  <SelectItem value="yield-asc">Yield (low–high)</SelectItem>
+                  <SelectItem value="rent-desc">Rent (high–low)</SelectItem>
+                  <SelectItem value="rent-asc">Rent (low–high)</SelectItem>
+                  <SelectItem value="gain">Value gain</SelectItem>
+                  <SelectItem value="loss">Value loss</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-wrap text-xs">
           <span className="text-muted-foreground">Value</span>
           <span className="font-semibold text-foreground">£{totalPortfolioValue.toLocaleString()}</span>
@@ -93,26 +115,7 @@ export function PortfolioGrid({
         </div>
       </div>
 
-      {gameState.ownedProperties.length > 0 && (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs text-muted-foreground">Sort</span>
-          <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-            <SelectTrigger className="h-7 w-[200px] text-xs" aria-label="Sort properties by">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="value-desc">Value (high–low)</SelectItem>
-              <SelectItem value="value-asc">Value (low–high)</SelectItem>
-              <SelectItem value="yield-desc">Yield (high–low)</SelectItem>
-              <SelectItem value="yield-asc">Yield (low–high)</SelectItem>
-              <SelectItem value="rent-desc">Rent (high–low)</SelectItem>
-              <SelectItem value="rent-asc">Rent (low–high)</SelectItem>
-              <SelectItem value="gain">Value gain</SelectItem>
-              <SelectItem value="loss">Value loss</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
 
