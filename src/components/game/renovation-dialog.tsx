@@ -513,6 +513,10 @@ export function RenovationDialog({
    * the player can afford the build.
    */
   const ineligibilityReason = (r: RenovationType, phase: 'planning' | 'works' = 'works'): string | null => {
+    // Phase 8 #21 — leasehold properties cannot do glazing, central heating, or EPC upgrades.
+    if (isLeasehold && LEASEHOLD_BLOCKED_RENO_IDS.has(r.id)) {
+      return 'Requires freeholder consent — not available on leasehold properties.';
+    }
     // Phase 3 #10 — `requiresVacant` works (conversions + heavy extensions) cannot
     // begin while a tenant is in residence. Planning submission is allowed; only
     // the physical works are gated.
@@ -547,11 +551,9 @@ export function RenovationDialog({
   };
 
 
-  // Phase 8 #21 — leasehold properties may only have glazing, central heating, EPC.
-  const LEASEHOLD_ALLOWED_RENO_IDS = new Set(['double_glazing', 'central_heating', 'epc_upgrade']);
-  const availableRenovations = isLeasehold
-    ? RENOVATION_OPTIONS.filter(r => LEASEHOLD_ALLOWED_RENO_IDS.has(r.id))
-    : RENOVATION_OPTIONS;
+  // Phase 8 #21 — leasehold properties cannot do glazing, central heating, or EPC upgrades.
+  const LEASEHOLD_BLOCKED_RENO_IDS = new Set(['double_glazing', 'central_heating', 'epc_upgrade']);
+  const availableRenovations = RENOVATION_OPTIONS;
   const groupedRenovations = availableRenovations.reduce((acc, renovation) => {
     if (!acc[renovation.category]) acc[renovation.category] = [];
     acc[renovation.category].push(renovation);
@@ -595,7 +597,7 @@ export function RenovationDialog({
           {isLeasehold && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               <span className="font-semibold">Leasehold property — </span>
-              Leasehold properties can only be improved with double glazing, central heating, and EPC upgrades. Structural works and conversions require freehold ownership.
+              Double glazing, central heating, and EPC upgrades require freeholder consent and are not available. Structural works, conversions, and other improvements remain available.
             </div>
           )}
           {Object.entries(groupedRenovations).map(([category, renovations]) => (
