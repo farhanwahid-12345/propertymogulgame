@@ -244,7 +244,7 @@ export interface Mortgage {
   revertedToSVR?: boolean;
 }
 
-export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour';
+export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause';
 
 export interface PropertyTenant {
   propertyId: string;

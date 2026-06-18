@@ -352,6 +352,17 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       if (!property || !tenantRec) {
         showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
       }
+      if ((property as any).type === 'commercial') {
+        const hasScheduledReview = (prev.pendingRentReviews || []).some((r: any) => r.propertyId === propertyId);
+        if (!hasScheduledReview) {
+          showToast(
+            "Rent Review Required",
+            "Commercial rents can only be increased at scheduled rent review dates as per the lease terms.",
+            "destructive",
+          );
+          return;
+        }
+      }
       const currentSlotRent = (tenantRec as any).rentPennies ?? property.monthlyIncome;
       if (newRentPennies <= currentSlotRent) {
         showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
@@ -453,6 +464,30 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         showToast("Eviction Already Served", "Notice already in effect for this slot. Cancel it first.", "destructive"); return;
       }
 
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const isCommercial = (property as any)?.type === 'commercial';
+      const lease: any = (property as any)?.commercialLease;
+
+      if (isCommercial) {
+        if (ground === 'landlord_sale' || ground === 'landlord_move_in' || ground === 'antisocial_behaviour' || ground === 'rent_arrears') {
+          showToast(
+            "Wrong Eviction Grounds",
+            "Commercial properties follow different lease law — use lease expiry, break clause, or persistent default as grounds.",
+            "destructive",
+          );
+          return;
+        }
+      } else {
+        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause') {
+          showToast(
+            "Wrong Eviction Grounds",
+            "These grounds apply to commercial leases only.",
+            "destructive",
+          );
+          return;
+        }
+      }
+
       if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
         const appealCd = (prev.propertyLocks || []).find(
           (l: any) => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex),
@@ -499,6 +534,54 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           noticeMonths = 4;
           validReason = 'Landlord moving in (4-month notice)';
           break;
+        case 'lease_expiry': {
+          if (!lease?.expiryMonth) {
+            showToast("Invalid Ground", "No active lease on file for this property.", "destructive"); return;
+          }
+          if (prev.monthsPlayed < lease.expiryMonth - 6) {
+            const monthsUntil = lease.expiryMonth - prev.monthsPlayed;
+            showToast(
+              "Too Early",
+              `Lease expiry grounds can only be served within 6 months of expiry (currently ${monthsUntil} months away).`,
+              "destructive",
+            );
+            return;
+          }
+          noticeMonths = 6;
+          validReason = `Lease expiry @ month ${lease.expiryMonth} (6-month notice)`;
+          break;
+        }
+        case 'tenant_default': {
+          const arrears = (tenant as any).arrearsMonths ?? 0;
+          if (arrears < 3 && recentDefaults < 3) {
+            showToast(
+              "Invalid Ground",
+              "Commercial tenant default requires ≥3 months of arrears before formal action.",
+              "destructive",
+            );
+            return;
+          }
+          noticeMonths = 3;
+          validReason = `Persistent tenant default (${Math.max(arrears, recentDefaults)} months arrears, 3-month notice)`;
+          break;
+        }
+        case 'break_clause': {
+          const bc = lease?.breakClause;
+          if (!bc || bc.type === 'none' || !bc.atMonth) {
+            showToast("Invalid Ground", "This lease has no break clause.", "destructive"); return;
+          }
+          if (prev.monthsPlayed < bc.atMonth) {
+            showToast(
+              "Break Not Yet Available",
+              `Break clause cannot be exercised until month ${bc.atMonth} (${bc.atMonth - prev.monthsPlayed} mo).`,
+              "destructive",
+            );
+            return;
+          }
+          noticeMonths = 6;
+          validReason = `Break clause exercised @ month ${bc.atMonth} (6-month notice)`;
+          break;
+        }
       }
 
       let appealChance =

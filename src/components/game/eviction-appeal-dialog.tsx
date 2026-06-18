@@ -27,6 +27,9 @@ const GROUND_LABELS: Record<EvictionGround, string> = {
   landlord_sale: "Landlord Sale",
   landlord_move_in: "Landlord Move-In",
   antisocial_behaviour: "Antisocial Behaviour",
+  lease_expiry: "Lease Expiry",
+  tenant_default: "Tenant Default",
+  break_clause: "Break Clause",
 };
 
 export function EvictionAppealDialog({
