@@ -628,7 +628,7 @@ export function RenovationDialog({
                   const planningTenantWarning = needsPlanningStep && hasTenant && (renovation.category === 'conversion' || renovation.requiresVacant);
                   const planningCashWarning = needsPlanningStep && !affordable;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
-                  const isEpcUpgrade = renovation.id === 'epc_upgrade' || renovation.category === 'epc';
+                  const isEpcUpgrade = renovation.id === 'epc_upgrade';
                   const batchSelectable = batchMode && !blocked && !isEpcUpgrade &&
                     (renovation.requiresPlanning ? (planningApproved ? affordable : true) : affordable);
                   const selectable = batchMode
