@@ -38,16 +38,29 @@ export function LoansPanel() {
     ? 0
     : store.creditScore >= 800 ? -0.005 : store.creditScore >= 650 ? 0 : store.creditScore >= 500 ? 0.01 : 0.02;
   const reputationRateAdj = kind === 'investor'
-    ? Math.max(-0.05, Math.min(0.06, (60 - reputation) * 0.002))
+    ? Math.max(-0.08, Math.min(0.10, (60 - reputation) * 0.002))
     : 0;
   // Phase 7 #18 — investor loyalty discount: −3% per on-time repaid loan, capped at −15%.
   const onTimePayoffs = (((store as any).loanPayoffHistory) || []).filter((p: any) => p.repaidOnSchedule).length;
   const loyaltyRateAdj = kind === 'investor' ? -Math.min(0.15, onTimePayoffs * 0.03) : 0;
+  // Track record & health factor adjustments (sync with financialActions.ts)
+  const profitableYears = ((store as any).annualAccounts || [])
+    .filter((a: any) => (a?.netProfitBeforeTax ?? 0) > 0).length;
+  const trackRecordFactor = Math.min(1.4, 0.8 + profitableYears * 0.08);
+  const monthlyRentForHealth = store.ownedProperties.reduce((s, p) => s + p.monthlyIncome, 0);
+  const monthlyMortgageForHealth = store.mortgages.reduce((s, m) => s + m.monthlyPayment, 0);
+  const existingLoanPmtsForHealth = ((store as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
+  const dtiForHealth = monthlyRentForHealth > 0 ? (monthlyMortgageForHealth + existingLoanPmtsForHealth) / monthlyRentForHealth : 1;
+  const healthFactor = (store.creditScore >= 750 && dtiForHealth < 0.35) ? 1.3
+    : (store.creditScore >= 650 && dtiForHealth < 0.5) ? 1.0 : 0.7;
+  const factorRateAdj = (kind === 'investor' || kind === 'business')
+    ? Math.max(-0.04, Math.min(0.05, ((1 - trackRecordFactor) * 0.1) + ((1 - healthFactor) * 0.1)))
+    : 0;
   const spread = kind === 'investor'
     ? product.baseSpread
     : ((store.currentLoanRates as any)?.[kind] ?? product.baseSpread);
   const baseRate = store.currentMarketRate + spread;
-  const rate = Math.max(0.02, baseRate + creditPenalty + reputationRateAdj + loyaltyRateAdj);
+  const rate = Math.max(0.02, baseRate + creditPenalty + reputationRateAdj + factorRateAdj + loyaltyRateAdj);
 
   // Dynamic cap based on rent roll, debt service & credit (investor capped by reputation instead).
   const dynamicMax = useMemo(() => {
@@ -56,7 +69,14 @@ export function LoansPanel() {
     const existingLoanPmts = ((store as any).loans || []).reduce((s: number, l: any) => s + (l.monthlyPayment || 0), 0);
     const netMonthly = Math.max(0, rentRoll - mortgages - existingLoanPmts);
     const creditFactor = Math.max(0.5, Math.min(1.4, store.creditScore / 700));
-    const reputationFactor = Math.max(0.4, Math.min(1.5, (((store as any).landlordReputation ?? 50)) / 60));
+    const profitableYears = ((store as any).annualAccounts || [])
+      .filter((a: any) => (a?.netProfitBeforeTax ?? 0) > 0).length;
+    const trackRecordFactor = Math.min(1.4, 0.8 + profitableYears * 0.08);
+    const dtiForHealth = rentRoll > 0 ? (mortgages + existingLoanPmts) / rentRoll : 1;
+    const healthFactor = (store.creditScore >= 750 && dtiForHealth < 0.35) ? 1.3
+      : (store.creditScore >= 650 && dtiForHealth < 0.5) ? 1.0 : 0.7;
+    const reputationFactor = Math.max(0.25, Math.min(2.5, (((store as any).landlordReputation ?? 50)) / 60));
+    const investorTotalFactor = Math.max(0.15, Math.min(4.0, reputationFactor * trackRecordFactor * healthFactor));
     const creditTierMult =
       store.creditScore < 500 ? 0.4 :
       store.creditScore < 650 ? 0.7 :
@@ -65,9 +85,9 @@ export function LoansPanel() {
       ? Math.min(product.hardCapPennies * creditTierMult, netMonthly * 6) * creditFactor
       : kind === 'business'
         ? Math.min(product.hardCapPennies * creditTierMult, netMonthly * 12 * 4) * creditFactor
-        : product.hardCapPennies * reputationFactor;
+        : product.hardCapPennies * investorTotalFactor;
     return Math.max(0, Math.floor(cap));
-  }, [store.ownedProperties, store.mortgages, (store as any).loans, store.creditScore, kind, product.hardCapPennies, (store as any).landlordReputation]);
+  }, [store.ownedProperties, store.mortgages, (store as any).loans, store.creditScore, kind, product.hardCapPennies, (store as any).landlordReputation, (store as any).annualAccounts]);
 
   // Combined-DTI gate (skipped for investor)
   const combinedDTIInfo = useMemo(() => {
@@ -206,6 +226,14 @@ export function LoansPanel() {
                       <span className="text-muted-foreground">Credit adj</span>
                       <span className={creditPenalty < 0 ? 'text-success' : 'text-danger'}>
                         {creditPenalty < 0 ? '−' : '+'}{Math.abs(creditPenalty * 100).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {factorRateAdj !== 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Track record / health adj</span>
+                      <span className={factorRateAdj < 0 ? 'text-success' : 'text-danger'}>
+                        {factorRateAdj < 0 ? '−' : '+'}{Math.abs(factorRateAdj * 100).toFixed(2)}%
                       </span>
                     </div>
                   )}
