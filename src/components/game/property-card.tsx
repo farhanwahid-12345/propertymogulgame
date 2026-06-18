@@ -226,6 +226,8 @@ export const PropertyCard = memo(function PropertyCard({
   const [reviewOpen, setReviewOpen] = useState(false);
   // Phase 4 — Renewal dialog state for sitting commercial tenants.
   const [renewalOpen, setRenewalOpen] = useState(false);
+  // Prompt 4 — collapsible commercial lease details inside the expanded Details view.
+  const [leaseExpanded, setLeaseExpanded] = useState(false);
   const signCommercialLease = useGameStore(s => (s as any).signCommercialLease);
   const settleRentReview = useGameStore(s => (s as any).settleRentReview);
   const renewCommercialLease = useGameStore(s => (s as any).renewCommercialLease);
@@ -688,6 +690,111 @@ export const PropertyCard = memo(function PropertyCard({
                     )}
                   </div>
                 </div>
+
+                {/* Prompt 4 — Commercial lease details (collapsible) */}
+                {property.type === 'commercial' && (() => {
+                  const lease = property.commercialLease;
+                  const tenant: any = sittingCommercialTenant;
+                  const covStrength: number | undefined = tenant?.covenantStrength;
+                  const covenantLabel = covStrength == null
+                    ? '—'
+                    : covStrength >= 85 ? 'National'
+                    : covStrength >= 65 ? 'Strong'
+                    : covStrength >= 40 ? 'Standard'
+                    : 'Weak';
+                  const now = monthsPlayed ?? 0;
+                  return (
+                    <div className="pt-1.5 border-t border-border/40 space-y-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLeaseExpanded(!leaseExpanded)}
+                        aria-expanded={leaseExpanded}
+                        aria-controls={`property-lease-${property.id}`}
+                        className="w-full justify-between text-[10px] h-6 px-2 text-muted-foreground hover:text-foreground"
+                      >
+                        <span className="flex items-center gap-1">
+                          {leaseExpanded ? <ChevronUp className="h-3 w-3" aria-hidden="true" /> : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
+                          📋 {leaseExpanded ? 'Hide lease' : 'View Lease'}
+                        </span>
+                        {lease ? (
+                          <span>FRI · {Math.round(lease.termMonths / 12)}yr</span>
+                        ) : (
+                          <span className="italic">No active lease</span>
+                        )}
+                      </Button>
+
+                      {leaseExpanded && (
+                        <div id={`property-lease-${property.id}`} className="space-y-1.5 pt-1 border-t border-border/40 text-xs">
+                          {!lease ? (
+                            <div className="text-xs text-muted-foreground italic py-1">
+                              No active lease — select a tenant to negotiate terms.
+                            </div>
+                          ) : (() => {
+                            const rentPennies = lease.negotiatedRentPennies ?? ((property.monthlyIncome || 0) * 100);
+                            const monthlyRentPounds = Math.round(rentPennies / 100);
+                            const annualRentPounds = monthlyRentPounds * 12;
+                            const termYears = Math.round(lease.termMonths / 12);
+                            const remainingMonthsTotal = Math.max(0, lease.expiryMonth - now);
+                            const remYears = Math.floor(remainingMonthsTotal / 12);
+                            const remMonths = remainingMonthsTotal % 12;
+                            const breakLabel = lease.breakClause.type === 'none'
+                              ? 'None'
+                              : lease.breakClause.type === 'tenant'
+                                ? `Tenant break at year ${Math.round(((lease.breakClause.atMonth ?? lease.startMonth) - lease.startMonth) / 12)}`
+                                : `Mutual break at year ${Math.round(((lease.breakClause.atMonth ?? lease.startMonth) - lease.startMonth) / 12)}`;
+                            const reviewYears = Math.round(lease.reviewFrequencyMonths / 12);
+                            const lastReview = (tenant?.lastRentReviewMonth ?? lease.startMonth);
+                            const nextReviewMonth = lastReview + lease.reviewFrequencyMonths;
+                            return (
+                              <>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Tenant</span>
+                                  <span className="font-medium text-right">
+                                    {tenant?.companyName ?? tenant?.name ?? '—'}
+                                    <span className="text-muted-foreground"> — {covenantLabel}</span>
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Monthly rent</span>
+                                  <span className="font-medium">£{monthlyRentPounds.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Annual rent</span>
+                                  <span className="font-medium">£{annualRentPounds.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Term</span>
+                                  <span className="font-medium">{termYears} years</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Remaining</span>
+                                  <span className="font-medium">{remYears}y {remMonths}m</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Break clause</span>
+                                  <span className="font-medium text-right">{breakLabel}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Rent reviews</span>
+                                  <span className="font-medium">Every {reviewYears} years</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Next review</span>
+                                  <span className="font-medium">Month {nextReviewMonth}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Lease type</span>
+                                  <span className="font-medium">{lease.fri ? 'FRI (Full Repairing & Insuring)' : 'Standard'}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </>
