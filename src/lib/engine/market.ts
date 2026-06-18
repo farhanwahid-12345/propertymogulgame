@@ -8,10 +8,13 @@ import { getCityConfig, pickTypeForCity, type CityId } from "./cities";
 import { generateSittingCommercialTenant } from "@/components/game/tenant-selector";
 
 /** Phase 3 — implied yield for an income-producing commercial property based on
- *  covenant strength and remaining lease term. Clamped to 5–12%. */
+ *  covenant strength and remaining lease term. Clamped to 6–15%. */
 export function impliedCommercialYield(covenantStrength: number, remainingMonths: number): number {
-  const y = 0.10 - (covenantStrength / 1000) - (remainingMonths / 6000);
-  return Math.max(0.05, Math.min(0.12, y));
+  // 6% for blue-chip national on long lease → 15% for weak local on short lease
+  const covenantDiscount = (covenantStrength / 100) * 0.07; // up to −7% from covenant
+  const termDiscount = (Math.min(remainingMonths, 120) / 120) * 0.02; // up to −2% from term
+  const y = 0.15 - covenantDiscount - termDiscount;
+  return Math.max(0.06, Math.min(0.15, y));
 }
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
