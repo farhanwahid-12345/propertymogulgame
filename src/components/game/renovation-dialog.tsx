@@ -628,7 +628,8 @@ export function RenovationDialog({
                   const planningTenantWarning = needsPlanningStep && hasTenant && (renovation.category === 'conversion' || renovation.requiresVacant);
                   const planningCashWarning = needsPlanningStep && !affordable;
                   const blocked = !!ineligible || inProgress || completed || planningPending || blockedByCooldown;
-                  const batchSelectable = batchMode && !blocked &&
+                  const isEpcUpgrade = renovation.id === 'epc_upgrade' || renovation.category === 'epc';
+                  const batchSelectable = batchMode && !blocked && !isEpcUpgrade &&
                     (renovation.requiresPlanning ? (planningApproved ? affordable : true) : affordable);
                   const selectable = batchMode
                     ? batchSelectable
@@ -731,6 +732,12 @@ export function RenovationDialog({
                         {completed && (
                           <div className="text-xs text-success border border-success/30 bg-success/5 rounded px-2 py-1">
                             ✅ Already completed on this property
+                          </div>
+                        )}
+
+                        {batchMode && isEpcUpgrade && !completed && (
+                          <div className="text-xs text-muted-foreground border border-border/40 bg-muted/20 rounded px-2 py-1">
+                            ⓘ EPC upgrades cannot be batched — apply per property.
                           </div>
                         )}
 
