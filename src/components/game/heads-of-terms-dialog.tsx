@@ -10,15 +10,24 @@ import type { Tenant } from "@/components/game/tenant-selector";
 // ─── Lease term presets ──────────────────────────────────────────────────────
 
 const TERM_OPTIONS = [
+  { label: "1 year", years: 1 },
+  { label: "2 years", years: 2 },
   { label: "3 years", years: 3 },
   { label: "5 years", years: 5 },
+  { label: "7 years", years: 7 },
   { label: "10 years", years: 10 },
   { label: "15 years", years: 15 },
+  { label: "20 years", years: 20 },
+  { label: "25 years", years: 25 },
 ] as const;
 
 const REVIEW_OPTIONS = [
+  { label: "1-year reviews", years: 1 },
+  { label: "2-year reviews", years: 2 },
   { label: "3-year reviews", years: 3 },
   { label: "5-year reviews", years: 5 },
+  { label: "7-year reviews", years: 7 },
+  { label: "10-year reviews", years: 10 },
 ] as const;
 
 type BreakChoice = 'none' | 'tenant_mid' | 'mutual_mid';
@@ -258,6 +267,19 @@ export function HeadsOfTermsDialog({
           <p className="text-[11px] text-muted-foreground italic">{tenant.description}</p>
         </div>
 
+        {/* Tenant profile — preferences hint */}
+        <div className="glass rounded-xl p-3 border border-border/40 bg-muted/20 space-y-1.5">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Tenant profile
+          </div>
+          <div className="text-[11px] text-muted-foreground space-y-0.5">
+            <div>Preferred term: {covenant >= 70 ? '10–15 years' : covenant >= 40 ? '5 years' : '1–3 years'}</div>
+            <div>Preferred review frequency: {covenant >= 70 ? '5-year reviews' : '3-year reviews'}</div>
+            <div>Break clause preference: {covenant < 40 ? 'Tenant break preferred' : 'None preferred'}</div>
+            <div>Rent expectation: Asking £{askingPounds.toLocaleString()}/mo{covenant >= 70 && ' — strong covenants typically negotiate down 5–15%.'}</div>
+          </div>
+        </div>
+
         {/* Rent negotiation */}
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -267,8 +289,8 @@ export function HeadsOfTermsDialog({
             <input
               type="number"
               value={proposedRentPounds}
-              min={Math.round(askingPounds * 0.5)}
-              max={Math.round(askingPounds * 2)}
+              min={Math.round(askingPounds * 0.3)}
+              max={Math.round(askingPounds * 3)}
               step={25}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
