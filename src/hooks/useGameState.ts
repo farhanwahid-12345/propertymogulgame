@@ -239,7 +239,7 @@ export function useGameState() {
     store.applyRentIncrease(propertyId, toPennies(newRentPounds), outcome, toPennies(tribunalFeePounds), slotIndex);
   }, [store.applyRentIncrease]);
 
-  const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour', slotIndex?: number) => {
+  const evictTenant = useCallback((propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause', slotIndex?: number) => {
     store.evictTenant(propertyId, ground, slotIndex);
   }, [store.evictTenant]);
 

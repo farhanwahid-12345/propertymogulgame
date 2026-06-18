@@ -18,7 +18,7 @@ export interface MultiUnitSlot {
   satisfactionReasons?: Array<{ reason: string; delta: number }>;
   rentPounds?: number;
   pendingEviction?: {
-    ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour';
+    ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause';
     effectiveMonth: number;
     servedMonth: number;
   };
