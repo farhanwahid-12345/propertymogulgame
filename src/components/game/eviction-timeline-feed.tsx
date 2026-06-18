@@ -17,6 +17,9 @@ const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; t
   landlord_sale: { label: "Landlord Sale", icon: Home, tone: "text-[hsl(var(--stat-credit))] border-[hsl(var(--stat-credit))]/30" },
   landlord_move_in: { label: "Landlord Move-In", icon: UserMinus, tone: "text-amber-400 border-amber-400/30" },
   antisocial_behaviour: { label: "Antisocial Behaviour", icon: ShieldAlert, tone: "text-danger border-danger/30" },
+  lease_expiry: { label: "Lease Expiry", icon: Home, tone: "text-[hsl(var(--stat-credit))] border-[hsl(var(--stat-credit))]/30" },
+  tenant_default: { label: "Tenant Default", icon: AlertTriangle, tone: "text-danger border-danger/30" },
+  break_clause: { label: "Break Clause", icon: Gavel, tone: "text-amber-400 border-amber-400/30" },
 };
 
 /** Format an in-game month index into a friendly "Month N (Year Y, Mon M)" label. */
