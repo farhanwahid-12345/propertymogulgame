@@ -693,7 +693,7 @@ export const PropertyCard = memo(function PropertyCard({
 
                 {/* Prompt 4 — Commercial lease details (collapsible) */}
                 {property.type === 'commercial' && (() => {
-                  const lease = property.commercialLease;
+                  const lease: any = property.commercialLease;
                   const tenant: any = sittingCommercialTenant;
                   const covStrength: number | undefined = tenant?.covenantStrength;
                   const covenantLabel = covStrength == null
