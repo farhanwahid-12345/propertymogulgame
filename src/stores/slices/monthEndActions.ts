@@ -974,7 +974,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const interestedP = Math.min(0.85, Math.max(0.3, 0.3 + covenant / 200));
           const interested = gameRandom() < interestedP;
           if (interested && !existingRenewalsByProp.has(p.id)) {
-            const currentRentPennies = (p.baseRent || p.monthlyIncome) * 100;
+            const currentRentPennies = p.baseRent || p.monthlyIncome;
             newlyQueuedRenewals.push({
               id: `renewal_${p.id}_${newMonthNumber}`,
               propertyId: p.id,
@@ -1400,7 +1400,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if (existingPendingByProp.has(property.id)) return;
         // Suggested market uplift: 3% compounded over the review period.
         const upliftFactor = Math.pow(1.03, freq / 12);
-        const currentRentPennies = (property.baseRent || property.monthlyIncome) * 100;
+        const currentRentPennies = property.baseRent || property.monthlyIncome;
         const proposedMarketRentPennies = Math.round(currentRentPennies * upliftFactor);
         newlyQueuedReviews.push({
           id: `rentreview_${property.id}_${newMonthNumber}`,
