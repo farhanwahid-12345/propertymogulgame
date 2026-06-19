@@ -8,10 +8,34 @@
 import type {
   PropertyTenant, EvictionGround, PendingEviction,
 } from '@/types/game';
-import { fromPennies } from '@/lib/formatCurrency';
+import { fromPennies, toPennies } from '@/lib/formatCurrency';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { gameRandom } from '@/lib/rng';
-import { showToast, debit, calcDeposit } from '../storeHelpers';
+import { showToast, debit, debitStrict, calcDeposit } from '../storeHelpers';
+
+/**
+ * Commercial lease transaction fees (in pounds).
+ * - Solicitor: tiered flat fee by lease term.
+ * - Land Registry: only registrable when term > 7yr (84mo); HMLR sliding scale
+ *   computed against the lease "premium" = annualRent × termYears / 5.
+ */
+function calcCommercialLeaseFeesPounds(monthlyRentPennies: number, termMonths: number): { solicitor: number; landRegistry: number } {
+  const termYears = termMonths / 12;
+  const solicitor = termYears < 5 ? 1500 : termYears <= 10 ? 2500 : 3500;
+  let landRegistry = 0;
+  if (termMonths > 84) {
+    const annualRentPounds = fromPennies(monthlyRentPennies) * 12;
+    const premium = annualRentPounds * termYears / 5;
+    if (premium < 100_000) landRegistry = 20;
+    else if (premium < 200_000) landRegistry = 45;
+    else if (premium < 500_000) landRegistry = 95;
+    else {
+      const extraThousands = Math.ceil((premium - 500_000) / 1000);
+      landRegistry = Math.min(500, 140 + extraThousands * 5);
+    }
+  }
+  return { solicitor, landRegistry };
+}
 import { checkAndUnlockAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import {
   CONCERN_RESOLVE_CONDITION_LIFT,
