@@ -227,9 +227,9 @@ export function HeadsOfTermsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <FileSignature className="h-5 w-5 text-amber-300" />
             {isReview ? 'Rent Review' : isRenewal ? 'Lease Renewal' : 'Heads of Terms'} — {propertyName}
           </DialogTitle>
@@ -248,7 +248,7 @@ export function HeadsOfTermsDialog({
         {/* Tenant summary */}
         <div className="glass rounded-xl p-3 space-y-2">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Building2 className="h-4 w-4 text-sky-300" />
               <div>
                 <div className="font-semibold text-sm">{tenant.companyName ?? tenant.name}</div>
@@ -285,7 +285,7 @@ export function HeadsOfTermsDialog({
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Proposed rent (£/mo)
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <input
               type="number"
               value={proposedRentPounds}
@@ -316,7 +316,7 @@ export function HeadsOfTermsDialog({
         {!isReview && (<>
         {/* Lease length */}
         <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1 flex-wrap">
             <Calendar className="h-3 w-3" /> Lease length
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -378,7 +378,7 @@ export function HeadsOfTermsDialog({
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Rent review frequency
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {REVIEW_OPTIONS.map(opt => {
               const active = reviewYears === opt.years;
               return (
@@ -403,14 +403,14 @@ export function HeadsOfTermsDialog({
         {/* Counter-offer / rejection feedback */}
         {stage === 'counter' && agreedRentPounds == null && tenantCounterPounds != null && (
           <div className="glass rounded-xl p-3 border border-amber-400/30 bg-amber-400/5 space-y-2">
-            <div className="text-xs font-semibold text-amber-300 flex items-center gap-1">
+            <div className="text-xs font-semibold text-amber-300 flex items-center gap-1 flex-wrap">
               <Handshake className="h-3 w-3" /> Tenant counter-offer
             </div>
             <div className="text-sm">
               {tenant.companyName ?? tenant.name} would prefer{' '}
               <span className="font-semibold text-foreground">£{tenantCounterPounds.toLocaleString()}/mo</span>.
             </div>
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button size="sm" variant="outline" onClick={handleAcceptCounter}>
                 Accept £{tenantCounterPounds.toLocaleString()}
               </Button>
@@ -438,14 +438,14 @@ export function HeadsOfTermsDialog({
         )}
 
         {/* Footer actions */}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+          <Button className="w-full sm:w-auto" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           {agreedRentPounds == null ? (
-            <Button onClick={handlePropose}>
+            <Button className="w-full sm:w-auto" onClick={handlePropose}>
               <Handshake className="h-4 w-4 mr-1" /> Propose terms
             </Button>
           ) : (
-            <Button onClick={handleSign}>
+            <Button className="w-full sm:w-auto" onClick={handleSign}>
               <FileSignature className="h-4 w-4 mr-1" /> Sign Heads of Terms
             </Button>
           )}
