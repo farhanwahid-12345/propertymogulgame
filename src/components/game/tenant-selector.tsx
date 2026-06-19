@@ -273,7 +273,7 @@ const generateCommercialTenantProfiles = (city: CityKey = 'middlesbrough'): Tena
     const profile = covenantToProfile(covenantStrength);
     const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
     const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
-    const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3);
+    const rentMultiplier = +(0.6 + (covenantStrength / 100) * 0.8).toFixed(3);
     return {
       id: `commercial_${i}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
       name: entry.name,
