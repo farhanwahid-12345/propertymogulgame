@@ -600,6 +600,21 @@ export function TenantSelector({
                   )}
                   <p className="text-sm text-muted-foreground italic">{tenant.description}</p>
 
+                  {/* Commercial desired lease terms */}
+                  {propertyType === 'commercial' && tenant.covenantStrength !== undefined && (
+                    <div className="rounded-xl border border-border/40 bg-muted/20 p-3 space-y-1.5">
+                      <div className="text-xs font-medium text-foreground">Desired terms</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <div>Term: {tenant.covenantStrength >= 70 ? '10–15 years' : tenant.covenantStrength >= 40 ? '5 years' : '1–3 years'}</div>
+                        <div>Reviews: {tenant.covenantStrength >= 70 ? 'Every 5 years' : 'Every 3 years'}</div>
+                        <div>Break: {tenant.covenantStrength < 40 ? 'Tenant break preferred' : 'None preferred'}</div>
+                        <div className="text-emerald-400 font-medium">
+                          Likely to offer £{Math.round(displayBaseRent * tenant.rentMultiplier * 0.9).toLocaleString()}–£{Math.round(displayBaseRent * tenant.rentMultiplier * 1.1).toLocaleString()}/mo
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Trait badges */}
                   <div className="flex flex-wrap gap-1.5">
                     {tenant.traits.map((trait) => (
