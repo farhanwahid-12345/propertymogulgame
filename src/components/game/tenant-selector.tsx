@@ -273,7 +273,7 @@ const generateCommercialTenantProfiles = (city: CityKey = 'middlesbrough'): Tena
     const profile = covenantToProfile(covenantStrength);
     const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
     const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
-    const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3);
+    const rentMultiplier = +(0.6 + (covenantStrength / 100) * 0.8).toFixed(3);
     return {
       id: `commercial_${i}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
       name: entry.name,
@@ -330,7 +330,7 @@ export function generateSittingCommercialTenant(city: CityKey = 'middlesbrough')
   const profile = covenantToProfile(covenantStrength);
   const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
   const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
-  const rentMultiplier = +(0.85 + (covenantStrength / 100) * 0.4).toFixed(3);
+  const rentMultiplier = +(0.6 + (covenantStrength / 100) * 0.8).toFixed(3);
   return {
     id: `sitting_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
     name: entry.name,
@@ -599,6 +599,21 @@ export function TenantSelector({
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground italic">{tenant.description}</p>
+
+                  {/* Commercial desired lease terms */}
+                  {propertyType === 'commercial' && tenant.covenantStrength !== undefined && (
+                    <div className="rounded-xl border border-border/40 bg-muted/20 p-3 space-y-1.5">
+                      <div className="text-xs font-medium text-foreground">Desired terms</div>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <div>Term: {tenant.covenantStrength >= 70 ? '10–15 years' : tenant.covenantStrength >= 40 ? '5 years' : '1–3 years'}</div>
+                        <div>Reviews: {tenant.covenantStrength >= 70 ? 'Every 5 years' : 'Every 3 years'}</div>
+                        <div>Break: {tenant.covenantStrength < 40 ? 'Tenant break preferred' : 'None preferred'}</div>
+                        <div className="text-emerald-400 font-medium">
+                          Likely to offer £{Math.round(displayBaseRent * tenant.rentMultiplier * 0.9).toLocaleString()}–£{Math.round(displayBaseRent * tenant.rentMultiplier * 1.1).toLocaleString()}/mo
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Trait badges */}
                   <div className="flex flex-wrap gap-1.5">
