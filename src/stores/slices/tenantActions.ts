@@ -259,7 +259,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         "Heads of Terms Signed 📄",
         `${tenant.companyName ?? tenant.name} — £${fromPennies(agreedRent).toLocaleString()}/mo on a ${Math.round(terms.termMonths / 12)}-yr FRI lease (${breakLabel}, ${terms.reviewFrequencyMonths}-mo reviews). 5-week deposit £${fromPennies(requiredDeposit).toLocaleString()} held.`,
       );
-      set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+      showToast(
+        "Commercial lease signed",
+        `Solicitor: £${fees.solicitor.toLocaleString()} | Land Registry: £${fees.landRegistry.toLocaleString()} | Total fees: £${(fees.solicitor + fees.landRegistry).toLocaleString()} deducted.`,
+      );
+      set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids, cash: debited.cash });
     },
 
     // Phase 3 — settle a pending commercial rent review at the agreed rent.
