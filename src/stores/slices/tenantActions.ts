@@ -196,6 +196,20 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
       const agreedRent = Math.max(1, Math.round(terms.agreedRentPennies));
       const requiredDeposit = calcDeposit(agreedRent);
+
+      // Commercial lease transaction fees — solicitor + (optional) HMLR registration.
+      const fees = calcCommercialLeaseFeesPounds(agreedRent, terms.termMonths);
+      const totalFeesPennies = toPennies(fees.solicitor + fees.landRegistry);
+      const debited = debitStrict(prev, totalFeesPennies);
+      if (!debited) {
+        showToast(
+          "Insufficient Funds",
+          `Need £${(fees.solicitor + fees.landRegistry).toLocaleString()} in cash to cover solicitor (£${fees.solicitor.toLocaleString()}) + land registry (£${fees.landRegistry.toLocaleString()}) fees.`,
+          "destructive",
+        );
+        return;
+      }
+
       const startMonth = prev.monthsPlayed;
       const lease = {
         fri: true,
