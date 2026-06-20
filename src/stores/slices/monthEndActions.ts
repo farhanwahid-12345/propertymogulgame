@@ -108,7 +108,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const derivedRent = conv.advertisedMonthlyIncome
             ?? (reconstructedValue > 0 ? Math.floor((reconstructedValue * (reconstructedYield / 100)) / 12) : 0);
           const reconstructedType = conv.propertyType ?? 'residential';
-          prop = { id: conv.propertyId, name: conv.propertyName, type: reconstructedType, price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, image: '', marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
+          prop = { id: conv.propertyId, name: conv.propertyName, type: reconstructedType, price: reconstructedValue, value: reconstructedValue, neighborhood: '', monthlyIncome: derivedRent, marketTrend: 'stable', condition: 'standard', monthsSinceLastRenovation: 0, yield: reconstructedYield };
         }
         // Phase 3 #2 — preserve the ADVERTISED rent so realised yield rises when
         // we buy under asking; bonus a small "instant equity" cushion when the
