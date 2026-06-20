@@ -530,9 +530,38 @@ export function EstateAgentWindow({
     return { low: Math.floor(marketValue * 0.70), high: Math.floor(marketValue * 0.85), speed: "Every 40-60s" };
   };
 
-  const unlistedProperties = ownedProperties.filter(
-    p => !propertyListings.some(l => l.propertyId === p.id)
+  const unlistedProperties = useMemo(
+    () => ownedProperties.filter(p => !propertyListings.some(l => l.propertyId === p.id)),
+    [ownedProperties, propertyListings],
   );
+
+  // Sorted + sliced Buy-tab list. Identical output to the previous inline pipeline.
+  const sortedBuyProperties = useMemo(() => {
+    return [...affordableProperties].sort((a, b) => {
+      switch (buySort) {
+        case 'price-asc':  return a.value - b.value;
+        case 'price-desc': return b.value - a.value;
+        case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
+        case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
+        case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
+        case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
+      }
+    }).slice(0, 20);
+  }, [affordableProperties, buySort]);
+
+  // Stable handlers for mapped Buy-tab cards.
+  const handleSelectBuyProperty = useCallback((property: Property) => {
+    setSelectedBuyProperty(property);
+    setOfferAmount([property.value]);
+    setVendorResponse(null);
+    setVendorCounterAmount(null);
+    setBuyNegotiationRound(0);
+    setIsVendorThinking(false);
+    setNegotiationHistory([]);
+  }, []);
+
+  const handleSelectCityFilter = useCallback((id: CityId | 'all') => setCityFilter(id), []);
+
 
   const getPropertyById = (propertyId: string) => {
     return ownedProperties.find(p => p.id === propertyId);
