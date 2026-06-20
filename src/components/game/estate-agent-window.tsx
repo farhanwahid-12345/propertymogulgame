@@ -174,38 +174,57 @@ export function EstateAgentWindow({
   const { min: levelMin, max: levelMax } = getLevelRange(level);
 
   // Calculate affordability for each property using credit-score-based LTV
-  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
-  
-  const calculateAffordability = (property: Property) => {
-    // Find the best LTV the player qualifies for, capped by credit score
+  const creditMaxLTV = useMemo(() => getMaxLTVForCreditScore(creditScore), [creditScore]);
+
+  // Combined filtering pipeline (city → level → affordability) — single pass, memoised.
+  const {
+    cityFilteredProperties,
+    levelFilteredProperties,
+    affordableProperties,
+    levelRestrictedCount,
+    unaffordableCount,
+  } = useMemo(() => {
     const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
-    const maxProviderLTV = eligibleProviders.length > 0 
+    const maxProviderLTV = eligibleProviders.length > 0
       ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
       : 0;
     const maxLTV = Math.min(maxProviderLTV, creditMaxLTV);
-    
-    const maxMortgage = property.value * maxLTV;
-    const stampDuty = property.value <= 250000 ? property.value * 0.03 :
-      (250000 * 0.03) + ((property.value - 250000) * 0.08);
-    const fees = 600 + (property.value * 0.01) + stampDuty;
-    const cashNeeded = (property.value - maxMortgage) + fees;
-    
-    return cash >= cashNeeded;
-  };
 
-  // Check if property is within player's level range
-  const isWithinLevelRange = (property: Property) => {
-    return property.value >= levelMin && property.value <= levelMax;
-  };
+    const cityFiltered = cityFilter === 'all'
+      ? availableProperties
+      : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
 
-  // Filter properties by BOTH level range AND affordability AND city
-  const cityFilteredProperties = cityFilter === 'all'
-    ? availableProperties
-    : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
-  const levelFilteredProperties = cityFilteredProperties.filter(isWithinLevelRange);
-  const affordableProperties = levelFilteredProperties.filter(calculateAffordability);
-  const levelRestrictedCount = cityFilteredProperties.length - levelFilteredProperties.length;
-  const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
+    const levelFiltered = cityFiltered.filter(p => p.value >= levelMin && p.value <= levelMax);
+
+    const affordable = levelFiltered.filter(p => {
+      const maxMortgage = p.value * maxLTV;
+      const stampDuty = p.value <= 250000
+        ? p.value * 0.03
+        : (250000 * 0.03) + ((p.value - 250000) * 0.08);
+      const fees = 600 + (p.value * 0.01) + stampDuty;
+      const cashNeeded = (p.value - maxMortgage) + fees;
+      return cash >= cashNeeded;
+    });
+
+    return {
+      cityFilteredProperties: cityFiltered,
+      levelFilteredProperties: levelFiltered,
+      affordableProperties: affordable,
+      levelRestrictedCount: cityFiltered.length - levelFiltered.length,
+      unaffordableCount: levelFiltered.length - affordable.length,
+    };
+  }, [availableProperties, cityFilter, levelMin, levelMax, cash, creditScore, mortgageProviders, creditMaxLTV]);
+
+  // Per-city counts for the city filter buttons.
+  const cityCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of availableProperties) {
+      const city = p.city ?? 'middlesbrough';
+      counts.set(city, (counts.get(city) ?? 0) + 1);
+    }
+    return counts;
+  }, [availableProperties]);
+
 
 
   // Reset negotiation when selecting a new property
