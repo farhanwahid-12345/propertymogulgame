@@ -1300,7 +1300,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Active renovations are capital already spent — include as WIP asset
       const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
       // Furniture as depreciating asset (matches useGameState calc).
-      const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p as any), 0);
+      const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p), 0);
       // Subtract drawn overdraft AND outstanding unsecured loan balances so
       // leveling-up cannot be triggered by borrowed money (item #20).
       const loanDebtForLevel = ((prev.loans || []) as Array<{ remainingBalance?: number }>)
@@ -1907,7 +1907,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const m = finalMortgages.find(mt => mt.propertyId === p.id);
         return t + p.value - (m?.remainingBalance || 0);
       }, 0);
-      const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p as any), 0);
+      const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p), 0);
       // Subtract outstanding unsecured loan balances so the bankruptcy gate
       // reflects ALL debt the player owes (item #20).
       const loanDebtFinal = updatedLoans.reduce((s, l) => s + (l.remainingBalance || 0), 0);
