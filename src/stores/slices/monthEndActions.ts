@@ -31,12 +31,13 @@ import { showToast, debit, credit } from '../storeHelpers';
 import { evaluateAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import { mergeConcernsById } from '../sanitizers';
 import type {
-  Property, Mortgage, Conveyancing, TenantEvent, VoidPeriod, DepositDispute,
+  GameState, Property, Mortgage, Conveyancing, TenantEvent, VoidPeriod, DepositDispute,
   PendingEviction, PropertyLock, EvictionGround, MacroEconomicEvent,
+  PropertyTenant, PendingRentReview, PendingLeaseRenewal, DebtRecoveryCase,
 } from '@/types/game';
 
-type SetFn = (partial: any) => void;
-type GetFn = () => any;
+type SetFn = (partial: Partial<GameState> | ((s: GameState) => Partial<GameState>)) => void;
+type GetFn = () => GameState;
 
 export function createMonthEndActions(set: SetFn, get: GetFn) {
   return {
@@ -92,7 +93,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newMortgages = [...prev.mortgages];
       let newEstateAgent = [...prev.estateAgentProperties];
       let newAuction = [...prev.auctionProperties];
-      const transferredSittingTenants: any[] = [];
+      const transferredSittingTenants: PropertyTenant[] = [];
 
       completedBuys.forEach(conv => {
         // Find the property from market lists
@@ -132,12 +133,12 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Phase 1 — commercial properties complete vacant unless a sitting tenant
         // + lease was attached to the listing (Phase 3 — tenanted commercial buys).
         const isCommercial = prop.type === 'commercial';
-        const inheritedLease = isCommercial ? (prop as any).commercialLease : undefined;
-        const inheritedSittingTenant = isCommercial ? (prop as any).sittingTenant : undefined;
+        const inheritedLease = isCommercial ? prop.commercialLease : undefined;
+        const inheritedSittingTenant = isCommercial ? prop.sittingTenant : undefined;
         const hasSittingTenant = !!(inheritedLease && inheritedSittingTenant);
         // When a sitting tenant transfers, rewrite the lease's start/expiry months
         // so the remaining term matches the current game month.
-        let transferredLease: any = undefined;
+        let transferredLease: NonNullable<Property['commercialLease']> | undefined = undefined;
         if (hasSittingTenant) {
           const placeholderStart = inheritedLease.startMonth ?? 0;
           const placeholderExpiry = inheritedLease.expiryMonth ?? inheritedLease.termMonths;
@@ -165,7 +166,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           monthlyIncome: purchasedMonthlyIncome,
           lastRentIncrease: newMonthNumber, baseRent: purchasedMonthlyIncome,
           // Item 9 — explicitly carry EPC from the listing (fallback 'D' for legacy listings without one).
-          epcRating: (prop as any).epcRating ?? 'D',
+          epcRating: prop.epcRating ?? 'D',
           ...(useClassInit ? { useClass: useClassInit } : {}),
           // Commercial: preserve transferred lease if present; otherwise vacant.
           ...(isCommercial ? { commercialLease: transferredLease } : {}),
@@ -220,7 +221,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newVoidPeriods = [...prev.voidPeriods];
       let newPropertyListings = [...prev.propertyListings];
       // Phase 4 (v5 statements) — accumulate CGT realised this tax year.
-      let cgtThisYearAcc = (prev as any).cgtThisYearPennies ?? 0;
+      let cgtThisYearAcc = prev.cgtThisYearPennies ?? 0;
       const cgtRecordsThisRun: import('@/types/game').TaxRecord[] = [];
 
 
@@ -315,10 +316,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         let monthlyP: number;
         if (prop?.type === 'commercial') {
           // Phase 5 — covenant-driven reliability for commercial tenants.
-          const cov = (t.tenant as any).covenantStrength ?? 50;
+          const cov = t.tenant.covenantStrength ?? 50;
           monthlyP = Math.min(0.15, Math.max(0.001, ((100 - cov) / 100) * 0.15));
         } else {
-          const risk = (t.tenant as any).defaultRisk ?? 5;
+          const risk = t.tenant.defaultRisk ?? 5;
           // Phase 5 #12 — risky tenants miss rent ~20%/mo (≈ 2–3 times/yr).
           const isHighRisk = t.tenant.profile === 'risky' || risk >= 30;
           const baseP = Math.min(0.25, Math.max(0.002, (risk / 100) * 0.4));
@@ -439,7 +440,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Phase 7 #17 — banded council tax by city/value; 50% discount only inside the void window.
         return total + computeMonthlyCouncilTaxPennies({
           valuePounds: Math.round((property.value || 0) / 100),
-          city: (property as any).city,
+          city: property.city,
           isOccupied: hasTenant,
           isInVoidDiscountWindow: !hasTenant && isInVoid,
         });
@@ -451,7 +452,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Phase 6 — FRI commercial leases: the "I" stands for Insuring, so the
       // tenant carries buildings insurance. Exclude those from landlord accrual.
       const monthlyInsuranceAccrual = newOwnedProperties.reduce((total, property) => {
-        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return total;
+        if (property.type === 'commercial' && property.commercialLease?.fri === true) return total;
         return total + Math.floor((property.value * 0.004) / 12);
       }, 0);
       const insurance = monthlyInsuranceAccrual; // kept for accrual/projection only
@@ -602,7 +603,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const newMonthsSince = (p.monthsSinceLastRenovation || 0) + 1;
         // Phase 6 — under an active FRI commercial lease, maintenance and condition
         // are the tenant's responsibility. Landlord-side decay is suspended.
-        const friActive = p.type === 'commercial' && (p as any).commercialLease?.fri === true;
+        const friActive = p.type === 'commercial' && p.commercialLease?.fri === true;
         if (friActive) {
           return { ...p, monthsSinceLastRenovation: newMonthsSince };
         }
@@ -642,8 +643,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Phase 4 #21: gate passive recovery when an open concern exists for the property.
       const openConcernPropertyIds = new Set(
         (prev.tenantConcerns || [])
-          .filter((c: any) => !c.resolvedMonth)
-          .map((c: any) => c.propertyId),
+          .filter((c) => !c.resolvedMonth)
+          .map((c) => c.propertyId),
       );
       let satisfactionAdjustedTenants = newTenants.map(t => {
         const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
@@ -712,7 +713,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Both paths refund deposit (with damage retention if property is poor/dilapidated)
       // and raise a TDS dispute if anything is withheld — same flow as eviction completion.
       const earlyExitVoids: VoidPeriod[] = [];
-      const newTenantHistory: import('@/types/game').TenantDeparture[] = [...((prev as any).tenantHistory || [])];
+      const newTenantHistory: import('@/types/game').TenantDeparture[] = [...(prev.tenantHistory || [])];
       let walkoutDepositRefund = 0;
       const walkoutDisputes: DepositDispute[] = [];
       // (reputationDelta/reputationLogEntries declared earlier — see "// ── Reputation buffer ──")
@@ -779,7 +780,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // drops under 25 and we haven't already warned about them recently.
       newTenants = newTenants.map(t => {
         if (t.satisfaction >= 25 || t.satisfaction <= 0) return t;
-        const lastWarn = (t as any).lastWalkoutWarningMonth ?? -Infinity;
+        const lastWarn = t.lastWalkoutWarningMonth ?? -Infinity;
         if (newMonthNumber - lastWarn < 3) return t;
         const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
         showToast(
@@ -787,7 +788,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           `${t.tenant.name}${property ? ` at ${property.name}` : ''} is critically unhappy (satisfaction ${Math.round(t.satisfaction)}). Address concerns or they may walk.`,
           "destructive",
         );
-        return { ...t, lastWalkoutWarningMonth: newMonthNumber } as any;
+        return { ...t, lastWalkoutWarningMonth: newMonthNumber };
       });
 
       // ── Tenant concerns: monthly generation + satisfaction decay + auto-resolution ──
@@ -813,8 +814,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // feed filters them out, which produced phantom toast notifications.
       const inConveyancingIds = new Set(
         (prev.conveyancing || [])
-          .filter((c: any) => c.status === 'selling' || c.status === 'buying')
-          .map((c: any) => c.propertyId)
+          .filter((c) => c.status === 'selling' || c.status === 'buying')
+          .map((c) => c.propertyId)
       );
       const ownedIdsForConcerns = new Set(updatedOwnedProperties.map(p => p.id));
 
@@ -826,7 +827,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         if ((existingActiveByProp.get(t.propertyId) || 0) >= 2) return;
         // Phase 6 — FRI commercial leases: tenant handles all maintenance, so the
         // landlord never sees concerns/repair bills from leased commercial units.
-        if (property.type === 'commercial' && (property as any).commercialLease?.fri === true) return;
+        if (property.type === 'commercial' && property.commercialLease?.fri === true) return;
 
         const conditionScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
         let chance = 0.035;
@@ -861,7 +862,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         newConcerns.push({
           id: concernId,
           propertyId: t.propertyId,
-          tenantProfile: t.tenant.profile as any,
+          tenantProfile: t.tenant.profile,
           category: tpl.category,
           description: desc,
           raisedMonth: newMonthNumber,
@@ -876,7 +877,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
             propertyId: property.id,
             propertyName: property.name,
             tenantName: t.tenant.name,
-            city: (property as any).city,
+            city: property.city,
             concernCategory: tpl.category,
             description: desc,
             month: newMonthNumber,
@@ -914,7 +915,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         newConcerns.push({
           id: `mees_${newMonthNumber}_${property.id}_${gameRandom().toString(36).slice(2, 6)}`,
           propertyId: property.id,
-          tenantProfile: t.tenant.profile as any,
+          tenantProfile: t.tenant.profile,
           category: 'safety',
           description: `EPC ${epc} — illegal to let under ${standardLabel}. Upgrade or face fines.`,
           raisedMonth: newMonthNumber,
@@ -937,7 +938,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           newConcerns.push({
             id: `mees2030_warn_${newMonthNumber}_${property.id}`,
             propertyId: property.id,
-            tenantProfile: t.tenant.profile as any,
+            tenantProfile: t.tenant.profile,
             category: 'safety',
             description: `EPC ${epc} — lettings ban from 2030 (${MEES_2030_MONTH - newMonthNumber}mo). Plan an EPC upgrade.`,
             raisedMonth: newMonthNumber,
@@ -960,16 +961,16 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // covenantStrength. Interested ⇒ queue a pendingLeaseRenewal HoT. Not
       // interested ⇒ stamp endingAtExpiry so the lease terminates on expiryMonth.
       const existingRenewalsByProp = new Set<string>(
-        ((prev as any).pendingLeaseRenewals || []).map((r: any) => r.propertyId),
+        (prev.pendingLeaseRenewals || []).map((r) => r.propertyId),
       );
-      const newlyQueuedRenewals: any[] = [];
+      const newlyQueuedRenewals: PendingLeaseRenewal[] = [];
       updatedOwnedProperties = updatedOwnedProperties.map(p => {
         const lease = p.commercialLease;
         if (!lease || p.type !== 'commercial') return p;
         const monthsToExpiry = lease.expiryMonth - newMonthNumber;
         if (monthsToExpiry === 6 && lease.renewalWarnedMonth !== newMonthNumber) {
           const tenantRec = newTenants.find(t => t.propertyId === p.id);
-          const covenant = (tenantRec?.tenant as any)?.covenantStrength ?? 50;
+          const covenant = tenantRec?.tenant?.covenantStrength ?? 50;
           // P(interested) = clamp(0.3 + covenant/200, 0.3, 0.85)
           const interestedP = Math.min(0.85, Math.max(0.3, 0.3 + covenant / 200));
           const interested = gameRandom() < interestedP;
@@ -1022,7 +1023,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           : 0;
         if (dilapsPennies > 0) {
           dilapidationsRecovered += dilapsPennies;
-          const companyName = (tenantRec?.tenant as any)?.companyName ?? tenantRec?.tenant?.name ?? 'former tenant';
+          const companyName = tenantRec?.tenant?.companyName ?? tenantRec?.tenant?.name ?? 'former tenant';
           showToast(
             "Dilapidations Recovered 💷",
             `£${fromPennies(dilapsPennies).toLocaleString()} recovered from ${companyName} for condition restoration at ${p.name}.`,
@@ -1039,7 +1040,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
             id: `dep_${p.id}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
             propertyId: p.id,
             propertyName: p.name,
-            tenantName: (tenantRec.tenant as any)?.companyName ?? tenantRec.tenant?.name ?? 'Commercial tenant',
+            tenantName: tenantRec.tenant?.companyName ?? tenantRec.tenant?.name ?? 'Commercial tenant',
             reason: 'end_of_tenancy',
             month: newMonthNumber,
             detail: dilapsPennies > 0
@@ -1225,8 +1226,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           if (app.approved) {
             // Phase 6 #15 — bake the sqft uplift into the property at approval so the
             // displayed footprint doesn't dip back down while works are underway.
-            const sqftAdded = (app as any).sqftAdded as number | undefined;
-            let sqftAppliedAtPlanning = (app as any).sqftAppliedAtPlanning === true;
+            const sqftAdded = app.sqftAdded as number | undefined;
+            let sqftAppliedAtPlanning = app.sqftAppliedAtPlanning === true;
             if (sqftAdded && sqftAdded > 0 && !sqftAppliedAtPlanning) {
               const idx = updatedOwnedProperties.findIndex(p => p.id === app.propertyId);
               if (idx >= 0) {
@@ -1272,7 +1273,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Drop refused applications only after the player has acknowledged them
       // via the refusal dialog (id removed from pendingPlanningRefusals).
       const refusalQueue = new Set<string>([
-        ...((prev as any).pendingPlanningRefusals || []),
+        ...(prev.pendingPlanningRefusals || []),
         ...newlyRefusedPlanningIds,
       ]);
       newPlanningApplications = newPlanningApplications.filter(app => {
@@ -1299,10 +1300,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Active renovations are capital already spent — include as WIP asset
       const renovationWIP = prev.renovations.reduce((sum, r) => sum + toPennies(r.type?.cost || 0), 0);
       // Furniture as depreciating asset (matches useGameState calc).
-      const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p as any), 0);
+      const furnitureWorth = updatedOwnedProperties.reduce((sum, p) => sum + getFurnitureValuePennies(p), 0);
       // Subtract drawn overdraft AND outstanding unsecured loan balances so
       // leveling-up cannot be triggered by borrowed money (item #20).
-      const loanDebtForLevel = (((prev as any).loans || []) as Array<{ remainingBalance?: number }>)
+      const loanDebtForLevel = ((prev.loans || []) as Array<{ remainingBalance?: number }>)
         .reduce((s, l) => s + (l.remainingBalance || 0), 0);
       const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth
         - prev.overdraftUsed - loanDebtForLevel;
@@ -1322,10 +1323,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Phase 5 — commercial properties with an active FRI lease are valued on
         // an income-cap basis (annual rent ÷ implied yield). Stronger covenant
         // and longer remaining term compress the yield → higher value.
-        const lease = (property as any).commercialLease;
+        const lease = property.commercialLease;
         if (property.type === 'commercial' && lease) {
           const tenantRec = newTenants.find(t => t.propertyId === property.id);
-          const cov = (tenantRec?.tenant as any)?.covenantStrength ?? 50;
+          const cov = tenantRec?.tenant?.covenantStrength ?? 50;
           const remainingMonths = Math.max(0, (lease.expiryMonth ?? 0) - newMonthNumber);
           const rawYield = 0.10 - (cov / 1000) - (remainingMonths / 6000);
           const impliedYield = Math.min(0.12, Math.max(0.05, rawYield));
@@ -1384,14 +1385,14 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // queue a `pendingRentReview` so the player can negotiate the new rent via
       // Heads of Terms (review mode). NO auto-uplift is applied any more.
       const existingPendingByProp = new Map<string, any>();
-      for (const r of ((prev as any).pendingRentReviews || [])) {
+      for (const r of (prev.pendingRentReviews || [])) {
         existingPendingByProp.set(r.propertyId, r);
       }
-      const newlyQueuedReviews: any[] = [];
+      const newlyQueuedReviews: PendingRentReview[] = [];
       newTenants.forEach(t => {
         const property = updatedOwnedProperties.find(p => p.id === t.propertyId);
         if (!property || property.type !== 'commercial') return;
-        const lease = (property as any).commercialLease;
+        const lease = property.commercialLease;
         const freq = (lease && typeof lease.reviewFrequencyMonths === 'number' && lease.reviewFrequencyMonths > 0)
           ? lease.reviewFrequencyMonths
           : 36;
@@ -1426,7 +1427,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       newTenants = newTenants.map(t => {
         const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
         const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
-        const rentPennies = (t as any).rentPennies || (prop?.monthlyIncome ?? 0);
+        const rentPennies = t.rentPennies || (prop?.monthlyIncome ?? 0);
         if (missedTenantKeys.has(key)) {
           const lastToast = t.lastDefaultToastMonth ?? -999;
           const stamped = newMonthNumber - lastToast >= 3 ? newMonthNumber : (t.lastDefaultToastMonth ?? 0);
@@ -1474,9 +1475,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let lastCorpTaxMonth = prev.lastCorporationTaxMonth;
       let newTaxRecords = [...prev.taxRecords, ...cgtRecordsThisRun];
       let newTotalTaxPaid = prev.totalTaxPaid;
-      let newUnusedLosses = (prev as any).unusedLosses ?? 0;
-      let newLossesApplied = (prev as any).lossesAppliedThisYear ?? 0;
-      let newLossesGenerated = (prev as any).lossesGeneratedThisYear ?? 0;
+      let newUnusedLosses = prev.unusedLosses ?? 0;
+      let newLossesApplied = prev.lossesAppliedThisYear ?? 0;
+      let newLossesGenerated = prev.lossesGeneratedThisYear ?? 0;
       // Phase 4 (v5 statements) — populated when an annual tax year closes below.
       let newAnnualAccountRecord: import('@/types/game').AnnualAccountRecord | null = null;
       let netProfitBeforeTaxForRecord = 0;
@@ -1590,13 +1591,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newPendingTransactions: import('@/types/game').PendingTransaction[] = [];
 
       // v3 #2 — Annual landlord insurance. Bill once every 12 months and warn one month ahead.
-      const nextInsuranceDueMonth = (prev as any).nextInsuranceDueMonth ?? 12;
-      const lastInsuranceWarnedMonth = (prev as any).lastInsuranceWarnedMonth ?? -1;
+      const nextInsuranceDueMonth = prev.nextInsuranceDueMonth ?? 12;
+      const lastInsuranceWarnedMonth = prev.lastInsuranceWarnedMonth ?? -1;
       let updatedNextInsuranceDueMonth = nextInsuranceDueMonth;
       let updatedLastInsuranceWarnedMonth = lastInsuranceWarnedMonth;
       const annualInsurancePennies = newOwnedProperties.reduce(
         (t, p) => {
-          if (p.type === 'commercial' && (p as any).commercialLease?.fri === true) return t;
+          if (p.type === 'commercial' && p.commercialLease?.fri === true) return t;
           return t + Math.floor(p.value * 0.004);
         },
         0,
@@ -1767,9 +1768,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       }
 
       // ── Loans amortisation (personal/business/investor) ──
-      const allPrevLoans: import('@/types/game').Loan[] = ((prev as any).loans || []);
-      const prevLoans = allPrevLoans.filter((l: any) => l.kind !== 'bridging');
-      const prevBridges = allPrevLoans.filter((l: any) => l.kind === 'bridging');
+      const allPrevLoans: import('@/types/game').Loan[] = (prev.loans || []);
+      const prevLoans = allPrevLoans.filter((l) => l.kind !== 'bridging');
+      const prevBridges = allPrevLoans.filter((l) => l.kind === 'bridging');
       const updatedLoans: import('@/types/game').Loan[] = [];
       // Phase 7 #18 — track loans repaid this month for the loyalty discount.
       const loanPayoffsThisMonth: Array<{ id: string; kind: 'personal'|'business'|'investor'|'bridging'; repaidOnSchedule: boolean; month: number }> = [];
@@ -1787,7 +1788,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           if (newStreak > 0 && newStreak % 12 === 0) creditAdj += 5;
           if (newBal <= 0) {
             const repaidOnSchedule = l.lastMissedMonth === undefined;
-            loanPayoffsThisMonth.push({ id: l.id, kind: l.kind as any, repaidOnSchedule, month: newMonthNumber });
+            loanPayoffsThisMonth.push({ id: l.id, kind: l.kind, repaidOnSchedule, month: newMonthNumber });
             newPayoffEvents.push({
               id: `payoff-loan-${l.id}-${newMonthNumber}`,
               kind: 'loan',
@@ -1906,7 +1907,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const m = finalMortgages.find(mt => mt.propertyId === p.id);
         return t + p.value - (m?.remainingBalance || 0);
       }, 0);
-      const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p as any), 0);
+      const furnitureWorthFinal = updatedOwnedProperties.reduce((s, p) => s + getFurnitureValuePennies(p), 0);
       // Subtract outstanding unsecured loan balances so the bankruptcy gate
       // reflects ALL debt the player owes (item #20).
       const loanDebtFinal = updatedLoans.reduce((s, l) => s + (l.remainingBalance || 0), 0);
@@ -1915,8 +1916,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let isBankrupt = false;
       // Phase 7 #16 — overdraft prompt: fires once at the start of a fresh distress
       // episode when the player has no overdraft and is eligible (creditScore > 580).
-      let newOverdraftPrompt: { eligibleLimit: number; month: number } | null = (prev as any).pendingOverdraftPrompt ?? null;
-      let newOverdraftPromptedMonth: number = (prev as any).overdraftPromptedMonth ?? -999;
+      let newOverdraftPrompt: { eligibleLimit: number; month: number } | null = prev.pendingOverdraftPrompt ?? null;
+      let newOverdraftPromptedMonth: number = prev.overdraftPromptedMonth ?? -999;
       if (inDistress) {
         const months = (newArrears?.monthsBehind ?? 0) + 1;
         if (!newArrears) {
@@ -1963,7 +1964,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         isBankrupt = true;
       }
       // Phase 7 #16 — snapshot at the moment of bankruptcy for the end-game modal.
-      let newBankruptcySummary = (prev as any).bankruptcySummary ?? null;
+      let newBankruptcySummary = prev.bankruptcySummary ?? null;
       if (isBankrupt && !prev.isBankrupt) {
         const totalDebt = loanDebtFinal
           + finalMortgages.reduce((s, m) => s + (m.remainingBalance || 0), 0)
@@ -1978,8 +1979,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       }
 
       // ── Tax projection warning — fire one month before April collection ──
-      let newProjectedTaxPennies = (prev as any).projectedTaxPennies ?? 0;
-      let newProjectedTaxStampedMonth = (prev as any).projectedTaxStampedMonth ?? 0;
+      let newProjectedTaxPennies = prev.projectedTaxPennies ?? 0;
+      let newProjectedTaxStampedMonth = prev.projectedTaxStampedMonth ?? 0;
       const monthIdx = newMonthNumber % 12;
       if (monthIdx === 2 && currentTaxYear > lastTaxYear && finalYearlyGrossRent > 0) {
         const projected = projectAnnualTax(
@@ -2009,11 +2010,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       }
 
       // ── Debt-recovery case resolution ──
-      const prevCases = ((prev as any).debtRecoveryCases || []) as import('@/types/game').DebtRecoveryCase[];
+      const prevCases = (prev.debtRecoveryCases || []) as import('@/types/game').DebtRecoveryCase[];
       const resolvedCases: import('@/types/game').DebtRecoveryCase[] = [];
       const updatedCases = prevCases.map(c => {
         if (c.status !== 'in_court' || newMonthNumber < c.resolveMonth) return c;
-        const predetermined = ((c as any)._predeterminedStatus || 'recovered') as 'recovered' | 'partial' | 'unrecoverable';
+        const predetermined = ((c as DebtRecoveryCase & { _predeterminedStatus?: 'recovered' | 'partial' | 'unrecoverable' })._predeterminedStatus || 'recovered');
         let recoveredGross = 0;
         if (predetermined === 'recovered') recoveredGross = c.originalArrearsPennies;
         else if (predetermined === 'partial') recoveredGross = Math.floor(c.originalArrearsPennies * (0.3 + gameRandom() * 0.4));
@@ -2031,7 +2032,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           showToast(
             predetermined === 'recovered' ? "⚖️ Debt recovered" : "⚖️ Partial recovery",
             `Recovered £${fromPennies(net).toLocaleString()} from ${c.tenantName} (after 25% agency fee).`,
-            'success' as any,
+            'success',
           );
         }
         return updated;
@@ -2045,7 +2046,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const credited = credit({ cash: finalCash, overdraftUsed: finalOverdraftUsed }, recovered);
           finalCash = credited.cash;
           finalOverdraftUsed = credited.overdraftUsed;
-          showToast("⚖️ HCE Recovered", `High Court Enforcement recovered £${fromPennies(recovered).toLocaleString()} from ${c.tenantName}.`, 'success' as any);
+          showToast("⚖️ HCE Recovered", `High Court Enforcement recovered £${fromPennies(recovered).toLocaleString()} from ${c.tenantName}.`, 'success');
         } else {
           showToast("⚖️ HCE Unsuccessful", `HCE could not recover the residual debt from ${c.tenantName}.`, "destructive");
         }
@@ -2124,71 +2125,71 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         depositDisputes: newDepositDisputes,
         planningApplications: newPlanningApplications,
         pendingPlanningCelebrations: [
-          ...((s as any).pendingPlanningCelebrations || []),
+          ...(s.pendingPlanningCelebrations || []),
           ...newlyApprovedPlanningIds,
         ],
         pendingPlanningRefusals: [
-          ...((s as any).pendingPlanningRefusals || []),
+          ...(s.pendingPlanningRefusals || []),
           ...newlyRefusedPlanningIds,
         ],
         tenantHistory: newTenantHistory.slice(-100),
         loans: updatedLoans,
         landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
-        reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries].slice(-40),
+        reputationLog: [...(prev.reputationLog || []), ...reputationLogEntries].slice(-40),
         opsFlashAt: opsFlashAtNew,
         debtRecoveryCases: trimmedCases,
         // Phase 5 #14 — persist this month's defaults so eviction checks (recentDefaults < 2) actually pass.
         tenantEvents: [...prev.tenantEvents, ...newDefaultEvents].slice(-24),
         // Phase 5 #12 — append new ASB police letters for the in-game dialog.
         pendingPoliceLetters: newPoliceLetters.length > 0
-          ? [...(((s as any).pendingPoliceLetters) || []), ...newPoliceLetters]
-          : ((s as any).pendingPoliceLetters || []),
+          ? [...((s.pendingPoliceLetters) || []), ...newPoliceLetters]
+          : (s.pendingPoliceLetters || []),
         // Phase 5 #13 — surface case resolutions as a pop-up.
         pendingCourtResolutions: resolvedCases.length > 0
-          ? [...(((s as any).pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
-          : ((s as any).pendingCourtResolutions || []),
+          ? [...((s.pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
+          : (s.pendingCourtResolutions || []),
         // Phase 7 #16 — overdraft prompt + bankruptcy snapshot
         pendingOverdraftPrompt: newOverdraftPrompt,
         overdraftPromptedMonth: newOverdraftPromptedMonth,
         bankruptcySummary: newBankruptcySummary,
         // Phase 7 #18 — track repaid loans for investor loyalty discount.
         loanPayoffHistory: [
-          ...(((s as any).loanPayoffHistory) || []),
+          ...((s.loanPayoffHistory) || []),
           ...loanPayoffsThisMonth,
         ].slice(-50),
         projectedTaxPennies: newProjectedTaxPennies,
         projectedTaxStampedMonth: newProjectedTaxStampedMonth,
         pendingTransactions: [
-          ...((s as any).pendingTransactions || []),
+          ...(s.pendingTransactions || []),
           ...newPendingTransactions,
         ],
         nextInsuranceDueMonth: updatedNextInsuranceDueMonth,
         lastInsuranceWarnedMonth: updatedLastInsuranceWarnedMonth,
         payoffEvents: newPayoffEvents.length > 0
-          ? [...(((s as any).payoffEvents) || []), ...newPayoffEvents]
-          : ((s as any).payoffEvents || []),
+          ? [...((s.payoffEvents) || []), ...newPayoffEvents]
+          : (s.payoffEvents || []),
         // Item #10 + Phase 3 #5 + v3 #4 + Phase 4 #20: pending debits,
         // chain-collapse events, payoff acknowledgements, planning decisions,
         // and macro-economic event pop-ups all auto-pause the clock until
         // the player dismisses them.
         isPaused:
-          (((s as any).pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
+          ((s.pendingTransactions?.length || 0) + newPendingTransactions.length > 0)
           || newChainCollapseEvents.length > 0
           || newPayoffEvents.length > 0
-          || (((s as any).payoffEvents?.length) || 0) > 0
+          || ((s.payoffEvents?.length) || 0) > 0
           || newlyApprovedPlanningIds.length > 0
           || newlyRefusedPlanningIds.length > 0
-          || (((s as any).pendingPlanningCelebrations?.length) || 0) > 0
-          || (((s as any).pendingPlanningRefusals?.length) || 0) > 0
+          || ((s.pendingPlanningCelebrations?.length) || 0) > 0
+          || ((s.pendingPlanningRefusals?.length) || 0) > 0
           || economicEvents.length !== prev.economicEvents.length
           || (economicEvents.length > 0 && economicEvents[economicEvents.length - 1]?.month === newMonthNumber)
             ? true
             : s.isPaused,
         // Phase 3 #4 — stamp goal achievement once net worth crosses the target.
         goalAchievedAt: (() => {
-          const existing = (s as any).goalAchievedAt;
+          const existing = s.goalAchievedAt;
           if (typeof existing === 'number' && existing > 0) return existing;
-          const target = ((s as any).goalTarget ?? 0) as number;
+          const target = (s.goalTarget ?? 0) as number;
           if (target > 0 && netWorthFinal >= target) {
             showToast("🏆 Goal Reached!", `You hit £${fromPennies(target).toLocaleString()} net worth. Set a new target or keep building.`);
             return newMonthNumber;
@@ -2197,7 +2198,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         })(),
         // Phase 2 (v5) — append performance snapshot (cap last 60).
         monthlySnapshots: [
-          ...(((s as any).monthlySnapshots) || []),
+          ...((s.monthlySnapshots) || []),
           {
             month: newMonthNumber,
             netWorth: netWorthFinal,
@@ -2209,9 +2210,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         ].slice(-60),
         // Phase 4 (v5) — evaluate achievements against the new state snapshot.
         achievements: (() => {
-          const prevUnlocked = (s as any).achievements || {};
-          const existingGoal = (s as any).goalAchievedAt;
-          const goalTarget = ((s as any).goalTarget ?? 0) as number;
+          const prevUnlocked = s.achievements || {};
+          const existingGoal = s.goalAchievedAt;
+          const goalTarget = (s.goalTarget ?? 0) as number;
           const goalAchievedAtSnapshot =
             (typeof existingGoal === 'number' && existingGoal > 0)
               ? existingGoal
@@ -2224,8 +2225,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
               planningApplications: newPlanningApplications,
               goalAchievedAt: goalAchievedAtSnapshot,
               landlordReputation: Math.max(0, Math.min(100, (prev.landlordReputation ?? 50) + reputationDelta)),
-              reputationLog: [...((prev as any).reputationLog || []), ...reputationLogEntries],
-            } as any,
+              reputationLog: [...(prev.reputationLog || []), ...reputationLogEntries],
+            },
             newMonthNumber,
             netWorthFinal,
           );
@@ -2237,7 +2238,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         })(),
         // Phase 4 (v5 statements) — append the just-closed annual account.
         annualAccounts: (() => {
-          const existing = ((s as any).annualAccounts as import('@/types/game').AnnualAccountRecord[] | undefined) || [];
+          const existing = (s.annualAccounts as import('@/types/game').AnnualAccountRecord[] | undefined) || [];
           if (!newAnnualAccountRecord) return existing;
           const propertyValueAtYearEnd = updatedOwnedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
           const mortgageDebtAtYearEnd = finalMortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
@@ -2256,15 +2257,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         })(),
         cgtThisYearPennies: cgtThisYearAcc,
         pendingRentReviews: newlyQueuedReviews.length > 0
-          ? [...(((s as any).pendingRentReviews) || []), ...newlyQueuedReviews]
-          : ((s as any).pendingRentReviews || []),
+          ? [...((s.pendingRentReviews) || []), ...newlyQueuedReviews]
+          : (s.pendingRentReviews || []),
         pendingLeaseRenewals: newlyQueuedRenewals.length > 0
-          ? [...(((s as any).pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
-          : ((s as any).pendingLeaseRenewals || []),
+          ? [...((s.pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
+          : (s.pendingLeaseRenewals || []),
 
 
 
-      } as any));
+      }));
     },
   };
 }

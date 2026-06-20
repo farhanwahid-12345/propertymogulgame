@@ -6,8 +6,10 @@
  * unchanged. Cross-slice reads via `get()` only.
  */
 import type {
+  GameState,
   PropertyTenant, EvictionGround, PendingEviction,
 } from '@/types/game';
+import type { Tenant } from '@/components/game/tenant-selector';
 import { fromPennies, toPennies } from '@/lib/formatCurrency';
 import { calcTenantRent } from '@/lib/tenantRent';
 import { gameRandom } from '@/lib/rng';
@@ -45,19 +47,19 @@ import {
   scoreFromConditionTier,
 } from '@/lib/engine/constants';
 
-type SetFn = (partial: any) => void;
-type GetFn = () => any;
+type SetFn = (partial: Partial<GameState> | ((s: GameState) => Partial<GameState>)) => void;
+type GetFn = () => GameState;
 
 export function createTenantActions(set: SetFn, get: GetFn) {
   return {
-    selectTenant: (propertyId: string, tenant: any, slotIndex: number = 0) => {
+    selectTenant: (propertyId: string, tenant: Tenant, slotIndex: number = 0) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property) return;
-      if (prev.conveyancing.some((c: any) => c.propertyId === propertyId)) {
+      if (prev.conveyancing.some((c) => c.propertyId === propertyId)) {
         showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
       }
-      const activeReno = (prev.renovations || []).find((r: any) => {
+      const activeReno = (prev.renovations || []).find((r) => {
         if (r.propertyId !== propertyId) return false;
         if (typeof r.completionMonth === 'number') return prev.monthsPlayed < r.completionMonth;
         return Date.now() < r.completionDate;
@@ -70,12 +72,12 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         );
         return;
       }
-      const releLock = prev.propertyLocks.find((l: any) => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex));
+      const releLock = prev.propertyLocks.find((l) => l.propertyId === propertyId && l.reason === 'relet_lock' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex));
       if (releLock) {
         showToast("Re-let Locked", `You evicted on 'move-in' grounds. Cannot re-let this slot until month ${releLock.untilMonth}.`, "destructive");
         return;
       }
-      const saleLock = prev.propertyLocks.find((l: any) => l.propertyId === propertyId && l.reason === 'sale_lock' && prev.monthsPlayed < l.untilMonth);
+      const saleLock = prev.propertyLocks.find((l) => l.propertyId === propertyId && l.reason === 'sale_lock' && prev.monthsPlayed < l.untilMonth);
       if (saleLock) {
         showToast(
           "Sale Lock Active",
@@ -103,7 +105,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const unitCount = isMultiUnit ? Math.max(1, property.subtypeUnits || 1) : 1;
       const safeSlot = Math.max(0, Math.min(unitCount - 1, slotIndex));
 
-      if (prev.tenants.some((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === safeSlot)) {
+      if (prev.tenants.some((t) => t.propertyId === propertyId && (t.slotIndex ?? 0) === safeSlot)) {
         showToast(
           "Slot Occupied",
           isMultiUnit
@@ -137,7 +139,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
       const requiredDeposit = calcDeposit(slotRent);
 
-      const updatedVoids = prev.voidPeriods.filter((vp: any) => vp.propertyId !== propertyId);
+      const updatedVoids = prev.voidPeriods.filter((vp) => vp.propertyId !== propertyId);
       const rec: PropertyTenant = {
         propertyId,
         slotIndex: safeSlot,
@@ -155,11 +157,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
       const newMonthlyIncome = isMultiUnit
         ? updatedTenants
-            .filter((t: any) => t.propertyId === propertyId)
-            .reduce((sum: number, t: any) => sum + (t.rentPennies ?? 0), 0)
+            .filter((t) => t.propertyId === propertyId)
+            .reduce((sum: number, t) => sum + (t.rentPennies ?? 0), 0)
         : slotRent;
 
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId ? { ...p, monthlyIncome: newMonthlyIncome, baseRent: propertyBaseRent, lastTenantChange: prev.monthsPlayed, lastRentIncrease: prev.monthsPlayed } : p
       );
       const slotLabel = isMultiUnit ? ` (${property.subtype === 'flats' ? 'Flat' : 'Room'} ${safeSlot + 1})` : '';
@@ -173,7 +175,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     // Phase 2 — Heads of Terms: sign a commercial lease at agreed terms.
     signCommercialLease: (
       propertyId: string,
-      tenant: any,
+      tenant: Tenant,
       terms: {
         agreedRentPennies: number;
         termMonths: number;
@@ -182,15 +184,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       },
     ) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property) return;
       if (property.type !== 'commercial') {
         showToast("Not Commercial", "Heads of Terms only apply to commercial property.", "destructive"); return;
       }
-      if (prev.conveyancing.some((c: any) => c.propertyId === propertyId)) {
+      if (prev.conveyancing.some((c) => c.propertyId === propertyId)) {
         showToast("In Conveyancing", "Cannot sign a lease during conveyancing.", "destructive"); return;
       }
-      if (prev.tenants.some((t: any) => t.propertyId === propertyId)) {
+      if (prev.tenants.some((t) => t.propertyId === propertyId)) {
         showToast("Already Let", "This unit already has a tenant in place.", "destructive"); return;
       }
 
@@ -238,8 +240,8 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         rentPennies: agreedRent,
       };
       const updatedTenants = [...prev.tenants, rec];
-      const updatedVoids = prev.voidPeriods.filter((vp: any) => vp.propertyId !== propertyId);
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedVoids = prev.voidPeriods.filter((vp) => vp.propertyId !== propertyId);
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId
           ? {
               ...p,
@@ -269,17 +271,17 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     // Phase 3 — settle a pending commercial rent review at the agreed rent.
     settleRentReview: (propertyId: string, agreedRentPennies: number) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property || property.type !== 'commercial') {
         showToast("Not Commercial", "Rent reviews only apply to commercial leases.", "destructive"); return;
       }
-      const pending = (prev.pendingRentReviews || []).find((r: any) => r.propertyId === propertyId);
+      const pending = (prev.pendingRentReviews || []).find((r) => r.propertyId === propertyId);
       if (!pending) {
         showToast("No review due", "There is no outstanding rent review for this property.", "destructive"); return;
       }
       const agreed = Math.max(1, Math.round(agreedRentPennies));
 
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId
           ? {
               ...p,
@@ -293,13 +295,13 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           : p,
       );
 
-      const updatedTenants = prev.tenants.map((t: any) =>
+      const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId
           ? { ...t, lastRentReviewMonth: prev.monthsPlayed, rentPennies: agreed }
           : t,
       );
 
-      const remainingReviews = (prev.pendingRentReviews || []).filter((r: any) => r.id !== pending.id);
+      const remainingReviews = (prev.pendingRentReviews || []).filter((r) => r.id !== pending.id);
       const deltaPct = pending.currentRentPennies > 0
         ? ((agreed - pending.currentRentPennies) / pending.currentRentPennies) * 100
         : 0;
@@ -321,11 +323,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       },
     ) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property || property.type !== 'commercial') {
         showToast("Not Commercial", "Renewals only apply to commercial leases.", "destructive"); return;
       }
-      const tenantRec = prev.tenants.find((t: any) => t.propertyId === propertyId);
+      const tenantRec = prev.tenants.find((t) => t.propertyId === propertyId);
       if (!tenantRec) {
         showToast("No sitting tenant", "There is no tenant to renew.", "destructive"); return;
       }
@@ -343,17 +345,17 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           : scoreFromConditionTier(property.condition),
         negotiatedRentPennies: agreed,
       };
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId
           ? { ...p, commercialLease: newLease, monthlyIncome: agreed, baseRent: agreed, lastRentIncrease: startMonth }
           : p,
       );
-      const updatedTenants = prev.tenants.map((t: any) =>
+      const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId
           ? { ...t, lastRentReviewMonth: startMonth, rentPennies: agreed }
           : t,
       );
-      const remainingRenewals = ((prev as any).pendingLeaseRenewals || []).filter((r: any) => r.propertyId !== propertyId);
+      const remainingRenewals = (prev.pendingLeaseRenewals || []).filter((r) => r.propertyId !== propertyId);
       showToast(
         "Lease Renewed 📄",
         `${(tenantRec.tenant.companyName ?? tenantRec.tenant.name)} re-signed for ${Math.round(terms.termMonths / 12)} years at £${fromPennies(agreed).toLocaleString()}/mo.`,
@@ -364,12 +366,12 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     // Phase 4 — player declines a renewal; lease will end at expiry.
     declineLeaseRenewal: (propertyId: string) => {
       const prev = get();
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId && p.commercialLease
           ? { ...p, commercialLease: { ...p.commercialLease, endingAtExpiry: true } }
           : p,
       );
-      const remainingRenewals = ((prev as any).pendingLeaseRenewals || []).filter((r: any) => r.propertyId !== propertyId);
+      const remainingRenewals = (prev.pendingLeaseRenewals || []).filter((r) => r.propertyId !== propertyId);
       showToast("Renewal Declined", "Lease will terminate at expiry. Dilapidations claim assessed on hand-back.");
       set({ ownedProperties: updatedProps, pendingLeaseRenewals: remainingRenewals });
     },
@@ -387,15 +389,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       slotIndex?: number,
     ) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
-      const tenantRec = prev.tenants.find((t: any) =>
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
+      const tenantRec = prev.tenants.find((t) =>
         t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
       );
       if (!property || !tenantRec) {
         showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
       }
-      if ((property as any).type === 'commercial') {
-        const hasScheduledReview = (prev.pendingRentReviews || []).some((r: any) => r.propertyId === propertyId);
+      if (property.type === 'commercial') {
+        const hasScheduledReview = (prev.pendingRentReviews || []).some((r) => r.propertyId === propertyId);
         if (!hasScheduledReview) {
           showToast(
             "Rent Review Required",
@@ -405,7 +407,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           return;
         }
       }
-      const currentSlotRent = (tenantRec as any).rentPennies ?? property.monthlyIncome;
+      const currentSlotRent = tenantRec.rentPennies ?? property.monthlyIncome;
       if (newRentPennies <= currentSlotRent) {
         showToast("No Increase", "Proposed rent is not higher than current rent.", "destructive"); return;
       }
@@ -438,15 +440,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       ];
 
       const isMultiUnit = (property.subtype === 'hmo' || property.subtype === 'flats') && (property.subtypeUnits ?? 1) > 1;
-      const updatedTenants = prev.tenants.map((t: any) =>
+      const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
           ? { ...t, rentPennies: newRentPennies, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
           : t
       );
       const recomputedMonthlyIncome = isMultiUnit
-        ? updatedTenants.filter((t: any) => t.propertyId === propertyId).reduce((sum: number, t: any) => sum + ((t as any).rentPennies ?? 0), 0)
+        ? updatedTenants.filter((t) => t.propertyId === propertyId).reduce((sum: number, t) => sum + (t.rentPennies ?? 0), 0)
         : newRentPennies;
-      const updatedProps = prev.ownedProperties.map((p: any) =>
+      const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId
           ? { ...p, monthlyIncome: recomputedMonthlyIncome, baseRent: isMultiUnit ? p.baseRent : newRentPennies, lastRentIncrease: prev.monthsPlayed }
           : p
@@ -462,7 +464,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       // Achievement wiring — tribunal won in landlord's favour pushes a
       // reputationLog marker and triggers the court_win unlock immediately.
       let achievementsPatch: Record<string, number> | undefined;
-      let extraRepLog: any[] = [];
+      let extraRepLog: NonNullable<GameState['reputationLog']> = [];
       if (outcome === 'tribunal_landlord') {
         extraRepLog = [{
           id: `rep_tribunal_win_${propertyId}_${prev.monthsPlayed}`,
@@ -475,7 +477,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           ...prev,
           ownedProperties: updatedProps,
           tenants: updatedTenants,
-          reputationLog: [...((prev as any).reputationLog || []), ...extraRepLog],
+          reputationLog: [...(prev.reputationLog || []), ...extraRepLog],
         };
         const { unlocked, newlyUnlockedIds } = checkAndUnlockAchievements(snapshot);
         if (newlyUnlockedIds.length) {
@@ -492,7 +494,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         ownedProperties: updatedProps,
         tenants: updatedTenants,
         ...(extraRepLog.length
-          ? { reputationLog: [...(((prev as any).reputationLog) || []), ...extraRepLog].slice(-40) }
+          ? { reputationLog: [...((prev.reputationLog) || []), ...extraRepLog].slice(-40) }
           : {}),
         ...(achievementsPatch ? { achievements: achievementsPatch } : {}),
       });
@@ -500,15 +502,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     evictTenant: (propertyId: string, ground: EvictionGround, slotIndex: number = 0) => {
       const prev = get();
-      const tenant = prev.tenants.find((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+      const tenant = prev.tenants.find((t) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
       if (!tenant) { showToast("No Tenant", "There is no tenant to evict.", "destructive"); return; }
-      if (prev.pendingEvictions.some((e: any) => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) {
+      if (prev.pendingEvictions.some((e) => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) {
         showToast("Eviction Already Served", "Notice already in effect for this slot. Cancel it first.", "destructive"); return;
       }
 
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
-      const isCommercial = (property as any)?.type === 'commercial';
-      const lease: any = (property as any)?.commercialLease;
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
+      const isCommercial = property?.type === 'commercial';
+      const lease = property?.commercialLease;
 
       if (isCommercial) {
         if (ground === 'landlord_sale' || ground === 'landlord_move_in' || ground === 'antisocial_behaviour' || ground === 'rent_arrears') {
@@ -532,7 +534,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
       if (ground === 'landlord_sale' || ground === 'landlord_move_in') {
         const appealCd = (prev.propertyLocks || []).find(
-          (l: any) => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex),
+          (l) => l.propertyId === propertyId && l.reason === 'appeal_cooldown' && prev.monthsPlayed < l.untilMonth && (l.slotIndex === undefined || l.slotIndex === slotIndex),
         );
         if (appealCd) {
           showToast(
@@ -544,9 +546,9 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         }
       }
 
-      const recentDefaults = prev.tenantEvents.filter((e: any) => e.propertyId === propertyId && e.type === 'default').length;
-      const concerns = prev.tenantConcerns.filter((c: any) => c.propertyId === propertyId && !c.resolvedMonth);
-      const longstandingASB = concerns.some((c: any) =>
+      const recentDefaults = prev.tenantEvents.filter((e) => e.propertyId === propertyId && e.type === 'default').length;
+      const concerns = prev.tenantConcerns.filter((c) => c.propertyId === propertyId && !c.resolvedMonth);
+      const longstandingASB = concerns.some((c) =>
         (c.category === 'noise' || c.category === 'safety') && (prev.monthsPlayed - c.raisedMonth) >= 1
       );
 
@@ -594,7 +596,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           break;
         }
         case 'tenant_default': {
-          const arrears = (tenant as any).arrearsMonths ?? 0;
+          const arrears = tenant.arrearsMonths ?? 0;
           if (arrears < 3 && recentDefaults < 3) {
             showToast(
               "Invalid Ground",
@@ -637,7 +639,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
       const courtBacklogMonths = 3 + Math.floor(gameRandom() * 4);
       const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
-      const updatedTenants = prev.tenants.map((t: any) =>
+      const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
           ? { ...t, evictionNoticeMonth: prev.monthsPlayed, evictionGround: ground }
           : t
@@ -666,11 +668,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     cancelEviction: (propertyId: string, slotIndex: number = 0) => {
       const prev = get();
-      if (!prev.pendingEvictions.some((e: any) => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) return;
+      if (!prev.pendingEvictions.some((e) => e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)) return;
       showToast("Eviction Withdrawn", "Notice cancelled — tenant stays.");
       set({
-        pendingEvictions: prev.pendingEvictions.filter((e: any) => !(e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)),
-        tenants: prev.tenants.map((t: any) =>
+        pendingEvictions: prev.pendingEvictions.filter((e) => !(e.propertyId === propertyId && (e.slotIndex ?? 0) === slotIndex)),
+        tenants: prev.tenants.map((t) =>
           t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
             ? { ...t, evictionNoticeMonth: undefined, evictionGround: undefined }
             : t
@@ -680,7 +682,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     disputeDeposit: (disputeId: string) => {
       const prev = get();
-      const dispute = (prev.depositDisputes || []).find((d: any) => d.id === disputeId && d.status === 'open');
+      const dispute = (prev.depositDisputes || []).find((d) => d.id === disputeId && d.status === 'open');
       if (!dispute) {
         showToast("No Open Dispute", "This dispute is no longer open.", "destructive");
         return;
@@ -705,7 +707,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
-          depositDisputes: prev.depositDisputes.map((d: any) =>
+          depositDisputes: prev.depositDisputes.map((d) =>
             d.id === disputeId
               ? { ...d, status: outcome, refundedAmount: d.refundedAmount + extraRefund, resolvedMonth: prev.monthsPlayed }
               : d,
@@ -713,7 +715,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         });
       } else {
         set({
-          depositDisputes: prev.depositDisputes.map((d: any) =>
+          depositDisputes: prev.depositDisputes.map((d) =>
             d.id === disputeId
               ? { ...d, status: outcome, resolvedMonth: prev.monthsPlayed }
               : d,
@@ -736,7 +738,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     dismissDispute: (disputeId: string) => {
       const prev = get();
-      const dispute = (prev.depositDisputes || []).find((d: any) => d.id === disputeId);
+      const dispute = (prev.depositDisputes || []).find((d) => d.id === disputeId);
       if (!dispute) return;
       if (dispute.status === 'open') {
         const debited = debit(prev, dispute.withheldAmount);
@@ -751,7 +753,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         set({
           cash: debited.cash,
           overdraftUsed: debited.overdraftUsed,
-          depositDisputes: prev.depositDisputes.map((d: any) =>
+          depositDisputes: prev.depositDisputes.map((d) =>
             d.id === disputeId
               ? { ...d, status: 'lost', refundedAmount: d.refundedAmount + dispute.withheldAmount, resolvedMonth: prev.monthsPlayed }
               : d,
@@ -759,7 +761,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         });
         showToast("Refund Issued", `Full £${fromPennies(dispute.withheldAmount).toLocaleString()} refunded to ${dispute.tenantName}.`);
       } else {
-        set({ depositDisputes: prev.depositDisputes.filter((d: any) => d.id !== disputeId) });
+        set({ depositDisputes: prev.depositDisputes.filter((d) => d.id !== disputeId) });
       }
     },
 
@@ -768,20 +770,20 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     resolveTenantConcern: (concernId: string) => {
       const prev = get();
       const concerns = prev.tenantConcerns || [];
-      const concern = concerns.find((c: any) => c.id === concernId && !c.resolvedMonth);
+      const concern = concerns.find((c) => c.id === concernId && !c.resolvedMonth);
       if (!concern) return;
       const debited = debit(prev, concern.resolveCost);
       if (!debited) {
         showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} (even with overdraft) to resolve.`, "destructive");
         return;
       }
-      const updatedTenants = prev.tenants.map((t: any) =>
+      const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === concern.propertyId
           ? { ...t, satisfaction: Math.min(100, t.satisfaction + 8) }
           : t
       );
       const lift = CONCERN_RESOLVE_CONDITION_LIFT[concern.category] ?? 3;
-      const updatedOwned = prev.ownedProperties.map((p: any) => {
+      const updatedOwned = prev.ownedProperties.map((p) => {
         if (p.id !== concern.propertyId) return p;
         const score = Math.max(0, Math.min(100, (p.conditionScore ?? scoreFromConditionTier(p.condition)) + lift));
         return { ...p, conditionScore: score, condition: conditionTierFromScore(score) };
@@ -791,17 +793,17 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       let updatedHistory = prev.damageHistory;
       if (concern.source === 'damage') {
         const currentYear = Math.floor(prev.monthsPlayed / 12);
-        const existing = prev.annualRepairCosts.find((a: any) => a.propertyId === concern.propertyId && a.year === currentYear);
+        const existing = prev.annualRepairCosts.find((a) => a.propertyId === concern.propertyId && a.year === currentYear);
         updatedAnnual = existing
-          ? prev.annualRepairCosts.map((a: any) =>
+          ? prev.annualRepairCosts.map((a) =>
               a.propertyId === concern.propertyId && a.year === currentYear
                 ? { ...a, totalCost: a.totalCost + concern.resolveCost }
                 : a
             )
           : [...prev.annualRepairCosts, { propertyId: concern.propertyId, year: currentYear, totalCost: concern.resolveCost }];
-        const dmgHist = prev.damageHistory.find((dh: any) => dh.propertyId === concern.propertyId);
+        const dmgHist = prev.damageHistory.find((dh) => dh.propertyId === concern.propertyId);
         updatedHistory = dmgHist
-          ? prev.damageHistory.map((dh: any) =>
+          ? prev.damageHistory.map((dh) =>
               dh.propertyId === concern.propertyId
                 ? { ...dh, lastDamageMonth: prev.monthsPlayed }
                 : dh
@@ -819,7 +821,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         ownedProperties: updatedOwned,
         annualRepairCosts: updatedAnnual,
         damageHistory: updatedHistory,
-        tenantConcerns: concerns.map((c: any) =>
+        tenantConcerns: concerns.map((c) =>
           c.id === concernId ? { ...c, resolvedMonth: prev.monthsPlayed } : c
         ),
       });
@@ -827,7 +829,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     topUpCondition: (propertyId: string, pointsRequested: number) => {
       const prev = get();
-      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property) return;
       const currentScore = property.conditionScore ?? scoreFromConditionTier(property.condition);
       const headroomToCap = Math.max(0, 100 - currentScore);
@@ -848,7 +850,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       }
       const newScore = Math.min(100, currentScore + pts);
       const newMonthlyUsed = monthlyUsed + pts;
-      const updated = prev.ownedProperties.map((p: any) =>
+      const updated = prev.ownedProperties.map((p) =>
         p.id !== propertyId ? p : ({
           ...p,
           conditionScore: newScore,
@@ -861,7 +863,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       let absorbedConcerns = 0;
       let updatedConcerns = prev.tenantConcerns;
       if (newScore >= 80 && currentScore < 80) {
-        updatedConcerns = (prev.tenantConcerns || []).map((c: any) => {
+        updatedConcerns = (prev.tenantConcerns || []).map((c) => {
           if (
             c && !c.resolvedMonth && c.propertyId === propertyId &&
             c.source !== 'damage' &&
@@ -892,8 +894,8 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     sendArrearsToCourt: (propertyId: string, slotIndex: number = 0) => {
       const s = get();
-      const tenant = s.tenants.find((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
-      const prop = s.ownedProperties.find((p: any) => p.id === propertyId);
+      const tenant = s.tenants.find((t) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+      const prop = s.ownedProperties.find((p) => p.id === propertyId);
       if (!tenant || !prop) {
         showToast("Cannot file claim", "Tenant or property not found.", "destructive");
         return;
@@ -904,7 +906,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         showToast("Not eligible", "Tenant needs at least 2 months of arrears to file in court.", "destructive");
         return;
       }
-      const existing = (s.debtRecoveryCases || []).find((c: any) => c.propertyId === propertyId && c.tenantName === tenant.tenant.name && c.status === 'in_court');
+      const existing = (s.debtRecoveryCases || []).find((c) => c.propertyId === propertyId && c.tenantName === tenant.tenant.name && c.status === 'in_court');
       if (existing) {
         showToast("Already filed", "A court case is already in progress for this tenant.", "destructive");
         return;
@@ -923,7 +925,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const status: 'recovered' | 'partial' | 'unrecoverable' =
         roll < recoveredCutoff ? 'recovered' : roll < partialCutoff ? 'partial' : 'unrecoverable';
       const resolveMonth = s.monthsPlayed + 6 + Math.floor(gameRandom() * 7);
-      const newCase: any = {
+      const newCase: import('@/types/game').DebtRecoveryCase & { _predeterminedStatus?: 'recovered' | 'partial' | 'unrecoverable' } = {
         id: `dr_${propertyId}_${slotIndex}_${s.monthsPlayed}_${gameRandom().toString(36).slice(2, 6)}`,
         propertyId,
         propertyName: prop.name,
@@ -936,7 +938,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       };
       newCase._predeterminedStatus = status;
 
-      const newTenants = s.tenants.map((t: any) =>
+      const newTenants = s.tenants.map((t) =>
         t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
           ? { ...t, arrearsMonths: 0, arrearsPennies: 0 }
           : t,
@@ -953,7 +955,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
 
     issueLetterBeforeAction: (propertyId: string, slotIndex: number = 0) => {
       const s = get();
-      const tenant = s.tenants.find((t: any) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
+      const tenant = s.tenants.find((t) => t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex);
       if (!tenant) { showToast("Cannot send letter", "Tenant not found.", "destructive"); return; }
       if ((tenant.arrearsMonths ?? 0) < 1) {
         showToast("Not needed", "Tenant has no arrears.", "destructive"); return;
@@ -967,7 +969,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       set({
         cash: debited.cash,
         overdraftUsed: debited.overdraftUsed,
-        tenants: s.tenants.map((t: any) =>
+        tenants: s.tenants.map((t) =>
           t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
             ? { ...t, letterBeforeActionMonth: s.monthsPlayed }
             : t,
@@ -979,7 +981,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     escalateToHighCourt: (caseId: string) => {
       const s = get();
       const cases = s.debtRecoveryCases || [];
-      const idx = cases.findIndex((c: any) => c.id === caseId);
+      const idx = cases.findIndex((c) => c.id === caseId);
       if (idx < 0) { showToast("Case not found", "Cannot escalate.", "destructive"); return; }
       const c = cases[idx];
       if (c.status !== 'partial' && c.status !== 'unrecoverable') {
