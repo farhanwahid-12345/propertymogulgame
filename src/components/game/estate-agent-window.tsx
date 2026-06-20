@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -174,38 +174,57 @@ export function EstateAgentWindow({
   const { min: levelMin, max: levelMax } = getLevelRange(level);
 
   // Calculate affordability for each property using credit-score-based LTV
-  const creditMaxLTV = getMaxLTVForCreditScore(creditScore);
-  
-  const calculateAffordability = (property: Property) => {
-    // Find the best LTV the player qualifies for, capped by credit score
+  const creditMaxLTV = useMemo(() => getMaxLTVForCreditScore(creditScore), [creditScore]);
+
+  // Combined filtering pipeline (city → level → affordability) — single pass, memoised.
+  const {
+    cityFilteredProperties,
+    levelFilteredProperties,
+    affordableProperties,
+    levelRestrictedCount,
+    unaffordableCount,
+  } = useMemo(() => {
     const eligibleProviders = mortgageProviders.filter((p: any) => creditScore >= p.minCreditScore);
-    const maxProviderLTV = eligibleProviders.length > 0 
+    const maxProviderLTV = eligibleProviders.length > 0
       ? Math.max(...eligibleProviders.map((p: any) => p.maxLTV))
       : 0;
     const maxLTV = Math.min(maxProviderLTV, creditMaxLTV);
-    
-    const maxMortgage = property.value * maxLTV;
-    const stampDuty = property.value <= 250000 ? property.value * 0.03 :
-      (250000 * 0.03) + ((property.value - 250000) * 0.08);
-    const fees = 600 + (property.value * 0.01) + stampDuty;
-    const cashNeeded = (property.value - maxMortgage) + fees;
-    
-    return cash >= cashNeeded;
-  };
 
-  // Check if property is within player's level range
-  const isWithinLevelRange = (property: Property) => {
-    return property.value >= levelMin && property.value <= levelMax;
-  };
+    const cityFiltered = cityFilter === 'all'
+      ? availableProperties
+      : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
 
-  // Filter properties by BOTH level range AND affordability AND city
-  const cityFilteredProperties = cityFilter === 'all'
-    ? availableProperties
-    : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
-  const levelFilteredProperties = cityFilteredProperties.filter(isWithinLevelRange);
-  const affordableProperties = levelFilteredProperties.filter(calculateAffordability);
-  const levelRestrictedCount = cityFilteredProperties.length - levelFilteredProperties.length;
-  const unaffordableCount = levelFilteredProperties.length - affordableProperties.length;
+    const levelFiltered = cityFiltered.filter(p => p.value >= levelMin && p.value <= levelMax);
+
+    const affordable = levelFiltered.filter(p => {
+      const maxMortgage = p.value * maxLTV;
+      const stampDuty = p.value <= 250000
+        ? p.value * 0.03
+        : (250000 * 0.03) + ((p.value - 250000) * 0.08);
+      const fees = 600 + (p.value * 0.01) + stampDuty;
+      const cashNeeded = (p.value - maxMortgage) + fees;
+      return cash >= cashNeeded;
+    });
+
+    return {
+      cityFilteredProperties: cityFiltered,
+      levelFilteredProperties: levelFiltered,
+      affordableProperties: affordable,
+      levelRestrictedCount: cityFiltered.length - levelFiltered.length,
+      unaffordableCount: levelFiltered.length - affordable.length,
+    };
+  }, [availableProperties, cityFilter, levelMin, levelMax, cash, creditScore, mortgageProviders, creditMaxLTV]);
+
+  // Per-city counts for the city filter buttons.
+  const cityCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of availableProperties) {
+      const city = p.city ?? 'middlesbrough';
+      counts.set(city, (counts.get(city) ?? 0) + 1);
+    }
+    return counts;
+  }, [availableProperties]);
+
 
 
   // Reset negotiation when selecting a new property
@@ -511,9 +530,38 @@ export function EstateAgentWindow({
     return { low: Math.floor(marketValue * 0.70), high: Math.floor(marketValue * 0.85), speed: "Every 40-60s" };
   };
 
-  const unlistedProperties = ownedProperties.filter(
-    p => !propertyListings.some(l => l.propertyId === p.id)
+  const unlistedProperties = useMemo(
+    () => ownedProperties.filter(p => !propertyListings.some(l => l.propertyId === p.id)),
+    [ownedProperties, propertyListings],
   );
+
+  // Sorted + sliced Buy-tab list. Identical output to the previous inline pipeline.
+  const sortedBuyProperties = useMemo(() => {
+    return [...affordableProperties].sort((a, b) => {
+      switch (buySort) {
+        case 'price-asc':  return a.value - b.value;
+        case 'price-desc': return b.value - a.value;
+        case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
+        case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
+        case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
+        case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
+      }
+    }).slice(0, 20);
+  }, [affordableProperties, buySort]);
+
+  // Stable handlers for mapped Buy-tab cards.
+  const handleSelectBuyProperty = useCallback((property: Property) => {
+    setSelectedBuyProperty(property);
+    setOfferAmount([property.value]);
+    setVendorResponse(null);
+    setVendorCounterAmount(null);
+    setBuyNegotiationRound(0);
+    setIsVendorThinking(false);
+    setNegotiationHistory([]);
+  }, []);
+
+  const handleSelectCityFilter = useCallback((id: CityId | 'all') => setCityFilter(id), []);
+
 
   const getPropertyById = (propertyId: string) => {
     return ownedProperties.find(p => p.id === propertyId);
@@ -568,21 +616,19 @@ export function EstateAgentWindow({
                   size="sm"
                   variant={cityFilter === 'all' ? 'default' : 'outline'}
                   className="h-7 text-xs px-2.5"
-                  onClick={() => setCityFilter('all')}
+                  onClick={() => handleSelectCityFilter('all')}
                 >
                   All cities ({availableProperties.length})
                 </Button>
                 {unlockedCities.map((c) => {
-                  const count = availableProperties.filter(
-                    (p) => (p.city ?? 'middlesbrough') === c.id
-                  ).length;
+                  const count = cityCounts.get(c.id) ?? 0;
                   return (
                     <Button
                       key={c.id}
                       size="sm"
                       variant={cityFilter === c.id ? 'default' : 'outline'}
                       className="h-7 text-xs px-2.5"
-                      onClick={() => setCityFilter(c.id)}
+                      onClick={() => handleSelectCityFilter(c.id)}
                     >
                       {c.name} ({count})
                     </Button>
@@ -590,6 +636,7 @@ export function EstateAgentWindow({
                 })}
               </div>
             )}
+
 
             {(levelRestrictedCount > 0 || unaffordableCount > 0) && (
               <div className="flex flex-col gap-1 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
@@ -626,16 +673,7 @@ export function EstateAgentWindow({
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {[...affordableProperties].sort((a, b) => {
-                switch (buySort) {
-                  case 'price-asc':  return a.value - b.value;
-                  case 'price-desc': return b.value - a.value;
-                  case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
-                  case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
-                  case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
-                  case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
-                }
-              }).slice(0, 20).map((property) => (
+              {sortedBuyProperties.map((property) => (
 
                 <Card
                   key={property.id}
@@ -644,12 +682,9 @@ export function EstateAgentWindow({
                       ? 'ring-2 ring-primary'
                       : 'hover:shadow-lg'
                   }`}
-                  onClick={() => {
-                    setSelectedBuyProperty(property);
-                    setOfferAmount([property.value]);
-                    resetNegotiation();
-                  }}
+                  onClick={() => handleSelectBuyProperty(property)}
                 >
+
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
                     <div className="text-[11px] text-muted-foreground leading-tight">
