@@ -673,16 +673,7 @@ export function EstateAgentWindow({
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {[...affordableProperties].sort((a, b) => {
-                switch (buySort) {
-                  case 'price-asc':  return a.value - b.value;
-                  case 'price-desc': return b.value - a.value;
-                  case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
-                  case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
-                  case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
-                  case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
-                }
-              }).slice(0, 20).map((property) => (
+              {sortedBuyProperties.map((property) => (
 
                 <Card
                   key={property.id}
@@ -691,12 +682,9 @@ export function EstateAgentWindow({
                       ? 'ring-2 ring-primary'
                       : 'hover:shadow-lg'
                   }`}
-                  onClick={() => {
-                    setSelectedBuyProperty(property);
-                    setOfferAmount([property.value]);
-                    resetNegotiation();
-                  }}
+                  onClick={() => handleSelectBuyProperty(property)}
                 >
+
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
                     <div className="text-[11px] text-muted-foreground leading-tight">
