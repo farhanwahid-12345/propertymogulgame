@@ -1875,6 +1875,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // ── Arrears / Court / Bailiff escalation ──────────────────────────
       // Three-stage: warning → court order + scheduled forced sale → bankruptcy.
       let newArrears: import('@/types/game').ArrearsState | null = prev.arrears ?? null;
+      const forceSoldPropertyIds = new Set<string>();
       const overdraftHeadroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
       const projectedNet = monthlyIncome - totalExpenses;
       // Distress only when (a) cash is gone AND overdraft is exhausted, OR
@@ -1893,11 +1894,39 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const salePrice = Math.floor((prop.marketValue || prop.value) * 0.90);
           const mortgageIdx = finalMortgages.findIndex(m => m.propertyId === pid);
           const owed = mortgageIdx >= 0 ? finalMortgages[mortgageIdx].remainingBalance : 0;
-          const netProceeds = Math.max(0, salePrice - owed);
+          let netProceeds = Math.max(0, salePrice - owed);
+
+          // Dilapidations recovery for commercial lease on forced-sold property
+          // (mirrors normal lease-expiry path at ~line 1005).
+          let dilapsPennies = 0;
+          const lease = prop.commercialLease;
+          if (prop.type === 'commercial' && lease) {
+            const sqft = Math.max(400, prop.internalSqft ?? 900);
+            const currentScore = typeof prop.conditionScore === 'number'
+              ? prop.conditionScore
+              : scoreFromConditionTier(prop.condition);
+            const deltaPoints = Math.max(0, (lease.conditionScoreAtLeaseStart ?? currentScore) - currentScore);
+            dilapsPennies = deltaPoints > 0
+              ? Math.max(0, Math.round(CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT * sqft * deltaPoints / 100))
+              : 0;
+            if (dilapsPennies > 0) netProceeds += dilapsPennies;
+          }
+
           finalCash += netProceeds;
           updatedOwnedProperties.splice(propIdx, 1);
           if (mortgageIdx >= 0) finalMortgages.splice(mortgageIdx, 1);
-          showToast("⚖️ Bailiffs Sold Property", `${prop.name} was forcibly auctioned at 90% of value. Net proceeds £${(netProceeds/100).toLocaleString()} applied to arrears.`, "destructive");
+
+          // Clean up orphaned tenant/concern/eviction/review/lock records for this property.
+          newTenants = newTenants.filter(t => t.propertyId !== pid);
+          updatedConcerns = updatedConcerns.filter(c => c.propertyId !== pid);
+          activePendingEvictions = activePendingEvictions.filter(ev => ev.propertyId !== pid);
+          newPropertyLocks = newPropertyLocks.filter(l => l.propertyId !== pid);
+          forceSoldPropertyIds.add(pid);
+
+          const dilapsMsg = dilapsPennies > 0
+            ? ` Dilapidations of £${fromPennies(dilapsPennies).toLocaleString()} also recovered.`
+            : '';
+          showToast("⚖️ Bailiffs Sold Property", `${prop.name} was forcibly auctioned at 90% of value. Net proceeds £${(netProceeds/100).toLocaleString()} applied to arrears.${dilapsMsg}`, "destructive");
         }
         newArrears = { ...newArrears, forcedAuctionPropertyId: undefined, scheduledSaleMonth: undefined };
       }
@@ -2256,12 +2285,14 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ];
         })(),
         cgtThisYearPennies: cgtThisYearAcc,
-        pendingRentReviews: newlyQueuedReviews.length > 0
+        pendingRentReviews: (newlyQueuedReviews.length > 0
           ? [...((s.pendingRentReviews) || []), ...newlyQueuedReviews]
-          : (s.pendingRentReviews || []),
-        pendingLeaseRenewals: newlyQueuedRenewals.length > 0
+          : (s.pendingRentReviews || [])
+        ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
+        pendingLeaseRenewals: (newlyQueuedRenewals.length > 0
           ? [...((s.pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
-          : (s.pendingLeaseRenewals || []),
+          : (s.pendingLeaseRenewals || [])
+        ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
 
 
 
