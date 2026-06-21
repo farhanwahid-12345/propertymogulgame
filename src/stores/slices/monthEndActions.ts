@@ -1875,6 +1875,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // ── Arrears / Court / Bailiff escalation ──────────────────────────
       // Three-stage: warning → court order + scheduled forced sale → bankruptcy.
       let newArrears: import('@/types/game').ArrearsState | null = prev.arrears ?? null;
+      const forceSoldPropertyIds = new Set<string>();
       const overdraftHeadroom = Math.max(0, prev.overdraftLimit - finalOverdraftUsed);
       const projectedNet = monthlyIncome - totalExpenses;
       // Distress only when (a) cash is gone AND overdraft is exhausted, OR
