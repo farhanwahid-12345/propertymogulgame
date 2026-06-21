@@ -2285,12 +2285,14 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ];
         })(),
         cgtThisYearPennies: cgtThisYearAcc,
-        pendingRentReviews: newlyQueuedReviews.length > 0
+        pendingRentReviews: (newlyQueuedReviews.length > 0
           ? [...((s.pendingRentReviews) || []), ...newlyQueuedReviews]
-          : (s.pendingRentReviews || []),
-        pendingLeaseRenewals: newlyQueuedRenewals.length > 0
+          : (s.pendingRentReviews || [])
+        ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
+        pendingLeaseRenewals: (newlyQueuedRenewals.length > 0
           ? [...((s.pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
-          : (s.pendingLeaseRenewals || []),
+          : (s.pendingLeaseRenewals || [])
+        ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
 
 
 
