@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Scale, Clock, Receipt, Percent } from "lucide-react";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
 interface Props {
   trigger: ReactNode;
@@ -28,6 +29,7 @@ export function CourtClaimDialog({ trigger, tenantName, arrearsPounds, onConfirm
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-md">
+        <DialogErrorBoundary onClose={() => setOpen(false)}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scale className="h-5 w-5 text-amber-400" />
@@ -65,6 +67,7 @@ export function CourtClaimDialog({ trigger, tenantName, arrearsPounds, onConfirm
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={() => { onConfirm(); setOpen(false); }}>File Claim (£325)</Button>
         </DialogFooter>
+        </DialogErrorBoundary>
       </DialogContent>
     </Dialog>
   );

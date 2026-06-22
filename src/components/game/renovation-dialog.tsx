@@ -16,6 +16,7 @@ import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCe
 import { computePlanningApprovalProbability } from "@/lib/engine/planning";
 import { getCeilingPrice } from "@/lib/engine/constants";
 import { Slider } from "@/components/ui/slider";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 import { useGameStore } from "@/stores/gameStore";
 
 export interface RenovationType {
@@ -570,6 +571,7 @@ export function RenovationDialog({
       </DialogTrigger>
       
       <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+        <DialogErrorBoundary onClose={() => setIsOpen(false)}>
         <DialogHeader>
           <div className="flex items-center justify-between gap-3">
             <DialogTitle>Property Renovations</DialogTitle>
@@ -1232,6 +1234,7 @@ export function RenovationDialog({
           </div>
         </div>
 
+        </DialogErrorBoundary>
       </DialogContent>
     </Dialog>
   );

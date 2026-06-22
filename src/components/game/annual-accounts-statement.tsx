@@ -6,6 +6,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { calculateIncomeTax, calculateCorporationTax } from "@/lib/engine/taxation";
 import { fromPennies } from "@/lib/formatCurrency";
 import type { AnnualAccountRecord, EntityType } from "@/types/game";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
 const fmt = (pennies: number) =>
   `£${Math.round(fromPennies(pennies)).toLocaleString()}`;
@@ -124,6 +125,7 @@ export function AnnualAccountsStatement() {
   const isLtd = stmt.entityType === 'ltd';
 
   return (
+    <DialogErrorBoundary>
     <div className="glass rounded-2xl p-4 space-y-4 animate-fade-in">
       {/* Header + year selector */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -175,6 +177,7 @@ export function AnnualAccountsStatement() {
 
       {isLtd ? <LtdStatements stmt={stmt} /> : <SoleTraderStatements stmt={stmt} />}
     </div>
+    </DialogErrorBoundary>
   );
 }
 

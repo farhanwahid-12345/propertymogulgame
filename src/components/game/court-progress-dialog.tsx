@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Scale } from "lucide-react";
 import { fromPennies } from "@/lib/formatCurrency";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 import type { DebtRecoveryCase } from "@/types/game";
 
 interface Props {
@@ -63,6 +64,7 @@ export function CourtProgressDialog({
     <Dialog open={isOpen} onOpenChange={setOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-w-md">
+        <DialogErrorBoundary onClose={() => setOpen(false)}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scale className="h-5 w-5 text-amber-400" />
@@ -120,6 +122,7 @@ export function CourtProgressDialog({
         <DialogFooter>
           <Button onClick={() => setOpen(false)}>Close</Button>
         </DialogFooter>
+        </DialogErrorBoundary>
       </DialogContent>
     </Dialog>
   );
