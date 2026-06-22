@@ -20,10 +20,11 @@ export function SpeedSelector({ compact = false }: { compact?: boolean }) {
   const setGameSpeed = useGameStore((s) => s.setGameSpeed);
 
   return (
-    <div className={cn(
+    <div id="game-clock-controls" className={cn(
       "inline-flex items-center gap-0.5 rounded-full border border-border/50 bg-muted/50 p-0.5",
       compact ? "scale-90" : ""
     )}>
+
       {SPEED_OPTIONS.map((opt) => {
         const active = Math.abs(gameSpeed - opt.value) < 0.01;
         return (
