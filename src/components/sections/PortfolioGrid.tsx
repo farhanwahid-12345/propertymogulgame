@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PropertyCard } from "@/components/game/property-card";
@@ -33,7 +34,15 @@ export function PortfolioGrid({
   getDebtForProperty,
 }: PortfolioGridProps) {
   if (gameState.ownedProperties.length === 0 && conveyancingBuyProperties.length === 0) {
-    return null;
+    return (
+      <div className="glass p-3 animate-fade-in">
+        <div className="text-center py-10 text-muted-foreground">
+          <Home className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="text-sm">Your portfolio is empty.</p>
+          <p className="text-xs mt-1">Visit the Estate Agent or Auction House to buy your first property.</p>
+        </div>
+      </div>
+    );
   }
 
   const [sortKey, setSortKey] = useState<SortKey>("value-desc");
