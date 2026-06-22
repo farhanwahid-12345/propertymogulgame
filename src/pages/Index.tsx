@@ -85,6 +85,18 @@ function OnboardingGate({
   // Entity picker is mandatory; tour is dismissible.
   const open = !entityChosen || (!onboardingCompleted && !dismissed);
 
+  // Pause the game clock while onboarding is on screen so month-end doesn't
+  // tick over while a new player is reading the welcome/entity screens.
+  useEffect(() => {
+    if (!open) return;
+    const prevPaused = (useGameStore.getState() as any).isPaused;
+    useGameStore.setState({ isPaused: true } as any);
+    return () => {
+      useGameStore.setState({ isPaused: prevPaused } as any);
+    };
+  }, [open]);
+
+
   return (
     <OnboardingFlow
       // key forces a fresh mount (and stage reset) on replay and on first open
