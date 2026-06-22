@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skull } from "lucide-react";
 import { useGameStore } from "@/stores/gameStore";
 import { fromPennies } from "@/lib/formatCurrency";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
 /**
  * Phase 7 #16 — End-game bankruptcy modal. Shown full-screen when isBankrupt
@@ -21,6 +22,7 @@ export function BankruptcyDialog() {
   return (
     <Dialog open={true} onOpenChange={() => { /* unclosable until reset */ }}>
       <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogErrorBoundary>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-400 text-2xl">
             <Skull className="h-7 w-7" />
@@ -61,6 +63,7 @@ export function BankruptcyDialog() {
         <div className="flex justify-center pt-2">
           <Button size="lg" onClick={() => resetGame()}>Start New Game</Button>
         </div>
+        </DialogErrorBoundary>
       </DialogContent>
     </Dialog>
   );

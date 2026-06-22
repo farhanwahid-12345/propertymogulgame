@@ -6,6 +6,7 @@ import { Building2, Handshake, FileSignature, Scale, Calendar } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import type { Tenant } from "@/components/game/tenant-selector";
+import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
 // ─── Lease term presets ──────────────────────────────────────────────────────
 
@@ -228,6 +229,7 @@ export function HeadsOfTermsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+        <DialogErrorBoundary onClose={() => onOpenChange(false)}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <FileSignature className="h-5 w-5 text-amber-300" />
@@ -450,6 +452,7 @@ export function HeadsOfTermsDialog({
             </Button>
           )}
         </div>
+        </DialogErrorBoundary>
       </DialogContent>
     </Dialog>
   );
