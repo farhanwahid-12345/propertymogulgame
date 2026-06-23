@@ -12,7 +12,7 @@ export function isFirstPurchaseCoachSeen(): boolean {
   }
 }
 
-function markFirstPurchaseCoachSeen() {
+export function markFirstPurchaseCoachSeen() {
   try {
     window.localStorage.setItem(LS_KEY, "1");
   } catch {
@@ -22,14 +22,13 @@ function markFirstPurchaseCoachSeen() {
 
 interface Props {
   onShowMe: () => void;
+  onDismiss: () => void;
 }
 
-export function FirstPurchaseCoach({ onShowMe }: Props) {
+export function FirstPurchaseCoach({ onShowMe, onDismiss }: Props) {
   const handleDismiss = () => {
     markFirstPurchaseCoachSeen();
-    // Parent should unmount this via its own state.
-    // We re-emit a custom event so the parent can react without prop drilling.
-    window.dispatchEvent(new CustomEvent("pm:coach-dismissed"));
+    onDismiss();
   };
 
   return (
