@@ -3,6 +3,7 @@ import { Building2, User, Receipt, CalendarClock } from "lucide-react";
 import { calculateIncomeTax, calculateCorporationTax } from "@/lib/engine/taxation";
 import type { EntityType, TaxRecord } from "@/types/game";
 import { fromPennies } from "@/lib/formatCurrency";
+import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
 
 interface Props {
   entityType: EntityType;
