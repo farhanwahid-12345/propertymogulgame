@@ -35,7 +35,7 @@ const STEPS = [
   { icon: PiggyBank, title: "Profit",    body: "Bank monthly cashflow, refinance equity, or sell up. Mind your tax bill in April." },
 ];
 
-type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-buying' | 'tour-bank' | 'tour-mortgage' | 'tour-tenants' | 'tour-satisfaction' | 'tour-epc' | 'tour-renovations' | 'tour-tax' | 'tour-alerts';
+type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-buying' | 'tour-bank' | 'tour-ops' | 'tour-monthend' | 'tour-mortgage' | 'tour-tenants' | 'tour-satisfaction' | 'tour-epc' | 'tour-renovations' | 'tour-tax' | 'tour-alerts';
 
 interface TourStep {
   id: Stage;
