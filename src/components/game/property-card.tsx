@@ -23,6 +23,7 @@ import { getMarketRentPounds } from "@/lib/engine/market";
 import { RepairBar } from "@/components/game/repair-bar";
 import { MultiUnitSlots } from "@/components/game/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
+import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
