@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Info } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/game/credit-improvement-guide";
 import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
+import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
