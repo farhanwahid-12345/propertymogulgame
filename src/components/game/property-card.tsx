@@ -751,10 +751,16 @@ export const PropertyCard = memo(function PropertyCard({
                               <>
                                 <div className="flex justify-between items-center">
                                   <span className="text-muted-foreground">Tenant</span>
-                                  <span className="font-medium text-right">
-                                    {tenant?.companyName ?? tenant?.name ?? '—'}
-                                    <span className="text-muted-foreground"> — {covenantLabel}</span>
-                                  </span>
+                                  <FirstTimeTooltip
+                                    id="covenant"
+                                    content="Covenant strength is how financially reliable a commercial tenant is. Strong covenants (80+) pay reliably and raise your property's value. Weak covenants (<40) carry higher default risk but sometimes accept below-market rents."
+                                    side="left"
+                                  >
+                                    <span className="font-medium text-right">
+                                      {tenant?.companyName ?? tenant?.name ?? '—'}
+                                      <span className="text-muted-foreground"> — {covenantLabel}</span>
+                                    </span>
+                                  </FirstTimeTooltip>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-muted-foreground">Monthly rent</span>
