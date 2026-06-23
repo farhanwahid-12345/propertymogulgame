@@ -239,13 +239,19 @@ export function GameStats({
               </FirstTimeTooltip>
             )}
             {totalMonthlyExpenses > 0 && (
-              <span className={cn(
-                "text-[11px] font-semibold inline-flex items-center gap-1",
-                dtiColor
-              )}>
-                DTI: {Math.round(dtiRatio)}%
-                <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
-              </span>
+              <FirstTimeTooltip
+                id="dti"
+                content="Debt-to-Income ratio — your total mortgage + loan payments divided by rental income. Lenders cap this at 75–85%. Above that, you can't borrow more until you reduce debt or increase income."
+                side="bottom"
+              >
+                <span className={cn(
+                  "text-[11px] font-semibold inline-flex items-center gap-1",
+                  dtiColor
+                )}>
+                  DTI: {Math.round(dtiRatio)}%
+                  <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
+                </span>
+              </FirstTimeTooltip>
             )}
             <CreditImprovementGuide
               creditScore={creditScore}
