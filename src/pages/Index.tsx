@@ -120,7 +120,17 @@ const Index = () => {
   useKeyboardShortcuts();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+  const [showFirstPurchaseCoach, setShowFirstPurchaseCoach] = useState(false);
 
+  const prevOwnedCountRef = useRef(gameState.ownedProperties.length);
+  useEffect(() => {
+    const current = gameState.ownedProperties.length;
+    const previous = prevOwnedCountRef.current;
+    if (current === 1 && previous === 0 && !isFirstPurchaseCoachSeen()) {
+      setShowFirstPurchaseCoach(true);
+    }
+    prevOwnedCountRef.current = current;
+  }, [gameState.ownedProperties.length]);
 
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
