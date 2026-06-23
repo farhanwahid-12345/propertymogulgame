@@ -222,15 +222,21 @@ export function GameStats({
               <InfoTip text={TIP_TEXTS.CREDIT_SCORE} label="About credit score" />
             </span>
             {portfolioLTV > 0 && (
-              <span className={cn(
-                "text-[11px] font-semibold inline-flex items-center gap-1",
-                portfolioLTV > 80 ? "text-danger" :
-                portfolioLTV > 60 ? "text-yellow-400" :
-                "text-success"
-              )}>
-                LTV: {portfolioLTV.toFixed(0)}%
-                <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
-              </span>
+              <FirstTimeTooltip
+                id="ltv"
+                content="Loan-to-Value — how much of your portfolio is mortgaged. High LTV means more risk but more leverage. Your credit score limits the LTV available to you."
+                side="bottom"
+              >
+                <span className={cn(
+                  "text-[11px] font-semibold inline-flex items-center gap-1",
+                  portfolioLTV > 80 ? "text-danger" :
+                  portfolioLTV > 60 ? "text-yellow-400" :
+                  "text-success"
+                )}>
+                  LTV: {portfolioLTV.toFixed(0)}%
+                  <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
+                </span>
+              </FirstTimeTooltip>
             )}
             {totalMonthlyExpenses > 0 && (
               <span className={cn(
