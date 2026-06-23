@@ -137,7 +137,13 @@ export function TaxBreakdown({
           <BandRow label="Basic rate (20%)" value={fmt(incomeBreakdown.basicBandTax)} />
           <BandRow label="Higher rate (40%)" value={fmt(incomeBreakdown.higherBandTax)} />
           <BandRow label="Additional rate (45%)" value={fmt(incomeBreakdown.additionalBandTax)} />
-          <BandRow label="Section 24 credit (mortgage interest)" value={`− ${fmt(incomeBreakdown.section24Credit)}`} positive />
+          <FirstTimeTooltip
+            id="s24"
+            content="As a sole trader, you can only claim a 20% tax credit on mortgage interest — not a full deduction. This is Section 24. On high-rate tax, this means you can be taxed on profit you didn't actually make. Consider incorporating."
+            side="top"
+          >
+            <BandRow label="Section 24 credit (mortgage interest)" value={`− ${fmt(incomeBreakdown.section24Credit)}`} positive />
+          </FirstTimeTooltip>
           <div className="border-t border-white/10 pt-1.5 mt-1.5 flex items-center justify-between font-semibold">
             <span>Year-to-date tax</span>
             <span className="text-amber-300">{fmt(incomeBreakdown.effectiveTax)}</span>
