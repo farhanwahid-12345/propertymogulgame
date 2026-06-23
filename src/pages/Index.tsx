@@ -20,6 +20,7 @@ import { PoliceLetterDialog } from "@/components/game/police-letter-dialog";
 import { CourtResolutionModal } from "@/components/game/court-resolution-modal";
 import { OverdraftPromptDialog } from "@/components/game/overdraft-prompt-dialog";
 import { BankruptcyDialog } from "@/components/game/bankruptcy-dialog";
+import { FirstPurchaseCoach, isFirstPurchaseCoachSeen } from "@/components/game/first-purchase-coach";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
