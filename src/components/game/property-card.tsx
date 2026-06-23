@@ -654,10 +654,16 @@ export const PropertyCard = memo(function PropertyCard({
                     <span className="font-medium">£{Math.round(monthlyInsurance).toLocaleString()}</span>
                   </div>
                   {monthlyCouncilTax > 0 && (
-                    <div className="flex justify-between items-center text-muted-foreground">
-                      <span>− Council tax (vacant)</span>
-                      <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
-                    </div>
+                    <FirstTimeTooltip
+                      id="void"
+                      content="A void period is when a property has no tenant. You still pay mortgage, council tax, and insurance — but receive no rent. Minimise void periods by pricing rent competitively and acting quickly on tenant concerns."
+                      side="top"
+                    >
+                      <div className="flex justify-between items-center text-muted-foreground">
+                        <span>− Council tax (vacant)</span>
+                        <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
+                      </div>
+                    </FirstTimeTooltip>
                   )}
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>− Maintenance (0.8%)</span>
