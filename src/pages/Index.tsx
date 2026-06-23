@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/game/game-stats";
@@ -20,6 +20,7 @@ import { PoliceLetterDialog } from "@/components/game/police-letter-dialog";
 import { CourtResolutionModal } from "@/components/game/court-resolution-modal";
 import { OverdraftPromptDialog } from "@/components/game/overdraft-prompt-dialog";
 import { BankruptcyDialog } from "@/components/game/bankruptcy-dialog";
+import { FirstPurchaseCoach, isFirstPurchaseCoachSeen } from "@/components/game/first-purchase-coach";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
@@ -119,7 +120,17 @@ const Index = () => {
   useKeyboardShortcuts();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+  const [showFirstPurchaseCoach, setShowFirstPurchaseCoach] = useState(false);
 
+  const prevOwnedCountRef = useRef(gameState.ownedProperties.length);
+  useEffect(() => {
+    const current = gameState.ownedProperties.length;
+    const previous = prevOwnedCountRef.current;
+    if (current === 1 && previous === 0 && !isFirstPurchaseCoachSeen()) {
+      setShowFirstPurchaseCoach(true);
+    }
+    prevOwnedCountRef.current = current;
+  }, [gameState.ownedProperties.length]);
 
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
@@ -306,17 +317,35 @@ const Index = () => {
           </CollapsibleSection>
         )}
 
-        <PortfolioGrid
-          gameState={gameState}
-          sortedOwnedProperties={sortedOwnedProperties}
-          conveyancingBuyProperties={conveyancingBuyProperties}
-          totalPortfolioValue={totalPortfolioValue}
-          totalPortfolioIncome={totalPortfolioIncome}
-          avgYield={avgYield}
-          portfolioLTV={portfolioLTV}
-          getDebtForProperty={getDebtForProperty}
-        />
+        <div id="section-portfolio">
+          <PortfolioGrid
+            gameState={gameState}
+            sortedOwnedProperties={sortedOwnedProperties}
+            conveyancingBuyProperties={conveyancingBuyProperties}
+            totalPortfolioValue={totalPortfolioValue}
+            totalPortfolioIncome={totalPortfolioIncome}
+            avgYield={avgYield}
+            portfolioLTV={portfolioLTV}
+            getDebtForProperty={getDebtForProperty}
+          />
+        </div>
       </div>
+
+      {showFirstPurchaseCoach && (
+        <FirstPurchaseCoach
+          onShowMe={() => {
+            setActiveTab("market");
+            setShowFirstPurchaseCoach(false);
+            requestAnimationFrame(() => {
+              const el = document.getElementById("section-portfolio");
+              if (el) {
+                try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ }
+              }
+            });
+          }}
+          onDismiss={() => setShowFirstPurchaseCoach(false)}
+        />
+      )}
 
 
       <OnboardingGate
