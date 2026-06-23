@@ -317,17 +317,35 @@ const Index = () => {
           </CollapsibleSection>
         )}
 
-        <PortfolioGrid
-          gameState={gameState}
-          sortedOwnedProperties={sortedOwnedProperties}
-          conveyancingBuyProperties={conveyancingBuyProperties}
-          totalPortfolioValue={totalPortfolioValue}
-          totalPortfolioIncome={totalPortfolioIncome}
-          avgYield={avgYield}
-          portfolioLTV={portfolioLTV}
-          getDebtForProperty={getDebtForProperty}
-        />
+        <div id="section-portfolio">
+          <PortfolioGrid
+            gameState={gameState}
+            sortedOwnedProperties={sortedOwnedProperties}
+            conveyancingBuyProperties={conveyancingBuyProperties}
+            totalPortfolioValue={totalPortfolioValue}
+            totalPortfolioIncome={totalPortfolioIncome}
+            avgYield={avgYield}
+            portfolioLTV={portfolioLTV}
+            getDebtForProperty={getDebtForProperty}
+          />
+        </div>
       </div>
+
+      {showFirstPurchaseCoach && (
+        <FirstPurchaseCoach
+          onShowMe={() => {
+            setActiveTab("market");
+            setShowFirstPurchaseCoach(false);
+            requestAnimationFrame(() => {
+              const el = document.getElementById("section-portfolio");
+              if (el) {
+                try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* noop */ }
+              }
+            });
+          }}
+          onDismiss={() => setShowFirstPurchaseCoach(false)}
+        />
+      )}
 
 
       <OnboardingGate
