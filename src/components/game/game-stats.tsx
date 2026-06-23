@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Info } from "lucide-react";
 import { CreditImprovementGuide } from "@/components/game/credit-improvement-guide";
 import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
+import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -221,24 +222,36 @@ export function GameStats({
               <InfoTip text={TIP_TEXTS.CREDIT_SCORE} label="About credit score" />
             </span>
             {portfolioLTV > 0 && (
-              <span className={cn(
-                "text-[11px] font-semibold inline-flex items-center gap-1",
-                portfolioLTV > 80 ? "text-danger" :
-                portfolioLTV > 60 ? "text-yellow-400" :
-                "text-success"
-              )}>
-                LTV: {portfolioLTV.toFixed(0)}%
-                <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
-              </span>
+              <FirstTimeTooltip
+                id="ltv"
+                content="Loan-to-Value — how much of your portfolio is mortgaged. High LTV means more risk but more leverage. Your credit score limits the LTV available to you."
+                side="bottom"
+              >
+                <span className={cn(
+                  "text-[11px] font-semibold inline-flex items-center gap-1",
+                  portfolioLTV > 80 ? "text-danger" :
+                  portfolioLTV > 60 ? "text-yellow-400" :
+                  "text-success"
+                )}>
+                  LTV: {portfolioLTV.toFixed(0)}%
+                  <InfoTip text={TIP_TEXTS.LTV} label="About LTV" />
+                </span>
+              </FirstTimeTooltip>
             )}
             {totalMonthlyExpenses > 0 && (
-              <span className={cn(
-                "text-[11px] font-semibold inline-flex items-center gap-1",
-                dtiColor
-              )}>
-                DTI: {Math.round(dtiRatio)}%
-                <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
-              </span>
+              <FirstTimeTooltip
+                id="dti"
+                content="Debt-to-Income ratio — your total mortgage + loan payments divided by rental income. Lenders cap this at 75–85%. Above that, you can't borrow more until you reduce debt or increase income."
+                side="bottom"
+              >
+                <span className={cn(
+                  "text-[11px] font-semibold inline-flex items-center gap-1",
+                  dtiColor
+                )}>
+                  DTI: {Math.round(dtiRatio)}%
+                  <InfoTip text={TIP_TEXTS.DTI} label="About DTI" />
+                </span>
+              </FirstTimeTooltip>
             )}
             <CreditImprovementGuide
               creditScore={creditScore}

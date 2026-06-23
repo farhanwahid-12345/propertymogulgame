@@ -23,6 +23,7 @@ import { getMarketRentPounds } from "@/lib/engine/market";
 import { RepairBar } from "@/components/game/repair-bar";
 import { MultiUnitSlots } from "@/components/game/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
+import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
 import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
@@ -653,10 +654,16 @@ export const PropertyCard = memo(function PropertyCard({
                     <span className="font-medium">£{Math.round(monthlyInsurance).toLocaleString()}</span>
                   </div>
                   {monthlyCouncilTax > 0 && (
-                    <div className="flex justify-between items-center text-muted-foreground">
-                      <span>− Council tax (vacant)</span>
-                      <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
-                    </div>
+                    <FirstTimeTooltip
+                      id="void"
+                      content="A void period is when a property has no tenant. You still pay mortgage, council tax, and insurance — but receive no rent. Minimise void periods by pricing rent competitively and acting quickly on tenant concerns."
+                      side="top"
+                    >
+                      <div className="flex justify-between items-center text-muted-foreground">
+                        <span>− Council tax (vacant)</span>
+                        <span className="font-medium">£{monthlyCouncilTax.toLocaleString()}</span>
+                      </div>
+                    </FirstTimeTooltip>
                   )}
                   <div className="flex justify-between items-center text-muted-foreground">
                     <span>− Maintenance (0.8%)</span>
@@ -750,10 +757,16 @@ export const PropertyCard = memo(function PropertyCard({
                               <>
                                 <div className="flex justify-between items-center">
                                   <span className="text-muted-foreground">Tenant</span>
-                                  <span className="font-medium text-right">
-                                    {tenant?.companyName ?? tenant?.name ?? '—'}
-                                    <span className="text-muted-foreground"> — {covenantLabel}</span>
-                                  </span>
+                                  <FirstTimeTooltip
+                                    id="covenant"
+                                    content="Covenant strength is how financially reliable a commercial tenant is. Strong covenants (80+) pay reliably and raise your property's value. Weak covenants (<40) carry higher default risk but sometimes accept below-market rents."
+                                    side="left"
+                                  >
+                                    <span className="font-medium text-right">
+                                      {tenant?.companyName ?? tenant?.name ?? '—'}
+                                      <span className="text-muted-foreground"> — {covenantLabel}</span>
+                                    </span>
+                                  </FirstTimeTooltip>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-muted-foreground">Monthly rent</span>
