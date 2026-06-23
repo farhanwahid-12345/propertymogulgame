@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Building2, User, Check, Home, Users, Wrench, PiggyBank,
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
-  ShoppingCart, CalendarDays,
+  ShoppingCart, CalendarDays, KeyRound, Heart, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
