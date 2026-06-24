@@ -13,7 +13,9 @@ import {
   Building2, User, Check, Home, Users, Wrench, PiggyBank,
   ArrowRight, Store, Landmark, ClipboardList, Bell, X,
   ShoppingCart, CalendarDays, KeyRound, Heart, Zap,
+  MousePointerClick, Receipt, Activity,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { ONBOARDING_DONE_KEY as LS_DONE_KEY } from "@/lib/onboarding";
 import type { EntityType } from "@/types/game";
