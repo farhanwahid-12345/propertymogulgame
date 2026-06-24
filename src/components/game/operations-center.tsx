@@ -51,11 +51,16 @@ interface OperationsCenterProps {
   onNegotiateExTenantSettlement?: (debtId: string, pct: number) => void;
   onWriteOffExTenantDebt?: (debtId: string) => void;
   onRefileExTenantCCJ?: (debtId: string) => void;
+  // Phase 7 — commercial letting agent comms
+  commercialSearchUpdates?: CommercialSearchUpdate[];
+  commercialAgentChase?: Record<string, number>;
+  vacantCommercialProperties?: Array<{ id: string; name: string }>;
+  onChaseCommercialAgent?: (propertyId: string) => void;
 }
 
 type TabKey =
   | "conveyancing" | "planning" | "renovations" | "concerns"
-  | "evictions" | "listings" | "extdebts";
+  | "evictions" | "listings" | "extdebts" | "commercial";
 
 export function OperationsCenter(props: OperationsCenterProps) {
   const {
