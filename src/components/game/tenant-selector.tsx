@@ -602,6 +602,17 @@ export function TenantSelector({
               <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
             </div>
           </div>
+        ) : propertyType === 'commercial' && tenantProfiles.length === 0 ? (
+          <div className="p-6 rounded-lg bg-muted/30 border border-border text-sm text-center space-y-3">
+            <p className="text-foreground font-medium">Waiting for applicants through the agent…</p>
+            <p className="text-xs text-muted-foreground">
+              The letting agent is marketing the unit. First enquiries are typically expected within 1–2 months;
+              stronger covenants (national chains, established businesses) often take 3–6 months to come through.
+            </p>
+            <div className="flex justify-center pt-1">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
+            </div>
+          </div>
         ) : (
           <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
