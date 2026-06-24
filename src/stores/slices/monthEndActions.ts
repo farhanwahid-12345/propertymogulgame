@@ -150,8 +150,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Phase 1 — commercial properties complete vacant unless a sitting tenant
         // + lease was attached to the listing (Phase 3 — tenanted commercial buys).
         const isCommercial = prop.type === 'commercial';
-        const inheritedLease = isCommercial ? prop.commercialLease : undefined;
-        const inheritedSittingTenant = isCommercial ? prop.sittingTenant : undefined;
+        // Phase 1 #19 — prefer the conveyancing snapshot so commercial sitting
+        // tenants survive an estate-agent refresh during the buy.
+        const inheritedLease = isCommercial ? (conv.commercialLeaseSnapshot ?? prop.commercialLease) : undefined;
+        const inheritedSittingTenant = isCommercial ? (conv.sittingTenant ?? prop.sittingTenant) : undefined;
         const hasSittingTenant = !!(inheritedLease && inheritedSittingTenant);
         // When a sitting tenant transfers, rewrite the lease's start/expiry months
         // so the remaining term matches the current game month.

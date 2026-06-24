@@ -109,6 +109,8 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         advertisedYield: property.yield,
         advertisedMonthlyIncome: property.monthlyIncome,
         propertyType: property.type,
+        sittingTenant: property.sittingTenant,
+        commercialLeaseSnapshot: property.commercialLease,
       };
 
       showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
@@ -202,6 +204,8 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         advertisedYield: property.yield,
         advertisedMonthlyIncome: property.monthlyIncome,
         propertyType: property.type,
+        sittingTenant: property.sittingTenant,
+        commercialLeaseSnapshot: property.commercialLease,
       };
 
       showToast("Offer Accepted! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);

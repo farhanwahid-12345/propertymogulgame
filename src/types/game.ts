@@ -41,6 +41,11 @@ export interface Conveyancing {
   /** Snapshot of property.type at offer time. Prevents commercial → residential
    *  flip when the source listing is no longer in market lists at settlement. */
   propertyType?: "residential" | "commercial" | "luxury";
+  /** Snapshot of sitting tenant at offer-time so a commercial buy keeps its
+   *  tenant even if the estate-agent listing refreshes during conveyancing. */
+  sittingTenant?: Tenant;
+  /** Snapshot of commercial lease at offer-time, paired with sittingTenant. */
+  commercialLeaseSnapshot?: Property['commercialLease'];
 }
 
 export interface Property {

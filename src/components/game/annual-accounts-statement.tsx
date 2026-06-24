@@ -5,6 +5,7 @@ import { Building2, User, FileText, ChevronLeft, ChevronRight } from "lucide-rea
 import { useGameStore } from "@/stores/gameStore";
 import { calculateIncomeTax, calculateCorporationTax } from "@/lib/engine/taxation";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import type { AnnualAccountRecord, EntityType } from "@/types/game";
 import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
@@ -41,6 +42,9 @@ export function AnnualAccountsStatement() {
   const ownedProperties = useGameStore((s) => s.ownedProperties);
   const mortgages = useGameStore((s) => s.mortgages);
   const loans = useGameStore((s) => s.loans || []);
+  const conveyancing = useGameStore((s) => s.conveyancing || []);
+  const renovations = useGameStore((s) => s.renovations || []);
+  const overdraftUsed = useGameStore((s) => s.overdraftUsed || 0);
   const annualAccounts = useGameStore(
     (s) => (s as any).annualAccounts as AnnualAccountRecord[] | undefined,
   );
@@ -53,7 +57,22 @@ export function AnnualAccountsStatement() {
     const propertyValue = ownedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
     const mortgageDebt = mortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
     const loanDebt = loans.reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
-    const netWorth = cash + propertyValue - mortgageDebt - loanDebt;
+    // Phase 1 #7 — align with HeroHeader / useGameState netWorth formula:
+    // include cash held by solicitor on in-flight buys, renovation WIP,
+    // remaining furniture depreciation, and subtract overdraft drawn.
+    const inflightBuyCapital = conveyancing
+      .filter((c: any) => c.status === 'buying')
+      .reduce((sum: number, c: any) => sum + (c.cashHeld || 0), 0);
+    const renovationWIP = renovations.reduce(
+      (sum: number, r: any) => sum + ((r.type?.cost || 0) * 100),
+      0,
+    );
+    const furnitureValue = ownedProperties.reduce(
+      (sum: number, p: any) => sum + getFurnitureValuePennies(p),
+      0,
+    );
+    const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
+      + propertyValue - mortgageDebt - loanDebt - overdraftUsed;
     const ytdTax =
       entityType === 'ltd'
         ? calculateCorporationTax(yearlyGrossRent, yearlyMortgageInterest, yearlyDeductibleExpenses)
@@ -110,6 +129,9 @@ export function AnnualAccountsStatement() {
     ownedProperties,
     mortgages,
     loans,
+    conveyancing,
+    renovations,
+    overdraftUsed,
     annualAccounts,
   ]);
 
@@ -190,7 +212,9 @@ function LtdStatements({ stmt }: { stmt: StatementData }) {
 
   const totalAssets = stmt.propertyValueAtYearEnd + stmt.cashAtYearEnd;
   const totalCreditors = stmt.mortgageDebtAtYearEnd + stmt.loanDebtAtYearEnd;
-  const netAssets = totalAssets - totalCreditors;
+  // Phase 1 #7 — use the header's net-worth formula (precomputed upstream)
+  // so this figure matches the headline in HeroHeader exactly.
+  const netAssets = stmt.netWorthAtYearEnd;
 
   return (
     <div className="space-y-4">
@@ -221,6 +245,9 @@ function LtdStatements({ stmt }: { stmt: StatementData }) {
           positive={netAssets >= 0}
           highlight
         />
+        <p className="text-[10px] text-muted-foreground italic pt-1">
+          Includes cash held in conveyancing and renovation WIP.
+        </p>
       </Section>
     </div>
   );
@@ -235,9 +262,9 @@ function SoleTraderStatements({ stmt }: { stmt: StatementData }) {
   // accounting net profit so the player can see real economic profit.
   const netProfit = stmt.netProfitBeforeTax;
 
-  const grossAssets = stmt.propertyValueAtYearEnd + stmt.cashAtYearEnd;
-  const totalDebt = stmt.mortgageDebtAtYearEnd + stmt.loanDebtAtYearEnd;
-  const netWorth = grossAssets - totalDebt;
+  // Phase 1 #7 — use the header's net-worth formula (precomputed upstream)
+  // so this figure matches the headline in HeroHeader exactly.
+  const netWorth = stmt.netWorthAtYearEnd;
 
   return (
     <div className="space-y-4">
@@ -266,6 +293,9 @@ function SoleTraderStatements({ stmt }: { stmt: StatementData }) {
         <Line label="Less: Mortgages" value={`− ${fmt(stmt.mortgageDebtAtYearEnd)}`} />
         <Line label="Less: Other loans" value={`− ${fmt(stmt.loanDebtAtYearEnd)}`} />
         <Total label="Net worth" value={fmt(netWorth)} positive={netWorth >= 0} highlight />
+        <p className="text-[10px] text-muted-foreground italic pt-1">
+          Includes cash held in conveyancing and renovation WIP.
+        </p>
       </Section>
     </div>
   );
