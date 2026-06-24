@@ -184,6 +184,15 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
         tenantEvents={gameState.tenantEvents}
         economicEvents={gameState.economicEvents}
         taxRecords={gameState.taxRecords || []}
+        pendingEvictions={gameState.pendingEvictions || []}
+        propertyListings={((gameState as any).propertyListings || []).map((l: any) => ({ ...l, askingPrice: l.askingPrice }))}
+        exTenantDebts={(gameState as any).exTenantDebts || []}
+        onCancelEviction={gameState.cancelEviction}
+        onCancelListing={gameState.cancelPropertyListing}
+        onFileExTenantCCJ={(gameState as any).fileExTenantCCJ}
+        onNegotiateExTenantSettlement={(gameState as any).negotiateExTenantSettlement}
+        onWriteOffExTenantDebt={(gameState as any).writeOffExTenantDebt}
+        onRefileExTenantCCJ={(gameState as any).refileExTenantCCJ}
       />
     </InlineDialogButton>
   );
