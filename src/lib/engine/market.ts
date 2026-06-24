@@ -193,7 +193,7 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     const elapsed = Math.floor(Math.random() * 24); // already-served portion
     const termMonths = remainingTermMonths + elapsed;
     const negotiatedRentPennies = Math.max(toPennies(400), baseMonthlyIncome);
-    const impliedYield = impliedCommercialYield(covenantStrength, remainingTermMonths);
+    const impliedYield = impliedCommercialYield(covenantStrength, remainingTermMonths, city.id);
     const incomePrice = Math.round((negotiatedRentPennies * 12) / impliedYield);
     finalPrice = Math.max(toPennies(40_000), Math.round(incomePrice / 100_000) * 100_000);
     finalValue = finalPrice;
