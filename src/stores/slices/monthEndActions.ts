@@ -735,6 +735,34 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newTenantHistory: import('@/types/game').TenantDeparture[] = [...(prev.tenantHistory || [])];
       let walkoutDepositRefund = 0;
       const walkoutDisputes: DepositDispute[] = [];
+      // Phase 2 — capture outstanding arrears when tenants vacate so the debt
+      // doesn't silently disappear. Surfaced in Operations → Ex-Tenant Debts.
+      const newExTenantDebts: import('@/types/game').ExTenantDebt[] = [
+        ...(((prev as any).exTenantDebts) || []),
+      ];
+      const captureExTenantDebt = (
+        propertyId: string,
+        propertyName: string,
+        tenantName: string,
+        arrearsPennies: number,
+      ) => {
+        if (!arrearsPennies || arrearsPennies <= 0) return;
+        const dup = newExTenantDebts.some(
+          (d) => d.propertyId === propertyId && d.tenantName === tenantName && d.vacatedMonth === newMonthNumber,
+        );
+        if (dup) return;
+        newExTenantDebts.push({
+          id: `extd_${propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
+          propertyId,
+          propertyName,
+          tenantName,
+          originalArrearsPennies: arrearsPennies,
+          remainingDebtPennies: arrearsPennies,
+          vacatedMonth: newMonthNumber,
+          status: 'chasing',
+          totalRecoveredPennies: 0,
+        });
+      };
       // (reputationDelta/reputationLogEntries declared earlier — see "// ── Reputation buffer ──")
       satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
         const guaranteedExit = t.satisfaction <= 0;
