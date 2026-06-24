@@ -103,10 +103,11 @@ export function OperationsCenter(props: OperationsCenterProps) {
     const ev = pendingEvictions.length;
     const lis = propertyListings.length;
     const ext = openDebts.length;
-    return { conv, plan, reno, concerns, ev, lis, ext };
-  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts]);
+    const comm = vacantCommercialProperties.length;
+    return { conv, plan, reno, concerns, ev, lis, ext, comm };
+  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts, vacantCommercialProperties]);
 
-  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext;
+  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext + counts.comm;
   const allEmpty = totalActionable === 0;
 
   const defaultTab: TabKey = useMemo(() => {
