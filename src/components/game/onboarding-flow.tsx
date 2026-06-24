@@ -295,16 +295,20 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
   if (!tour) return null;
   const Icon = tour.icon;
   const isLast = tourIndex === TOUR_STEPS.length - 1;
+  const isWait = tour.interactionMode === 'waitForAction';
+  const position: Position = tour.position ?? 'bottom-right';
+  const positionClass =
+    position === 'bottom-left'
+      ? "left-3 right-3 bottom-3 sm:right-auto sm:left-6 sm:bottom-6 sm:w-[22rem]"
+      : position === 'top-right'
+        ? "left-3 right-3 top-3 sm:left-auto sm:right-6 sm:top-6 sm:w-[22rem]"
+        : "left-3 right-3 bottom-3 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[22rem]";
 
   return (
     <div
       role="dialog"
       aria-label={tour.title}
-      className={cn(
-        "fixed z-50 pointer-events-auto",
-        // Mobile: bottom sheet style; Desktop: bottom-right floating card
-        "left-3 right-3 bottom-3 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[22rem]",
-      )}
+      className={cn("fixed z-50 pointer-events-auto", positionClass)}
     >
       <div className="glass rounded-2xl border border-white/10 shadow-2xl p-4 bg-background/90 backdrop-blur-xl">
         <div className="flex items-center gap-2 mb-2">
@@ -312,7 +316,7 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
             <Icon className="h-5 w-5 text-primary" />
           </span>
           <span className="font-semibold text-base">{tour.title}</span>
-          <span className="ml-auto text-xs text-muted-foreground">{tour.index} / {TOUR_STEPS.length}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{tourIndex + 1} / {TOUR_STEPS.length}</span>
           <button
             type="button"
             aria-label="Close tour"
@@ -345,20 +349,33 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
                 Back
               </Button>
             )}
-            <Button
-              size="sm"
-              onClick={() => {
-                if (isLast) finish();
-                else setStage(TOUR_STEPS[tourIndex + 1].id);
-              }}
-            >
-              {isLast ? <>Got it <Check className="h-4 w-4 ml-2" /></> : <>Next <ArrowRight className="h-4 w-4 ml-2" /></>}
-            </Button>
+            {tour.action && (
+              <Button size="sm" onClick={() => runStepAction(tour.action)}>
+                {tour.actionLabel ?? 'Take me there'} <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+            {!isWait && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (isLast) finish();
+                  else setStage(TOUR_STEPS[tourIndex + 1].id);
+                }}
+              >
+                {isLast ? <>Got it <Check className="h-4 w-4 ml-2" /></> : <>Next <ArrowRight className="h-4 w-4 ml-2" /></>}
+              </Button>
+            )}
           </div>
         </div>
+        {isWait && (
+          <p className="text-[11px] text-muted-foreground/80 mt-2 text-right italic">
+            Waiting for you to {tour.action ? 'click the highlighted control' : 'complete the action'}…
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
 
 export { LS_DONE_KEY as ONBOARDING_DONE_KEY };
