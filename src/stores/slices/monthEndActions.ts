@@ -27,6 +27,12 @@ import {
   CHAIN_COLLAPSE_PROB, SUI_GENERIS_PROB, EVICTION_UPHELD_PROB,
   MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
 } from '@/lib/engine/probabilities';
+import { impliedCommercialYield } from '@/lib/engine/market';
+
+// Phase 2 — city-level residential yield anchors for mean-reversion drift.
+const CITY_RESIDENTIAL_YIELD: Record<string, number> = {
+  middlesbrough: 0.10, leeds: 0.08, manchester: 0.07, london: 0.06,
+};
 import { showToast, debit, credit } from '../storeHelpers';
 import { evaluateAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import { mergeConcernsById } from '../sanitizers';
