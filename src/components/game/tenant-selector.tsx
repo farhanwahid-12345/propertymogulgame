@@ -350,6 +350,43 @@ export function generateSittingCommercialTenant(city: CityKey = 'middlesbrough')
   };
 }
 
+/**
+ * Phase 3 — generate a single commercial applicant within a specified covenant
+ * range (used by the agent-applicant drip mechanic). Draws from the local pool
+ * for covenant < 70, otherwise from the national pool.
+ */
+export function generateCommercialApplicantInRange(
+  city: CityKey = 'middlesbrough',
+  covenantRange: [number, number] = [20, 50],
+): Tenant {
+  const [lo, hi] = covenantRange;
+  const isNational = lo >= 70;
+  const pool = isNational ? NATIONAL_TENANT_POOL : (CITY_LOCAL_POOL[city] ?? CITY_LOCAL_POOL.middlesbrough);
+  const entry = pick(pool);
+  const covenantStrength = randInt(lo, hi);
+  const profile = covenantToProfile(covenantStrength);
+  const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
+  const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
+  const rentMultiplier = +(0.6 + (covenantStrength / 100) * 0.8).toFixed(3);
+  return {
+    id: `applicant_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    name: entry.name,
+    companyName: entry.name,
+    covenantStrength,
+    sector: entry.sector,
+    profile,
+    creditScore: 400 + Math.round(covenantStrength * 4),
+    monthlyIncome: 5000 + covenantStrength * 200,
+    employmentStatus: entry.sector.replace('_', ' '),
+    rentMultiplier,
+    defaultRisk,
+    damageRisk,
+    description: entry.description,
+    traits: [],
+    isNational,
+  };
+}
+
 
 
 // --- Star rating helper ---
