@@ -58,6 +58,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const prev = get();
       const property = prev.ownedProperties.find((p) => p.id === propertyId);
       if (!property) return;
+      // Phase 8 (item 22) — HMOs cannot accept tenants without an active licence.
+      if (property.subtype === 'hmo' && property.hmoLicenceStatus !== 'licensed') {
+        showToast(
+          "HMO Licence Required",
+          "HMO licence required before tenanting. Apply from the property card.",
+          "destructive",
+        );
+        return;
+      }
       if (prev.conveyancing.some((c) => c.propertyId === propertyId)) {
         showToast("In Conveyancing", "Cannot change tenants during conveyancing.", "destructive"); return;
       }
