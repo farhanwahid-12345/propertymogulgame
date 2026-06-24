@@ -1064,7 +1064,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
               : 'Lease expiry',
           });
         }
-        return { ...p, commercialLease: undefined, monthlyIncome: 0 };
+        return { ...p, commercialLease: undefined, monthlyIncome: 0, commercialVacantSinceMonth: newMonthNumber };
       });
       if (propertiesToVacate.length > 0) {
         newTenants = newTenants.filter(t => !propertiesToVacate.includes(t.propertyId));
