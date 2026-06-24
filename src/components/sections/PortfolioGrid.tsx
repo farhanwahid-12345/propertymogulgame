@@ -248,7 +248,7 @@ export function PortfolioGrid({
           return (
             <PropertyCard
               key={property.id}
-              property={property}
+              property={propertyForCard}
               onSell={gameState.sellProperty}
               onSelectTenant={gameState.selectTenant}
               onRenovate={gameState.startRenovation}
