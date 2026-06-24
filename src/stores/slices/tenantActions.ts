@@ -1132,5 +1132,38 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       });
       showToast("⚖️ CCJ re-filed", `New monthly roll begins for ${debt.tenantName}.`);
     },
+
+    chaseCommercialAgent: (propertyId: string) => {
+      const s = get();
+      const property = s.ownedProperties.find(p => p.id === propertyId);
+      if (!property || property.type !== 'commercial') {
+        showToast("Not Commercial", "Only commercial vacancies can be chased.", "destructive"); return;
+      }
+      if (property.commercialLease) {
+        showToast("Already Let", "This unit is already leased.", "destructive"); return;
+      }
+      const chaseMap = { ...(s.commercialAgentChase || {}) } as Record<string, number>;
+      const last = chaseMap[propertyId] ?? -999;
+      if (s.monthsPlayed - last < 2) {
+        const wait = 2 - (s.monthsPlayed - last);
+        showToast("Already Chased", `The agent has been chased recently. Try again in ${wait} month${wait === 1 ? '' : 's'}.`, "destructive");
+        return;
+      }
+      chaseMap[propertyId] = s.monthsPlayed;
+      const update: import('@/types/game').CommercialSearchUpdate = {
+        id: `csu_${propertyId}_${s.monthsPlayed}_chase`,
+        propertyId,
+        month: s.monthsPlayed,
+        kind: 'chase',
+        leadCount: (s.pendingCommercialApplicants || []).filter(a => a.propertyId === propertyId).length,
+        message: `You chased the agent. They've promised to push harder this month.`,
+      };
+      set({
+        commercialAgentChase: chaseMap,
+        commercialSearchUpdates: [...(s.commercialSearchUpdates || []), update].slice(-200),
+        opsFlashAt: Date.now(),
+      });
+      showToast("📣 Agent chased", `${property.name} — agent will redouble efforts this month.`);
+    },
   };
 }

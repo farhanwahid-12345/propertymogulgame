@@ -265,6 +265,8 @@ export function createInitialState(): GameState {
     loanPayoffHistory: [],
     seenGroundRentExplainer: false,
     exTenantDebts: [],
+    commercialSearchUpdates: [],
+    commercialAgentChase: {},
 
 
   };
@@ -503,6 +505,23 @@ export const migrationSteps: ReadonlyArray<Migration> = [
     from: 21, to: 22, describe: 'Phase 2 — exTenantDebts queue',
     apply: (persisted) => {
       if (!Array.isArray(persisted.exTenantDebts)) persisted.exTenantDebts = [];
+    },
+  },
+  {
+    from: 22, to: 23, describe: 'Phase 7 — commercial agent comms + stale rent-review cleanup',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.commercialSearchUpdates)) persisted.commercialSearchUpdates = [];
+      if (!persisted.commercialAgentChase || typeof persisted.commercialAgentChase !== 'object' || Array.isArray(persisted.commercialAgentChase)) {
+        persisted.commercialAgentChase = {};
+      }
+      // Drop pendingRentReviews for properties that aren't commercial-with-active-lease.
+      if (Array.isArray(persisted.pendingRentReviews) && Array.isArray(persisted.ownedProperties)) {
+        const byId = new Map<string, any>(persisted.ownedProperties.map((p: any) => [p?.id, p]));
+        persisted.pendingRentReviews = persisted.pendingRentReviews.filter((r: any) => {
+          const p = byId.get(r?.propertyId);
+          return !!p && p.type === 'commercial' && !!p.commercialLease;
+        });
+      }
     },
   },
 ];

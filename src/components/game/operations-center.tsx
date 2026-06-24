@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Hourglass, FileText, Hammer, Wrench, Sparkles, ShieldAlert, Tag, Coins,
+  Hourglass, FileText, Hammer, Wrench, Sparkles, ShieldAlert, Tag, Coins, Megaphone,
 } from "lucide-react";
 import { ConveyancingTracker } from "@/components/game/conveyancing-tracker";
 import { RenovationTracker } from "@/components/game/renovation-tracker";
@@ -21,6 +21,7 @@ import type {
   PendingEviction,
   PropertyListing,
   ExTenantDebt,
+  CommercialSearchUpdate,
 } from "@/types/game";
 
 interface OperationsCenterProps {
@@ -50,11 +51,16 @@ interface OperationsCenterProps {
   onNegotiateExTenantSettlement?: (debtId: string, pct: number) => void;
   onWriteOffExTenantDebt?: (debtId: string) => void;
   onRefileExTenantCCJ?: (debtId: string) => void;
+  // Phase 7 — commercial letting agent comms
+  commercialSearchUpdates?: CommercialSearchUpdate[];
+  commercialAgentChase?: Record<string, number>;
+  vacantCommercialProperties?: Array<{ id: string; name: string }>;
+  onChaseCommercialAgent?: (propertyId: string) => void;
 }
 
 type TabKey =
   | "conveyancing" | "planning" | "renovations" | "concerns"
-  | "evictions" | "listings" | "extdebts";
+  | "evictions" | "listings" | "extdebts" | "commercial";
 
 export function OperationsCenter(props: OperationsCenterProps) {
   const {
@@ -78,6 +84,10 @@ export function OperationsCenter(props: OperationsCenterProps) {
     onNegotiateExTenantSettlement,
     onWriteOffExTenantDebt,
     onRefileExTenantCCJ,
+    commercialSearchUpdates = [],
+    commercialAgentChase = {},
+    vacantCommercialProperties = [],
+    onChaseCommercialAgent,
   } = props;
 
   const ownedIds = new Set(ownedProperties.map(p => p.id));
@@ -93,10 +103,11 @@ export function OperationsCenter(props: OperationsCenterProps) {
     const ev = pendingEvictions.length;
     const lis = propertyListings.length;
     const ext = openDebts.length;
-    return { conv, plan, reno, concerns, ev, lis, ext };
-  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts]);
+    const comm = vacantCommercialProperties.length;
+    return { conv, plan, reno, concerns, ev, lis, ext, comm };
+  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts, vacantCommercialProperties]);
 
-  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext;
+  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext + counts.comm;
   const allEmpty = totalActionable === 0;
 
   const defaultTab: TabKey = useMemo(() => {
@@ -119,7 +130,8 @@ export function OperationsCenter(props: OperationsCenterProps) {
       (tab === "concerns" && counts.concerns === 0) ||
       (tab === "evictions" && counts.ev === 0) ||
       (tab === "listings" && counts.lis === 0) ||
-      (tab === "extdebts" && counts.ext === 0);
+      (tab === "extdebts" && counts.ext === 0) ||
+      (tab === "commercial" && counts.comm === 0);
     if (isCurrentEmpty) setTab(defaultTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultTab]);
@@ -132,6 +144,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
       if (requested === 'evictions') setTab('evictions');
       else if (requested === 'listings') setTab('listings');
       else if (requested === 'extdebts') setTab('extdebts');
+      else if (requested === 'commercial') setTab('commercial');
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('pm:open-operations', handler as EventListener);
@@ -147,6 +160,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
     { key: "evictions", label: "Evictions", icon: ShieldAlert, count: counts.ev },
     { key: "listings", label: "Listings", icon: Tag, count: counts.lis },
     { key: "extdebts", label: "Ex-Debts", icon: Coins, count: counts.ext },
+    { key: "commercial", label: "Comm. Letting", icon: Megaphone, count: counts.comm },
     { key: "conveyancing", label: "Conveyancing", icon: Hourglass, count: counts.conv },
     { key: "planning", label: "Planning", icon: FileText, count: counts.plan },
     { key: "renovations", label: "Renovations", icon: Hammer, count: counts.reno },
@@ -341,6 +355,70 @@ export function OperationsCenter(props: OperationsCenterProps) {
                         Write off
                       </Button>
                     )}
+                  </div>
+                </div>
+              );
+            })}
+          </TabsContent>
+
+          <TabsContent value="commercial" className="mt-0 space-y-3">
+            {vacantCommercialProperties.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No vacant commercial units.</p>
+            ) : vacantCommercialProperties.map(prop => {
+              const propUpdates = commercialSearchUpdates
+                .filter(u => u.propertyId === prop.id)
+                .sort((a, b) => b.month - a.month)
+                .slice(0, 6);
+              const latest = propUpdates[0];
+              const lastChase = commercialAgentChase[prop.id] ?? -999;
+              const canChase = (monthsPlayed - lastChase) >= 2;
+              const chaseWait = Math.max(0, 2 - (monthsPlayed - lastChase));
+              return (
+                <div key={prop.id} className="rounded-lg border border-white/10 bg-white/[0.04] p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="text-xs space-y-0.5">
+                      <div className="font-semibold text-foreground flex items-center gap-1.5">
+                        <Megaphone className="h-3.5 w-3.5 text-primary" />
+                        {prop.name}
+                      </div>
+                      {latest?.estimatedNextApplicantMonth != null && (
+                        <div className="text-muted-foreground">
+                          Next applicant expected ~ month {latest.estimatedNextApplicantMonth}
+                          {' '}({Math.max(0, latest.estimatedNextApplicantMonth - monthsPlayed)}mo)
+                          {' · '}{latest.leadCount} lead{latest.leadCount === 1 ? '' : 's'} in pipeline
+                        </div>
+                      )}
+                    </div>
+                    {onChaseCommercialAgent && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        disabled={!canChase}
+                        onClick={() => onChaseCommercialAgent(prop.id)}
+                      >
+                        {canChase ? '📣 Chase agent' : `Chase in ${chaseWait}mo`}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {propUpdates.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground italic">No updates yet — first month-end report incoming.</p>
+                    ) : propUpdates.map(u => (
+                      <div key={u.id} className="text-[11px] flex items-start gap-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            u.kind === 'new_enquiry' ? 'border-green-400/40 bg-green-500/10 text-green-300' :
+                            u.kind === 'chase' ? 'border-amber-400/40 bg-amber-500/10 text-amber-300' :
+                            'border-white/20 text-muted-foreground'
+                          }
+                        >
+                          M{u.month}
+                        </Badge>
+                        <span className="text-foreground/90 flex-1">{u.message}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );

@@ -2193,17 +2193,21 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ? { ...p, commercialVacantSinceMonth: newMonthNumber }
           : p;
       });
+      const newSearchUpdates: import('@/types/game').CommercialSearchUpdate[] = [];
+      const chaseMap = (prev.commercialAgentChase || {}) as Record<string, number>;
       updatedOwnedProperties.forEach(property => {
         if (property.type !== 'commercial') return;
         const hasTenant = newTenants.some(t => t.propertyId === property.id);
         const hasLease = !!property.commercialLease;
         if (hasTenant || hasLease) return;
-        const queuedForProp = nextApplicants.filter(a => a.propertyId === property.id).length;
-        if (queuedForProp >= 3) return;
+        const queuedBefore = nextApplicants.filter(a => a.propertyId === property.id).length;
         const monthsVacant = newMonthNumber - (property.commercialVacantSinceMonth ?? newMonthNumber);
         const city = (property.city ?? 'middlesbrough') as 'middlesbrough'|'leeds'|'manchester'|'london';
+        // Phase 7 — chase boost active for the month immediately after chasing.
+        const lastChase = chaseMap[property.id] ?? -999;
+        const chaseBoost = (newMonthNumber - lastChase) <= 1 ? 0.12 : 0;
         // Weak/local: 70% chance every month, arrival +1
-        if (gameRandom() < 0.70 && queuedForProp + 1 <= 3) {
+        if (queuedBefore < 3 && gameRandom() < (0.70 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [20, 50]),
@@ -2212,7 +2216,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
         // Standard business: from month 2+, 50% chance, arrival +1..3
         const queuedNow1 = nextApplicants.filter(a => a.propertyId === property.id).length;
-        if (monthsVacant >= 2 && gameRandom() < 0.50 && queuedNow1 < 3) {
+        if (monthsVacant >= 2 && queuedNow1 < 3 && gameRandom() < (0.50 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [45, 70]),
@@ -2221,14 +2225,71 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
         // Strong/national: from month 4+, 25% chance, arrival +2..4
         const queuedNow2 = nextApplicants.filter(a => a.propertyId === property.id).length;
-        if (monthsVacant >= 4 && gameRandom() < 0.25 && queuedNow2 < 3) {
+        if (monthsVacant >= 4 && queuedNow2 < 3 && gameRandom() < (0.25 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [70, 95]),
             arrivalMonth: newMonthNumber + 2 + Math.floor(gameRandom() * 3),
           });
         }
+
+        // ── Phase 7 — agent comms ──
+        const propApplicants = nextApplicants.filter(a => a.propertyId === property.id);
+        const queuedAfter = propApplicants.length;
+        const addedThisTick = propApplicants.slice(queuedBefore);
+        const futureArrivals = propApplicants
+          .map(a => a.arrivalMonth)
+          .filter(m => m > newMonthNumber)
+          .sort((a, b) => a - b);
+        const estimatedNextApplicantMonth = futureArrivals[0];
+        // New-enquiry lines, one per added lead this tick.
+        addedThisTick.forEach((a, idx) => {
+          newSearchUpdates.push({
+            id: `csu_${property.id}_${newMonthNumber}_new_${idx}`,
+            propertyId: property.id,
+            month: newMonthNumber,
+            kind: 'new_enquiry',
+            leadCount: queuedAfter,
+            estimatedNextApplicantMonth: a.arrivalMonth,
+            message: `New enquiry received — ${a.tenant.name} have expressed interest. Available to view their offer once they're due to view.`,
+          });
+        });
+        // Monthly status line.
+        let statusMsg: string;
+        if (monthsVacant <= 1) {
+          statusMsg = `We've listed the property and begun our search. Initial enquiries expected within 2–3 months.`;
+        } else if (monthsVacant <= 3) {
+          statusMsg = `We've had ${queuedAfter} preliminary enquir${queuedAfter === 1 ? 'y' : 'ies'}. Awaiting formal expressions of interest.`;
+        } else {
+          const eta = estimatedNextApplicantMonth ? Math.max(1, estimatedNextApplicantMonth - newMonthNumber) : null;
+          statusMsg = `We are actively chasing ${queuedAfter} lead${queuedAfter === 1 ? '' : 's'}.${eta ? ` A new applicant is expected within ${eta} month${eta === 1 ? '' : 's'}.` : ''}`;
+        }
+        newSearchUpdates.push({
+          id: `csu_${property.id}_${newMonthNumber}_status`,
+          propertyId: property.id,
+          month: newMonthNumber,
+          kind: 'status',
+          leadCount: queuedAfter,
+          estimatedNextApplicantMonth,
+          message: statusMsg,
+        });
       });
+
+      // Clean stale updates (property gone, occupied, or older than 12mo).
+      const ownedIdsForCsu = new Set(updatedOwnedProperties.map(p => p.id));
+      const vacantCommercialIds = new Set(
+        updatedOwnedProperties
+          .filter(p => p.type === 'commercial' && !p.commercialLease && !newTenants.some(t => t.propertyId === p.id))
+          .map(p => p.id)
+      );
+      const mergedSearchUpdates = [...(prev.commercialSearchUpdates || []), ...newSearchUpdates]
+        .filter(u => ownedIdsForCsu.has(u.propertyId) && vacantCommercialIds.has(u.propertyId))
+        .filter(u => (newMonthNumber - u.month) <= 12)
+        .slice(-200);
+      // Prune chase map to currently-vacant commercials.
+      const prunedChase: Record<string, number> = {};
+      Object.entries(chaseMap).forEach(([k, v]) => { if (vacantCommercialIds.has(k)) prunedChase[k] = v; });
+
 
 
       // ── Phase 2 — Ex-tenant debt monthly processing ──
@@ -2449,6 +2510,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           : (s.pendingLeaseRenewals || [])
         ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
         pendingCommercialApplicants: nextApplicants.filter(a => !forceSoldPropertyIds.has(a.propertyId)),
+        commercialSearchUpdates: mergedSearchUpdates.filter(u => !forceSoldPropertyIds.has(u.propertyId)),
+        commercialAgentChase: prunedChase,
 
 
 

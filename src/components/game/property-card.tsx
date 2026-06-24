@@ -1096,7 +1096,7 @@ export const PropertyCard = memo(function PropertyCard({
                        handled per-slot by MultiUnitSlots above, otherwise this
                        dialog would pass property.monthlyIncome (the combined
                        total) as the per-slot floor and reject all raises. */}
-                  {currentTenant && !pendingEviction && evictTenant && !(multiUnitSlots && multiUnitSlots.length > 0) && (
+                  {currentTenant && !pendingEviction && evictTenant && !(multiUnitSlots && multiUnitSlots.length > 0) && property.type !== 'commercial' && (
                     <div className="grid grid-cols-2 gap-2">
                       {applyRentIncrease && (
                         <RentNegotiationDialog
@@ -1146,6 +1146,11 @@ export const PropertyCard = memo(function PropertyCard({
                         hasLongstandingASB={tenantConcerns.some(c => c.propertyId === property.id && !c.resolvedMonth && (c.category === 'noise' || c.category === 'safety') && (monthsPlayed - c.raisedMonth) >= 1)}
                         onEvict={evictTenant}
                       />
+                    </div>
+                  )}
+                  {property.type === 'commercial' && currentTenant && (
+                    <div className="text-[11px] text-muted-foreground italic px-1 py-1">
+                      Commercial lease management — see the lease panel above for rent reviews, break clauses, and renewal options.
                     </div>
                   )}
                   </>}
