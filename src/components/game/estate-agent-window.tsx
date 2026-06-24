@@ -688,10 +688,11 @@ export function EstateAgentWindow({
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {sortedBuyProperties.map((property) => (
+              {sortedBuyProperties.map((property, idx) => (
 
                 <Card
                   key={property.id}
+                  data-tour={idx === 0 ? 'first-buy-card' : undefined}
                   className={`cursor-pointer transition-all p-3 space-y-1 ${
                     selectedBuyProperty?.id === property.id
                       ? 'ring-2 ring-primary'
@@ -699,6 +700,7 @@ export function EstateAgentWindow({
                   }`}
                   onClick={() => handleSelectBuyProperty(property)}
                 >
+
 
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
