@@ -251,6 +251,7 @@ export function createInitialState(): GameState {
     annualAccounts: [],
     pendingRentReviews: [],
     pendingLeaseRenewals: [],
+    pendingCommercialApplicants: [],
     pendingPoliceLetters: [],
     pendingCourtResolutions: [],
     pendingOverdraftPrompt: null,
@@ -484,6 +485,12 @@ export const migrationSteps: ReadonlyArray<Migration> = [
     from: 19, to: 20, describe: 'Phase 4 (v5 statements) — annual accounts array',
     apply: (persisted) => {
       if (!Array.isArray(persisted.annualAccounts)) persisted.annualAccounts = [];
+    },
+  },
+  {
+    from: 20, to: 21, describe: 'Phase 3 (commercial) — pendingCommercialApplicants queue',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.pendingCommercialApplicants)) persisted.pendingCommercialApplicants = [];
     },
   },
 ];

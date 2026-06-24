@@ -17,13 +17,15 @@ import { showToast, debit, debitStrict, calcDeposit } from '../storeHelpers';
 
 /**
  * Commercial lease transaction fees (in pounds).
+ * - Agent fee: 10% of the first year's rent.
  * - Solicitor: tiered flat fee by lease term.
  * - Land Registry: only registrable when term > 7yr (84mo); HMLR sliding scale
  *   computed against the lease "premium" = annualRent × termYears / 5.
  */
-function calcCommercialLeaseFeesPounds(monthlyRentPennies: number, termMonths: number): { solicitor: number; landRegistry: number } {
+function calcCommercialLeaseFeesPounds(monthlyRentPennies: number, termMonths: number): { solicitor: number; landRegistry: number; agentFee: number } {
   const termYears = termMonths / 12;
   const solicitor = termYears < 5 ? 1500 : termYears <= 10 ? 2500 : 3500;
+  const agentFee = Math.round((monthlyRentPennies / 100) * 12 * 0.10);
   let landRegistry = 0;
   if (termMonths > 84) {
     const annualRentPounds = fromPennies(monthlyRentPennies) * 12;
@@ -36,7 +38,7 @@ function calcCommercialLeaseFeesPounds(monthlyRentPennies: number, termMonths: n
       landRegistry = Math.min(500, 140 + extraThousands * 5);
     }
   }
-  return { solicitor, landRegistry };
+  return { solicitor, landRegistry, agentFee };
 }
 import { checkAndUnlockAchievements, ACHIEVEMENTS } from '@/lib/achievements';
 import {
@@ -199,14 +201,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const agreedRent = Math.max(1, Math.round(terms.agreedRentPennies));
       const requiredDeposit = calcDeposit(agreedRent);
 
-      // Commercial lease transaction fees — solicitor + (optional) HMLR registration.
+      // Commercial lease transaction fees — agent + solicitor + (optional) HMLR registration.
       const fees = calcCommercialLeaseFeesPounds(agreedRent, terms.termMonths);
-      const totalFeesPennies = toPennies(fees.solicitor + fees.landRegistry);
+      const totalFees = fees.solicitor + fees.landRegistry + fees.agentFee;
+      const totalFeesPennies = toPennies(totalFees);
       const debited = debitStrict(prev, totalFeesPennies);
       if (!debited) {
         showToast(
           "Insufficient Funds",
-          `Need £${(fees.solicitor + fees.landRegistry).toLocaleString()} in cash to cover solicitor (£${fees.solicitor.toLocaleString()}) + land registry (£${fees.landRegistry.toLocaleString()}) fees.`,
+          `Need £${totalFees.toLocaleString()} in cash to cover agent (£${fees.agentFee.toLocaleString()}) + solicitor (£${fees.solicitor.toLocaleString()}) + land registry (£${fees.landRegistry.toLocaleString()}) fees.`,
           "destructive",
         );
         return;
@@ -250,9 +253,13 @@ export function createTenantActions(set: SetFn, get: GetFn) {
               baseRent: agreedRent,
               lastTenantChange: prev.monthsPlayed,
               lastRentIncrease: prev.monthsPlayed,
+              commercialVacantSinceMonth: undefined,
             }
           : p,
       );
+      // Drop any queued applicants for this property — the unit is now let.
+      const updatedPendingApplicants = (prev.pendingCommercialApplicants || [])
+        .filter((a) => a.propertyId !== propertyId);
 
       const breakLabel = terms.breakClause.type === 'none'
         ? 'no break clause'
@@ -263,9 +270,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       );
       showToast(
         "Commercial lease signed",
-        `Solicitor: £${fees.solicitor.toLocaleString()} | Land Registry: £${fees.landRegistry.toLocaleString()} | Total fees: £${(fees.solicitor + fees.landRegistry).toLocaleString()} deducted.`,
+        `Agent fee: £${fees.agentFee.toLocaleString()} | Solicitor: £${fees.solicitor.toLocaleString()} | Land Registry: £${fees.landRegistry.toLocaleString()} | Total: £${totalFees.toLocaleString()} deducted.`,
       );
-      set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids, cash: debited.cash });
+      set({
+        tenants: updatedTenants,
+        ownedProperties: updatedProps,
+        voidPeriods: updatedVoids,
+        cash: debited.cash,
+        pendingCommercialApplicants: updatedPendingApplicants,
+      });
     },
 
     // Phase 3 — settle a pending commercial rent review at the agreed rent.

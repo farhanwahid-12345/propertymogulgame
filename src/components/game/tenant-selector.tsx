@@ -350,6 +350,43 @@ export function generateSittingCommercialTenant(city: CityKey = 'middlesbrough')
   };
 }
 
+/**
+ * Phase 3 — generate a single commercial applicant within a specified covenant
+ * range (used by the agent-applicant drip mechanic). Draws from the local pool
+ * for covenant < 70, otherwise from the national pool.
+ */
+export function generateCommercialApplicantInRange(
+  city: CityKey = 'middlesbrough',
+  covenantRange: [number, number] = [20, 50],
+): Tenant {
+  const [lo, hi] = covenantRange;
+  const isNational = lo >= 70;
+  const pool = isNational ? NATIONAL_TENANT_POOL : (CITY_LOCAL_POOL[city] ?? CITY_LOCAL_POOL.middlesbrough);
+  const entry = pick(pool);
+  const covenantStrength = randInt(lo, hi);
+  const profile = covenantToProfile(covenantStrength);
+  const defaultRisk = +Math.max(1, 45 - covenantStrength * 0.45).toFixed(1);
+  const damageRisk = +Math.max(0.5, 10 - covenantStrength * 0.08).toFixed(1);
+  const rentMultiplier = +(0.6 + (covenantStrength / 100) * 0.8).toFixed(3);
+  return {
+    id: `applicant_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    name: entry.name,
+    companyName: entry.name,
+    covenantStrength,
+    sector: entry.sector,
+    profile,
+    creditScore: 400 + Math.round(covenantStrength * 4),
+    monthlyIncome: 5000 + covenantStrength * 200,
+    employmentStatus: entry.sector.replace('_', ' '),
+    rentMultiplier,
+    defaultRisk,
+    damageRisk,
+    description: entry.description,
+    traits: [],
+    isNational,
+  };
+}
+
 
 
 // --- Star rating helper ---
@@ -441,17 +478,27 @@ export function TenantSelector({
   type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
   const [screened, setScreened] = useState<Record<string, Screened>>({});
 
+  // Phase 3 — commercial properties pull applicants from the agent queue
+  // populated by month-end ticks, not synthesised client-side on open.
+  const pendingCommercialApplicants = useGameStore(s => s.pendingCommercialApplicants);
+  const storeMonthsPlayed = useGameStore(s => s.monthsPlayed);
+  const arrivedCommercialApplicants = (pendingCommercialApplicants || [])
+    .filter(a => a.propertyId === propertyId && a.arrivalMonth <= storeMonthsPlayed)
+    .map(a => a.tenant);
+
   useEffect(() => {
     if (isOpen) {
       setTenantProfiles(
         propertyType === 'commercial'
-          ? generateCommercialTenantProfiles(city ?? 'middlesbrough')
+          ? arrivedCommercialApplicants
           : generateTenantProfiles(),
       );
       setSelectedTenant(null);
       setScreened({});
     }
-  }, [isOpen, propertyType, city]);
+    // arrivedCommercialApplicants identity changes each render — depend on serialised ids instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, propertyType, city, arrivedCommercialApplicants.map(a => a.id).join('|')]);
 
 
 
@@ -552,6 +599,17 @@ export function TenantSelector({
               <li><strong className="text-foreground">Remove tenant</strong> — close this dialog and click <em>"Serve eviction notice"</em>; pick a valid ground and wait the notice period.</li>
             </ul>
             <div className="flex justify-end pt-1">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
+            </div>
+          </div>
+        ) : propertyType === 'commercial' && tenantProfiles.length === 0 ? (
+          <div className="p-6 rounded-lg bg-muted/30 border border-border text-sm text-center space-y-3">
+            <p className="text-foreground font-medium">Waiting for applicants through the agent…</p>
+            <p className="text-xs text-muted-foreground">
+              The letting agent is marketing the unit. First enquiries are typically expected within 1–2 months;
+              stronger covenants (national chains, established businesses) often take 3–6 months to come through.
+            </p>
+            <div className="flex justify-center pt-1">
               <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
             </div>
           </div>
