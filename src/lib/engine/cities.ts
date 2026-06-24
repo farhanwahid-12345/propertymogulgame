@@ -87,8 +87,8 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Middlesbrough',
     unlockLevel: 1,
     valueRange: { min: 60_000, max: 180_000 },
-    yieldRange: { min: 6.5, max: 9.5 },
-    monthlyAppreciation: 0.002, // ~2.4%/yr
+    yieldRange: { min: 9.0, max: 11.0 },
+    monthlyAppreciation: 0.000125, // 0.15% pa rental growth
     typeMix: { residential: 0.70, commercial: 0.18, luxury: 0.12 },
     streets: MIDDLESBROUGH_STREETS,
     neighborhoods: MIDDLESBROUGH_NEIGHBORHOODS,
@@ -98,8 +98,8 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Leeds',
     unlockLevel: 1,
     valueRange: { min: 130_000, max: 400_000 },
-    yieldRange: { min: 4.5, max: 7.0 },
-    monthlyAppreciation: 0.003, // ~3.6%/yr
+    yieldRange: { min: 7.5, max: 9.5 },
+    monthlyAppreciation: 0.000208, // 0.25% pa rental growth
     typeMix: { residential: 0.65, commercial: 0.20, luxury: 0.15 },
     streets: LEEDS_STREETS,
     neighborhoods: LEEDS_NEIGHBORHOODS,
@@ -109,8 +109,8 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Manchester',
     unlockLevel: 1,
     valueRange: { min: 160_000, max: 550_000 },
-    yieldRange: { min: 4.0, max: 6.5 },
-    monthlyAppreciation: 0.0035, // ~4.2%/yr
+    yieldRange: { min: 6.5, max: 8.5 },
+    monthlyAppreciation: 0.000292, // 0.35% pa rental growth
     typeMix: { residential: 0.60, commercial: 0.22, luxury: 0.18 },
     streets: MANCHESTER_STREETS,
     neighborhoods: MANCHESTER_NEIGHBORHOODS,
@@ -120,8 +120,8 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'London',
     unlockLevel: 1,
     valueRange: { min: 380_000, max: 1_500_000 },
-    yieldRange: { min: 2.5, max: 4.5 },
-    monthlyAppreciation: 0.004, // ~4.8%/yr
+    yieldRange: { min: 5.0, max: 7.0 },
+    monthlyAppreciation: 0.000417, // 0.5% pa rental growth
     typeMix: { residential: 0.55, commercial: 0.22, luxury: 0.23 },
     streets: LONDON_STREETS,
     neighborhoods: LONDON_NEIGHBORHOODS,
