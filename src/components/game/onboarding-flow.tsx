@@ -39,40 +39,88 @@ const STEPS = [
 
 type Stage = 'welcome' | 'entity' | 'tour-market' | 'tour-buying' | 'tour-bank' | 'tour-ops' | 'tour-monthend' | 'tour-mortgage' | 'tour-tenants' | 'tour-satisfaction' | 'tour-epc' | 'tour-renovations' | 'tour-tax' | 'tour-alerts';
 
+type Stage =
+  | 'welcome' | 'entity'
+  | 'tour-market' | 'tour-buying'
+  | 'tour-open-estate-agent' | 'tour-select-property' | 'tour-review-costs'
+  | 'tour-bank-intro' | 'tour-operations-live'
+  | 'tour-bank' | 'tour-ops' | 'tour-monthend' | 'tour-mortgage'
+  | 'tour-tenants' | 'tour-satisfaction' | 'tour-epc'
+  | 'tour-renovations' | 'tour-tax' | 'tour-alerts';
+
+type Position = 'bottom-right' | 'bottom-left' | 'top-right';
+type InteractionMode = 'passive' | 'waitForAction';
+type TourAction = 'open-estate-agent';
+
 interface TourStep {
   id: Stage;
   icon: typeof Store;
   title: string;
   body: string;
-  index: number;
   /** Tab to switch to before scrolling/highlighting. */
   tab?: string;
   /** DOM id of the element to scroll into view and highlight. */
   scrollId?: string;
+  /** Optional CSS selector (takes precedence over scrollId). */
+  selector?: string;
+  /** Interaction mode — 'waitForAction' steps auto-advance on awaitEvent. */
+  interactionMode?: InteractionMode;
+  /** Custom-event name that auto-advances this step (waitForAction only). */
+  awaitEvent?: string;
+  /** Optional CTA button that triggers a programmatic action. */
+  action?: TourAction;
+  /** Label for the action button. */
+  actionLabel?: string;
+  /** Position of the floating coach card. */
+  position?: Position;
 }
 
 const TOUR_STEPS: TourStep[] = [
-  { id: 'tour-market', icon: Store,         title: "The Market", index: 1, tab: 'market', scrollId: 'section-tabs',
+  { id: 'tour-market', icon: Store,         title: "The Market", tab: 'market', scrollId: 'section-tabs',
     body: "This is the Market tab — estate agent listings and the auction house. We've switched you here now so you can see what's for sale." },
-  { id: 'tour-buying', icon: ShoppingCart,  title: "Making an Offer", index: 2, tab: 'market', scrollId: 'section-market',
+  { id: 'tour-buying', icon: ShoppingCart,  title: "Making an Offer", tab: 'market', scrollId: 'section-market',
     body: "Pick a property, make an offer (cash or mortgage), then wait through conveyancing. Solicitor fees and stamp duty apply on completion." },
-  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", index: 3, tab: 'bank', scrollId: 'section-tabs',
+  { id: 'tour-open-estate-agent', icon: Building2, title: "Open the Estate Agent",
+    tab: 'market', selector: '#estate-agent-trigger',
+    interactionMode: 'waitForAction', awaitEvent: 'pm:estate-agent-opened',
+    action: 'open-estate-agent', actionLabel: 'Take me there',
+    position: 'bottom-left',
+    body: "Let's look at a real property. Click 'Estate Agent' to open the listings." },
+  { id: 'tour-select-property', icon: MousePointerClick, title: "Pick a property",
+    tab: 'market', selector: '[data-tour="first-buy-card"]',
+    interactionMode: 'waitForAction', awaitEvent: 'pm:estate-agent-property-selected',
+    position: 'bottom-left',
+    body: "Pick any property and click it to see the details — price, yield, stamp duty, and mortgage options." },
+  { id: 'tour-review-costs', icon: Receipt, title: "Review the costs",
+    tab: 'market', selector: '#tour-cost-breakdown',
+    position: 'bottom-left',
+    body: "Notice the stamp duty and solicitor fees — these are added on top of the price. Your LTV slider controls your deposit size. Lower LTV = more cash needed upfront, lower monthly payments." },
+  { id: 'tour-bank-intro', icon: Landmark, title: "Check your borrowing",
+    tab: 'bank', scrollId: 'section-bank',
+    position: 'bottom-right',
+    body: "Before buying, check your borrowing capacity. Your credit score and debt-to-income ratio determine what mortgages are available. A score above 700 unlocks the best rates." },
+  { id: 'tour-operations-live', icon: Activity, title: "Operations is your command centre",
+    tab: 'bank', scrollId: 'section-ops',
+    position: 'bottom-right',
+    body: "Once your purchase completes, Operations becomes your command centre. Tenant concerns, eviction notices, and financial warnings all appear here. Check it every few months." },
+  { id: 'tour-bank',   icon: Landmark,      title: "The Bank", tab: 'bank', scrollId: 'section-tabs',
     body: "The Bank tab covers mortgages, overdraft, loans and your tax bill. Refinance equity here to fund your next deposit." },
-  { id: 'tour-mortgage', icon: KeyRound,    title: "Your first mortgage", index: 4, tab: 'market', scrollId: 'section-market',
+  { id: 'tour-mortgage', icon: KeyRound,    title: "Your first mortgage", tab: 'market', scrollId: 'section-market',
     body: "When buying with a mortgage, your LTV (Loan to Value) determines your deposit. 75% LTV on a £100k property means a £25k deposit. Your credit score affects the rates you're offered — keep it above 700 for the best deals." },
-  { id: 'tour-tenants', icon: Users,        title: "Tenants and deposit", index: 5, tab: 'market', scrollId: 'section-tabs',
+  { id: 'tour-tenants', icon: Users,        title: "Tenants and deposit", tab: 'market', scrollId: 'section-tabs',
     body: "Once your purchase completes, select a tenant from the applicants list. You'll hold 5 weeks' rent as a deposit in case of damage. Premium tenants pay more; risky tenants may miss rent but can be evicted for antisocial behaviour after 1 month." },
-  { id: 'tour-satisfaction', icon: Heart,     title: "Satisfaction and concerns", index: 6, tab: 'bank', scrollId: 'section-ops',
+  { id: 'tour-satisfaction', icon: Heart,     title: "Satisfaction and concerns", tab: 'bank', scrollId: 'section-ops',
     body: "Tenant satisfaction drops if you ignore repair concerns. Below 40% they may leave mid-tenancy. Respond to concerns within 1 month to avoid reputation damage. Your landlord reputation (shown in the header) affects your borrowing power." },
-  { id: 'tour-epc', icon: Zap,              title: "EPC and MEES", index: 7, tab: 'bank', scrollId: 'section-ops',
+  { id: 'tour-epc', icon: Zap,              title: "EPC and MEES", tab: 'bank', scrollId: 'section-ops',
     body: "Every property has an EPC rating (A–G). From 2030, any property rated D or below cannot be re-let. Improve ratings through the renovation menu — insulation, heating upgrades, and double glazing all help." },
-  { id: 'tour-renovations', icon: Wrench,    title: "Operations and renovations", index: 8, tab: 'bank', scrollId: 'section-ops',
+  { id: 'tour-renovations', icon: Wrench,    title: "Operations and renovations", tab: 'bank', scrollId: 'section-ops',
     body: "The Operations panel tracks your conveyancing, active renovations, and planning applications. Extensions and conversions require planning permission — submit first, then wait for approval before works can begin." },
-  { id: 'tour-tax', icon: CalendarDays,      title: "Month end and tax", index: 9, tab: undefined, scrollId: 'game-clock-controls',
+  { id: 'tour-tax', icon: CalendarDays,      title: "Month end and tax", tab: undefined, scrollId: 'game-clock-controls',
     body: "Rent, mortgage payments, council tax and expenses all settle at month end. In April (month 4, 16, 28…) your annual tax bill is calculated. As a sole trader, Section 24 limits your mortgage interest relief to a 20% tax credit — this is why many landlords incorporate." },
-  { id: 'tour-alerts', icon: Bell,           title: "Action Required", index: 10, tab: 'market', scrollId: 'section-alerts',
+  { id: 'tour-alerts', icon: Bell,           title: "Action Required", tab: 'market', scrollId: 'section-alerts',
     body: "Eviction notices, deposit disputes and financial warnings appear here. Evictions take 2+ months — serve notice early if a tenant is in persistent arrears. Clear all items before they compound into bigger problems." },
 ];
+
 
 
 
