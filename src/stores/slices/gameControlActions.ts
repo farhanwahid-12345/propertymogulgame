@@ -44,6 +44,23 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       const queue: PendingTransaction[] = Array.isArray(s.pendingTransactions) ? s.pendingTransactions : [];
       const tx = queue.find((t) => t.id === id);
       if (!tx) return;
+      // Phase 8 — HMO licence approval delegates to the dedicated action
+      // (debits the fee + flips the property's licence status to 'applied').
+      if (tx.type === 'hmo_licence_required') {
+        if (!tx.propertyId) return;
+        const before = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+        (get() as any).applyForHmoLicence(tx.propertyId);
+        const after = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+        const didApply = after?.hmoLicenceStatus === 'applied' && before?.hmoLicenceStatus !== 'applied';
+        if (!didApply) return; // toast already shown (insufficient funds / wrong subtype)
+        const s2 = get();
+        const remaining = (s2.pendingTransactions || []).filter((t) => t.id !== id);
+        set({
+          pendingTransactions: remaining,
+          isPaused: remaining.length === 0 ? false : s2.isPaused,
+        });
+        return;
+      }
       const result = debit({ cash: s.cash, overdraftUsed: s.overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
       if (!result) {
         showToast("Insufficient funds", `Cannot approve £${fromPennies(tx.amount).toLocaleString()} — raise cash or extend overdraft first.`, 'destructive');
@@ -73,6 +90,24 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       let approvedAmount = 0;
       let usedOverdraftTotal = 0;
       for (const tx of queue) {
+        // Phase 8 — HMO licence approval is processed via the dedicated action.
+        if (tx.type === 'hmo_licence_required') {
+          if (!tx.propertyId) { remaining.push(tx); continue; }
+          const before = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+          (get() as any).applyForHmoLicence(tx.propertyId);
+          const after = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+          const didApply = after?.hmoLicenceStatus === 'applied' && before?.hmoLicenceStatus !== 'applied';
+          if (didApply) {
+            // applyForHmoLicence already debited via its own action; resync local cash trackers.
+            const fresh = get();
+            cash = fresh.cash;
+            overdraftUsed = fresh.overdraftUsed;
+            approvedAmount += tx.amount;
+          } else {
+            remaining.push(tx);
+          }
+          continue;
+        }
         const result = debit({ cash, overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
         if (!result) {
           remaining.push(tx);

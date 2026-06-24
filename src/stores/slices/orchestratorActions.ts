@@ -347,6 +347,33 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
       };
 
       const renovationsCompletedThisTick = completedRenovations.length > 0;
+
+      // Phase 8 (item 22) — when an HMO conversion finishes on a property
+      // without a licence, queue a blocking pendingTransaction prompting the
+      // player to apply. The game's existing pause-on-pending logic will pause.
+      const newHmoLicencePendings: any[] = [];
+      const HMO_LICENCE_FEE_PENNIES = 100_000; // £1,000 — matches applyForHmoLicence
+      const existingPendings = (prev.pendingTransactions || []) as any[];
+      completedRenovations.forEach((renovation: Renovation) => {
+        const resultingSubtype = (renovation.type as any).resultingSubtype as Property['subtype'] | undefined;
+        if (resultingSubtype !== 'hmo') return;
+        const propAfter = updatedProperties.find(p => p.id === renovation.propertyId);
+        if (!propAfter || propAfter.subtype !== 'hmo') return;
+        if (propAfter.hmoLicenceStatus === 'licensed' || propAfter.hmoLicenceStatus === 'applied') return;
+        const alreadyQueued =
+          existingPendings.some(t => t.type === 'hmo_licence_required' && t.propertyId === propAfter.id) ||
+          newHmoLicencePendings.some(t => t.propertyId === propAfter.id);
+        if (alreadyQueued) return;
+        newHmoLicencePendings.push({
+          id: `hmo_lic_req_${propAfter.id}_${prev.monthsPlayed}`,
+          type: 'hmo_licence_required',
+          amount: HMO_LICENCE_FEE_PENNIES,
+          description: `${propAfter.name} — HMO conversion complete. Apply for a licence before placing tenants.`,
+          month: prev.monthsPlayed,
+          propertyId: propAfter.id,
+        });
+      });
+
       set((s: any) => ({
         ownedProperties: updatedProperties,
         renovations: activeRenovations,
@@ -366,6 +393,10 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
         reputationLog: reputationLogEntries.length > 0
           ? [...((s as any).reputationLog || []), ...reputationLogEntries].slice(-40)
           : ((s as any).reputationLog || []),
+        pendingTransactions: newHmoLicencePendings.length > 0
+          ? [...((s as any).pendingTransactions || []), ...newHmoLicencePendings]
+          : ((s as any).pendingTransactions || []),
+        isPaused: newHmoLicencePendings.length > 0 ? true : (s as any).isPaused,
       } as any));
 
       // Toast AFTER state commit — guarantees the matching concern is in the feed

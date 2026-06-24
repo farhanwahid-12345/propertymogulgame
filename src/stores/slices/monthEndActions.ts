@@ -442,7 +442,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           showToast('HMO Licence Renewal Due', `${property.name} — licence expires in 2 months.`);
         }
         // Fine: 3-month grace, then £500/mo + −2 rep (rep applied via reputationDelta after init)
-        if (status === 'none' || status === 'expired') {
+        // Phase 8 (item 22) — only fine when the unit is actually let.
+        const isOccupied = newTenants.some(t => t.propertyId === property.id);
+        if ((status === 'none' || status === 'expired') && isOccupied) {
           const monthsOwned = newMonthNumber; // approximation — no precise purchase month tracked
           if (status === 'expired' || monthsOwned >= 3) {
             hmoFines += 50_000; // £500
