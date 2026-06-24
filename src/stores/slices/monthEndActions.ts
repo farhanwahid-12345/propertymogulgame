@@ -28,6 +28,7 @@ import {
   MARKET_DIP_PROB, TENANT_WALKOUT_RISK_PROB,
 } from '@/lib/engine/probabilities';
 import { impliedCommercialYield } from '@/lib/engine/market';
+import { generateCommercialApplicantInRange } from '@/components/game/tenant-selector';
 
 // Phase 2 — city-level residential yield anchors for mean-reversion drift.
 const CITY_RESIDENTIAL_YIELD: Record<string, number> = {
