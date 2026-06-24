@@ -203,6 +203,14 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
         onNegotiateExTenantSettlement={(gameState as any).negotiateExTenantSettlement}
         onWriteOffExTenantDebt={(gameState as any).writeOffExTenantDebt}
         onRefileExTenantCCJ={(gameState as any).refileExTenantCCJ}
+        commercialSearchUpdates={(gameState as any).commercialSearchUpdates || []}
+        commercialAgentChase={(gameState as any).commercialAgentChase || {}}
+        vacantCommercialProperties={
+          gameState.ownedProperties
+            .filter((p: any) => p.type === 'commercial' && !p.commercialLease && !gameState.tenants.some((t: any) => t.propertyId === p.id))
+            .map((p: any) => ({ id: p.id, name: p.name }))
+        }
+        onChaseCommercialAgent={(gameState as any).chaseCommercialAgent}
       />
     </InlineDialogButton>
   );
