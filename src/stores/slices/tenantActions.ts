@@ -960,6 +960,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         cash: debited.cash,
         overdraftUsed: debited.overdraftUsed,
         tenants: newTenants,
+        // Phase 1 #3 — clear historical 'default' events so the property card
+        // doesn't show "Xmo owed" after the case is filed (arrears reset to 0).
+        tenantEvents: (s.tenantEvents || []).filter(
+          (e: any) => !(e.propertyId === propertyId && e.type === 'default'),
+        ),
         debtRecoveryCases: [...(s.debtRecoveryCases || []), newCase],
         opsFlashAt: Date.now(),
       });
