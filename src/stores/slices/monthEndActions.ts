@@ -817,6 +817,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           month: newMonthNumber, reason: `${t.tenant.name} walked out of ${property?.name || 'a property'}`,
           delta: d, category: 'walkout',
         });
+        captureExTenantDebt(t.propertyId, property?.name || t.propertyId, t.tenant.name, (t as any).arrearsPennies || 0);
         return false;
       });
       newTenants = satisfactionAdjustedTenants;
