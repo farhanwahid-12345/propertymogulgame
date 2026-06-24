@@ -251,6 +251,7 @@ export function createInitialState(): GameState {
     annualAccounts: [],
     pendingRentReviews: [],
     pendingLeaseRenewals: [],
+    pendingCommercialApplicants: [],
     pendingPoliceLetters: [],
     pendingCourtResolutions: [],
     pendingOverdraftPrompt: null,
