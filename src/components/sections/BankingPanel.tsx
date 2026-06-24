@@ -91,6 +91,7 @@ function InlineDialogButton({
   title,
   attention = false,
   flash = false,
+  autoOpenEvent,
   children,
 }: {
   id?: string;
@@ -99,9 +100,17 @@ function InlineDialogButton({
   title: string;
   attention?: boolean;
   flash?: boolean;
+  /** When set, listens for this window event and auto-opens the dialog. */
+  autoOpenEvent?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!autoOpenEvent || typeof window === 'undefined') return;
+    const handler = () => setOpen(true);
+    window.addEventListener(autoOpenEvent, handler);
+    return () => window.removeEventListener(autoOpenEvent, handler);
+  }, [autoOpenEvent]);
   return (
     <>
       <Button
