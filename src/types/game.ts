@@ -464,6 +464,21 @@ export interface TaxRecord {
   description: string;
 }
 
+// Phase 2 — debt left behind by an ex-tenant. Lives in Operations.
+export interface ExTenantDebt {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  originalArrearsPennies: number;
+  remainingDebtPennies: number;
+  vacatedMonth: number;
+  status: 'chasing' | 'ccj_filed' | 'monthly_recovery' | 'settled' | 'written_off';
+  ccjFiledMonth?: number;
+  monthlyRecoveryPennies?: number;
+  totalRecoveredPennies: number;
+}
+
 export interface GameState {
   // Version for save migration
   _version: number;
