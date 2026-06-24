@@ -201,14 +201,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const agreedRent = Math.max(1, Math.round(terms.agreedRentPennies));
       const requiredDeposit = calcDeposit(agreedRent);
 
-      // Commercial lease transaction fees — solicitor + (optional) HMLR registration.
+      // Commercial lease transaction fees — agent + solicitor + (optional) HMLR registration.
       const fees = calcCommercialLeaseFeesPounds(agreedRent, terms.termMonths);
-      const totalFeesPennies = toPennies(fees.solicitor + fees.landRegistry);
+      const totalFees = fees.solicitor + fees.landRegistry + fees.agentFee;
+      const totalFeesPennies = toPennies(totalFees);
       const debited = debitStrict(prev, totalFeesPennies);
       if (!debited) {
         showToast(
           "Insufficient Funds",
-          `Need £${(fees.solicitor + fees.landRegistry).toLocaleString()} in cash to cover solicitor (£${fees.solicitor.toLocaleString()}) + land registry (£${fees.landRegistry.toLocaleString()}) fees.`,
+          `Need £${totalFees.toLocaleString()} in cash to cover agent (£${fees.agentFee.toLocaleString()}) + solicitor (£${fees.solicitor.toLocaleString()}) + land registry (£${fees.landRegistry.toLocaleString()}) fees.`,
           "destructive",
         );
         return;
@@ -252,9 +253,13 @@ export function createTenantActions(set: SetFn, get: GetFn) {
               baseRent: agreedRent,
               lastTenantChange: prev.monthsPlayed,
               lastRentIncrease: prev.monthsPlayed,
+              commercialVacantSinceMonth: undefined,
             }
           : p,
       );
+      // Drop any queued applicants for this property — the unit is now let.
+      const updatedPendingApplicants = (prev.pendingCommercialApplicants || [])
+        .filter((a) => a.propertyId !== propertyId);
 
       const breakLabel = terms.breakClause.type === 'none'
         ? 'no break clause'
@@ -265,9 +270,15 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       );
       showToast(
         "Commercial lease signed",
-        `Solicitor: £${fees.solicitor.toLocaleString()} | Land Registry: £${fees.landRegistry.toLocaleString()} | Total fees: £${(fees.solicitor + fees.landRegistry).toLocaleString()} deducted.`,
+        `Agent fee: £${fees.agentFee.toLocaleString()} | Solicitor: £${fees.solicitor.toLocaleString()} | Land Registry: £${fees.landRegistry.toLocaleString()} | Total: £${totalFees.toLocaleString()} deducted.`,
       );
-      set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids, cash: debited.cash });
+      set({
+        tenants: updatedTenants,
+        ownedProperties: updatedProps,
+        voidPeriods: updatedVoids,
+        cash: debited.cash,
+        pendingCommercialApplicants: updatedPendingApplicants,
+      });
     },
 
     // Phase 3 — settle a pending commercial rent review at the agreed rent.
