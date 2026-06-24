@@ -1,5 +1,4 @@
 import { lazy, Suspense } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PanelSkeleton } from "@/components/ui/property-card-skeleton";
 import { useGameState } from "@/hooks/useGameState";
 
@@ -16,32 +15,10 @@ const AnnualAccountsStatement = lazy(() =>
 
 type GameState = ReturnType<typeof useGameState>;
 
-export function AccountsPanel({ gameState }: { gameState: GameState }) {
+export function AccountsPanel({ gameState, activeSubTab }: { gameState: GameState; activeSubTab: 'tax' | 'performance' | 'statements' }) {
   return (
-    <Tabs defaultValue="tax" className="w-full mt-2">
-      <TabsList className="glass border-0 bg-white/[0.06] h-9 w-auto">
-        <TabsTrigger
-          value="tax"
-          className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none"
-        >
-          🧾 Tax
-        </TabsTrigger>
-        <TabsTrigger
-          value="performance"
-          className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none"
-        >
-          📈 Performance
-        </TabsTrigger>
-        <TabsTrigger
-          value="statements"
-          className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none"
-        >
-          📑 Statements
-        </TabsTrigger>
-
-      </TabsList>
-
-      <TabsContent value="tax" className="mt-3">
+    <div className="w-full mt-2">
+      {activeSubTab === 'tax' && (
         <Suspense fallback={<PanelSkeleton />}>
           <TaxBreakdown
             entityType={gameState.entityType}
@@ -57,20 +34,17 @@ export function AccountsPanel({ gameState }: { gameState: GameState }) {
             lossesGeneratedThisYearPennies={(gameState as any).lossesGeneratedThisYear || 0}
           />
         </Suspense>
-      </TabsContent>
-
-      <TabsContent value="performance" className="mt-3">
+      )}
+      {activeSubTab === 'performance' && (
         <Suspense fallback={<PanelSkeleton />}>
           <PerformanceChart />
         </Suspense>
-      </TabsContent>
-
-      <TabsContent value="statements" className="mt-3">
+      )}
+      {activeSubTab === 'statements' && (
         <Suspense fallback={<PanelSkeleton />}>
           <AnnualAccountsStatement />
         </Suspense>
-      </TabsContent>
-
-    </Tabs>
+      )}
+    </div>
   );
 }
