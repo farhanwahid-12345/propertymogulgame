@@ -5,6 +5,7 @@ import { Building2, User, FileText, ChevronLeft, ChevronRight } from "lucide-rea
 import { useGameStore } from "@/stores/gameStore";
 import { calculateIncomeTax, calculateCorporationTax } from "@/lib/engine/taxation";
 import { fromPennies } from "@/lib/formatCurrency";
+import { getFurnitureValuePennies } from "@/lib/engine/financials";
 import type { AnnualAccountRecord, EntityType } from "@/types/game";
 import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
