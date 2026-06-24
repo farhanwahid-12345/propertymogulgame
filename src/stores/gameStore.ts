@@ -494,6 +494,12 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       if (!Array.isArray(persisted.pendingCommercialApplicants)) persisted.pendingCommercialApplicants = [];
     },
   },
+  {
+    from: 21, to: 22, describe: 'Phase 2 — exTenantDebts queue',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.exTenantDebts)) persisted.exTenantDebts = [];
+    },
+  },
 ];
 
 
