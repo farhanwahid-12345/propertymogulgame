@@ -478,17 +478,27 @@ export function TenantSelector({
   type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
   const [screened, setScreened] = useState<Record<string, Screened>>({});
 
+  // Phase 3 — commercial properties pull applicants from the agent queue
+  // populated by month-end ticks, not synthesised client-side on open.
+  const pendingCommercialApplicants = useGameStore(s => s.pendingCommercialApplicants);
+  const storeMonthsPlayed = useGameStore(s => s.monthsPlayed);
+  const arrivedCommercialApplicants = (pendingCommercialApplicants || [])
+    .filter(a => a.propertyId === propertyId && a.arrivalMonth <= storeMonthsPlayed)
+    .map(a => a.tenant);
+
   useEffect(() => {
     if (isOpen) {
       setTenantProfiles(
         propertyType === 'commercial'
-          ? generateCommercialTenantProfiles(city ?? 'middlesbrough')
+          ? arrivedCommercialApplicants
           : generateTenantProfiles(),
       );
       setSelectedTenant(null);
       setScreened({});
     }
-  }, [isOpen, propertyType, city]);
+    // arrivedCommercialApplicants identity changes each render — depend on serialised ids instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, propertyType, city, arrivedCommercialApplicants.map(a => a.id).join('|')]);
 
 
 
