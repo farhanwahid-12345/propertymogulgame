@@ -125,8 +125,18 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const paid = conv.purchasePrice || prop.price;
         const advertisedRent = conv.advertisedMonthlyIncome ?? prop.monthlyIncome;
         const bargainRatio = listedValue > 0 ? paid / listedValue : 1;
+        // Phase 2 — yield-implied fair value (residential) using city yield anchor.
+        const cityYieldAtBuy = CITY_RESIDENTIAL_YIELD[prop.city ?? 'middlesbrough'] ?? 0.08;
+        const yieldImpliedValueAtBuy = (prop.type !== 'commercial' && advertisedRent > 0)
+          ? Math.round((advertisedRent * 12) / cityYieldAtBuy)
+          : paid;
         let settledValue: number;
-        if (bargainRatio < 0.9 && listedValue > paid) {
+        if (prop.type !== 'commercial' && yieldImpliedValueAtBuy > paid) {
+          // Midpoint between paid and yield-implied value — captures instant
+          // equity for bargain buys without overshooting fair market.
+          const midpoint = Math.round((paid + yieldImpliedValueAtBuy) / 2);
+          settledValue = Math.min(Math.max(listedValue, paid), midpoint);
+        } else if (bargainRatio < 0.9 && listedValue > paid) {
           // Material bargain → settle slightly above paid (capped at listed value,
           // max +15% of paid) so net worth reflects the instant equity gain.
           settledValue = Math.min(listedValue, Math.round(paid * 1.15));
