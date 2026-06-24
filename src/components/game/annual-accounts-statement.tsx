@@ -129,6 +129,9 @@ export function AnnualAccountsStatement() {
     ownedProperties,
     mortgages,
     loans,
+    conveyancing,
+    renovations,
+    overdraftUsed,
     annualAccounts,
   ]);
 
