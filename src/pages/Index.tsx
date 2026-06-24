@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/game/game-stats";
@@ -121,6 +122,7 @@ const Index = () => {
   useKeyboardShortcuts();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+  const [accountsSubTab, setAccountsSubTab] = useState<'tax' | 'performance' | 'statements'>('tax');
   const [showFirstPurchaseCoach, setShowFirstPurchaseCoach] = useState(false);
 
   const prevOwnedCountRef = useRef(gameState.ownedProperties.length);
@@ -221,6 +223,13 @@ const Index = () => {
                     <LoansInlineButton gameState={gameState} />
                   </>
                 )}
+                {activeTab === 'accounts' && (
+                  <>
+                    <Button variant={accountsSubTab === 'tax' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('tax')}>🧾 Tax</Button>
+                    <Button variant={accountsSubTab === 'performance' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('performance')}>📈 Performance</Button>
+                    <Button variant={accountsSubTab === 'statements' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('statements')}>📑 Statements</Button>
+                  </>
+                )}
                 <OperationsInlineButton gameState={gameState} />
               </div>
             </div>
@@ -230,7 +239,7 @@ const Index = () => {
           <TabsContent value="market" className="mt-0" />
           <TabsContent value="bank" className="mt-0" />
           <TabsContent value="accounts" className="mt-0">
-            <AccountsPanel gameState={gameState} />
+            <AccountsPanel gameState={gameState} activeSubTab={accountsSubTab} />
           </TabsContent>
         </Tabs>
 
