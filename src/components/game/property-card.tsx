@@ -453,13 +453,42 @@ export const PropertyCard = memo(function PropertyCard({
                 🛠️ {activeConcernCount} concern{activeConcernCount > 1 ? 's' : ''}
               </Badge>
             )}
-            {rentArrearsCount > 0 && (
+            {rentArrearsCount > 0 && currentTenant && !hasExTenantDebt && (
               <Badge
                 variant="outline"
                 className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10"
                 title={rentArrearsCount >= 2 ? 'Section 8 eviction available' : 'Tenant has missed rent'}
               >
                 💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
+              </Badge>
+            )}
+            {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
+            {pendingEviction && (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10 cursor-pointer hover:bg-red-500/20"
+                title="Open Operations → Evictions"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
+                  }
+                }}
+              >
+                🔴 Eviction in progress
+              </Badge>
+            )}
+            {isListedForSale && (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20"
+                title="Open Operations → Listings"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'listings', propertyId: property.id } }));
+                  }
+                }}
+              >
+                🏷️ {listingOfferCount > 0 ? `On market — ${listingOfferCount} offer${listingOfferCount === 1 ? '' : 's'}` : 'Listed for sale'}
               </Badge>
             )}
             {hasActiveDebtRecovery && (() => {
