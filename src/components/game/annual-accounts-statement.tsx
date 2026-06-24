@@ -293,6 +293,9 @@ function SoleTraderStatements({ stmt }: { stmt: StatementData }) {
         <Line label="Less: Mortgages" value={`− ${fmt(stmt.mortgageDebtAtYearEnd)}`} />
         <Line label="Less: Other loans" value={`− ${fmt(stmt.loanDebtAtYearEnd)}`} />
         <Total label="Net worth" value={fmt(netWorth)} positive={netWorth >= 0} highlight />
+        <p className="text-[10px] text-muted-foreground italic pt-1">
+          Includes cash held in conveyancing and renovation WIP.
+        </p>
       </Section>
     </div>
   );
