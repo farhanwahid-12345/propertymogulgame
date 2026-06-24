@@ -722,26 +722,6 @@ export function TenantSelector({
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-xs text-muted-foreground">Credit Score</span>
-                      {screened[tenant.id]?.credit ? (
-                        <div className={cn(
-                          "font-semibold",
-                          tenant.creditScore >= 700 ? "text-emerald-400" :
-                          tenant.creditScore >= 600 ? "text-amber-400" : "text-red-400"
-                        )}>
-                          {tenant.creditScore}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'credit', 35); }}
-                          className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200"
-                        >
-                          <CreditCard className="h-3 w-3" /> Run check (£35)
-                        </button>
-                      )}
-                    </div>
-                    <div>
                       <span className="text-xs text-muted-foreground">Income</span>
                       <div className="font-semibold">£{tenant.monthlyIncome.toLocaleString()}/mo</div>
                     </div>
@@ -749,50 +729,44 @@ export function TenantSelector({
                       <span className="text-xs text-muted-foreground">Employment</span>
                       <div className="text-sm">{tenant.employmentStatus}</div>
                     </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Potential Rent</span>
+                    <div className="col-span-2">
+                      <span className="text-xs text-muted-foreground">Likely to offer</span>
                       <div className="font-semibold text-emerald-400 flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
-                        £{potentialRent.toLocaleString()}/mo
+                        £{Math.round(potentialRent * 0.95).toLocaleString()}–£{Math.round(potentialRent * 1.05).toLocaleString()}/mo
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">
-                        £{Math.round(displayBaseRent).toLocaleString()} × {profileMult.toFixed(2)}
+                        Base £{Math.round(displayBaseRent).toLocaleString()} × {profileMult.toFixed(2)}
                         {conditionMult !== 1 && ` × ${conditionMult.toFixed(2)} ${condition}`}
                       </div>
                     </div>
                   </div>
 
-                  {/* Star ratings — gated behind reference check */}
-                  {screened[tenant.id]?.ref ? (
-                    <div className="flex gap-4 pt-1">
-                      <StarRating value={reliabilityStars} label="Reliability" />
-                      <StarRating value={careStars} label="Property Care" />
-                      <span className="text-[10px] text-muted-foreground ml-auto">
-                        Default risk: {tenant.defaultRisk.toFixed(1)}%
-                      </span>
+                  {/* Reference checks — single combined £75 reveal */}
+                  {referenced[tenant.id] ? (
+                    <div className="rounded-md border border-border/40 bg-muted/20 p-2 space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Credit score</span>
+                        <span className={cn("font-semibold", referenced[tenant.id].creditTone)}>{referenced[tenant.id].creditBand}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tenancy history</span>
+                        <span className={cn("font-semibold", referenced[tenant.id].historyTone)}>{referenced[tenant.id].history}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Right to rent</span>
+                        <span className={cn("font-semibold flex items-center gap-1", referenced[tenant.id].rtrTone)}>
+                          <ShieldCheck className="h-3 w-3" /> {referenced[tenant.id].rightToRent}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'ref', 50); }}
-                      className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200 pt-1"
+                      onClick={(e) => { e.stopPropagation(); runReferenceChecks(tenant); }}
+                      className="w-full flex items-center justify-center gap-1.5 text-xs text-sky-300 hover:text-sky-200 border border-sky-400/30 rounded-md py-1.5 mt-1"
                     >
-                      <FileSearch className="h-3 w-3" /> Reference check (£50) — reveal reliability + risk
-                    </button>
-                  )}
-
-                  {/* Right-to-rent — required check */}
-                  {screened[tenant.id]?.rtr ? (
-                    <div className="flex items-center gap-1 text-[11px] text-emerald-400">
-                      <ShieldCheck className="h-3 w-3" /> Right to rent verified
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'rtr', 25); }}
-                      className="flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200"
-                    >
-                      <Lock className="h-3 w-3" /> Right-to-rent check (£25) — legally required
+                      <FileSearch className="h-3 w-3" /> 📋 Reference checks — £75
                     </button>
                   )}
                 </CardContent>
