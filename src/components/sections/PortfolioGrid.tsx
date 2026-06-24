@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PropertyCard } from "@/components/game/property-card";
+import { RENOVATION_OPTIONS } from "@/components/game/renovation-dialog";
 import type { useGameState } from "@/hooks/useGameState";
 
 type GameState = ReturnType<typeof useGameState>;
