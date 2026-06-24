@@ -729,6 +729,7 @@ export type PendingTransactionType =
   | 'income_tax'
   | 'corporation_tax'
   | 'eicr'
+  | 'hmo_licence_required'
   | 'other';
 
 export interface PendingTransaction {
@@ -737,6 +738,8 @@ export interface PendingTransaction {
   amount: number; // pennies
   description: string;
   month: number;
+  /** Phase 8 — for type-specific actions (e.g. hmo_licence_required). */
+  propertyId?: string;
 }
 
 /** A debt-recovery / county-court case filed against a tenant in arrears. */
