@@ -15,6 +15,7 @@ import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
 import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
+import { computeMonthlyCouncilTaxPennies, getCouncilTaxBand } from "@/lib/engine/constants";
 
 
 interface SellerBid {
