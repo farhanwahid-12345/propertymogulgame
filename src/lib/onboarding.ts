@@ -34,9 +34,6 @@ export function dismissTour() {
   if (!state.entityChosen) return;
   try { window.localStorage.setItem(ONBOARDING_DONE_KEY, '1'); } catch { /* noop */ }
   useGameStore.setState({ onboardingCompleted: true } as any);
-  // Force the zustand persist write through immediately so a debounced tick
-  // can't overwrite the dismissed flag with stale state.
-  flushPersistedSave();
 }
 
 /** Clear all tutorial persistence — used by resetGame so a fresh game can
