@@ -1090,27 +1090,7 @@ export const PropertyCard = memo(function PropertyCard({
                       ⏳ Rent pending — tenant just moved in
                     </div>
                   )}
-                  {/* Eviction notice banner OR serve-notice button */}
-                  {currentTenant && pendingEviction && (
-                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 flex items-center justify-between gap-2">
-                      <div className="text-[11px]">
-                        <div className="font-semibold text-destructive">Eviction notice served</div>
-                        <div className="text-muted-foreground">
-                          Ground: {pendingEviction.ground.replace(/_/g, ' ')} · Vacates by month {pendingEviction.effectiveMonth}
-                        </div>
-                      </div>
-                      {cancelEviction && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-[10px] h-7"
-                          onClick={() => cancelEviction(property.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  {/* Phase 2 — eviction detail moved to Operations; compact badge shown at top of card */}
                   {/* Single-tenant rent + eviction controls.
                        Hide for multi-unit (HMO/flats with >1 unit) — those are
                        handled per-slot by MultiUnitSlots above, otherwise this
