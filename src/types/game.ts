@@ -629,6 +629,8 @@ export interface GameState {
   } | null;
   /** Phase 7 #18 — chronological log of completed loans, with on-time flag. */
   loanPayoffHistory?: Array<{ id: string; kind: 'personal' | 'business' | 'investor' | 'bridging'; repaidOnSchedule: boolean; month: number }>;
+  /** Phase 2 — outstanding arrears left by vacated tenants. */
+  exTenantDebts?: ExTenantDebt[];
 }
 
 export interface PoliceLetter {
