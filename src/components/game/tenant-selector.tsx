@@ -681,15 +681,7 @@ export function TenantSelector({
                 onClick={() => { if (!conditionLocked) setSelectedTenant(tenant); }}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{ProfileEmoji[tenant.profile]}</span>
-                      <CardTitle className="text-base">{tenant.name}</CardTitle>
-                    </div>
-                    <Badge variant="outline" className="capitalize text-xs">
-                      {tenant.profile}
-                    </Badge>
-                  </div>
+                  <CardTitle className="text-base">{tenant.name}</CardTitle>
                 </CardHeader>
 
                 <CardContent className="space-y-2.5">
