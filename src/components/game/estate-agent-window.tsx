@@ -750,7 +750,7 @@ export function EstateAgentWindow({
 
 
             {selectedBuyProperty && (
-              <Card className="mt-4">
+              <Card id="tour-cost-breakdown" className="mt-4">
                 <CardHeader>
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
