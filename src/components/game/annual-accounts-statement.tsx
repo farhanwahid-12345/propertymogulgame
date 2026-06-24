@@ -245,6 +245,9 @@ function LtdStatements({ stmt }: { stmt: StatementData }) {
           positive={netAssets >= 0}
           highlight
         />
+        <p className="text-[10px] text-muted-foreground italic pt-1">
+          Includes cash held in conveyancing and renovation WIP.
+        </p>
       </Section>
     </div>
   );
