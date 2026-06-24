@@ -475,8 +475,15 @@ export function TenantSelector({
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
-  type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
-  const [screened, setScreened] = useState<Record<string, Screened>>({});
+  type Reference = {
+    creditBand: string;
+    creditTone: string;
+    history: string;
+    historyTone: string;
+    rightToRent: string;
+    rtrTone: string;
+  };
+  const [referenced, setReferenced] = useState<Record<string, Reference>>({});
 
   // Phase 3 — commercial properties pull applicants from the agent queue
   // populated by month-end ticks, not synthesised client-side on open.
@@ -488,13 +495,14 @@ export function TenantSelector({
 
   useEffect(() => {
     if (isOpen) {
-      setTenantProfiles(
-        propertyType === 'commercial'
-          ? arrivedCommercialApplicants
-          : generateTenantProfiles(),
-      );
+      const pool = propertyType === 'commercial'
+        ? arrivedCommercialApplicants
+        : generateTenantProfiles();
+      // Phase 3 — sort by potential rent (rentMultiplier desc) so highest offers come first.
+      const sorted = [...pool].sort((a, b) => b.rentMultiplier - a.rentMultiplier);
+      setTenantProfiles(sorted);
       setSelectedTenant(null);
-      setScreened({});
+      setReferenced({});
     }
     // arrivedCommercialApplicants identity changes each render — depend on serialised ids instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -504,12 +512,46 @@ export function TenantSelector({
 
   const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
 
-  const runScreening = useCallback((tenantId: string, kind: keyof Screened, costPounds: number) => {
+  const runReferenceChecks = useCallback((tenant: Tenant) => {
+    const COST_POUNDS = 75;
     const cashPennies = useGameStore.getState().cash;
-    if (cashPennies < toPennies(costPounds)) return;
-    useGameStore.getState().setCash(cashPennies - toPennies(costPounds));
-    setScreened(prev => ({ ...prev, [tenantId]: { ...prev[tenantId], [kind]: true } }));
-  }, []);
+    if (cashPennies < toPennies(COST_POUNDS)) return;
+    if (referenced[tenant.id]) return;
+    useGameStore.getState().setCash(cashPennies - toPennies(COST_POUNDS));
+
+    // Credit band — derived inversely from default risk.
+    const dr = tenant.defaultRisk;
+    let creditBand = 'Poor (below 500)';
+    let creditTone = 'text-red-400';
+    if (dr <= 5) { creditBand = 'Excellent (750+)'; creditTone = 'text-emerald-400'; }
+    else if (dr <= 12) { creditBand = 'Good (650–750)'; creditTone = 'text-emerald-300'; }
+    else if (dr <= 22) { creditBand = 'Fair (500–650)'; creditTone = 'text-amber-400'; }
+
+    // Tenancy history — realistic descriptors without naming the profile.
+    let history = 'No previous issues';
+    let historyTone = 'text-emerald-300';
+    if (tenant.profile === 'budget') { history = '1 previous late payment'; historyTone = 'text-amber-300'; }
+    else if (tenant.profile === 'risky') {
+      history = Math.random() < 0.5 ? 'CCJ on record' : 'Previous eviction';
+      historyTone = 'text-red-400';
+    }
+
+    // Right to rent.
+    let rightToRent = 'Verified UK/EU citizen';
+    let rtrTone = 'text-emerald-400';
+    if (tenant.profile === 'budget') {
+      rightToRent = `Valid visa — expires in ${randInt(12, 36)} months`;
+      rtrTone = 'text-amber-300';
+    } else if (tenant.profile === 'risky') {
+      if (Math.random() < 0.2) { rightToRent = 'Cannot verify — do not rent'; rtrTone = 'text-red-400'; }
+      else { rightToRent = `Valid visa — expires in ${randInt(6, 24)} months`; rtrTone = 'text-amber-300'; }
+    }
+
+    setReferenced(prev => ({
+      ...prev,
+      [tenant.id]: { creditBand, creditTone, history, historyTone, rightToRent, rtrTone },
+    }));
+  }, [referenced]);
 
   const handleSelectTenant = useCallback(() => {
     if (!selectedTenant) return;
