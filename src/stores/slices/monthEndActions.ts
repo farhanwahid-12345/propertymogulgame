@@ -2375,6 +2375,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ? [...((s.pendingLeaseRenewals) || []), ...newlyQueuedRenewals]
           : (s.pendingLeaseRenewals || [])
         ).filter(r => !forceSoldPropertyIds.has(r.propertyId)),
+        pendingCommercialApplicants: nextApplicants.filter(a => !forceSoldPropertyIds.has(a.propertyId)),
 
 
 
