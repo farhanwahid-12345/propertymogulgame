@@ -130,7 +130,8 @@ export function OperationsCenter(props: OperationsCenterProps) {
       (tab === "concerns" && counts.concerns === 0) ||
       (tab === "evictions" && counts.ev === 0) ||
       (tab === "listings" && counts.lis === 0) ||
-      (tab === "extdebts" && counts.ext === 0);
+      (tab === "extdebts" && counts.ext === 0) ||
+      (tab === "commercial" && counts.comm === 0);
     if (isCurrentEmpty) setTab(defaultTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultTab]);
