@@ -266,10 +266,14 @@ export function generateMarketProperty(level: number, cityId?: CityId): Property
   const furniturePennies = getFurnitureValuePennies(tempForFurniture);
   const bumpedPrice = base.price + furniturePennies;
   const bumpedValue = base.value + furniturePennies;
+  const bumpedYield = bumpedPrice > 0
+    ? +(((base.monthlyIncome * 12) / bumpedPrice) * 100).toFixed(2)
+    : base.yield;
   return {
     ...base,
     price: bumpedPrice,
     value: bumpedValue,
+    yield: bumpedYield,
     furnishingTier: roll.tier,
     furnishingMonthsRemaining: roll.monthsRemaining,
   };
