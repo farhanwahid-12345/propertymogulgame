@@ -558,7 +558,21 @@ export function EstateAgentWindow({
     setBuyNegotiationRound(0);
     setIsVendorThinking(false);
     setNegotiationHistory([]);
+    try { window.dispatchEvent(new CustomEvent('pm:estate-agent-property-selected')); } catch { /* noop */ }
   }, []);
+
+  // Onboarding tour: external open trigger + open-state broadcast.
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('pm:open-estate-agent', handler);
+    return () => window.removeEventListener('pm:open-estate-agent', handler);
+  }, []);
+  useEffect(() => {
+    if (isOpen) {
+      try { window.dispatchEvent(new CustomEvent('pm:estate-agent-opened')); } catch { /* noop */ }
+    }
+  }, [isOpen]);
+
 
   const handleSelectCityFilter = useCallback((id: CityId | 'all') => setCityFilter(id), []);
 
@@ -593,11 +607,12 @@ export function EstateAgentWindow({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+        <Button id="estate-agent-trigger" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
           <Building2 className="h-4 w-4 mr-2" />
           Estate Agent
         </Button>
       </DialogTrigger>
+
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Estate Agent</DialogTitle>
@@ -673,10 +688,11 @@ export function EstateAgentWindow({
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {sortedBuyProperties.map((property) => (
+              {sortedBuyProperties.map((property, idx) => (
 
                 <Card
                   key={property.id}
+                  data-tour={idx === 0 ? 'first-buy-card' : undefined}
                   className={`cursor-pointer transition-all p-3 space-y-1 ${
                     selectedBuyProperty?.id === property.id
                       ? 'ring-2 ring-primary'
@@ -684,6 +700,7 @@ export function EstateAgentWindow({
                   }`}
                   onClick={() => handleSelectBuyProperty(property)}
                 >
+
 
                   <div>
                     <div className="text-sm font-semibold leading-tight">{property.name}</div>
@@ -733,7 +750,7 @@ export function EstateAgentWindow({
 
 
             {selectedBuyProperty && (
-              <Card className="mt-4">
+              <Card id="tour-cost-breakdown" className="mt-4">
                 <CardHeader>
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
