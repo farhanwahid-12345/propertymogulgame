@@ -21,6 +21,7 @@ import type {
   PendingEviction,
   PropertyListing,
   ExTenantDebt,
+  CommercialSearchUpdate,
 } from "@/types/game";
 
 interface OperationsCenterProps {
