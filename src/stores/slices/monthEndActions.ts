@@ -1456,8 +1456,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const baseline = t.lastRentReviewMonth ?? t.moveInMonth ?? lease?.startMonth ?? 0;
         if (newMonthNumber - baseline < freq) return;
         if (existingPendingByProp.has(property.id)) return;
-        // Suggested market uplift: 3% compounded over the review period.
-        const upliftFactor = Math.pow(1.03, freq / 12);
+        // Phase 5 (item 15) — suggested market uplift mirrors per-city annual rental growth.
+        const annualGrowth = CITY_COMMERCIAL_ANNUAL_GROWTH[property.city ?? 'middlesbrough'] ?? 0.0015;
+        const upliftFactor = Math.pow(1 + annualGrowth, freq / 12);
         const currentRentPennies = property.baseRent || property.monthlyIncome;
         const proposedMarketRentPennies = Math.round(currentRentPennies * upliftFactor);
         newlyQueuedReviews.push({
