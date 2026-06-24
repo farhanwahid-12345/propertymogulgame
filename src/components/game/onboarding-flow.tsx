@@ -138,8 +138,11 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
 
     // Wait a tick so the new tab content paints before we scroll/highlight.
     const raf = requestAnimationFrame(() => {
-      if (!step.scrollId) return;
-      const el = document.getElementById(step.scrollId);
+      const el = step.selector
+        ? document.querySelector<HTMLElement>(step.selector)
+        : step.scrollId
+          ? document.getElementById(step.scrollId)
+          : null;
       if (!el) return;
       try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* noop */ }
       el.classList.add('tour-highlight');
@@ -148,10 +151,32 @@ export function OnboardingFlow({ open, onEntityPick, onFinish, skipEntity = fals
     return () => cancelAnimationFrame(raf);
   }, [stage, open, setActiveTab]);
 
+  // waitForAction steps: auto-advance when the awaited custom event fires.
+  useEffect(() => {
+    if (!open) return;
+    const step = TOUR_STEPS.find(s => s.id === stage);
+    if (!step || step.interactionMode !== 'waitForAction' || !step.awaitEvent) return;
+    const handler = () => {
+      const idx = TOUR_STEPS.findIndex(s => s.id === step.id);
+      if (idx >= 0 && idx < TOUR_STEPS.length - 1) {
+        setStage(TOUR_STEPS[idx + 1].id);
+      }
+    };
+    window.addEventListener(step.awaitEvent, handler);
+    return () => window.removeEventListener(step.awaitEvent!, handler);
+  }, [stage, open]);
+
   const finish = useCallback(() => {
     // Parent handles persistence (dismissTour) — single write path.
     onFinish();
   }, [onFinish]);
+
+  const runStepAction = useCallback((action?: TourAction) => {
+    if (action === 'open-estate-agent') {
+      try { window.dispatchEvent(new CustomEvent('pm:open-estate-agent')); } catch { /* noop */ }
+    }
+  }, []);
+
 
   if (!open) return null;
 
