@@ -475,8 +475,15 @@ export function TenantSelector({
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [tenantProfiles, setTenantProfiles] = useState<Tenant[]>([]);
-  type Screened = { credit?: boolean; ref?: boolean; rtr?: boolean };
-  const [screened, setScreened] = useState<Record<string, Screened>>({});
+  type Reference = {
+    creditBand: string;
+    creditTone: string;
+    history: string;
+    historyTone: string;
+    rightToRent: string;
+    rtrTone: string;
+  };
+  const [referenced, setReferenced] = useState<Record<string, Reference>>({});
 
   // Phase 3 — commercial properties pull applicants from the agent queue
   // populated by month-end ticks, not synthesised client-side on open.
@@ -488,13 +495,14 @@ export function TenantSelector({
 
   useEffect(() => {
     if (isOpen) {
-      setTenantProfiles(
-        propertyType === 'commercial'
-          ? arrivedCommercialApplicants
-          : generateTenantProfiles(),
-      );
+      const pool = propertyType === 'commercial'
+        ? arrivedCommercialApplicants
+        : generateTenantProfiles();
+      // Phase 3 — sort by potential rent (rentMultiplier desc) so highest offers come first.
+      const sorted = [...pool].sort((a, b) => b.rentMultiplier - a.rentMultiplier);
+      setTenantProfiles(sorted);
       setSelectedTenant(null);
-      setScreened({});
+      setReferenced({});
     }
     // arrivedCommercialApplicants identity changes each render — depend on serialised ids instead.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -504,12 +512,46 @@ export function TenantSelector({
 
   const handleOpenChange = useCallback((open: boolean) => setIsOpen(open), []);
 
-  const runScreening = useCallback((tenantId: string, kind: keyof Screened, costPounds: number) => {
+  const runReferenceChecks = useCallback((tenant: Tenant) => {
+    const COST_POUNDS = 75;
     const cashPennies = useGameStore.getState().cash;
-    if (cashPennies < toPennies(costPounds)) return;
-    useGameStore.getState().setCash(cashPennies - toPennies(costPounds));
-    setScreened(prev => ({ ...prev, [tenantId]: { ...prev[tenantId], [kind]: true } }));
-  }, []);
+    if (cashPennies < toPennies(COST_POUNDS)) return;
+    if (referenced[tenant.id]) return;
+    useGameStore.getState().setCash(cashPennies - toPennies(COST_POUNDS));
+
+    // Credit band — derived inversely from default risk.
+    const dr = tenant.defaultRisk;
+    let creditBand = 'Poor (below 500)';
+    let creditTone = 'text-red-400';
+    if (dr <= 5) { creditBand = 'Excellent (750+)'; creditTone = 'text-emerald-400'; }
+    else if (dr <= 12) { creditBand = 'Good (650–750)'; creditTone = 'text-emerald-300'; }
+    else if (dr <= 22) { creditBand = 'Fair (500–650)'; creditTone = 'text-amber-400'; }
+
+    // Tenancy history — realistic descriptors without naming the profile.
+    let history = 'No previous issues';
+    let historyTone = 'text-emerald-300';
+    if (tenant.profile === 'budget') { history = '1 previous late payment'; historyTone = 'text-amber-300'; }
+    else if (tenant.profile === 'risky') {
+      history = Math.random() < 0.5 ? 'CCJ on record' : 'Previous eviction';
+      historyTone = 'text-red-400';
+    }
+
+    // Right to rent.
+    let rightToRent = 'Verified UK/EU citizen';
+    let rtrTone = 'text-emerald-400';
+    if (tenant.profile === 'budget') {
+      rightToRent = `Valid visa — expires in ${randInt(12, 36)} months`;
+      rtrTone = 'text-amber-300';
+    } else if (tenant.profile === 'risky') {
+      if (Math.random() < 0.2) { rightToRent = 'Cannot verify — do not rent'; rtrTone = 'text-red-400'; }
+      else { rightToRent = `Valid visa — expires in ${randInt(6, 24)} months`; rtrTone = 'text-amber-300'; }
+    }
+
+    setReferenced(prev => ({
+      ...prev,
+      [tenant.id]: { creditBand, creditTone, history, historyTone, rightToRent, rtrTone },
+    }));
+  }, [referenced]);
 
   const handleSelectTenant = useCallback(() => {
     if (!selectedTenant) return;
@@ -634,20 +676,12 @@ export function TenantSelector({
                   "transition-all border",
                   conditionLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-md",
                   isSelected && !conditionLocked && "ring-2 ring-primary",
-                  ProfileColors[tenant.profile]
+                  "border-border/40 bg-muted/10"
                 )}
                 onClick={() => { if (!conditionLocked) setSelectedTenant(tenant); }}
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{ProfileEmoji[tenant.profile]}</span>
-                      <CardTitle className="text-base">{tenant.name}</CardTitle>
-                    </div>
-                    <Badge variant="outline" className="capitalize text-xs">
-                      {tenant.profile}
-                    </Badge>
-                  </div>
+                  <CardTitle className="text-base">{tenant.name}</CardTitle>
                 </CardHeader>
 
                 <CardContent className="space-y-2.5">
@@ -688,26 +722,6 @@ export function TenantSelector({
 
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-xs text-muted-foreground">Credit Score</span>
-                      {screened[tenant.id]?.credit ? (
-                        <div className={cn(
-                          "font-semibold",
-                          tenant.creditScore >= 700 ? "text-emerald-400" :
-                          tenant.creditScore >= 600 ? "text-amber-400" : "text-red-400"
-                        )}>
-                          {tenant.creditScore}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'credit', 35); }}
-                          className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200"
-                        >
-                          <CreditCard className="h-3 w-3" /> Run check (£35)
-                        </button>
-                      )}
-                    </div>
-                    <div>
                       <span className="text-xs text-muted-foreground">Income</span>
                       <div className="font-semibold">£{tenant.monthlyIncome.toLocaleString()}/mo</div>
                     </div>
@@ -715,50 +729,44 @@ export function TenantSelector({
                       <span className="text-xs text-muted-foreground">Employment</span>
                       <div className="text-sm">{tenant.employmentStatus}</div>
                     </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Potential Rent</span>
+                    <div className="col-span-2">
+                      <span className="text-xs text-muted-foreground">Likely to offer</span>
                       <div className="font-semibold text-emerald-400 flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
-                        £{potentialRent.toLocaleString()}/mo
+                        £{Math.round(potentialRent * 0.95).toLocaleString()}–£{Math.round(potentialRent * 1.05).toLocaleString()}/mo
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">
-                        £{Math.round(displayBaseRent).toLocaleString()} × {profileMult.toFixed(2)}
+                        Base £{Math.round(displayBaseRent).toLocaleString()} × {profileMult.toFixed(2)}
                         {conditionMult !== 1 && ` × ${conditionMult.toFixed(2)} ${condition}`}
                       </div>
                     </div>
                   </div>
 
-                  {/* Star ratings — gated behind reference check */}
-                  {screened[tenant.id]?.ref ? (
-                    <div className="flex gap-4 pt-1">
-                      <StarRating value={reliabilityStars} label="Reliability" />
-                      <StarRating value={careStars} label="Property Care" />
-                      <span className="text-[10px] text-muted-foreground ml-auto">
-                        Default risk: {tenant.defaultRisk.toFixed(1)}%
-                      </span>
+                  {/* Reference checks — single combined £75 reveal */}
+                  {referenced[tenant.id] ? (
+                    <div className="rounded-md border border-border/40 bg-muted/20 p-2 space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Credit score</span>
+                        <span className={cn("font-semibold", referenced[tenant.id].creditTone)}>{referenced[tenant.id].creditBand}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tenancy history</span>
+                        <span className={cn("font-semibold", referenced[tenant.id].historyTone)}>{referenced[tenant.id].history}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Right to rent</span>
+                        <span className={cn("font-semibold flex items-center gap-1", referenced[tenant.id].rtrTone)}>
+                          <ShieldCheck className="h-3 w-3" /> {referenced[tenant.id].rightToRent}
+                        </span>
+                      </div>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'ref', 50); }}
-                      className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200 pt-1"
+                      onClick={(e) => { e.stopPropagation(); runReferenceChecks(tenant); }}
+                      className="w-full flex items-center justify-center gap-1.5 text-xs text-sky-300 hover:text-sky-200 border border-sky-400/30 rounded-md py-1.5 mt-1"
                     >
-                      <FileSearch className="h-3 w-3" /> Reference check (£50) — reveal reliability + risk
-                    </button>
-                  )}
-
-                  {/* Right-to-rent — required check */}
-                  {screened[tenant.id]?.rtr ? (
-                    <div className="flex items-center gap-1 text-[11px] text-emerald-400">
-                      <ShieldCheck className="h-3 w-3" /> Right to rent verified
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); runScreening(tenant.id, 'rtr', 25); }}
-                      className="flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200"
-                    >
-                      <Lock className="h-3 w-3" /> Right-to-rent check (£25) — legally required
+                      <FileSearch className="h-3 w-3" /> 📋 Reference checks — £75
                     </button>
                   )}
                 </CardContent>
