@@ -1148,6 +1148,11 @@ export const PropertyCard = memo(function PropertyCard({
                       />
                     </div>
                   )}
+                  {property.type === 'commercial' && currentTenant && (
+                    <div className="text-[11px] text-muted-foreground italic px-1 py-1">
+                      Commercial lease management — see the lease panel above for rent reviews, break clauses, and renewal options.
+                    </div>
+                  )}
                   </>}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
