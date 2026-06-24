@@ -155,6 +155,11 @@ interface GameActions {
   sendArrearsToCourt: (propertyId: string, slotIndex?: number) => void;
   issueLetterBeforeAction: (propertyId: string, slotIndex?: number) => void;
   escalateToHighCourt: (caseId: string) => void;
+  // Phase 2 — Ex-tenant debt recovery (post-tenancy chasing)
+  fileExTenantCCJ: (debtId: string) => void;
+  negotiateExTenantSettlement: (debtId: string, pct: number) => void;
+  writeOffExTenantDebt: (debtId: string) => void;
+  refileExTenantCCJ: (debtId: string) => void;
   // Phase 4 #2 — Title-split a converted flat into its own leasehold property
   splitFlatUnit: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
   // Phase 2 (v5) — Letting Agent / Rent Guarantee / HMO Licensing
