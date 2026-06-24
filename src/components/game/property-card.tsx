@@ -215,6 +215,9 @@ export const PropertyCard = memo(function PropertyCard({
   onSendToCourt,
   onSplitFlatUnit,
   tenantConcerns = [],
+  hasExTenantDebt = false,
+  isListedForSale = false,
+  listingOfferCount = 0,
 }: PropertyCardProps) {
 
   const [isLoading, setIsLoading] = useState(false);
