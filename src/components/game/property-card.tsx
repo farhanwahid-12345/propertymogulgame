@@ -1096,7 +1096,7 @@ export const PropertyCard = memo(function PropertyCard({
                        handled per-slot by MultiUnitSlots above, otherwise this
                        dialog would pass property.monthlyIncome (the combined
                        total) as the per-slot floor and reject all raises. */}
-                  {currentTenant && !pendingEviction && evictTenant && !(multiUnitSlots && multiUnitSlots.length > 0) && (
+                  {currentTenant && !pendingEviction && evictTenant && !(multiUnitSlots && multiUnitSlots.length > 0) && property.type !== 'commercial' && (
                     <div className="grid grid-cols-2 gap-2">
                       {applyRentIncrease && (
                         <RentNegotiationDialog
