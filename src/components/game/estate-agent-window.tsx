@@ -739,6 +739,23 @@ export function EstateAgentWindow({
                     <span className="text-muted-foreground">Base Rent</span>
                     <span className="text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
                   </div>
+                  {(() => {
+                    const band = getCouncilTaxBand(property.value);
+                    const monthly = Math.round(
+                      computeMonthlyCouncilTaxPennies({
+                        valuePounds: property.value,
+                        city: (property as any).city,
+                        isOccupied: false,
+                        isInVoidDiscountWindow: false,
+                      }) / 100,
+                    );
+                    return (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Council Tax</span>
+                        <span className="font-medium">Band {band} · £{monthly}/mo</span>
+                      </div>
+                    );
+                  })()}
                   {(property as any).commercialLease && (property as any).sittingTenant && (
                     <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-blue-500/50 text-blue-300">
                       🏢 Tenanted · FRI lease
