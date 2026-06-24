@@ -106,12 +106,6 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
   const price = Math.floor(basePrice / 100_000) * 100_000;
   const value = price;
 
-  // Yield: blend the city's typical range with the value-anchored centre.
-  const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
-  const valueAnchored = yieldForValue(value);
-  const averageYield = (cityYield * 0.7) + (valueAnchored * 0.3);
-  const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
-
   const neighborhood = city.neighborhoods[Math.floor(Math.random() * city.neighborhoods.length)];
   const streetName = city.streets[Math.floor(Math.random() * city.streets.length)];
   const houseNumber = Math.floor(1 + Math.random() * 200);
@@ -147,10 +141,36 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
   const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
   let marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
 
+  // Phase 4 (items 9–12) — anchor expected residential rent to LHA bands.
+  // Commercial stock keeps yield-based pricing (handled in the sitting-tenant
+  // branch below); for non-commercial we use LHA × tier with small jitter.
+  let baseMonthlyIncome: number;
+  if (type === 'commercial') {
+    // Provisional figure; overridden by income-cap pricing if a sitting tenant
+    // is generated. Otherwise we keep a yield-based asking rent for vacant
+    // commercial units (no LHA reference).
+    const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
+    baseMonthlyIncome = Math.floor((price * (cityYield / 100)) / 12);
+  } else {
+    const rentJitter = 1 + (Math.random() - 0.5) * 0.16; // ±8%
+    baseMonthlyIncome = Math.round(
+      lhaAnchoredMonthlyRentPennies({
+        cityId: city.id,
+        internalSqft,
+        valuePennies: value,
+        subtype: 'standard',
+        subtypeUnits: 1,
+        tier: 'standard',
+      }) * rentJitter,
+    );
+  }
+
   let finalPrice = price;
   let finalValue = value;
-  let finalYield = averageYield;
   let finalMonthlyIncome = Math.max(toPennies(400), baseMonthlyIncome);
+  // Yield is now back-computed from anchored rent and value.
+  let finalYield = (finalMonthlyIncome * 12) / value * 100;
+
   let commercialLease: Property['commercialLease'] | undefined;
   let sittingTenant: Property['sittingTenant'] | undefined;
 
