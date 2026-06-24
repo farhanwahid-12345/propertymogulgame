@@ -265,6 +265,8 @@ export function createInitialState(): GameState {
     loanPayoffHistory: [],
     seenGroundRentExplainer: false,
     exTenantDebts: [],
+    commercialSearchUpdates: [],
+    commercialAgentChase: {},
 
 
   };
