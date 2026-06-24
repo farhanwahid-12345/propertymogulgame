@@ -262,9 +262,9 @@ function SoleTraderStatements({ stmt }: { stmt: StatementData }) {
   // accounting net profit so the player can see real economic profit.
   const netProfit = stmt.netProfitBeforeTax;
 
-  const grossAssets = stmt.propertyValueAtYearEnd + stmt.cashAtYearEnd;
-  const totalDebt = stmt.mortgageDebtAtYearEnd + stmt.loanDebtAtYearEnd;
-  const netWorth = grossAssets - totalDebt;
+  // Phase 1 #7 — use the header's net-worth formula (precomputed upstream)
+  // so this figure matches the headline in HeroHeader exactly.
+  const netWorth = stmt.netWorthAtYearEnd;
 
   return (
     <div className="space-y-4">
