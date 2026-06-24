@@ -558,7 +558,21 @@ export function EstateAgentWindow({
     setBuyNegotiationRound(0);
     setIsVendorThinking(false);
     setNegotiationHistory([]);
+    try { window.dispatchEvent(new CustomEvent('pm:estate-agent-property-selected')); } catch { /* noop */ }
   }, []);
+
+  // Onboarding tour: external open trigger + open-state broadcast.
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('pm:open-estate-agent', handler);
+    return () => window.removeEventListener('pm:open-estate-agent', handler);
+  }, []);
+  useEffect(() => {
+    if (isOpen) {
+      try { window.dispatchEvent(new CustomEvent('pm:estate-agent-opened')); } catch { /* noop */ }
+    }
+  }, [isOpen]);
+
 
   const handleSelectCityFilter = useCallback((id: CityId | 'all') => setCityFilter(id), []);
 
