@@ -631,6 +631,21 @@ export interface GameState {
   loanPayoffHistory?: Array<{ id: string; kind: 'personal' | 'business' | 'investor' | 'bridging'; repaidOnSchedule: boolean; month: number }>;
   /** Phase 2 — outstanding arrears left by vacated tenants. */
   exTenantDebts?: ExTenantDebt[];
+  /** Phase 7 — agent comms for vacant commercial units (newest-last). */
+  commercialSearchUpdates?: CommercialSearchUpdate[];
+  /** Phase 7 — monthsPlayed when player last chased the agent per property. */
+  commercialAgentChase?: Record<string, number>;
+}
+
+/** Phase 7 — agent update for a vacant commercial unit. */
+export interface CommercialSearchUpdate {
+  id: string;
+  propertyId: string;
+  message: string;
+  month: number;
+  estimatedNextApplicantMonth?: number;
+  leadCount: number;
+  kind: 'status' | 'new_enquiry' | 'chase';
 }
 
 export interface PoliceLetter {
