@@ -676,7 +676,7 @@ export function TenantSelector({
                   "transition-all border",
                   conditionLocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:shadow-md",
                   isSelected && !conditionLocked && "ring-2 ring-primary",
-                  ProfileColors[tenant.profile]
+                  "border-border/40 bg-muted/10"
                 )}
                 onClick={() => { if (!conditionLocked) setSelectedTenant(tenant); }}
               >
