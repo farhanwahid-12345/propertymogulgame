@@ -108,6 +108,7 @@ function OnboardingGate({
       setActiveTab={setActiveTab}
       onEntityPick={(entity) => setEntityType(entity)}
       onFinish={() => {
+        useGameStore.setState({ onboardingCompleted: true } as any);
         setDismissed(true);
         onboardingModule.dismissTour();
       }}
