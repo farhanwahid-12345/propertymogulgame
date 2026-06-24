@@ -1,11 +1,62 @@
 // Property generation — pure functions, all monetary values in pennies
 import type { Property } from "@/types/game";
 import { toPennies } from "@/lib/formatCurrency";
-import { MIDDLESBROUGH_STREETS, NEIGHBORHOODS } from "./constants";
+import {
+  MIDDLESBROUGH_STREETS, NEIGHBORHOODS,
+  CITY_LHA_MONTHLY_PENNIES, LHA_TENANT_TIER_MULT, bedroomsForSqft,
+} from "./constants";
 import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
 import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
 import { getCityConfig, pickTypeForCity, type CityId } from "./cities";
 import { generateSittingCommercialTenant } from "@/components/game/tenant-selector";
+
+/**
+ * Phase 4 (items 9–12) — LHA-anchored expected monthly rent (pennies) for a
+ * property listing. Replaces the inflated `value × yield / 12` baseline.
+ *
+ *  - Bedroom band is inferred from per-unit sqft (HMO/multi-let split by unit)
+ *    or per-unit value bands for flats subtype where sqft isn't subdivided.
+ *  - Tier defaults to 'standard' (1.30× LHA), the market "asking" expectation.
+ */
+export function lhaAnchoredMonthlyRentPennies(args: {
+  cityId?: string;
+  internalSqft: number;
+  valuePennies: number;
+  subtype?: 'standard' | 'hmo' | 'flats' | 'multi-let';
+  subtypeUnits?: number;
+  tier?: 'risky' | 'budget' | 'standard' | 'premium';
+}): number {
+  const cityKey = (args.cityId ?? 'middlesbrough').toLowerCase();
+  const table = CITY_LHA_MONTHLY_PENNIES[cityKey] ?? CITY_LHA_MONTHLY_PENNIES.middlesbrough;
+  const units = Math.max(1, args.subtypeUnits ?? 1);
+
+  // Per-unit bedroom inference.
+  let bedrooms: number;
+  if (args.subtype === 'flats' && units > 1) {
+    // Per-unit value → sqft-equivalent band via price.
+    const perUnitValuePounds = (args.valuePennies / 100) / units;
+    if (perUnitValuePounds < 60_000) bedrooms = 1;
+    else if (perUnitValuePounds < 110_000) bedrooms = 2;
+    else if (perUnitValuePounds < 180_000) bedrooms = 3;
+    else bedrooms = 4;
+  } else if ((args.subtype === 'hmo' || args.subtype === 'multi-let') && units > 1) {
+    bedrooms = bedroomsForSqft(Math.round(args.internalSqft / units));
+  } else {
+    bedrooms = bedroomsForSqft(args.internalSqft);
+  }
+
+  const lhaPerUnit = table[bedrooms] ?? table[2];
+  const tier = args.tier ?? 'standard';
+  const mult = LHA_TENANT_TIER_MULT[tier];
+  const perUnitRent = Math.round(lhaPerUnit * mult);
+  // Multi-unit properties aggregate rent across all units.
+  const aggregate = (args.subtype === 'hmo' || args.subtype === 'flats' || args.subtype === 'multi-let')
+    ? perUnitRent * units
+    : perUnitRent;
+  return Math.max(toPennies(400), aggregate);
+}
+
+
 
 /** Phase 3 — implied yield for an income-producing commercial property based on
  *  covenant strength and remaining lease term. Clamped to 6–15%. */
@@ -55,12 +106,6 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
   const price = Math.floor(basePrice / 100_000) * 100_000;
   const value = price;
 
-  // Yield: blend the city's typical range with the value-anchored centre.
-  const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
-  const valueAnchored = yieldForValue(value);
-  const averageYield = (cityYield * 0.7) + (valueAnchored * 0.3);
-  const baseMonthlyIncome = Math.floor((price * (averageYield / 100)) / 12);
-
   const neighborhood = city.neighborhoods[Math.floor(Math.random() * city.neighborhoods.length)];
   const streetName = city.streets[Math.floor(Math.random() * city.streets.length)];
   const houseNumber = Math.floor(1 + Math.random() * 200);
@@ -96,10 +141,36 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
   const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
   let marketValue = Math.max(toPennies(40_000), Math.round(value * marketJitter));
 
+  // Phase 4 (items 9–12) — anchor expected residential rent to LHA bands.
+  // Commercial stock keeps yield-based pricing (handled in the sitting-tenant
+  // branch below); for non-commercial we use LHA × tier with small jitter.
+  let baseMonthlyIncome: number;
+  if (type === 'commercial') {
+    // Provisional figure; overridden by income-cap pricing if a sitting tenant
+    // is generated. Otherwise we keep a yield-based asking rent for vacant
+    // commercial units (no LHA reference).
+    const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
+    baseMonthlyIncome = Math.floor((price * (cityYield / 100)) / 12);
+  } else {
+    const rentJitter = 1 + (Math.random() - 0.5) * 0.16; // ±8%
+    baseMonthlyIncome = Math.round(
+      lhaAnchoredMonthlyRentPennies({
+        cityId: city.id,
+        internalSqft,
+        valuePennies: value,
+        subtype: 'standard',
+        subtypeUnits: 1,
+        tier: 'standard',
+      }) * rentJitter,
+    );
+  }
+
   let finalPrice = price;
   let finalValue = value;
-  let finalYield = averageYield;
   let finalMonthlyIncome = Math.max(toPennies(400), baseMonthlyIncome);
+  // Yield is now back-computed from anchored rent and value.
+  let finalYield = (finalMonthlyIncome * 12) / value * 100;
+
   let commercialLease: Property['commercialLease'] | undefined;
   let sittingTenant: Property['sittingTenant'] | undefined;
 
