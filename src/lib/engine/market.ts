@@ -60,12 +60,21 @@ export function lhaAnchoredMonthlyRentPennies(args: {
 
 /** Phase 3 — implied yield for an income-producing commercial property based on
  *  covenant strength and remaining lease term. Clamped to 6–15%. */
-export function impliedCommercialYield(covenantStrength: number, remainingMonths: number): number {
-  // 6% for blue-chip national on long lease → 15% for weak local on short lease
-  const covenantDiscount = (covenantStrength / 100) * 0.07; // up to −7% from covenant
-  const termDiscount = (Math.min(remainingMonths, 120) / 120) * 0.02; // up to −2% from term
-  const y = 0.15 - covenantDiscount - termDiscount;
-  return Math.max(0.06, Math.min(0.15, y));
+/** Phase 5 (item 14) — implied commercial yield is a step function of covenant
+ *  strength with London-specific yield compression. `remainingMonths` is kept
+ *  in the signature for back-compatibility but no longer materially shifts the
+ *  yield (covenant dominates pricing). */
+export function impliedCommercialYield(
+  covenantStrength: number,
+  _remainingMonths: number,
+  cityId?: string,
+): number {
+  const isLondon = (cityId ?? '').toLowerCase() === 'london';
+  if (covenantStrength >= 80) return isLondon ? 0.055 : 0.06;  // national high
+  if (covenantStrength >= 65) return isLondon ? 0.060 : 0.08;  // national mid
+  if (covenantStrength >= 50) return isLondon ? 0.065 : 0.10;  // local high
+  if (covenantStrength >= 35) return isLondon ? 0.070 : 0.11;  // local mid
+  return isLondon ? 0.075 : 0.12;                              // local lower
 }
 
 /** Map a property value (pennies) to a plausible gross rental yield %.
@@ -184,7 +193,7 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     const elapsed = Math.floor(Math.random() * 24); // already-served portion
     const termMonths = remainingTermMonths + elapsed;
     const negotiatedRentPennies = Math.max(toPennies(400), baseMonthlyIncome);
-    const impliedYield = impliedCommercialYield(covenantStrength, remainingTermMonths);
+    const impliedYield = impliedCommercialYield(covenantStrength, remainingTermMonths, city.id);
     const incomePrice = Math.round((negotiatedRentPennies * 12) / impliedYield);
     finalPrice = Math.max(toPennies(40_000), Math.round(incomePrice / 100_000) * 100_000);
     finalValue = finalPrice;
