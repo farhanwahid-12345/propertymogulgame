@@ -1344,27 +1344,30 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const tenantRec = newTenants.find(t => t.propertyId === property.id);
           const cov = tenantRec?.tenant?.covenantStrength ?? 50;
           const remainingMonths = Math.max(0, (lease.expiryMonth ?? 0) - newMonthNumber);
-          const rawYield = 0.10 - (cov / 1000) - (remainingMonths / 6000);
-          const impliedYield = Math.min(0.12, Math.max(0.05, rawYield));
+          const impliedYield = impliedCommercialYield(cov, remainingMonths);
           const annualRent = (property.monthlyIncome || 0) * 12;
           const capValue = impliedYield > 0 ? Math.round(annualRent / impliedYield) : property.value;
           // Light noise so net worth isn't perfectly static between events.
           const noisy = Math.round(capValue * (1 + (gameRandom() - 0.5) * 0.004));
           return { ...property, value: noisy, marketValue: noisy };
         }
-        // Condition-aware mean drift: premium appreciates faster, dilapidated decays
-        const meanByCondition =
-          property.condition === 'premium'     ? 0.0030 :
-          property.condition === 'dilapidated' ? -0.0005 :
-                                                 0.0020; // standard
-        const monthlyDrift = meanByCondition + (gameRandom() - 0.5) * 0.003; // ±0.15%
+        // Phase 2 — residential: yield mean-reversion toward city-implied fair value.
+        const cityYield = CITY_RESIDENTIAL_YIELD[property.city ?? 'middlesbrough'] ?? 0.08;
+        const monthlyIncomePennies = property.monthlyIncome || 0;
+        const yieldImpliedValue = monthlyIncomePennies > 0
+          ? Math.round((monthlyIncomePennies * 12) / cityYield)
+          : property.value;
+        const reversion = (yieldImpliedValue - property.value) * 0.02;
+        const noise = (gameRandom() - 0.5) * property.value * 0.003;
         const isDip = gameRandom() < MARKET_DIP_PROB;
-        const change = isDip ? -(0.004 + gameRandom() * 0.012) : monthlyDrift;
-        const purchaseBasis = property.price || property.value;
-        const valueCap = Math.round(purchaseBasis * 2.5);
-        const drifted = Math.round(property.value * (1 + change));
-        const driftedMarket = Math.round((property.marketValue || property.value) * (1 + change));
-        const newValue = change > 0 ? Math.min(drifted, valueCap) : drifted;
+        const dipAmount = isDip ? -(0.004 + gameRandom() * 0.012) * property.value : 0;
+        const drifted = Math.round(property.value + reversion + noise + dipAmount);
+        // Growth cap scales with rental income, not the (possibly bargain) price paid.
+        const valueCap = Math.round(yieldImpliedValue * 2.5);
+        const isAppreciating = drifted > property.value;
+        const newValue = isAppreciating ? Math.min(drifted, valueCap) : drifted;
+        const driftRatio = property.value > 0 ? newValue / property.value : 1;
+        const driftedMarket = Math.round((property.marketValue || property.value) * driftRatio);
         return {
           ...property,
           value: newValue,
