@@ -160,6 +160,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
     { key: "evictions", label: "Evictions", icon: ShieldAlert, count: counts.ev },
     { key: "listings", label: "Listings", icon: Tag, count: counts.lis },
     { key: "extdebts", label: "Ex-Debts", icon: Coins, count: counts.ext },
+    { key: "commercial", label: "Comm. Letting", icon: Megaphone, count: counts.comm },
     { key: "conveyancing", label: "Conveyancing", icon: Hourglass, count: counts.conv },
     { key: "planning", label: "Planning", icon: FileText, count: counts.plan },
     { key: "renovations", label: "Renovations", icon: Hammer, count: counts.reno },
