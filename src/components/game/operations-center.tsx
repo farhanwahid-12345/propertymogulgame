@@ -360,6 +360,70 @@ export function OperationsCenter(props: OperationsCenterProps) {
               );
             })}
           </TabsContent>
+
+          <TabsContent value="commercial" className="mt-0 space-y-3">
+            {vacantCommercialProperties.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No vacant commercial units.</p>
+            ) : vacantCommercialProperties.map(prop => {
+              const propUpdates = commercialSearchUpdates
+                .filter(u => u.propertyId === prop.id)
+                .sort((a, b) => b.month - a.month)
+                .slice(0, 6);
+              const latest = propUpdates[0];
+              const lastChase = commercialAgentChase[prop.id] ?? -999;
+              const canChase = (monthsPlayed - lastChase) >= 2;
+              const chaseWait = Math.max(0, 2 - (monthsPlayed - lastChase));
+              return (
+                <div key={prop.id} className="rounded-lg border border-white/10 bg-white/[0.04] p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="text-xs space-y-0.5">
+                      <div className="font-semibold text-foreground flex items-center gap-1.5">
+                        <Megaphone className="h-3.5 w-3.5 text-primary" />
+                        {prop.name}
+                      </div>
+                      {latest?.estimatedNextApplicantMonth != null && (
+                        <div className="text-muted-foreground">
+                          Next applicant expected ~ month {latest.estimatedNextApplicantMonth}
+                          {' '}({Math.max(0, latest.estimatedNextApplicantMonth - monthsPlayed)}mo)
+                          {' · '}{latest.leadCount} lead{latest.leadCount === 1 ? '' : 's'} in pipeline
+                        </div>
+                      )}
+                    </div>
+                    {onChaseCommercialAgent && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        disabled={!canChase}
+                        onClick={() => onChaseCommercialAgent(prop.id)}
+                      >
+                        {canChase ? '📣 Chase agent' : `Chase in ${chaseWait}mo`}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {propUpdates.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground italic">No updates yet — first month-end report incoming.</p>
+                    ) : propUpdates.map(u => (
+                      <div key={u.id} className="text-[11px] flex items-start gap-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            u.kind === 'new_enquiry' ? 'border-green-400/40 bg-green-500/10 text-green-300' :
+                            u.kind === 'chase' ? 'border-amber-400/40 bg-amber-500/10 text-amber-300' :
+                            'border-white/20 text-muted-foreground'
+                          }
+                        >
+                          M{u.month}
+                        </Badge>
+                        <span className="text-foreground/90 flex-1">{u.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </TabsContent>
         </div>
       </Tabs>
     </div>
