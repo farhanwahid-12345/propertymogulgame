@@ -42,6 +42,9 @@ export function AnnualAccountsStatement() {
   const ownedProperties = useGameStore((s) => s.ownedProperties);
   const mortgages = useGameStore((s) => s.mortgages);
   const loans = useGameStore((s) => s.loans || []);
+  const conveyancing = useGameStore((s) => s.conveyancing || []);
+  const renovations = useGameStore((s) => s.renovations || []);
+  const overdraftUsed = useGameStore((s) => s.overdraftUsed || 0);
   const annualAccounts = useGameStore(
     (s) => (s as any).annualAccounts as AnnualAccountRecord[] | undefined,
   );
@@ -54,7 +57,22 @@ export function AnnualAccountsStatement() {
     const propertyValue = ownedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
     const mortgageDebt = mortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
     const loanDebt = loans.reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
-    const netWorth = cash + propertyValue - mortgageDebt - loanDebt;
+    // Phase 1 #7 — align with HeroHeader / useGameState netWorth formula:
+    // include cash held by solicitor on in-flight buys, renovation WIP,
+    // remaining furniture depreciation, and subtract overdraft drawn.
+    const inflightBuyCapital = conveyancing
+      .filter((c: any) => c.status === 'buying')
+      .reduce((sum: number, c: any) => sum + (c.cashHeld || 0), 0);
+    const renovationWIP = renovations.reduce(
+      (sum: number, r: any) => sum + ((r.type?.cost || 0) * 100),
+      0,
+    );
+    const furnitureValue = ownedProperties.reduce(
+      (sum: number, p: any) => sum + getFurnitureValuePennies(p),
+      0,
+    );
+    const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
+      + propertyValue - mortgageDebt - loanDebt - overdraftUsed;
     const ytdTax =
       entityType === 'ltd'
         ? calculateCorporationTax(yearlyGrossRent, yearlyMortgageInterest, yearlyDeductibleExpenses)
