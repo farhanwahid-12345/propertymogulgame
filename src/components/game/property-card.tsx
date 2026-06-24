@@ -152,6 +152,12 @@ interface PropertyCardProps {
   onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
   /** Active tenant concerns across portfolio — used to compute longstanding ASB. */
   tenantConcerns?: Array<{ propertyId: string; category: string; raisedMonth: number; resolvedMonth?: number }>;
+  /** Phase 2 — true if there's an open ex-tenant debt; suppresses arrears badge when vacant. */
+  hasExTenantDebt?: boolean;
+  /** Phase 2 — true if the property has an active sale listing. */
+  isListedForSale?: boolean;
+  /** Phase 2 — number of offers on the active listing. */
+  listingOfferCount?: number;
 }
 
 
