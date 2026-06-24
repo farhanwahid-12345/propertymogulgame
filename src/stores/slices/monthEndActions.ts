@@ -2289,6 +2289,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         tenants: newTenants,
         voidPeriods: newVoidPeriods,
         propertyListings: newPropertyListings,
+        exTenantDebts: processedExTenantDebts,
         taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
         totalTaxPaid: newTotalTaxPaid,
         unusedLosses: newUnusedLosses,
