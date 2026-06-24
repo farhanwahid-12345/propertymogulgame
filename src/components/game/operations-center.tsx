@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Hourglass, FileText, Hammer, Wrench, Sparkles, ShieldAlert, Tag, Coins,
+  Hourglass, FileText, Hammer, Wrench, Sparkles, ShieldAlert, Tag, Coins, Megaphone,
 } from "lucide-react";
 import { ConveyancingTracker } from "@/components/game/conveyancing-tracker";
 import { RenovationTracker } from "@/components/game/renovation-tracker";
