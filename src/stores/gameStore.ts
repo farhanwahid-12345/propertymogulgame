@@ -259,6 +259,7 @@ export function createInitialState(): GameState {
     bankruptcySummary: null,
     loanPayoffHistory: [],
     seenGroundRentExplainer: false,
+    exTenantDebts: [],
 
 
   };
