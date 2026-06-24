@@ -212,7 +212,9 @@ function LtdStatements({ stmt }: { stmt: StatementData }) {
 
   const totalAssets = stmt.propertyValueAtYearEnd + stmt.cashAtYearEnd;
   const totalCreditors = stmt.mortgageDebtAtYearEnd + stmt.loanDebtAtYearEnd;
-  const netAssets = totalAssets - totalCreditors;
+  // Phase 1 #7 — use the header's net-worth formula (precomputed upstream)
+  // so this figure matches the headline in HeroHeader exactly.
+  const netAssets = stmt.netWorthAtYearEnd;
 
   return (
     <div className="space-y-4">
