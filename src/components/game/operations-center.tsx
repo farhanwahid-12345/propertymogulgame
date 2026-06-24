@@ -144,6 +144,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
       if (requested === 'evictions') setTab('evictions');
       else if (requested === 'listings') setTab('listings');
       else if (requested === 'extdebts') setTab('extdebts');
+      else if (requested === 'commercial') setTab('commercial');
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('pm:open-operations', handler as EventListener);
