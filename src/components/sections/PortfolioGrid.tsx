@@ -173,17 +173,41 @@ export function PortfolioGrid({
           // Item 2: prefer authoritative per-tenant arrearsMonths (clears on
           // payment) over the append-only tenantEvents counter.
           const liveArrearsMonths = Math.max(0, ...tenantRecs.map((t: any) => t.arrearsMonths ?? 0));
-          const arrearsCount = liveArrearsMonths > 0
-            ? liveArrearsMonths
-            : (gameState.tenantEvents || []).filter(
-                (e: any) => e.propertyId === property.id && e.type === "default"
-              ).length;
+          // Phase 1 #3 — if a court case is in progress, arrears have been
+          // reset to 0 and "Xmo owed" should not show on the card.
+          const hasActiveDebtCase = ((gameState as any).debtRecoveryCases || []).some(
+            (c: any) => c.propertyId === property.id && c.status === 'in_court',
+          );
+          const arrearsCount = hasActiveDebtCase
+            ? 0
+            : (liveArrearsMonths > 0
+                ? liveArrearsMonths
+                : (gameState.tenantEvents || []).filter(
+                    (e: any) => e.propertyId === property.id && e.type === "default"
+                  ).length);
           const arrearsPenniesTotal = tenantRecs.reduce(
             (s: number, t: any) => s + (t.arrearsPennies ?? 0), 0
           );
           const propertyApps = ((gameState as any).planningApplications || []).filter(
             (a: any) => a.propertyId === property.id
           );
+          // Phase 1 #1+2 — match RenovationDialog's effective sqft so the card
+          // and the renovation screen never disagree (approved-but-not-built
+          // extensions are reflected in both).
+          const approvedPendingSqft = propertyApps
+            .filter((a: any) => a.status === 'approved')
+            .reduce((sum: number, a: any) => {
+              const reno = RENOVATION_OPTIONS.find(r => r.id === a.renovationTypeId);
+              if (!reno?.sqftAdded) return sum;
+              const alreadyDone = ((property as any).completedRenovationIds || []).includes(a.renovationTypeId);
+              const alreadyActive = activeRenoIds.includes(a.renovationTypeId);
+              if (alreadyDone || alreadyActive) return sum;
+              return sum + (reno.sqftAdded || 0);
+            }, 0);
+          const displaySqft = (property.internalSqft || 0) + approvedPendingSqft;
+          const propertyForCard = approvedPendingSqft > 0
+            ? { ...property, internalSqft: displaySqft }
+            : property;
           // Property-wide cooldown only fires when an *unscoped* legacy lock is present.
           // Scoped locks are handled per-renovation inside RenovationDialog.
           const inPlanningCooldown = (gameState.propertyLocks || []).some(
