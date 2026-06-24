@@ -90,6 +90,24 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       let approvedAmount = 0;
       let usedOverdraftTotal = 0;
       for (const tx of queue) {
+        // Phase 8 — HMO licence approval is processed via the dedicated action.
+        if (tx.type === 'hmo_licence_required') {
+          if (!tx.propertyId) { remaining.push(tx); continue; }
+          const before = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+          (get() as any).applyForHmoLicence(tx.propertyId);
+          const after = (get().ownedProperties || []).find((p: any) => p.id === tx.propertyId);
+          const didApply = after?.hmoLicenceStatus === 'applied' && before?.hmoLicenceStatus !== 'applied';
+          if (didApply) {
+            // applyForHmoLicence already debited via its own action; resync local cash trackers.
+            const fresh = get();
+            cash = fresh.cash;
+            overdraftUsed = fresh.overdraftUsed;
+            approvedAmount += tx.amount;
+          } else {
+            remaining.push(tx);
+          }
+          continue;
+        }
         const result = debit({ cash, overdraftUsed, overdraftLimit: s.overdraftLimit }, tx.amount);
         if (!result) {
           remaining.push(tx);
