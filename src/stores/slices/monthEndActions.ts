@@ -2225,9 +2225,43 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       });
 
 
+      // ── Phase 2 — Ex-tenant debt monthly processing ──
+      // 1) monthly_recovery: credit instalment to cash, decrement remaining.
+      // 2) ccj_filed: 60% roll → transition to monthly_recovery; 40% stays filed.
+      let extdCashCredit = 0;
+      const processedExTenantDebts = newExTenantDebts.map((d) => {
+        if (d.status === 'monthly_recovery') {
+          const instalment = Math.min(d.monthlyRecoveryPennies || 0, d.remainingDebtPennies);
+          if (instalment <= 0) return d;
+          extdCashCredit += instalment;
+          const remaining = d.remainingDebtPennies - instalment;
+          return {
+            ...d,
+            remainingDebtPennies: remaining,
+            totalRecoveredPennies: d.totalRecoveredPennies + instalment,
+            status: remaining <= 0 ? ('settled' as const) : d.status,
+          };
+        }
+        if (d.status === 'ccj_filed') {
+          const filedMo = d.ccjFiledMonth ?? newMonthNumber;
+          // Roll once per month — soonest the month after filing.
+          if (newMonthNumber <= filedMo) return d;
+          if (gameRandom() < 0.6) {
+            const orig = d.originalArrearsPennies;
+            const instalment = orig < 50_000 ? 5_000 : orig <= 200_000 ? 10_000 : 15_000;
+            return {
+              ...d,
+              status: 'monthly_recovery' as const,
+              monthlyRecoveryPennies: instalment,
+            };
+          }
+          return d;
+        }
+        return d;
+      });
 
       set(s => ({
-        cash: finalCash,
+        cash: finalCash + extdCashCredit,
         overdraftUsed: finalOverdraftUsed,
         ownedProperties: updatedOwnedProperties,
         mortgages: finalMortgages,
