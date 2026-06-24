@@ -122,6 +122,7 @@ const Index = () => {
   useKeyboardShortcuts();
   const gameState = useGameState();
   const [activeTab, setActiveTab] = useState("market");
+  const [accountsSubTab, setAccountsSubTab] = useState<'tax' | 'performance' | 'statements'>('tax');
   const [showFirstPurchaseCoach, setShowFirstPurchaseCoach] = useState(false);
 
   const prevOwnedCountRef = useRef(gameState.ownedProperties.length);
