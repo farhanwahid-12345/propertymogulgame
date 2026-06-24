@@ -176,6 +176,7 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
       attention={attention}
       flash={flash}
       title="Operations"
+      autoOpenEvent="pm:open-operations"
     >
       <OperationsCenter
         monthsPlayed={gameState.monthsPlayed}
