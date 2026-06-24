@@ -15,6 +15,7 @@ import { Gavel, Clock, ShoppingCart, Building2, Landmark } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
 import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
+import { computeMonthlyCouncilTaxPennies, getCouncilTaxBand } from "@/lib/engine/constants";
 
 
 interface SellerBid {
@@ -735,7 +736,25 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
                               £{property.monthlyIncome.toLocaleString()}/mo
                             </span>
                           </div>
+                          {(() => {
+                            const band = getCouncilTaxBand(property.value);
+                            const monthly = Math.round(
+                              computeMonthlyCouncilTaxPennies({
+                                valuePounds: property.value,
+                                city: (property as any).city,
+                                isOccupied: false,
+                                isInVoidDiscountWindow: false,
+                              }) / 100,
+                            );
+                            return (
+                              <div className="col-span-2">
+                                <span className="text-muted-foreground">Council Tax:</span>
+                                <span className="ml-1 font-medium">Band {band} · £{monthly}/mo</span>
+                              </div>
+                            );
+                          })()}
                         </div>
+
 
                         {(property as any).commercialLease && (property as any).sittingTenant && (
                           <TenantInPlaceBlock property={property as any} />

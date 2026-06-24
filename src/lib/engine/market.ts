@@ -215,6 +215,14 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     };
   }
 
+  // Phase 6 (items 16/17) — yield must always reflect actual rent / actual
+  // price, so the estate-agent display matches the income the property will
+  // generate (post sitting-tenant rewrite, post LHA anchoring).
+  const actualYield = finalPrice > 0
+    ? +(((finalMonthlyIncome * 12) / finalPrice) * 100).toFixed(2)
+    : 0;
+  finalYield = actualYield;
+
   return {
     id,
     name: `${houseNumber} ${streetName}`,
@@ -240,6 +248,7 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
 }
 
 
+
 /** Roll a furnishing tier for new-stock listings. ~78% unfurnished / 15% part / 7% full. */
 function rollListingFurnishing(): { tier: 'unfurnished' | 'part_furnished' | 'fully_furnished'; monthsRemaining?: number } {
   const r = Math.random();
@@ -257,10 +266,14 @@ export function generateMarketProperty(level: number, cityId?: CityId): Property
   const furniturePennies = getFurnitureValuePennies(tempForFurniture);
   const bumpedPrice = base.price + furniturePennies;
   const bumpedValue = base.value + furniturePennies;
+  const bumpedYield = bumpedPrice > 0
+    ? +(((base.monthlyIncome * 12) / bumpedPrice) * 100).toFixed(2)
+    : base.yield;
   return {
     ...base,
     price: bumpedPrice,
     value: bumpedValue,
+    yield: bumpedYield,
     furnishingTier: roll.tier,
     furnishingMonthsRemaining: roll.monthsRemaining,
   };

@@ -13,7 +13,7 @@ import { Check, X, Building2, ShoppingCart, TrendingUp, AlertCircle, Loader2, Me
 import { toast } from "@/hooks/use-toast";
 import { getMaxLTVForCreditScore, getRatePenaltyForCreditScore, calculateMortgageEligibility } from "@/lib/mortgageEligibility";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
-import { computeErcRate } from "@/lib/engine/constants";
+import { computeErcRate, computeMonthlyCouncilTaxPennies, getCouncilTaxBand } from "@/lib/engine/constants";
 import { getUnlockedCities, getCityConfig, type CityId } from "@/lib/engine/cities";
 import { TenantInPlaceBlock } from "@/components/game/tenant-in-place-block";
 
@@ -739,6 +739,23 @@ export function EstateAgentWindow({
                     <span className="text-muted-foreground">Base Rent</span>
                     <span className="text-green-600 font-semibold">£{property.monthlyIncome}/mo</span>
                   </div>
+                  {(() => {
+                    const band = getCouncilTaxBand(property.value);
+                    const monthly = Math.round(
+                      computeMonthlyCouncilTaxPennies({
+                        valuePounds: property.value,
+                        city: (property as any).city,
+                        isOccupied: false,
+                        isInVoidDiscountWindow: false,
+                      }) / 100,
+                    );
+                    return (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Council Tax</span>
+                        <span className="font-medium">Band {band} · £{monthly}/mo</span>
+                      </div>
+                    );
+                  })()}
                   {(property as any).commercialLease && (property as any).sittingTenant && (
                     <Badge variant="outline" className="text-[10px] py-0 px-1.5 border-blue-500/50 text-blue-300">
                       🏢 Tenanted · FRI lease
