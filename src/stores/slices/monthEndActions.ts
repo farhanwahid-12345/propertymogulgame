@@ -1222,6 +1222,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         // Remove tenant + start a void period
+        captureExTenantDebt(ev.propertyId, property?.name || ev.propertyId, tenantRec.tenant.name, (tenantRec as any).arrearsPennies || 0);
         newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
         const voidDuration = (30 + gameRandom() * 60) * 24 * 60 * 60 * 1000;
         newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
