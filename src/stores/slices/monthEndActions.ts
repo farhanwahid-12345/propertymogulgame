@@ -2132,6 +2132,68 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         });
       });
 
+      // ── Phase 3 (commercial) — agent applicant drip ──
+      // For each vacant commercial property, occasionally enqueue applicants
+      // with covenant strength scaling by how long the unit has been on the
+      // market. Applicants arrive 1–4 months after generation.
+      const existingApplicants = [...(prev.pendingCommercialApplicants || [])];
+      let nextApplicants = existingApplicants.filter(a =>
+        updatedOwnedProperties.some(p => p.id === a.propertyId)
+      );
+      // Stamp vacancy-since on any commercial property that's vacant but missing the stamp.
+      updatedOwnedProperties = updatedOwnedProperties.map(p => {
+        if (p.type !== 'commercial') return p;
+        const hasTenant = newTenants.some(t => t.propertyId === p.id);
+        const hasLease = !!p.commercialLease;
+        if (hasTenant || hasLease) {
+          // Occupied / leased — clear stale stamp if present.
+          return p.commercialVacantSinceMonth !== undefined
+            ? { ...p, commercialVacantSinceMonth: undefined }
+            : p;
+        }
+        return p.commercialVacantSinceMonth === undefined
+          ? { ...p, commercialVacantSinceMonth: newMonthNumber }
+          : p;
+      });
+      updatedOwnedProperties.forEach(property => {
+        if (property.type !== 'commercial') return;
+        const hasTenant = newTenants.some(t => t.propertyId === property.id);
+        const hasLease = !!property.commercialLease;
+        if (hasTenant || hasLease) return;
+        const queuedForProp = nextApplicants.filter(a => a.propertyId === property.id).length;
+        if (queuedForProp >= 3) return;
+        const monthsVacant = newMonthNumber - (property.commercialVacantSinceMonth ?? newMonthNumber);
+        const city = (property.city ?? 'middlesbrough') as 'middlesbrough'|'leeds'|'manchester'|'london';
+        // Weak/local: 70% chance every month, arrival +1
+        if (gameRandom() < 0.70 && queuedForProp + 1 <= 3) {
+          nextApplicants.push({
+            propertyId: property.id,
+            tenant: generateCommercialApplicantInRange(city, [20, 50]),
+            arrivalMonth: newMonthNumber + 1,
+          });
+        }
+        // Standard business: from month 2+, 50% chance, arrival +1..3
+        const queuedNow1 = nextApplicants.filter(a => a.propertyId === property.id).length;
+        if (monthsVacant >= 2 && gameRandom() < 0.50 && queuedNow1 < 3) {
+          nextApplicants.push({
+            propertyId: property.id,
+            tenant: generateCommercialApplicantInRange(city, [45, 70]),
+            arrivalMonth: newMonthNumber + 1 + Math.floor(gameRandom() * 3),
+          });
+        }
+        // Strong/national: from month 4+, 25% chance, arrival +2..4
+        const queuedNow2 = nextApplicants.filter(a => a.propertyId === property.id).length;
+        if (monthsVacant >= 4 && gameRandom() < 0.25 && queuedNow2 < 3) {
+          nextApplicants.push({
+            propertyId: property.id,
+            tenant: generateCommercialApplicantInRange(city, [70, 95]),
+            arrivalMonth: newMonthNumber + 2 + Math.floor(gameRandom() * 3),
+          });
+        }
+      });
+
+
+
       set(s => ({
         cash: finalCash,
         overdraftUsed: finalOverdraftUsed,
