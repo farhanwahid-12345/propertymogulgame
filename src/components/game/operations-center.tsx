@@ -84,6 +84,10 @@ export function OperationsCenter(props: OperationsCenterProps) {
     onNegotiateExTenantSettlement,
     onWriteOffExTenantDebt,
     onRefileExTenantCCJ,
+    commercialSearchUpdates = [],
+    commercialAgentChase = {},
+    vacantCommercialProperties = [],
+    onChaseCommercialAgent,
   } = props;
 
   const ownedIds = new Set(ownedProperties.map(p => p.id));
