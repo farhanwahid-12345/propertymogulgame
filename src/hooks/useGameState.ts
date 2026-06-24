@@ -439,9 +439,14 @@ export function useGameState() {
     planningApplications: Array.isArray((store as any).planningApplications) ? (store as any).planningApplications : [],
     tenantHistory: Array.isArray((store as any).tenantHistory) ? (store as any).tenantHistory : [],
     debtRecoveryCases: Array.isArray((store as any).debtRecoveryCases) ? (store as any).debtRecoveryCases : [],
+    exTenantDebts: Array.isArray((store as any).exTenantDebts) ? (store as any).exTenantDebts : [],
     sendArrearsToCourt: (store as any).sendArrearsToCourt,
     issueLetterBeforeAction: (store as any).issueLetterBeforeAction,
     escalateToHighCourt: (store as any).escalateToHighCourt,
+    fileExTenantCCJ: (store as any).fileExTenantCCJ,
+    negotiateExTenantSettlement: (store as any).negotiateExTenantSettlement,
+    writeOffExTenantDebt: (store as any).writeOffExTenantDebt,
+    refileExTenantCCJ: (store as any).refileExTenantCCJ,
     projectedTaxPennies: (store as any).projectedTaxPennies ?? 0,
 
     // Derived values
