@@ -464,6 +464,21 @@ export interface TaxRecord {
   description: string;
 }
 
+// Phase 2 — debt left behind by an ex-tenant. Lives in Operations.
+export interface ExTenantDebt {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  tenantName: string;
+  originalArrearsPennies: number;
+  remainingDebtPennies: number;
+  vacatedMonth: number;
+  status: 'chasing' | 'ccj_filed' | 'monthly_recovery' | 'settled' | 'written_off';
+  ccjFiledMonth?: number;
+  monthlyRecoveryPennies?: number;
+  totalRecoveredPennies: number;
+}
+
 export interface GameState {
   // Version for save migration
   _version: number;
@@ -614,6 +629,8 @@ export interface GameState {
   } | null;
   /** Phase 7 #18 — chronological log of completed loans, with on-time flag. */
   loanPayoffHistory?: Array<{ id: string; kind: 'personal' | 'business' | 'investor' | 'bridging'; repaidOnSchedule: boolean; month: number }>;
+  /** Phase 2 — outstanding arrears left by vacated tenants. */
+  exTenantDebts?: ExTenantDebt[];
 }
 
 export interface PoliceLetter {

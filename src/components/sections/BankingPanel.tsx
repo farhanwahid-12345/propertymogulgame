@@ -91,6 +91,7 @@ function InlineDialogButton({
   title,
   attention = false,
   flash = false,
+  autoOpenEvent,
   children,
 }: {
   id?: string;
@@ -99,9 +100,17 @@ function InlineDialogButton({
   title: string;
   attention?: boolean;
   flash?: boolean;
+  /** When set, listens for this window event and auto-opens the dialog. */
+  autoOpenEvent?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!autoOpenEvent || typeof window === 'undefined') return;
+    const handler = () => setOpen(true);
+    window.addEventListener(autoOpenEvent, handler);
+    return () => window.removeEventListener(autoOpenEvent, handler);
+  }, [autoOpenEvent]);
   return (
     <>
       <Button
@@ -167,6 +176,7 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
       attention={attention}
       flash={flash}
       title="Operations"
+      autoOpenEvent="pm:open-operations"
     >
       <OperationsCenter
         monthsPlayed={gameState.monthsPlayed}
@@ -184,6 +194,15 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
         tenantEvents={gameState.tenantEvents}
         economicEvents={gameState.economicEvents}
         taxRecords={gameState.taxRecords || []}
+        pendingEvictions={gameState.pendingEvictions || []}
+        propertyListings={((gameState as any).propertyListings || []).map((l: any) => ({ ...l, askingPrice: l.askingPrice }))}
+        exTenantDebts={(gameState as any).exTenantDebts || []}
+        onCancelEviction={gameState.cancelEviction}
+        onCancelListing={gameState.cancelPropertyListing}
+        onFileExTenantCCJ={(gameState as any).fileExTenantCCJ}
+        onNegotiateExTenantSettlement={(gameState as any).negotiateExTenantSettlement}
+        onWriteOffExTenantDebt={(gameState as any).writeOffExTenantDebt}
+        onRefileExTenantCCJ={(gameState as any).refileExTenantCCJ}
       />
     </InlineDialogButton>
   );

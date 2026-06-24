@@ -1,43 +1,53 @@
-# Replace `any` with proper types in tenant/monthEnd slices
+# Phase 2 — Condensed cards + Ex-Tenant Debt in Operations
 
-Both files are large (1,013 + 2,270 lines) and central to financial logic. A single-pass rewrite is high risk — past bugs (rent-review 100× error, arrears-eviction array-merge) came from this code, and removing `any` casts will almost certainly surface latent type errors that need careful fixing rather than papering over. I'll do this in five verifiable batches, running the TypeScript build and the existing vitest suites (`gameStoreStateMachine.test.ts`, `gameStore.test.ts`, `tenantRent.test.ts`, `financials.test.ts`, `phase*Verification.test.ts`) after each batch.
+## Goal
+Strip noisy eviction/listing detail off property cards (replace with compact deep-link badges), and move the full UI into the Operations panel. Add a brand-new Ex-Tenant Debt recovery flow so arrears don't silently vanish when a tenant leaves.
 
-## Shared foundation (batch 0)
+## 1. Types (`src/types/game.ts`)
+Add `ExTenantDebt` interface and `exTenantDebts: ExTenantDebt[]` to `GameState`. Fields exactly as spec'd. Bump store version + migration to seed `[]`.
 
-Tighten the slice signatures both files import so per-callback types flow through naturally:
+## 2. Store — capture debt when tenant exits
+Find every place a tenant record is removed with outstanding `arrearsPennies > 0`:
+- `evictTenant` completion (in `tenantActions.ts` / monthEnd processing of `pendingEvictions`)
+- Voluntary departure / walkout paths in `monthEndActions.ts`
+- Lease expiry (commercial + AST)
 
-```ts
-import type { GameState } from '@/types/game';
-type SetFn = (partial: Partial<GameState> | ((s: GameState) => Partial<GameState>)) => void;
-type GetFn = () => GameState;
-```
+For each, build an `ExTenantDebt { status: 'chasing', remainingDebtPennies: arrearsPennies, totalRecoveredPennies: 0, vacatedMonth: monthsPlayed }` and push to `exTenantDebts`. Don't double-create if one already exists for that propertyId+tenantName+vacatedMonth.
 
-Apply only to the two target files for now (the other slices keep their current `(partial: any) => void` signatures so this change stays scoped). Fix the immediate compile errors this creates inside those two files only.
+## 3. MonthEnd processing
+In `monthEndActions.ts`, after rent collection:
+- For each `exTenantDebt` with `status === 'monthly_recovery'`: credit `min(monthlyRecoveryPennies, remainingDebtPennies)` to cash, decrement remaining, push activity-feed entry. When `remainingDebtPennies <= 0` → `status = 'settled'`.
+- For each `status === 'ccj_filed'`: 60% roll → transition to `monthly_recovery`, set `monthlyRecoveryPennies` scaled to original debt (£50 for <£500, £100 for £500–£2k, £150 for >£2k). 40% → stay filed; player can re-file after 6mo.
 
-## Batch plan
+## 4. New store actions (`tenantActions.ts`)
+- `fileExTenantCCJ(debtId)` — debits £100, sets `status='ccj_filed'`, `ccjFiledMonth=monthsPlayed`.
+- `negotiateExTenantSettlement(debtId, pct)` — credits `remainingDebt * pct` (clamped 0.4–0.7), `status='settled'`.
+- `writeOffExTenantDebt(debtId)` — `status='written_off'`, +2 credit score (small reputation gain).
+- `refileExTenantCCJ(debtId)` — only if previously `ccj_filed` and ≥6mo since `ccjFiledMonth`; re-debits £100, resets clock.
 
-Each batch = type the listed actions, remove their `(p: any)` / `as any`, then `lovable-exec test` + tsc check.
+## 5. Property card slimming (`src/components/game/property-card.tsx`)
+Replace the multi-line eviction timeline block with one compact badge:
+- Active eviction → `🔴 Eviction in progress` (button, dispatches `pm:open-operations` with `{ tab: 'evictions', propertyId }`)
+- Active sale listing → `🏷️ On market — N offers` (deep-links to `{ tab: 'listings', propertyId }`)
+- Remove inline marketing/estate-agency status block entirely
+- Remove arrears badge if no current tenant record exists for that property and an `ExTenantDebt` exists for it (parent passes a boolean flag).
 
-1. **tenantActions.ts — tenant placement & lease signing**
-   `selectTenant`, `placeTenantManually`, commercial lease fee/registry block. Types: `Property`, `PropertyTenant`, `Tenant`, `CommercialLease`, `VoidPeriod`, `PropertyLock`, `Renovation`.
-2. **tenantActions.ts — rent reviews, renewals, S13**
-   `acceptRentReview`, `rejectRentReview`, `acceptLeaseRenewal`, `declineLeaseRenewal`, `applyRentIncrease`. Types: `PendingRentReview`, `PropertyTenant`, commercial-lease guard already touched in Prompt 7. Likely surfaces: the `(tenantRec as any).rentPennies` and `(prev as any).pendingLeaseRenewals` casts — confirm `pendingLeaseRenewals` exists on `GameState` (add to the interface if missing rather than re-casting).
-3. **tenantActions.ts — evictions, deposit disputes, concerns, debt recovery**
-   `evictTenant`, `cancelEviction`, `acceptDepositOffer`, `defendDepositDispute`, `resolveConcern`, `markCleared`, `escalateToCourt`, `recordCourtOutcome`. Types: `PendingEviction`, `DepositDispute`, `TenantConcern`, `TenantEvent`, `DebtRecoveryCase`. Validate the array-merge fix from the earlier arrears bug is still expressed cleanly under proper types.
-4. **monthEndActions.ts — rent collection & arrears**
-   The rent-credit loop, arrears accumulation, void-period accrual. Types: `Property`, `PropertyTenant`, `TenantEvent`, `VoidPeriod`. This is where the rent-review 100× originated, so the pennies/pounds boundaries get explicit `number` annotations and any `as any` around `rentPennies` is removed.
-5. **monthEndActions.ts — costs, tax, accounts, credit**
-   Mortgage/maintenance/council-tax debits, annual accounts append, credit-score updates, macro event hooks. Types: `AnnualAccountRecord`, plus the macro/credit fields already on `GameState`.
+PortfolioGrid: pass `hasExTenantDebt` per property and stop showing arrearsCount/pennies when there's no current tenant.
+
+## 6. Operations panel (`src/components/sections/BankingPanel.tsx`)
+Add three collapsible sub-sections matching the existing court-proceedings card style:
+- **Evictions** — list every pending eviction with grounds, served month, effective month, countdown, Cancel / Send to court buttons (the detail removed from cards).
+- **Property Listings** — listing detail (asking price, days on market, offers list with Accept/Counter/Reject), the bits removed from cards.
+- **Ex-Tenant Debts** — one row per record: tenant + property, original owed, recovered so far, status pill, action buttons (File CCJ / Negotiate / Write off / Re-file) gated by status.
+
+Listen for `pm:open-operations` to auto-scroll to + flash the requested sub-section and propertyId row.
 
 ## Out of scope
+- No new visual design language — reuse glass/sectioning that already exists.
+- No changes to rent collection or arrears accrual while a tenant is in place.
 
-- Other slices' `SetFn/GetFn` — left as-is to keep this PR focused, per the user's "do not attempt full file in one pass" guidance.
-- Logic changes. This is types-only; any behavioural fix surfaced by the compiler will be called out in the batch summary and only applied with the user's go-ahead.
-
-## Verification per batch
-
-- `bunx vitest run src/stores src/lib/engine/financials.test.ts src/lib/tenantRent.test.ts`
-- Lovable build (auto-runs after edits).
-- Spot-check the preview: open a property, sign a tenant, advance a month — confirm no runtime regressions before moving to the next batch.
-
-Reply "go" to start batch 0+1, or tell me to reorder/skip batches.
+## Technical notes
+- All money in pennies in state; convert at UI boundary via `fromPennies`.
+- Version bump + migration seeds `exTenantDebts: []` to keep old saves loadable.
+- Court CCJ filing for *current* tenants (`sendArrearsToCourt`) is unrelated and untouched — this flow is strictly post-tenancy.
+- Event channel reuses existing `window.dispatchEvent` pattern from Phase 5 onboarding (`pm:open-operations`).

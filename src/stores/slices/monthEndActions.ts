@@ -735,6 +735,34 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newTenantHistory: import('@/types/game').TenantDeparture[] = [...(prev.tenantHistory || [])];
       let walkoutDepositRefund = 0;
       const walkoutDisputes: DepositDispute[] = [];
+      // Phase 2 — capture outstanding arrears when tenants vacate so the debt
+      // doesn't silently disappear. Surfaced in Operations → Ex-Tenant Debts.
+      const newExTenantDebts: import('@/types/game').ExTenantDebt[] = [
+        ...(((prev as any).exTenantDebts) || []),
+      ];
+      const captureExTenantDebt = (
+        propertyId: string,
+        propertyName: string,
+        tenantName: string,
+        arrearsPennies: number,
+      ) => {
+        if (!arrearsPennies || arrearsPennies <= 0) return;
+        const dup = newExTenantDebts.some(
+          (d) => d.propertyId === propertyId && d.tenantName === tenantName && d.vacatedMonth === newMonthNumber,
+        );
+        if (dup) return;
+        newExTenantDebts.push({
+          id: `extd_${propertyId}_${newMonthNumber}_${Math.floor(gameRandom() * 1e6)}`,
+          propertyId,
+          propertyName,
+          tenantName,
+          originalArrearsPennies: arrearsPennies,
+          remainingDebtPennies: arrearsPennies,
+          vacatedMonth: newMonthNumber,
+          status: 'chasing',
+          totalRecoveredPennies: 0,
+        });
+      };
       // (reputationDelta/reputationLogEntries declared earlier — see "// ── Reputation buffer ──")
       satisfactionAdjustedTenants = satisfactionAdjustedTenants.filter(t => {
         const guaranteedExit = t.satisfaction <= 0;
@@ -789,6 +817,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           month: newMonthNumber, reason: `${t.tenant.name} walked out of ${property?.name || 'a property'}`,
           delta: d, category: 'walkout',
         });
+        captureExTenantDebt(t.propertyId, property?.name || t.propertyId, t.tenant.name, (t as any).arrearsPennies || 0);
         return false;
       });
       newTenants = satisfactionAdjustedTenants;
@@ -1193,6 +1222,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
 
         // Remove tenant + start a void period
+        captureExTenantDebt(ev.propertyId, property?.name || ev.propertyId, tenantRec.tenant.name, (tenantRec as any).arrearsPennies || 0);
         newTenants = newTenants.filter(t => t.propertyId !== ev.propertyId);
         const voidDuration = (30 + gameRandom() * 60) * 24 * 60 * 60 * 1000;
         newVoidPeriods.push({ propertyId: ev.propertyId, startDate: Date.now(), endDate: Date.now() + voidDuration });
@@ -2195,9 +2225,43 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       });
 
 
+      // ── Phase 2 — Ex-tenant debt monthly processing ──
+      // 1) monthly_recovery: credit instalment to cash, decrement remaining.
+      // 2) ccj_filed: 60% roll → transition to monthly_recovery; 40% stays filed.
+      let extdCashCredit = 0;
+      const processedExTenantDebts = newExTenantDebts.map((d) => {
+        if (d.status === 'monthly_recovery') {
+          const instalment = Math.min(d.monthlyRecoveryPennies || 0, d.remainingDebtPennies);
+          if (instalment <= 0) return d;
+          extdCashCredit += instalment;
+          const remaining = d.remainingDebtPennies - instalment;
+          return {
+            ...d,
+            remainingDebtPennies: remaining,
+            totalRecoveredPennies: d.totalRecoveredPennies + instalment,
+            status: remaining <= 0 ? ('settled' as const) : d.status,
+          };
+        }
+        if (d.status === 'ccj_filed') {
+          const filedMo = d.ccjFiledMonth ?? newMonthNumber;
+          // Roll once per month — soonest the month after filing.
+          if (newMonthNumber <= filedMo) return d;
+          if (gameRandom() < 0.6) {
+            const orig = d.originalArrearsPennies;
+            const instalment = orig < 50_000 ? 5_000 : orig <= 200_000 ? 10_000 : 15_000;
+            return {
+              ...d,
+              status: 'monthly_recovery' as const,
+              monthlyRecoveryPennies: instalment,
+            };
+          }
+          return d;
+        }
+        return d;
+      });
 
       set(s => ({
-        cash: finalCash,
+        cash: finalCash + extdCashCredit,
         overdraftUsed: finalOverdraftUsed,
         ownedProperties: updatedOwnedProperties,
         mortgages: finalMortgages,
@@ -2225,6 +2289,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         tenants: newTenants,
         voidPeriods: newVoidPeriods,
         propertyListings: newPropertyListings,
+        exTenantDebts: processedExTenantDebts,
         taxRecords: newTaxRecords.slice(-50), // Keep last 50 records
         totalTaxPaid: newTotalTaxPaid,
         unusedLosses: newUnusedLosses,

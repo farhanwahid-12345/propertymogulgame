@@ -1029,5 +1029,108 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       });
       showToast("⚖️ Escalated to High Court", `£${fromPennies(fee).toLocaleString()} HCE fee paid. Decision in 3 months.`);
     },
+
+    // ── Phase 2 — Ex-tenant debt recovery ───────────────────
+    fileExTenantCCJ: (debtId: string) => {
+      const s = get();
+      const debts = (s.exTenantDebts || []) as import('@/types/game').ExTenantDebt[];
+      const debt = debts.find((d) => d.id === debtId);
+      if (!debt) return;
+      if (debt.status !== 'chasing') {
+        showToast("Cannot file", "This debt is not in the chasing stage.", "destructive");
+        return;
+      }
+      const FEE = 10000; // £100 in pennies
+      const debited = debit(s, FEE);
+      if (!debited) {
+        showToast("Insufficient funds", "You need £100 to file a CCJ.", "destructive");
+        return;
+      }
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        exTenantDebts: debts.map((d) =>
+          d.id === debtId ? { ...d, status: 'ccj_filed' as const, ccjFiledMonth: s.monthsPlayed } : d,
+        ),
+        opsFlashAt: Date.now(),
+      });
+      showToast("⚖️ CCJ filed", `Claim filed against ${debt.tenantName} for £${fromPennies(debt.remainingDebtPennies).toLocaleString()}.`);
+    },
+
+    negotiateExTenantSettlement: (debtId: string, pct: number) => {
+      const s = get();
+      const debts = (s.exTenantDebts || []) as import('@/types/game').ExTenantDebt[];
+      const debt = debts.find((d) => d.id === debtId);
+      if (!debt) return;
+      if (debt.status === 'settled' || debt.status === 'written_off') {
+        showToast("Already closed", "This debt is no longer open.", "destructive");
+        return;
+      }
+      const clamped = Math.max(0.4, Math.min(0.7, pct));
+      const recovered = Math.round(debt.remainingDebtPennies * clamped);
+      set({
+        cash: s.cash + recovered,
+        exTenantDebts: debts.map((d) =>
+          d.id === debtId
+            ? {
+                ...d,
+                status: 'settled' as const,
+                remainingDebtPennies: 0,
+                totalRecoveredPennies: d.totalRecoveredPennies + recovered,
+              }
+            : d,
+        ),
+        opsFlashAt: Date.now(),
+      });
+      showToast("Settlement agreed", `${debt.tenantName} paid £${fromPennies(recovered).toLocaleString()} as final settlement.`);
+    },
+
+    writeOffExTenantDebt: (debtId: string) => {
+      const s = get();
+      const debts = (s.exTenantDebts || []) as import('@/types/game').ExTenantDebt[];
+      const debt = debts.find((d) => d.id === debtId);
+      if (!debt) return;
+      if (debt.status === 'settled' || debt.status === 'written_off') return;
+      set({
+        exTenantDebts: debts.map((d) =>
+          d.id === debtId ? { ...d, status: 'written_off' as const } : d,
+        ),
+        creditScore: Math.max(300, Math.min(850, s.creditScore + 2)),
+        landlordReputation: Math.max(0, Math.min(100, (s.landlordReputation ?? 50) + 1)),
+      });
+      showToast("Debt written off", `${debt.tenantName}'s debt closed. Small reputation gain for being reasonable.`);
+    },
+
+    refileExTenantCCJ: (debtId: string) => {
+      const s = get();
+      const debts = (s.exTenantDebts || []) as import('@/types/game').ExTenantDebt[];
+      const debt = debts.find((d) => d.id === debtId);
+      if (!debt) return;
+      if (debt.status !== 'ccj_filed') {
+        showToast("Cannot re-file", "Only a previously-filed CCJ can be re-filed.", "destructive");
+        return;
+      }
+      const filedMo = debt.ccjFiledMonth ?? 0;
+      if (s.monthsPlayed - filedMo < 6) {
+        const wait = 6 - (s.monthsPlayed - filedMo);
+        showToast("Too soon", `Re-file available in ${wait} more month(s).`, "destructive");
+        return;
+      }
+      const FEE = 10000;
+      const debited = debit(s, FEE);
+      if (!debited) {
+        showToast("Insufficient funds", "You need £100 to re-file.", "destructive");
+        return;
+      }
+      set({
+        cash: debited.cash,
+        overdraftUsed: debited.overdraftUsed,
+        exTenantDebts: debts.map((d) =>
+          d.id === debtId ? { ...d, ccjFiledMonth: s.monthsPlayed } : d,
+        ),
+        opsFlashAt: Date.now(),
+      });
+      showToast("⚖️ CCJ re-filed", `New monthly roll begins for ${debt.tenantName}.`);
+    },
   };
 }

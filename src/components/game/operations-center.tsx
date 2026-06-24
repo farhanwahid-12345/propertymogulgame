@@ -1,10 +1,14 @@
 import { useMemo, useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Hourglass, FileText, Hammer, Wrench, Sparkles } from "lucide-react";
+import {
+  Hourglass, FileText, Hammer, Wrench, Sparkles, ShieldAlert, Tag, Coins,
+} from "lucide-react";
 import { ConveyancingTracker } from "@/components/game/conveyancing-tracker";
 import { RenovationTracker } from "@/components/game/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/game/tenant-concerns-feed";
+import { fromPennies } from "@/lib/formatCurrency";
 import type {
   Conveyancing,
   Renovation,
@@ -14,6 +18,9 @@ import type {
   TenantEvent,
   MacroEconomicEvent,
   TaxRecord,
+  PendingEviction,
+  PropertyListing,
+  ExTenantDebt,
 } from "@/types/game";
 
 interface OperationsCenterProps {
@@ -33,9 +40,21 @@ interface OperationsCenterProps {
   tenantEvents?: Array<TenantEvent & { amount: number }>;
   economicEvents?: MacroEconomicEvent[];
   taxRecords?: TaxRecord[];
+  // Phase 2 — evictions / listings / ex-tenant debts
+  pendingEvictions?: PendingEviction[];
+  propertyListings?: PropertyListing[];
+  exTenantDebts?: ExTenantDebt[];
+  onCancelEviction?: (propertyId: string, slotIndex?: number) => void;
+  onCancelListing?: (propertyId: string) => void;
+  onFileExTenantCCJ?: (debtId: string) => void;
+  onNegotiateExTenantSettlement?: (debtId: string, pct: number) => void;
+  onWriteOffExTenantDebt?: (debtId: string) => void;
+  onRefileExTenantCCJ?: (debtId: string) => void;
 }
 
-type TabKey = "conveyancing" | "planning" | "renovations" | "concerns";
+type TabKey =
+  | "conveyancing" | "planning" | "renovations" | "concerns"
+  | "evictions" | "listings" | "extdebts";
 
 export function OperationsCenter(props: OperationsCenterProps) {
   const {
@@ -50,34 +69,43 @@ export function OperationsCenter(props: OperationsCenterProps) {
     onResolveConcern,
     onSnoozeConcern,
     onWithdrawConveyancing,
-    tenantHistory = [],
-    tenantEvents = [],
-    economicEvents = [],
-    taxRecords = [],
+    pendingEvictions = [],
+    propertyListings = [],
+    exTenantDebts = [],
+    onCancelEviction,
+    onCancelListing,
+    onFileExTenantCCJ,
+    onNegotiateExTenantSettlement,
+    onWriteOffExTenantDebt,
+    onRefileExTenantCCJ,
   } = props;
 
   const ownedIds = new Set(ownedProperties.map(p => p.id));
+  const nameOf = (id: string) => ownedProperties.find(p => p.id === id)?.name || id;
+
+  const openDebts = exTenantDebts.filter(d => d.status !== 'settled' && d.status !== 'written_off');
 
   const counts = useMemo(() => {
     const conv = conveyancing.length;
     const plan = planningApplications.filter(a => a.status === 'pending').length;
     const reno = renovations.length;
     const concerns = tenantConcerns.filter(c => c && !c.resolvedMonth && ownedIds.has(c.propertyId)).length;
-    return { conv, plan, reno, concerns };
-  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds]);
+    const ev = pendingEvictions.length;
+    const lis = propertyListings.length;
+    const ext = openDebts.length;
+    return { conv, plan, reno, concerns, ev, lis, ext };
+  }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts]);
 
-  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns;
-  const allEmpty =
-    counts.conv === 0 &&
-    counts.plan === 0 &&
-    counts.reno === 0 &&
-    counts.concerns === 0;
+  const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext;
+  const allEmpty = totalActionable === 0;
 
-  // Default tab → first non-empty
   const defaultTab: TabKey = useMemo(() => {
     if (counts.concerns > 0) return "concerns";
+    if (counts.ev > 0) return "evictions";
+    if (counts.ext > 0) return "extdebts";
     if (counts.conv > 0) return "conveyancing";
     if (counts.plan > 0) return "planning";
+    if (counts.lis > 0) return "listings";
     return "renovations";
   }, [counts]);
 
@@ -88,16 +116,37 @@ export function OperationsCenter(props: OperationsCenterProps) {
       (tab === "conveyancing" && counts.conv === 0) ||
       (tab === "planning" && counts.plan === 0) ||
       (tab === "renovations" && counts.reno === 0) ||
-      (tab === "concerns" && counts.concerns === 0);
+      (tab === "concerns" && counts.concerns === 0) ||
+      (tab === "evictions" && counts.ev === 0) ||
+      (tab === "listings" && counts.lis === 0) ||
+      (tab === "extdebts" && counts.ext === 0);
     if (isCurrentEmpty) setTab(defaultTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultTab]);
+
+  // Phase 2 — listen for deep-link events from compact property-card badges.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { tab?: string } | undefined;
+      const requested = detail?.tab;
+      if (requested === 'evictions') setTab('evictions');
+      else if (requested === 'listings') setTab('listings');
+      else if (requested === 'extdebts') setTab('extdebts');
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pm:open-operations', handler as EventListener);
+      return () => window.removeEventListener('pm:open-operations', handler as EventListener);
+    }
+  }, []);
 
   if (allEmpty) {
     return null;
   }
 
   const tabDef: Array<{ key: TabKey; label: string; icon: any; count: number }> = [
+    { key: "evictions", label: "Evictions", icon: ShieldAlert, count: counts.ev },
+    { key: "listings", label: "Listings", icon: Tag, count: counts.lis },
+    { key: "extdebts", label: "Ex-Debts", icon: Coins, count: counts.ext },
     { key: "conveyancing", label: "Conveyancing", icon: Hourglass, count: counts.conv },
     { key: "planning", label: "Planning", icon: FileText, count: counts.plan },
     { key: "renovations", label: "Renovations", icon: Hammer, count: counts.reno },
@@ -117,14 +166,14 @@ export function OperationsCenter(props: OperationsCenterProps) {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-        <TabsList className="grid w-full grid-cols-4 bg-white/[0.06] border-0 mb-3">
+        <TabsList className="flex flex-wrap w-full bg-white/[0.06] border-0 mb-3 h-auto">
           {tabDef.map(t => {
             const Icon = t.icon;
             return (
               <TabsTrigger
                 key={t.key}
                 value={t.key}
-                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg text-xs gap-1.5"
+                className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg text-xs gap-1.5 flex-1 min-w-[90px]"
               >
                 <Icon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">{t.label}</span>
@@ -180,6 +229,122 @@ export function OperationsCenter(props: OperationsCenterProps) {
               onSnooze={onSnoozeConcern}
               bare
             />
+          </TabsContent>
+
+          <TabsContent value="evictions" className="mt-0 space-y-2">
+            {pendingEvictions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No pending evictions.</p>
+            ) : pendingEvictions.map((ev) => {
+              const remaining = Math.max(0, ev.effectiveMonth - monthsPlayed);
+              return (
+                <div key={`${ev.propertyId}_${ev.slotIndex ?? 0}_${ev.servedMonth}`} className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-xs space-y-0.5">
+                    <div className="font-semibold text-destructive flex items-center gap-1.5">
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      {nameOf(ev.propertyId)}
+                      {(ev.slotIndex ?? 0) > 0 && <span className="text-muted-foreground">· unit {(ev.slotIndex ?? 0) + 1}</span>}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {ev.tenantName} · Ground: {ev.ground.replace(/_/g, ' ')}
+                    </div>
+                    <div className="text-muted-foreground">
+                      Served month {ev.servedMonth} · Vacates by month {ev.effectiveMonth} ({remaining}mo remaining)
+                    </div>
+                  </div>
+                  {onCancelEviction && (
+                    <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => onCancelEviction(ev.propertyId, ev.slotIndex)}>
+                      Cancel notice
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </TabsContent>
+
+          <TabsContent value="listings" className="mt-0 space-y-2">
+            {propertyListings.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No properties on the market.</p>
+            ) : propertyListings.map((l: any) => {
+              const days = l.listingMonth != null ? `${monthsPlayed - l.listingMonth}mo on market` : '';
+              const offers = (l.offers || []).length;
+              return (
+                <div key={l.propertyId} className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-xs space-y-0.5">
+                    <div className="font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" />
+                      {nameOf(l.propertyId)}
+                    </div>
+                    <div className="text-muted-foreground">
+                      Asking £{Math.round(l.askingPrice ?? 0).toLocaleString()} · {days}
+                    </div>
+                    <div className="text-muted-foreground">
+                      {offers === 0 ? 'No offers yet' : `${offers} offer${offers === 1 ? '' : 's'} — open the property card to review`}
+                    </div>
+                  </div>
+                  {onCancelListing && (
+                    <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={() => onCancelListing(l.propertyId)}>
+                      Cancel listing
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </TabsContent>
+
+          <TabsContent value="extdebts" className="mt-0 space-y-2">
+            {openDebts.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No outstanding ex-tenant debts.</p>
+            ) : openDebts.map((d) => {
+              const filedMo = d.ccjFiledMonth ?? -999;
+              const canRefile = d.status === 'ccj_filed' && (monthsPlayed - filedMo) >= 6;
+              return (
+                <div key={d.id} className="rounded-lg border border-white/10 bg-white/[0.04] p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="text-xs space-y-0.5">
+                      <div className="font-semibold text-foreground">{d.tenantName} <span className="text-muted-foreground font-normal">— {d.propertyName}</span></div>
+                      <div className="text-muted-foreground">
+                        Owed originally: £{fromPennies(d.originalArrearsPennies).toLocaleString()} · Recovered: £{fromPennies(d.totalRecoveredPennies).toLocaleString()} · Outstanding: £{fromPennies(d.remainingDebtPennies).toLocaleString()}
+                      </div>
+                      <div className="text-muted-foreground">Vacated month {d.vacatedMonth}</div>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        d.status === 'monthly_recovery' ? 'text-green-300 border-green-400/40 bg-green-500/10' :
+                        d.status === 'ccj_filed' ? 'text-amber-300 border-amber-400/40 bg-amber-500/10' :
+                        'text-muted-foreground border-white/20'
+                      }
+                    >
+                      {d.status === 'monthly_recovery'
+                        ? `Recovering £${fromPennies(d.monthlyRecoveryPennies || 0).toLocaleString()}/mo`
+                        : d.status.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {d.status === 'chasing' && onFileExTenantCCJ && (
+                      <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onFileExTenantCCJ(d.id)}>
+                        ⚖️ File CCJ (£100)
+                      </Button>
+                    )}
+                    {canRefile && onRefileExTenantCCJ && (
+                      <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onRefileExTenantCCJ(d.id)}>
+                        Re-file CCJ (£100)
+                      </Button>
+                    )}
+                    {d.status !== 'monthly_recovery' && onNegotiateExTenantSettlement && (
+                      <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onNegotiateExTenantSettlement(d.id, 0.55)}>
+                        Negotiate 55% settlement
+                      </Button>
+                    )}
+                    {onWriteOffExTenantDebt && (
+                      <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => onWriteOffExTenantDebt(d.id)}>
+                        Write off
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </TabsContent>
         </div>
       </Tabs>

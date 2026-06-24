@@ -152,6 +152,12 @@ interface PropertyCardProps {
   onSplitFlatUnit?: (propertyId: string, slotIndex: number, groundRentMode: 'peppercorn' | 'percent') => void;
   /** Active tenant concerns across portfolio — used to compute longstanding ASB. */
   tenantConcerns?: Array<{ propertyId: string; category: string; raisedMonth: number; resolvedMonth?: number }>;
+  /** Phase 2 — true if there's an open ex-tenant debt; suppresses arrears badge when vacant. */
+  hasExTenantDebt?: boolean;
+  /** Phase 2 — true if the property has an active sale listing. */
+  isListedForSale?: boolean;
+  /** Phase 2 — number of offers on the active listing. */
+  listingOfferCount?: number;
 }
 
 
@@ -209,6 +215,9 @@ export const PropertyCard = memo(function PropertyCard({
   onSendToCourt,
   onSplitFlatUnit,
   tenantConcerns = [],
+  hasExTenantDebt = false,
+  isListedForSale = false,
+  listingOfferCount = 0,
 }: PropertyCardProps) {
 
   const [isLoading, setIsLoading] = useState(false);
@@ -444,13 +453,42 @@ export const PropertyCard = memo(function PropertyCard({
                 🛠️ {activeConcernCount} concern{activeConcernCount > 1 ? 's' : ''}
               </Badge>
             )}
-            {rentArrearsCount > 0 && (
+            {rentArrearsCount > 0 && currentTenant && !hasExTenantDebt && (
               <Badge
                 variant="outline"
                 className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10"
                 title={rentArrearsCount >= 2 ? 'Section 8 eviction available' : 'Tenant has missed rent'}
               >
                 💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
+              </Badge>
+            )}
+            {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
+            {pendingEviction && (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10 cursor-pointer hover:bg-red-500/20"
+                title="Open Operations → Evictions"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
+                  }
+                }}
+              >
+                🔴 Eviction in progress
+              </Badge>
+            )}
+            {isListedForSale && (
+              <Badge
+                variant="outline"
+                className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20"
+                title="Open Operations → Listings"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'listings', propertyId: property.id } }));
+                  }
+                }}
+              >
+                🏷️ {listingOfferCount > 0 ? `On market — ${listingOfferCount} offer${listingOfferCount === 1 ? '' : 's'}` : 'Listed for sale'}
               </Badge>
             )}
             {hasActiveDebtRecovery && (() => {
@@ -1052,27 +1090,7 @@ export const PropertyCard = memo(function PropertyCard({
                       ⏳ Rent pending — tenant just moved in
                     </div>
                   )}
-                  {/* Eviction notice banner OR serve-notice button */}
-                  {currentTenant && pendingEviction && (
-                    <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 flex items-center justify-between gap-2">
-                      <div className="text-[11px]">
-                        <div className="font-semibold text-destructive">Eviction notice served</div>
-                        <div className="text-muted-foreground">
-                          Ground: {pendingEviction.ground.replace(/_/g, ' ')} · Vacates by month {pendingEviction.effectiveMonth}
-                        </div>
-                      </div>
-                      {cancelEviction && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-[10px] h-7"
-                          onClick={() => cancelEviction(property.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                  {/* Phase 2 — eviction detail moved to Operations; compact badge shown at top of card */}
                   {/* Single-tenant rent + eviction controls.
                        Hide for multi-unit (HMO/flats with >1 unit) — those are
                        handled per-slot by MultiUnitSlots above, otherwise this
