@@ -159,6 +159,9 @@ export interface Property {
   hmoLicenceAppliedMonth?: number;
   /** monthsPlayed when licence expires (typically applied + 60). */
   hmoLicenceExpiresMonth?: number;
+  /** Phase 3 — monthsPlayed when this commercial property became vacant.
+   *  Drives the agent-applicant drip mechanic. Cleared when a tenant is placed. */
+  commercialVacantSinceMonth?: number;
 }
 
 /** Phase 2 (v5) — monthly portfolio performance snapshot for the Bank chart. */
