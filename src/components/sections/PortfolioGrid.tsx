@@ -288,6 +288,14 @@ export function PortfolioGrid({
               onSendToCourt={(gameState as any).sendArrearsToCourt}
               onSplitFlatUnit={(gameState as any).splitFlatUnit}
               tenantConcerns={gameState.tenantConcerns || []}
+              hasExTenantDebt={((gameState as any).exTenantDebts || []).some(
+                (d: any) => d.propertyId === property.id && d.status !== 'settled' && d.status !== 'written_off',
+              )}
+              isListedForSale={(gameState.propertyListings || []).some((l: any) => l.propertyId === property.id)}
+              listingOfferCount={(() => {
+                const l = (gameState.propertyListings || []).find((x: any) => x.propertyId === property.id);
+                return l ? (l.offers || []).length : 0;
+              })()}
             />
 
           );
