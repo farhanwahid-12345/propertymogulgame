@@ -1382,7 +1382,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const tenantRec = newTenants.find(t => t.propertyId === property.id);
           const cov = tenantRec?.tenant?.covenantStrength ?? 50;
           const remainingMonths = Math.max(0, (lease.expiryMonth ?? 0) - newMonthNumber);
-          const impliedYield = impliedCommercialYield(cov, remainingMonths);
+          const impliedYield = impliedCommercialYield(cov, remainingMonths, property.city);
           const annualRent = (property.monthlyIncome || 0) * 12;
           const capValue = impliedYield > 0 ? Math.round(annualRent / impliedYield) : property.value;
           // Light noise so net worth isn't perfectly static between events.
