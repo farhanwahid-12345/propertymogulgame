@@ -239,7 +239,7 @@ const Index = () => {
           <TabsContent value="market" className="mt-0" />
           <TabsContent value="bank" className="mt-0" />
           <TabsContent value="accounts" className="mt-0">
-            <AccountsPanel gameState={gameState} />
+            <AccountsPanel gameState={gameState} activeSubTab={accountsSubTab} />
           </TabsContent>
         </Tabs>
 
