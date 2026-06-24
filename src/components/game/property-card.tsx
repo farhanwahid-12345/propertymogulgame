@@ -881,7 +881,23 @@ export const PropertyCard = memo(function PropertyCard({
             ) : (
               <>
                 <div className="grid grid-cols-1 gap-2">
-                  {multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
+                  {property.subtype === 'hmo' && property.hmoLicenceStatus !== 'licensed' ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 cursor-not-allowed select-none">
+                            <div className="font-semibold flex items-center gap-1.5">🏠 HMO licence required</div>
+                            <div className="text-amber-200/80 mt-0.5">
+                              {property.hmoLicenceStatus === 'applied'
+                                ? 'Application submitted — licence issued in ~2 months. Tenanting blocked until then.'
+                                : 'Apply for an HMO licence from the property actions before placing tenants.'}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>HMO licence required before tenanting.</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
                     <MultiUnitSlots
                       propertyId={property.id}
                       propertyName={property.name}
