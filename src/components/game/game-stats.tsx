@@ -154,10 +154,13 @@ export function GameStats({
           </div>
 
           {/* Cash Flow */}
-          <div className={cn(
-            "border-l-4 pl-2 flex items-center gap-2 flex-wrap min-w-0",
-            netMonthlyIncome >= 0 ? "border-[hsl(var(--stat-flow))]" : "border-danger"
-          )}>
+          <div
+            data-tutorial="cashflow-stat"
+            className={cn(
+              "border-l-4 pl-2 flex items-center gap-2 flex-wrap min-w-0",
+              netMonthlyIncome >= 0 ? "border-[hsl(var(--stat-flow))]" : "border-danger"
+            )}
+          >
             <span className="text-xs text-muted-foreground whitespace-nowrap">
               {netMonthlyIncome >= 0 ? "📈" : "📉"} Cash Flow
             </span>

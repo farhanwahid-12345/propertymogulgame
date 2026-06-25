@@ -564,7 +564,7 @@ export function RenovationDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full">
+        <Button data-tutorial="renovate-btn" variant="outline" className="w-full">
           <Hammer className="h-4 w-4 mr-2" />
           Renovate
         </Button>
