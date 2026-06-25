@@ -795,6 +795,9 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const concerns = prev.tenantConcerns || [];
       const concern = concerns.find((c) => c.id === concernId && !c.resolvedMonth);
       if (!concern) return;
+      // MEES/EPC concerns are auto-dismissed once epcRating is upgraded to C or above.
+      // No manual resolve path — the "Plan EPC upgrade" CTA routes the player to Renovations.
+      if (concern.id.startsWith('mees2030_warn_')) return;
       const debited = debit(prev, concern.resolveCost);
       if (!debited) {
         showToast("Insufficient Funds", `Need £${fromPennies(concern.resolveCost).toLocaleString()} (even with overdraft) to resolve.`, "destructive");

@@ -17,6 +17,8 @@ interface Props {
   monthsPlayed: number;
   onResolve: (concernId: string) => void;
   onSnooze: (concernId: string) => void;
+  /** Route the player to the Renovations tab for the given property (used for MEES/EPC concerns). */
+  onNavigateToRenovations?: (propertyId: string) => void;
   /** When true, render only the body (no outer Card / heading). */
   bare?: boolean;
 }
@@ -44,6 +46,7 @@ export function TenantConcernsFeed({
   monthsPlayed,
   onResolve,
   onSnooze,
+  onNavigateToRenovations,
   bare = false,
 }: Props) {
   const ownedIds = new Set(ownedProperties.map(p => p.id));
@@ -104,6 +107,7 @@ export function TenantConcernsFeed({
           const isDecaying = monthsOpen > grace;
           const cost = fromPennies(c.resolveCost || 0);
           const canAfford = playerCash >= (c.resolveCost || 0);
+          const isMeesConcern = c.id.startsWith('mees2030_warn_') || (c.description?.includes('lettings ban from 2030') ?? false);
           return (
             <div
               key={c.id}
@@ -151,23 +155,36 @@ export function TenantConcernsFeed({
                 })()}
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="h-7 text-xs"
-                  disabled={!canAfford}
-                  onClick={() => onResolve(c.id)}
-                >
-                  Resolve £{cost.toLocaleString()}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 text-xs text-muted-foreground"
-                  onClick={() => onSnooze(c.id)}
-                >
-                  Snooze
-                </Button>
+                {isMeesConcern ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-7 text-xs bg-amber-600 hover:bg-amber-500"
+                    onClick={() => onNavigateToRenovations?.(c.propertyId)}
+                  >
+                    Plan EPC upgrade →
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-xs"
+                      disabled={!canAfford}
+                      onClick={() => onResolve(c.id)}
+                    >
+                      Resolve £{cost.toLocaleString()}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={() => onSnooze(c.id)}
+                    >
+                      Snooze
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           );

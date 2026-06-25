@@ -996,7 +996,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
             propertyId: property.id,
             tenantProfile: t.tenant.profile,
             category: 'safety',
-            description: `EPC ${epc} — lettings ban from 2030 (${MEES_2030_MONTH - newMonthNumber}mo). Plan an EPC upgrade.`,
+            description: `EPC ${epc} — properties below Band C cannot be re-let from 2030 (${MEES_2030_MONTH - newMonthNumber} months). Click 'Plan EPC upgrade' to open the renovation menu and improve your rating.`,
             raisedMonth: newMonthNumber,
             resolveCost: 0,
             satisfactionPenaltyIfIgnored: 0,
