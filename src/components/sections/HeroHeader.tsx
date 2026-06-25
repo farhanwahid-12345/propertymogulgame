@@ -52,8 +52,6 @@ interface HeroHeaderProps {
   level?: number;
 }
 
-// Phase 4 #19: soft long-term targets surfaced as a slim progress bar.
-// Tier scales with level — first target is achievable, later ones aspirational.
 const PROGRESSION_TARGETS: Array<{ minLevel: number; target: number; label: string }> = [
   { minLevel: 1, target: 250_000,   label: "£250k net worth" },
   { minLevel: 2, target: 500_000,   label: "£500k net worth" },
@@ -64,7 +62,6 @@ const PROGRESSION_TARGETS: Array<{ minLevel: number; target: number; label: stri
 ];
 
 function pickGoal(level: number, netWorth: number) {
-  // Pick the lowest target the player hasn't yet hit, scoped to their tier.
   const tier = PROGRESSION_TARGETS.filter(t => t.minLevel <= Math.max(1, level));
   const next = tier.find(t => netWorth < t.target) || PROGRESSION_TARGETS.find(t => netWorth < t.target);
   return next || PROGRESSION_TARGETS[PROGRESSION_TARGETS.length - 1];
@@ -90,9 +87,6 @@ export function HeroHeader({
   netWorth = 0,
   level = 1,
 }: HeroHeaderProps) {
-  // Phase 3 #4 — the explicit, persisted goalTarget takes precedence over the
-  // tier-scaled PROGRESSION_TARGETS. Falls back to the tier system for legacy
-  // saves and when the goal has been achieved (next aspirational tier shown).
   const goalTargetPounds = useGameStore((s) => ((s as any).goalTarget ?? 0) / 100);
   const goalAchievedAt = useGameStore((s) => (s as any).goalAchievedAt as number | undefined);
   const tierGoal = pickGoal(level, netWorth);
@@ -145,72 +139,104 @@ export function HeroHeader({
   };
 
   return (
+    // Outer wrapper is ALWAYS 56px tall in layout. No height transitions —
+    // animating layout-affecting properties (height) reflows the entire
+    // document on every frame and causes the sticky-header "jump" bug.
+    // The expanding band below uses max-height transitions that only repaint.
     <div
-      className={cn(
-        "sticky top-0 z-30 bg-cover bg-center transition-all duration-300 will-change-[height]",
-        compact ? "h-[56px]" : "h-[120px] md:h-[160px]",
-      )}
+      className="sticky top-0 z-30 h-[56px] bg-cover bg-center"
       style={{ backgroundImage: `url(${transporterBridgeHero})` }}
     >
       <div className="absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
-      {isPaused && !compact && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-semibold shadow-lg backdrop-blur">
-          ⏸ Paused
-        </div>
-      )}
+
+      {/* Expanding band — absolutely positioned BELOW the 56px sticky strip.
+          Only max-height animates; the document beneath the sticky header
+          never reflows because the outer wrapper's layout height is fixed. */}
       <div
+        aria-hidden={compact}
         className={cn(
-          "relative w-full px-4 h-full flex items-center transition-all",
-          compact ? "py-1" : "pb-3 pt-6 md:pt-8",
+          "absolute inset-x-0 top-[56px] overflow-hidden bg-cover bg-center transition-[max-height] duration-300 ease-in-out will-change-[max-height]",
+          compact ? "max-h-0" : "max-h-[112px] md:max-h-[152px]",
         )}
+        style={{ backgroundImage: `url(${transporterBridgeHero})` }}
       >
+        <div className="absolute inset-0" style={{ background: "var(--gradient-hero)" }} />
+        {isPaused && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-semibold shadow-lg backdrop-blur">
+            ⏸ Paused
+          </div>
+        )}
+        <div className="relative w-full px-4 pt-2 pb-3">
+          <div className="container mx-auto min-w-0">
+            <h1 className="font-bold tracking-tight gradient-text text-2xl md:text-3xl truncate">
+              Property Tycoon 🏘️
+            </h1>
+            <div className="hidden md:flex flex-col gap-1 mt-0.5">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Build your empire, one house at a time!</span>
+                <ReputationBadge reputation={reputation} log={reputationLog} />
+              </p>
+              <div
+                className="flex items-center gap-2 max-w-md"
+                title={`Goal: ${goal.label} — £${netWorth.toLocaleString()} of £${goal.target.toLocaleString()}`}
+                aria-label={`Progression goal: ${goal.label}`}
+              >
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
+                  {goalAchievedAt ? `🏆 ${goal.label}` : `🎯 ${goal.label}`}
+                </span>
+                <div
+                  className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={Math.floor(goalPct)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Progress toward goal: ${goal.label}`}
+                >
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-primary/60"
+                    style={{ width: `${goalPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] tabular-nums text-muted-foreground/80 shrink-0 w-8 text-right">
+                  {Math.floor(goalPct)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Always-visible 56px control strip */}
+      <div className="relative w-full px-4 h-full flex items-center">
         <div className="container mx-auto min-w-0">
           <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
             <div className="min-w-0 flex-1">
               <h1
                 className={cn(
-                  "font-bold tracking-tight gradient-text transition-all truncate",
-                  compact ? "text-base md:text-lg" : "text-2xl md:text-3xl",
+                  "font-bold tracking-tight gradient-text truncate text-base md:text-lg transition-opacity duration-200",
+                  compact ? "opacity-100" : "opacity-0",
                 )}
               >
-                Property Tycoon{compact ? "" : " 🏘️"}
+                Property Tycoon
               </h1>
-              {!compact && (
-                <div className="hidden md:flex flex-col gap-1 mt-0.5">
-                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Build your empire, one house at a time!</span>
-                    <ReputationBadge reputation={reputation} log={reputationLog} />
-                  </p>
-                  <div
-                    className="flex items-center gap-2 max-w-md"
-                    title={`Goal: ${goal.label} — £${netWorth.toLocaleString()} of £${goal.target.toLocaleString()}`}
-                    aria-label={`Progression goal: ${goal.label}`}
-                  >
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 shrink-0">
-                      {goalAchievedAt ? `🏆 ${goal.label}` : `🎯 ${goal.label}`}
-                    </span>
-                    <div
-                      className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden"
-                      role="progressbar"
-                      aria-valuenow={Math.floor(goalPct)}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={`Progress toward goal: ${goal.label}`}
-                    >
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-primary/60 transition-all"
-                        style={{ width: `${goalPct}%` }}
-                      />
-                    </div>
-
-                    <span className="text-[10px] tabular-nums text-muted-foreground/80 shrink-0 w-8 text-right">
-                      {Math.floor(goalPct)}%
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
+              {compact && (
+                <div
+                  className="glass rounded-full px-3 py-1 hidden md:flex items-center gap-2 text-[11px] text-muted-foreground whitespace-nowrap"
+                  title={`Cash flow £${netMonthlyCashflow.toLocaleString()}/mo · Market rate ${(currentMarketRate * 100).toFixed(2)}% · Total debt £${totalDebt.toLocaleString()} · Month ${monthsPlayed}`}
+                >
+                  <span className={cn(netMonthlyCashflow >= 0 ? "text-success" : "text-danger", "font-semibold")}>
+                    {netMonthlyCashflow >= 0 ? "📈" : "📉"} £{netMonthlyCashflow.toLocaleString()}/mo
+                  </span>
+                  <span className="opacity-60">·</span>
+                  <span>{(currentMarketRate * 100).toFixed(2)}%</span>
+                  <span className="opacity-60">·</span>
+                  <span>Debt £{totalDebt.toLocaleString()}</span>
+                  <span className="opacity-60">·</span>
+                  <span>M {monthsPlayed}</span>
+                </div>
+              )}
               {!compact && (
                 <div
                   className="glass rounded-full px-3 py-1 hidden md:flex items-center gap-2 text-[11px] text-muted-foreground whitespace-nowrap"
