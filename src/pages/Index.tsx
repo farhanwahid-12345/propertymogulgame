@@ -24,6 +24,7 @@ import { BankruptcyDialog } from "@/components/game/bankruptcy-dialog";
 import { FirstPurchaseCoach, isFirstPurchaseCoachSeen } from "@/components/game/first-purchase-coach";
 import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
+import { TutorialEngine } from "@/components/game/tutorial/TutorialEngine";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
 import { BankingPanelActions, OperationsInlineButton, LoansInlineButton } from "@/components/sections/BankingPanel";
 import { AccountsPanel } from "@/components/sections/AccountsPanel";
@@ -135,6 +136,18 @@ const Index = () => {
     prevOwnedCountRef.current = current;
   }, [gameState.ownedProperties.length]);
 
+  // Tutorial scenario steps can request tab switches via pm:set-active-tab.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const tab = (e as CustomEvent<{ tab?: string }>).detail?.tab;
+      if (tab === 'market' || tab === 'bank' || tab === 'accounts') {
+        setActiveTab(tab);
+      }
+    };
+    window.addEventListener('pm:set-active-tab', handler as EventListener);
+    return () => window.removeEventListener('pm:set-active-tab', handler as EventListener);
+  }, []);
+
   const getDebtForProperty = usePropertyDebt(gameState.mortgages);
   const {
     totalPortfolioValue,
@@ -202,10 +215,10 @@ const Index = () => {
                 <TabsTrigger value="market" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg h-7 px-3 text-xs flex-none">
                   🏪 Market
                 </TabsTrigger>
-                <TabsTrigger value="bank" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
+                <TabsTrigger value="bank" data-tutorial="bank-tab" className="data-[state=active]:bg-[hsl(var(--stat-credit))]/20 data-[state=active]:text-[hsl(var(--stat-credit))] rounded-lg h-7 px-3 text-xs flex-none">
                   🏦 Bank
                 </TabsTrigger>
-                <TabsTrigger value="accounts" className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none">
+                <TabsTrigger value="accounts" data-tutorial="accounts-tab" className="data-[state=active]:bg-[hsl(var(--stat-level))]/20 data-[state=active]:text-[hsl(var(--stat-level))] rounded-lg h-7 px-3 text-xs flex-none">
                   📊 Accounts
                 </TabsTrigger>
               </TabsList>
@@ -379,6 +392,8 @@ const Index = () => {
       <CourtResolutionModal />
       <OverdraftPromptDialog />
       <BankruptcyDialog />
+
+      <TutorialEngine />
     </div>
   );
 };
