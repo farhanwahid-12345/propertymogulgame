@@ -171,7 +171,7 @@ const Index = () => {
         level={gameState.level}
       />
 
-      <div className="container mx-auto px-3 sm:px-4 py-4 space-y-3 pb-24 md:pb-6">
+      <div className="container mx-auto px-3 sm:px-4 pt-[56px] py-4 space-y-3 pb-24 md:pb-6">
 
         <GameStats
           cash={gameState.cash}
