@@ -195,5 +195,82 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       const next = Array.from(new Set([...prevSeen, ...ids])).slice(-50);
       set({ seenEconomicEventIds: next });
     },
+
+    /**
+     * Player-triggered bankruptcy from the rescue panel. Liquidates the entire
+     * portfolio at a 70 % auction haircut, pays off mortgages first, then loans,
+     * then any remaining pending transactions. Whatever cash is left (positive
+     * or negative) becomes the player's final net worth and is recorded in
+     * `bankruptcySummary` for the end-game modal.
+     */
+    triggerBankruptcy: () => {
+      const prev: any = get();
+      if (prev.isBankrupt) return;
+
+      const propertiesSoldFor: Array<{ name: string; soldFor: number; mortgagePaid: number; net: number }> = [];
+      let cash = prev.cash;
+      let proceeds = 0;
+
+      // 1) Liquidate every owned property at 70 % auction value.
+      for (const property of prev.ownedProperties as any[]) {
+        const soldFor = Math.round(property.value * 0.7);
+        const ownMortgage = (prev.mortgages as any[]).find((m) => m.propertyId === property.id && !m.collateralPropertyIds?.length);
+        const portfolioShare = (prev.mortgages as any[])
+          .filter((m) => (m.collateralPropertyIds || []).includes(property.id))
+          .reduce((s, m) => s + Math.round(m.remainingBalance / Math.max(1, (m.collateralPropertyIds?.length || 1))), 0);
+        const mortgagePaid = (ownMortgage?.remainingBalance || 0) + portfolioShare;
+        const net = soldFor - mortgagePaid;
+        proceeds += net;
+        propertiesSoldFor.push({ name: property.name, soldFor, mortgagePaid, net });
+      }
+      cash += proceeds;
+
+      // 2) Pay remaining loans (personal/business/investor/bridging).
+      const outstandingLoans = ((prev.loans || []) as any[]).reduce((s, l) => s + (l.remainingBalance || 0), 0);
+      cash -= outstandingLoans;
+
+      // 3) Clear any pending transactions (tax / insurance / council tax).
+      const pendingDebits = ((prev.pendingTransactions || []) as any[]).reduce((s, t) => s + (t.amount || 0), 0);
+      cash -= pendingDebits;
+
+      // 4) Settle overdraft from whatever cash remains.
+      cash -= prev.overdraftUsed || 0;
+
+      const totalDebt = ((prev.mortgages || []) as any[]).reduce((s, m) => s + m.remainingBalance, 0)
+        + outstandingLoans
+        + pendingDebits
+        + (prev.overdraftUsed || 0);
+
+      const summary = {
+        month: prev.monthsPlayed,
+        totalDebt,
+        propertiesLostCount: (prev.ownedProperties || []).length,
+        remainingCash: cash, // doubles as final net worth
+        propertiesSoldFor,
+      };
+
+      set({
+        isBankrupt: true,
+        bankruptcySummary: summary,
+        cash,
+        overdraftUsed: 0,
+        ownedProperties: [],
+        mortgages: [],
+        loans: [],
+        tenants: [],
+        voidPeriods: [],
+        tenantConcerns: [],
+        pendingEvictions: [],
+        propertyLocks: [],
+        pendingTransactions: [],
+        isPaused: false,
+      });
+
+      showToast(
+        "Bankruptcy Filed",
+        `Portfolio liquidated. Final net worth: £${fromPennies(cash).toLocaleString()}.`,
+        cash < 0 ? "destructive" : undefined,
+      );
+    },
   };
 }

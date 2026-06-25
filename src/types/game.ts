@@ -625,7 +625,9 @@ export interface GameState {
     month: number;
     totalDebt: number;          // pennies
     propertiesLostCount: number;
-    remainingCash: number;      // pennies (may be negative)
+    remainingCash: number;      // pennies (may be negative) — also acts as final net worth
+    /** Per-property breakdown when bankruptcy was player-triggered via the rescue panel. */
+    propertiesSoldFor?: Array<{ name: string; soldFor: number; mortgagePaid: number; net: number }>;
   } | null;
   /** Phase 7 #18 — chronological log of completed loans, with on-time flag. */
   loanPayoffHistory?: Array<{ id: string; kind: 'personal' | 'business' | 'investor' | 'bridging'; repaidOnSchedule: boolean; month: number }>;
