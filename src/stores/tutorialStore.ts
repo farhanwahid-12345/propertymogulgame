@@ -1,21 +1,23 @@
 import { create } from "zustand";
 
+/**
+ * Phase 2 tutorial step contract — strictly scripted scenario.
+ *
+ *  • `advance: 'button'` → user clicks Next.
+ *  • `advance: 'event'`  → auto-advances when `advanceEvent` fires on window.
+ *  • `beforeStep`        → side effect (switch tab, open dialog) when step activates.
+ *  • `isFinal`           → render full-overlay centered congratulations card (no spotlight).
+ */
 export interface TutorialStep {
   id: string;
   title: string;
   body: string;
-  /** CSS selector for the target element. If omitted, tooltip centers on screen. */
-  selector?: string;
-  /** Tab to switch to before showing this step. */
-  tab?: string;
-  /** When true, advance only when awaitEvent fires (not on Next click). */
-  waitForAction?: boolean;
-  /** Custom-event name that auto-advances a waitForAction step. */
-  awaitEvent?: string;
-  /** Optional CTA button label shown alongside the step. */
-  actionLabel?: string;
-  /** Custom-event dispatched when the CTA is clicked. */
-  actionEvent?: string;
+  targetSelector: string;            // empty string allowed on the final step
+  tooltipSide: "top" | "bottom" | "left" | "right";
+  advance: "button" | "event";
+  advanceEvent?: string;
+  beforeStep?: () => void;
+  isFinal?: boolean;
 }
 
 export type StepStatus = "idle" | "waiting" | "done";
