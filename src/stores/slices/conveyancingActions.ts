@@ -36,6 +36,7 @@ export function createConveyancingActions(set: SetFn, get: GetFn) {
       };
 
       showToast("Sale Agreed! ⏳", `${property.name} — conveyancing started. Completion in ${conveyancingMonths} month(s).`);
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:purchase-initiated', { detail: { propertyId, source: 'estate-agent-sale' } })); } catch { /* noop */ }
       set({
         conveyancing: [...prev.conveyancing, conv],
         propertyListings: prev.propertyListings.filter((l: any) => l.propertyId !== propertyId),
@@ -62,6 +63,7 @@ export function createConveyancingActions(set: SetFn, get: GetFn) {
       };
 
       showToast("Auction Sale Agreed! ⏳", `${property.name} — conveyancing for 1 month.`);
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:purchase-initiated', { detail: { propertyId, source: 'auction-sale' } })); } catch { /* noop */ }
       set({
         conveyancing: [...prev.conveyancing, conv],
         propertyListings: prev.propertyListings.filter((l: any) => l.propertyId !== propertyId),
