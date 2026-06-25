@@ -242,6 +242,13 @@ export function OperationsCenter(props: OperationsCenterProps) {
               monthsPlayed={monthsPlayed}
               onResolve={onResolveConcern}
               onSnooze={onSnoozeConcern}
+              onNavigateToRenovations={(propertyId) => {
+                setTab('renovations');
+                requestAnimationFrame(() => {
+                  const el = document.querySelector(`[data-property-id="${propertyId}"]`);
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+              }}
               bare
             />
           </TabsContent>
