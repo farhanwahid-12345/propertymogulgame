@@ -2519,6 +2519,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
 
       }));
+
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:month-end-completed', { detail: { month: newMonthNumber } })); } catch { /* noop */ }
     },
   };
 }
