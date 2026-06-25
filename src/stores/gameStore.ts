@@ -168,6 +168,9 @@ interface GameActions {
   applyForHmoLicence: (propertyId: string) => void;
   // Game
   resetGame: () => void;
+  // Phase — emergency rescue actions surfaced from the Pending Transactions dialog
+  forceQuickSale: (propertyId: string) => void;
+  triggerBankruptcy: () => void;
 }
 
 // ─── Initial state ────────────────────────────────────────
