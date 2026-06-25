@@ -399,5 +399,44 @@ export function createPortfolioActions(set: SetFn, get: GetFn) {
         );
       }
     },
+
+    /**
+     * Emergency immediate sale — bypasses conveyancing. Credits net proceeds
+     * (90 % of book value minus the property's outstanding mortgage balance)
+     * straight to cash. Removes the property, its mortgage, and any tenants /
+     * voids in a single set() so the player can use the funds to clear the
+     * paused pending-transactions queue without waiting weeks.
+     */
+    forceQuickSale: (propertyId: string) => {
+      const prev = get();
+      const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
+      if (!property) { showToast("Quick Sale Failed", "Property not found in your portfolio.", "destructive"); return; }
+      // Quick-sale price: 90 % of current book value (auction haircut).
+      const salePrice = Math.round(property.value * 0.9);
+      // Settle the property's own mortgage (single-property only — portfolio
+      // facilities require unwinding and aren't supported via quick sale).
+      const ownMortgage = prev.mortgages.find((m: any) => m.propertyId === propertyId && !m.collateralPropertyIds?.length);
+      if (prev.mortgages.some((m: any) => (m.collateralPropertyIds || []).includes(propertyId))) {
+        showToast("Quick Sale Blocked", "This property is collateral for a portfolio mortgage — refinance that facility first.", "destructive");
+        return;
+      }
+      const mortgagePaid = ownMortgage?.remainingBalance || 0;
+      const netProceeds = salePrice - mortgagePaid;
+      const newCash = prev.cash + netProceeds;
+      set({
+        cash: newCash,
+        ownedProperties: prev.ownedProperties.filter((p: any) => p.id !== propertyId),
+        mortgages: prev.mortgages.filter((m: any) => m.propertyId !== propertyId),
+        tenants: prev.tenants.filter((t: any) => t.propertyId !== propertyId),
+        voidPeriods: prev.voidPeriods.filter((vp: any) => vp.propertyId !== propertyId),
+        tenantConcerns: (prev.tenantConcerns || []).filter((c: any) => c.propertyId !== propertyId),
+        pendingEvictions: (prev.pendingEvictions || []).filter((e: any) => e.propertyId !== propertyId),
+        propertyLocks: (prev.propertyLocks || []).filter((l: any) => l.propertyId !== propertyId),
+      });
+      showToast(
+        "Property Sold at Auction 🏠",
+        `${property.name} sold for £${fromPennies(salePrice).toLocaleString()} (mortgage £${fromPennies(mortgagePaid).toLocaleString()} settled). Net £${fromPennies(netProceeds).toLocaleString()} credited.`,
+      );
+    },
   };
 }
