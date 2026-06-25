@@ -181,6 +181,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         `${tenant.name}${slotLabel} renting at £${fromPennies(slotRent).toLocaleString()}/mo. 5-week deposit (£${fromPennies(requiredDeposit).toLocaleString()}) protected via TDS.`
       );
       set({ tenants: updatedTenants, ownedProperties: updatedProps, voidPeriods: updatedVoids });
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:tenant-selected', { detail: { propertyId } })); } catch { /* noop */ }
     },
 
     // Phase 2 — Heads of Terms: sign a commercial lease at agreed terms.

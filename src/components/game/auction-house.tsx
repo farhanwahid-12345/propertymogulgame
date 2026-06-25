@@ -141,6 +141,7 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
           if (prev.currentBid >= prev.reservePrice) {
             if (isUserWinner) {
               // Pass mortgage details through to purchase
+              try { window.dispatchEvent(new CustomEvent('pm:purchase-initiated')); } catch { /* noop */ }
               onBuyProperty(prev.property, prev.currentBid, selectedMortgagePercent, selectedProviderId, selectedTermYears, selectedMortgageType, selectedFixedTermYears);
             } else {
               toast({

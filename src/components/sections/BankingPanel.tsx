@@ -92,6 +92,7 @@ function InlineDialogButton({
   attention = false,
   flash = false,
   autoOpenEvent,
+  dataTutorial,
   children,
 }: {
   id?: string;
@@ -102,6 +103,8 @@ function InlineDialogButton({
   flash?: boolean;
   /** When set, listens for this window event and auto-opens the dialog. */
   autoOpenEvent?: string;
+  /** Optional data-tutorial attribute for the spotlight tutorial engine. */
+  dataTutorial?: string;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -115,6 +118,7 @@ function InlineDialogButton({
     <>
       <Button
         id={id}
+        data-tutorial={dataTutorial}
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
@@ -177,6 +181,7 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
       flash={flash}
       title="Operations"
       autoOpenEvent="pm:open-operations"
+      dataTutorial="ops-conveyancing"
     >
       <OperationsCenter
         monthsPlayed={gameState.monthsPlayed}

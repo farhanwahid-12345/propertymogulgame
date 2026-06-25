@@ -578,7 +578,7 @@ export function TenantSelector({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full">
+        <Button data-tutorial="select-tenant-btn" variant="outline" className="w-full">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             {hasSittingTenant ? `Tenant: ${currentTenant!.name}` : "Select Tenant"}

@@ -607,7 +607,7 @@ export function EstateAgentWindow({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button id="estate-agent-trigger" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+        <Button id="estate-agent-trigger" data-tutorial="estate-agent-btn" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
           <Building2 className="h-4 w-4 mr-2" />
           Estate Agent
         </Button>
@@ -693,6 +693,7 @@ export function EstateAgentWindow({
                 <Card
                   key={property.id}
                   data-tour={idx === 0 ? 'first-buy-card' : undefined}
+                  data-tutorial={idx === 0 ? 'ea-first-card' : undefined}
                   className={`cursor-pointer transition-all p-3 space-y-1 ${
                     selectedBuyProperty?.id === property.id
                       ? 'ring-2 ring-primary'
@@ -767,7 +768,7 @@ export function EstateAgentWindow({
 
 
             {selectedBuyProperty && (
-              <Card id="tour-cost-breakdown" className="mt-4">
+              <Card id="tour-cost-breakdown" data-tutorial="ea-cost-breakdown" className="mt-4">
                 <CardHeader>
                   <CardTitle>Make an Offer - {selectedBuyProperty.name}</CardTitle>
                 </CardHeader>
@@ -1019,6 +1020,7 @@ export function EstateAgentWindow({
                               }
                             }
                           }
+                          try { window.dispatchEvent(new CustomEvent('pm:purchase-initiated')); } catch { /* noop */ }
                           onBuyProperty(
                             selectedBuyProperty,
                             offerAmount[0],

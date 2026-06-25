@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 import { useTutorialStore } from "@/stores/tutorialStore";
 
 interface Props {
-  /** Optional: tab switcher so step.tab can navigate the page underneath. */
-  setActiveTab?: (tab: string) => void;
   /** Called when the tutorial finishes (last step, skip, or X). */
   onFinish?: () => void;
 }
@@ -16,7 +14,7 @@ const PADDING = 6;
 const TOOLTIP_MAX_W = 320;
 const TOOLTIP_GAP = 14;
 
-export function TutorialEngine({ setActiveTab, onFinish }: Props) {
+export function TutorialEngine({ onFinish }: Props) {
   const active = useTutorialStore((s) => s.active);
   const steps = useTutorialStore((s) => s.steps);
   const stepIndex = useTutorialStore((s) => s.stepIndex);
@@ -32,21 +30,24 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
   const [mounted, setMounted] = useState(false);
   const rafRef = useRef<number | null>(null);
 
-  // Mount portal target once.
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Switch tab when a step requests it.
+  // Run beforeStep side-effect when a step activates.
   useEffect(() => {
     if (!active || !step) return;
-    if (step.tab && setActiveTab) setActiveTab(step.tab);
-  }, [active, step, setActiveTab]);
+    try {
+      step.beforeStep?.();
+    } catch {
+      /* noop */
+    }
+  }, [active, step]);
 
   // Track the target element rect — observe size/scroll/resize.
   useLayoutEffect(() => {
     if (!active || !step) return;
-    if (!step.selector) {
+    if (!step.targetSelector || step.isFinal) {
       setRect(null);
       return;
     }
@@ -57,9 +58,8 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
 
     const measure = () => {
       if (cancelled) return;
-      const el = document.querySelector(step.selector!);
+      const el = document.querySelector(step.targetSelector);
       if (!el) {
-        // Element not yet in DOM — poll via RAF until it appears.
         rafRef.current = requestAnimationFrame(measure);
         return;
       }
@@ -72,15 +72,11 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
         }
         if (observer) observer.disconnect();
         observer = new ResizeObserver(() => {
-          rafRef.current = requestAnimationFrame(() => {
-            const r = el.getBoundingClientRect();
-            setRect(r);
-          });
+          rafRef.current = requestAnimationFrame(() => setRect(el.getBoundingClientRect()));
         });
         observer.observe(el);
       }
-      const r = el.getBoundingClientRect();
-      setRect(r);
+      setRect(el.getBoundingClientRect());
     };
 
     measure();
@@ -105,16 +101,17 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
     };
   }, [active, step, setRect]);
 
-  // waitForAction: auto-advance on awaitEvent.
+  // 'event' advance: listen for the named custom event and auto-advance.
   useEffect(() => {
-    if (!active || !step || !step.waitForAction || !step.awaitEvent) return;
+    if (!active || !step) return;
+    if (step.advance !== "event" || !step.advanceEvent) return;
     setStatus("waiting");
     const handler = () => {
       setStatus("done");
       next();
     };
-    window.addEventListener(step.awaitEvent, handler);
-    return () => window.removeEventListener(step.awaitEvent!, handler);
+    window.addEventListener(step.advanceEvent, handler);
+    return () => window.removeEventListener(step.advanceEvent!, handler);
   }, [active, step, next, setStatus]);
 
   const handleFinish = () => {
@@ -122,77 +119,137 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
     onFinish?.();
   };
 
+  /**
+   * Tooltip positioning honours `tooltipSide` as a hint, but flips/clamps when
+   * the chosen side has insufficient room.
+   */
   const tooltipPosition = useMemo(() => {
-    if (!targetRect) {
-      // Centered fallback.
-      return {
-        top: typeof window !== "undefined" ? window.innerHeight / 2 - 100 : 200,
-        left:
-          typeof window !== "undefined"
-            ? Math.max(12, window.innerWidth / 2 - TOOLTIP_MAX_W / 2)
-            : 12,
-        placement: "center" as const,
-        arrowStyle: { display: "none" } as React.CSSProperties,
-      };
+    if (!targetRect || !step || step.isFinal) {
+      return null;
     }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const spaceBelow = vh - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-    const placeBelow = spaceBelow >= 220 || spaceBelow >= spaceAbove;
-
-    const top = placeBelow
-      ? targetRect.bottom + TOOLTIP_GAP
-      : Math.max(12, targetRect.top - TOOLTIP_GAP - 180);
-
-    // Horizontal alignment: try to center on target, clamp to viewport.
-    const targetCenter = targetRect.left + targetRect.width / 2;
     const isMobile = vw < 640;
     const width = isMobile ? Math.min(vw - 24, TOOLTIP_MAX_W) : TOOLTIP_MAX_W;
-    let left = targetCenter - width / 2;
+    const estHeight = 220;
+
+    const spaceBelow = vh - targetRect.bottom;
+    const spaceAbove = targetRect.top;
+    const spaceRight = vw - targetRect.right;
+    const spaceLeft = targetRect.left;
+
+    let side = step.tooltipSide;
+    // Flip if requested side has no room.
+    if (side === "bottom" && spaceBelow < estHeight && spaceAbove > spaceBelow) side = "top";
+    else if (side === "top" && spaceAbove < estHeight && spaceBelow > spaceAbove) side = "bottom";
+    else if (side === "right" && spaceRight < width + 20 && spaceLeft > spaceRight) side = "left";
+    else if (side === "left" && spaceLeft < width + 20 && spaceRight > spaceLeft) side = "right";
+
+    let top = 0;
+    let left = 0;
+
+    if (side === "bottom") {
+      top = targetRect.bottom + TOOLTIP_GAP;
+      left = targetRect.left + targetRect.width / 2 - width / 2;
+    } else if (side === "top") {
+      top = Math.max(12, targetRect.top - TOOLTIP_GAP - estHeight);
+      left = targetRect.left + targetRect.width / 2 - width / 2;
+    } else if (side === "right") {
+      top = targetRect.top + targetRect.height / 2 - estHeight / 2;
+      left = targetRect.right + TOOLTIP_GAP;
+    } else {
+      // left
+      top = targetRect.top + targetRect.height / 2 - estHeight / 2;
+      left = targetRect.left - TOOLTIP_GAP - width;
+    }
+
     left = Math.max(12, Math.min(left, vw - width - 12));
+    top = Math.max(12, Math.min(top, vh - 60));
 
-    // Arrow horizontal position relative to tooltip.
-    const arrowLeft = Math.max(16, Math.min(width - 16, targetCenter - left));
-
-    const arrowStyle: React.CSSProperties = placeBelow
-      ? {
-          position: "absolute",
-          top: -6,
-          left: arrowLeft - 6,
-          width: 12,
-          height: 12,
-          transform: "rotate(45deg)",
-          background: "hsl(var(--background))",
-          borderTop: "1px solid hsl(var(--border))",
-          borderLeft: "1px solid hsl(var(--border))",
-        }
-      : {
-          position: "absolute",
-          bottom: -6,
-          left: arrowLeft - 6,
-          width: 12,
-          height: 12,
-          transform: "rotate(45deg)",
-          background: "hsl(var(--background))",
-          borderBottom: "1px solid hsl(var(--border))",
-          borderRight: "1px solid hsl(var(--border))",
-        };
-
-    return {
-      top,
-      left,
-      width,
-      placement: placeBelow ? ("below" as const) : ("above" as const),
-      arrowStyle,
+    // Arrow position
+    const arrowBase: React.CSSProperties = {
+      position: "absolute",
+      width: 12,
+      height: 12,
+      transform: "rotate(45deg)",
+      background: "hsl(var(--background))",
     };
-  }, [targetRect]);
+    let arrowStyle: React.CSSProperties = arrowBase;
+    if (side === "bottom") {
+      const tc = targetRect.left + targetRect.width / 2;
+      const ax = Math.max(16, Math.min(width - 16, tc - left));
+      arrowStyle = {
+        ...arrowBase,
+        top: -6,
+        left: ax - 6,
+        borderTop: "1px solid hsl(var(--border))",
+        borderLeft: "1px solid hsl(var(--border))",
+      };
+    } else if (side === "top") {
+      const tc = targetRect.left + targetRect.width / 2;
+      const ax = Math.max(16, Math.min(width - 16, tc - left));
+      arrowStyle = {
+        ...arrowBase,
+        bottom: -6,
+        left: ax - 6,
+        borderBottom: "1px solid hsl(var(--border))",
+        borderRight: "1px solid hsl(var(--border))",
+      };
+    } else if (side === "right") {
+      const tc = targetRect.top + targetRect.height / 2;
+      const ay = Math.max(16, Math.min(estHeight - 16, tc - top));
+      arrowStyle = {
+        ...arrowBase,
+        left: -6,
+        top: ay - 6,
+        borderBottom: "1px solid hsl(var(--border))",
+        borderLeft: "1px solid hsl(var(--border))",
+      };
+    } else {
+      const tc = targetRect.top + targetRect.height / 2;
+      const ay = Math.max(16, Math.min(estHeight - 16, tc - top));
+      arrowStyle = {
+        ...arrowBase,
+        right: -6,
+        top: ay - 6,
+        borderTop: "1px solid hsl(var(--border))",
+        borderRight: "1px solid hsl(var(--border))",
+      };
+    }
+
+    return { top, left, width, side, arrowStyle };
+  }, [targetRect, step]);
 
   if (!mounted || !active || !step) return null;
 
   const isLast = stepIndex >= steps.length - 1;
-  const isWait = !!step.waitForAction;
+  const isWait = step.advance === "event";
 
+  // ── Final step: full overlay congratulations modal, no spotlight. ──
+  if (step.isFinal) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        style={{ background: "rgba(0,0,0,0.72)" }}
+      >
+        <div
+          role="dialog"
+          aria-label={step.title}
+          className="glass rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl p-6 max-w-md w-full text-center animate-in fade-in zoom-in-95 duration-300"
+        >
+          <div className="text-5xl mb-3">🏘️</div>
+          <h2 className="text-xl font-semibold mb-2">{step.title}</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-5">{step.body}</p>
+          <Button size="lg" className="w-full" onClick={handleFinish}>
+            Let's go 🏘️
+          </Button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  // ── Spotlight + tooltip steps. ──
   const spotlightStyle: React.CSSProperties = targetRect
     ? {
         position: "fixed",
@@ -207,8 +264,6 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
         zIndex: 60,
       }
     : {
-        // No target — render a full dim layer using the same technique by
-        // placing the "hole" off-screen at zero size.
         position: "fixed",
         top: -20,
         left: -20,
@@ -219,40 +274,36 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
         zIndex: 60,
       };
 
-  const tooltipStyle: React.CSSProperties = {
-    position: "fixed",
-    top: tooltipPosition.top,
-    left: tooltipPosition.left,
-    width: tooltipPosition.width,
-    maxWidth: "calc(100vw - 24px)",
-    zIndex: 61,
-    pointerEvents: "auto",
-  };
-
-  const triggerAction = () => {
-    if (step.actionEvent) {
-      try {
-        window.dispatchEvent(new CustomEvent(step.actionEvent));
-      } catch {
-        /* noop */
+  const tooltipStyle: React.CSSProperties = tooltipPosition
+    ? {
+        position: "fixed",
+        top: tooltipPosition.top,
+        left: tooltipPosition.left,
+        width: tooltipPosition.width,
+        maxWidth: "calc(100vw - 24px)",
+        zIndex: 61,
+        pointerEvents: "auto",
       }
-    }
-  };
+    : {
+        position: "fixed",
+        top: typeof window !== "undefined" ? window.innerHeight / 2 - 100 : 200,
+        left:
+          typeof window !== "undefined"
+            ? Math.max(12, window.innerWidth / 2 - TOOLTIP_MAX_W / 2)
+            : 12,
+        width: TOOLTIP_MAX_W,
+        maxWidth: "calc(100vw - 24px)",
+        zIndex: 61,
+        pointerEvents: "auto",
+      };
 
   return createPortal(
     <>
-      {/* Spotlight cutout */}
       <div aria-hidden style={spotlightStyle} />
 
       {/* Always-visible skip button */}
       <div
-        style={{
-          position: "fixed",
-          top: 12,
-          right: 12,
-          zIndex: 62,
-          pointerEvents: "auto",
-        }}
+        style={{ position: "fixed", top: 12, right: 12, zIndex: 62, pointerEvents: "auto" }}
       >
         {!confirmSkip ? (
           <Button
@@ -279,18 +330,16 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
         )}
       </div>
 
-      {/* Tooltip card */}
+      {/* Tooltip */}
       <div
         key={step.id}
         role="dialog"
         aria-label={step.title}
         style={tooltipStyle}
-        className={cn(
-          "animate-in fade-in slide-in-from-bottom-1 duration-300",
-        )}
+        className={cn("animate-in fade-in slide-in-from-bottom-1 duration-300")}
       >
         <div className="relative glass rounded-2xl border border-border bg-background/95 backdrop-blur-xl shadow-2xl p-4">
-          {tooltipPosition.placement !== "center" && <div style={tooltipPosition.arrowStyle} />}
+          {tooltipPosition && <div style={tooltipPosition.arrowStyle} />}
 
           <div className="flex items-center gap-2 mb-2">
             <span className="font-semibold text-base">{step.title}</span>
@@ -322,12 +371,6 @@ export function TutorialEngine({ setActiveTab, onFinish }: Props) {
               )}
             </div>
             <div className="flex gap-2">
-              {step.actionLabel && step.actionEvent && (
-                <Button size="sm" onClick={triggerAction}>
-                  {step.actionLabel}
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
               {!isWait && (
                 <Button
                   size="sm"

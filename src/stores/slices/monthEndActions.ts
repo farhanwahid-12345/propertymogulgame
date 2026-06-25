@@ -237,6 +237,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           ? ` Sitting tenant ${inheritedSittingTenant.companyName} transferred — lease continues.`
           : '';
         showToast("Conveyancing Complete! 🏠", `${conv.propertyName} is now yours!${tenantNote}`);
+        try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:conveyancing-complete', { detail: { propertyId: conv.propertyId } })); } catch { /* noop */ }
       });
 
       // Complete sell conveyancing — remove property, add cash
@@ -2518,6 +2519,8 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
 
       }));
+
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('pm:month-end-completed', { detail: { month: newMonthNumber } })); } catch { /* noop */ }
     },
   };
 }

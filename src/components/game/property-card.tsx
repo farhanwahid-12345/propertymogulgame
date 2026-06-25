@@ -356,7 +356,7 @@ export const PropertyCard = memo(function PropertyCard({
             <span className="text-lg">{typeEmoji[propertyType]}</span>
             <CardTitle className="text-base">{property.name}</CardTitle>
             {property.epcRating && (
-              <Badge className={cn("text-xs px-1.5 py-0.5",
+              <Badge data-tutorial="property-epc-badge" className={cn("text-xs px-1.5 py-0.5",
                 ['A','B','C'].includes(property.epcRating) ? "bg-green-500/20 text-green-400 border-green-500/30" :
                 ['D','E'].includes(property.epcRating) ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
                 "bg-red-500/20 text-red-400 border-red-500/30"
@@ -608,7 +608,7 @@ export const PropertyCard = memo(function PropertyCard({
                 {financialsExpanded ? <ChevronUp className="h-3 w-3" aria-hidden="true" /> : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                 {financialsExpanded ? 'Hide details' : 'Details'}
               </span>
-              <span>Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
+              <span data-tutorial="property-rent-display">Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
             </Button>
 
 
