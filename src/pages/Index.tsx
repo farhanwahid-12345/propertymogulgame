@@ -179,6 +179,7 @@ const Index = () => {
         entityType={gameState.entityType}
         currentMarketRate={gameState.currentMarketRate}
         totalDebt={gameState.totalDebt}
+        landlordReputation={gameState.landlordReputation}
         netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
         netWorth={gameState.netWorth}
         level={gameState.level}
