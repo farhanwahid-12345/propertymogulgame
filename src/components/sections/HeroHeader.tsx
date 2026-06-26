@@ -16,6 +16,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
 import { replayTour } from "@/lib/onboarding";
 import { ConfirmDialog } from "@/components/game/confirm-dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type {
   Conveyancing,
   Renovation,
