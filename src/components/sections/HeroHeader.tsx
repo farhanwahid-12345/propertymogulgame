@@ -44,6 +44,7 @@ interface HeroHeaderProps {
   entityType?: EntityType;
   currentMarketRate?: number;
   totalDebt?: number;
+  landlordReputation?: number;
   netMonthlyCashflow?: number;
   netWorth?: number;
   level?: number;
