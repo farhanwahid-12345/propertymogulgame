@@ -407,6 +407,7 @@ export function useGameState() {
     timeUntilNextMonth: store.timeUntilNextMonth,
     isBankrupt: store.isBankrupt,
     creditScore,
+    landlordReputation: store.landlordReputation,
     currentMarketRate: store.currentMarketRate,
     tenantEvents,
     pendingEvictions: Array.isArray(store.pendingEvictions) ? store.pendingEvictions : [],

@@ -44,6 +44,7 @@ interface HeroHeaderProps {
   entityType?: EntityType;
   currentMarketRate?: number;
   totalDebt?: number;
+  landlordReputation?: number;
   netMonthlyCashflow?: number;
   netWorth?: number;
   level?: number;
@@ -63,6 +64,8 @@ export function HeroHeader({
   planningApplications,
   lastCorporationTaxMonth,
   entityType,
+  totalDebt,
+  landlordReputation,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
@@ -84,6 +87,48 @@ export function HeroHeader({
               <h1 className="font-bold tracking-tight gradient-text truncate text-base md:text-lg">
                 Property Tycoon
               </h1>
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center gap-4 glass rounded-full px-4 py-1.5 text-xs">
+                {/* In-game month */}
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span>📅</span>
+                  <span className="font-medium text-foreground">M {monthsPlayed}</span>
+                </div>
+                <div className="w-px h-3 bg-border/50" />
+                {/* Landlord reputation */}
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span>⭐</span>
+                  <span
+                    className="font-medium"
+                    style={{
+                      color:
+                        (landlordReputation ?? 0) >= 75
+                          ? '#4ade80'
+                          : (landlordReputation ?? 0) >= 50
+                            ? '#facc15'
+                            : '#f87171',
+                    }}
+                  >
+                    {landlordReputation ?? 0}
+                    <span className="text-muted-foreground font-normal"> rep</span>
+                  </span>
+                </div>
+                <div className="w-px h-3 bg-border/50" />
+                {/* Total debt */}
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span>💳</span>
+                  <span className="font-medium text-foreground">
+                    £
+                    {totalDebt && totalDebt >= 1000000
+                      ? `${(totalDebt / 1000000).toFixed(1)}M`
+                      : totalDebt && totalDebt >= 1000
+                        ? `${(totalDebt / 1000).toFixed(0)}k`
+                        : (totalDebt ?? 0).toFixed(0)}
+                    <span className="text-muted-foreground font-normal"> debt</span>
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2 justify-end flex-nowrap shrink-0">
               <div className="glass rounded-full px-3 py-1 hidden sm:flex items-center w-[220px]">
