@@ -180,6 +180,7 @@ const Index = () => {
         currentMarketRate={gameState.currentMarketRate}
         totalDebt={gameState.totalDebt}
         landlordReputation={gameState.landlordReputation}
+        reputationLog={gameState.reputationLog || []}
         netMonthlyCashflow={gameState.totalMonthlyIncome - gameState.totalMonthlyExpenses}
         netWorth={gameState.netWorth}
         level={gameState.level}
