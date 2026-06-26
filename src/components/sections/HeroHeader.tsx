@@ -46,6 +46,7 @@ interface HeroHeaderProps {
   currentMarketRate?: number;
   totalDebt?: number;
   landlordReputation?: number;
+  reputationLog?: Array<{ month: number; delta: number; reason: string }>;
   netMonthlyCashflow?: number;
   netWorth?: number;
   level?: number;
