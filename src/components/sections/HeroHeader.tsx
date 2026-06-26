@@ -16,6 +16,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
 import { replayTour } from "@/lib/onboarding";
 import { ConfirmDialog } from "@/components/game/confirm-dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type {
   Conveyancing,
   Renovation,
@@ -45,6 +46,7 @@ interface HeroHeaderProps {
   currentMarketRate?: number;
   totalDebt?: number;
   landlordReputation?: number;
+  reputationLog?: Array<{ month: number; delta: number; reason: string }>;
   netMonthlyCashflow?: number;
   netWorth?: number;
   level?: number;
@@ -66,7 +68,14 @@ export function HeroHeader({
   entityType,
   totalDebt,
   landlordReputation,
+  reputationLog,
 }: HeroHeaderProps) {
+  const repColour =
+    (landlordReputation ?? 0) >= 75
+      ? '#4ade80'
+      : (landlordReputation ?? 0) >= 50
+        ? '#facc15'
+        : '#f87171';
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
@@ -79,7 +88,7 @@ export function HeroHeader({
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md border-b border-border/30">
+    <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md border-b border-border/30 py-2">
       <div className="relative w-full px-4 flex items-center">
         <div className="container mx-auto min-w-0">
           <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
@@ -98,21 +107,63 @@ export function HeroHeader({
                 <div className="w-px h-3 bg-border/50" />
                 {/* Landlord reputation */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span>⭐</span>
-                  <span
-                    className="font-medium"
-                    style={{
-                      color:
-                        (landlordReputation ?? 0) >= 75
-                          ? '#4ade80'
-                          : (landlordReputation ?? 0) >= 50
-                            ? '#facc15'
-                            : '#f87171',
-                    }}
-                  >
-                    {landlordReputation ?? 0}
-                    <span className="text-muted-foreground font-normal"> rep</span>
-                  </span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 bg-transparent border-0 p-0 cursor-pointer"
+                      >
+                        <span>⭐</span>
+                        <span className="font-medium" style={{ color: repColour }}>
+                          {landlordReputation ?? 0}
+                          <span className="text-muted-foreground font-normal"> rep</span>
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="center" side="bottom">
+                      <div className="space-y-3">
+                        <div className="flex items-baseline justify-between">
+                          <h4 className="font-semibold text-sm">Landlord Reputation</h4>
+                          <span className="text-xs text-muted-foreground">{landlordReputation ?? 0} / 100</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, Math.max(0, landlordReputation ?? 0))}%`,
+                              backgroundColor: repColour,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="border-t pt-3 mt-3">
+                        <div className="text-[11px] font-medium mb-2">What affects reputation:</div>
+                        <ul className="space-y-1 text-[11px] text-muted-foreground">
+                          <li>✅ Resolving tenant concerns quickly +2–4</li>
+                          <li>✅ Completing renovations +2</li>
+                          <li>✅ Tenant anniversaries (12mo+) +1</li>
+                          <li>⚠️ Ignoring concerns −2/mo</li>
+                          <li>⚠️ Failed eviction tribunals −3</li>
+                          <li>⚠️ HMO unlicensed fine −2/mo</li>
+                        </ul>
+                      </div>
+                      {reputationLog && reputationLog.length > 0 && (
+                        <div className="border-t pt-3 mt-3">
+                          <div className="text-[11px] font-medium mb-2">Recent changes:</div>
+                          <ul className="space-y-1">
+                            {[...reputationLog].reverse().slice(0, 8).map((entry, i) => (
+                              <li key={i} className="flex items-center justify-between text-[11px]">
+                                <span className="text-foreground/80 truncate flex-1">{entry.reason}</span>
+                                <span className={entry.delta >= 0 ? 'text-emerald-400 shrink-0' : 'text-red-400 shrink-0'}>
+                                  {entry.delta >= 0 ? '+' : ''}{entry.delta}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="w-px h-3 bg-border/50" />
                 {/* Total debt */}
