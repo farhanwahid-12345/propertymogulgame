@@ -68,7 +68,14 @@ export function HeroHeader({
   entityType,
   totalDebt,
   landlordReputation,
+  reputationLog,
 }: HeroHeaderProps) {
+  const repColour =
+    (landlordReputation ?? 0) >= 75
+      ? '#4ade80'
+      : (landlordReputation ?? 0) >= 50
+        ? '#facc15'
+        : '#f87171';
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
