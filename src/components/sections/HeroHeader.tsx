@@ -64,6 +64,8 @@ export function HeroHeader({
   planningApplications,
   lastCorporationTaxMonth,
   entityType,
+  totalDebt,
+  landlordReputation,
 }: HeroHeaderProps) {
   const isPaused = useGameStore((s) => s.isPaused);
   const togglePause = useGameStore((s) => s.togglePause);
