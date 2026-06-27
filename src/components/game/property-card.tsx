@@ -617,7 +617,11 @@ export const PropertyCard = memo(function PropertyCard({
                 {financialsExpanded ? <ChevronUp className="h-3 w-3" aria-hidden="true" /> : <ChevronDown className="h-3 w-3" aria-hidden="true" />}
                 {financialsExpanded ? 'Hide details' : 'Details'}
               </span>
-              <span data-tutorial="property-rent-display">Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
+              {currentTenant ? (
+                <span data-tutorial="property-rent-display">Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
+              ) : (
+                <span className="text-danger">Vacant — no income</span>
+              )}
             </Button>
 
 
