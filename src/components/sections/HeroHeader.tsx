@@ -66,6 +66,7 @@ export function HeroHeader({
   planningApplications,
   lastCorporationTaxMonth,
   entityType,
+  currentMarketRate,
   totalDebt,
   landlordReputation,
   reputationLog,
