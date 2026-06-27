@@ -571,15 +571,24 @@ export const PropertyCard = memo(function PropertyCard({
                 <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Value</div>
                 <div className="text-sm font-bold leading-tight">£{(marketValueToUse / 1000).toFixed(0)}k</div>
               </div>
-              <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Net /mo</div>
-                <div className={cn(
-                  "text-sm font-bold leading-tight",
-                  netMonthlyIncome >= 0 ? "text-success" : "text-danger"
-                )}>
-                  £{netMonthlyIncome.toLocaleString()}
+              {currentTenant ? (
+                <div className="rounded-md bg-muted/30 px-2 py-1.5">
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Net /mo</div>
+                  <div className={cn(
+                    "text-sm font-bold leading-tight",
+                    netMonthlyIncome >= 0 ? "text-success" : "text-danger"
+                  )}>
+                    £{netMonthlyIncome.toLocaleString()}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-md bg-muted/30 px-2 py-1.5">
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Void cost</div>
+                  <div className="text-sm font-bold leading-tight text-danger">
+                    −£{Math.abs(totalMonthlyExpenses).toLocaleString()}
+                  </div>
+                </div>
+              )}
               <div className="rounded-md bg-muted/30 px-2 py-1.5">
                 <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
                   {propertyLTV > 0 ? 'LTV' : 'Market Value Gain'}
