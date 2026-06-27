@@ -861,6 +861,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const newPoliceLetters: Array<{ id: string; propertyId: string; propertyName: string; tenantName: string; city?: string; concernCategory: string; description: string; month: number; concernId: string }> = [];
       const existingActiveByProp = new Map<string, number>();
       const prevConcerns = prev.tenantConcerns || [];
+      let updatedConcerns = [...prevConcerns];
       prevConcerns.filter(c => !c.resolvedMonth).forEach(c => {
         existingActiveByProp.set(c.propertyId, (existingActiveByProp.get(c.propertyId) || 0) + 1);
       });
