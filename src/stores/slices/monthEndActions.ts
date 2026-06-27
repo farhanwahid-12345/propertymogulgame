@@ -1128,7 +1128,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       }
 
       // Apply satisfaction decay for old unresolved concerns; auto-resolve when condition is premium
-      let updatedConcerns = [...prevConcerns, ...newConcerns];
+      updatedConcerns = [...updatedConcerns, ...newConcerns];
       const satPenaltyByProp = new Map<string, number>();
       updatedConcerns = updatedConcerns.map(c => {
         if (c.resolvedMonth) return c;
