@@ -985,7 +985,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const MEES_2030_MONTH = 60;
       const MEES_2030_WARNING_MONTH = MEES_2030_MONTH - 12;
       const meesAlreadyByProp = new Set(
-        prevConcerns
+        updatedConcerns
           .filter(c => !c.resolvedMonth && c.category === 'safety' && c.description.startsWith('EPC '))
           .map(c => c.propertyId)
       );
