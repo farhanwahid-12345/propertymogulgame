@@ -106,6 +106,15 @@ export function HeroHeader({
                   <span className="font-medium text-foreground">M {monthsPlayed}</span>
                 </div>
                 <div className="w-px h-3 bg-border/50" />
+                {/* BoE base rate */}
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <span>🏦</span>
+                  <span className="font-medium text-foreground">
+                    {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
+                    <span className="text-muted-foreground font-normal"> BoE</span>
+                  </span>
+                </div>
+                <div className="w-px h-3 bg-border/50" />
                 {/* Landlord reputation */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Popover>
