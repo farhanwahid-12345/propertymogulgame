@@ -942,6 +942,39 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
         existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
       });
+      // Resolve any open MEES concerns for properties that are now EPC C or better
+      const resolvedMeesIds = new Set<string>();
+      updatedConcerns = updatedConcerns.map(c => {
+        if (c.resolvedMonth || !c.description.startsWith('EPC ')) return c;
+        const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
+        if (!property) return c;
+        const epc = property.epcRating;
+        const isSafe = epc && ['A','B','C'].includes(epc);
+        if (isSafe) {
+          resolvedMeesIds.add(c.id);
+          return { ...c, resolvedMonth: newMonthNumber };
+        }
+        return c;
+      });
+      if (resolvedMeesIds.size > 0) {
+        const resolvedNames = [...new Set(
+          updatedOwnedProperties
+            .filter(p => {
+              const epc = p.epcRating;
+              return epc && ['A','B','C'].includes(epc) && updatedConcerns.some(c => resolvedMeesIds.has(c.id) && c.propertyId === p.id);
+            })
+            .map(p => p.name)
+        )];
+        if (resolvedNames.length > 0) {
+          showToast(
+            "EPC upgraded — MEES concern resolved",
+            resolvedNames.length === 1
+              ? `EPC upgraded — MEES concern resolved for ${resolvedNames[0]}.`
+              : `EPC upgraded — MEES concerns resolved for ${resolvedNames.join(', ')}.`,
+            "success"
+          );
+        }
+      }
 
       // ── MEES (Minimum Energy Efficiency Standards) ──
       // Today: F/G properties cannot be let lawfully.
