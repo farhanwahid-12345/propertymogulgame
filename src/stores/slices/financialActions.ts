@@ -92,6 +92,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
       if (!property || !provider) { showToast("Remortgage Failed", "Not found!", "destructive"); return; }
+      // Negative-equity / >95% LTV guard — no lender will write this loan.
+      const newLTV = property.value > 0 ? newLoanAmount / property.value : Infinity;
+      if (newLTV > 0.95) {
+        showToast(
+          "Remortgage Refused",
+          `New mortgage of £${fromPennies(newLoanAmount).toLocaleString()} would require ${(newLTV * 100).toFixed(0)}% LTV — no lender will approve this. The property's value (£${fromPennies(property.value).toLocaleString()}) is too close to or below the mortgage amount.`,
+          "destructive",
+        );
+        return;
+      }
       const maxLTV = Math.round(property.value * provider.maxLTV);
       if (newLoanAmount > maxLTV) { showToast("Loan Too Large", `Max: £${fromPennies(maxLTV).toLocaleString()}`, "destructive"); return; }
       const existing = prev.mortgages.find((m: Mortgage) => m.propertyId === propertyId);
@@ -140,6 +150,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const currentBal = existing?.remainingBalance || 0;
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
       if (newLoanAmount < currentBal) { showToast("Refinance Failed", "Must cover existing balance!", "destructive"); return; }
+      // Negative-equity / >95% LTV guard — block before eligibility check.
+      const refiLTV = property.value > 0 ? newLoanAmount / property.value : Infinity;
+      if (refiLTV > 0.95) {
+        showToast(
+          "Refinance Refused",
+          `New mortgage of £${fromPennies(newLoanAmount).toLocaleString()} would require ${(refiLTV * 100).toFixed(0)}% LTV — no lender will approve this. The property's value (£${fromPennies(property.value).toLocaleString()}) is too close to or below the mortgage amount.`,
+          "destructive",
+        );
+        return;
+      }
 
       const totalRentalIncome = prev.ownedProperties.reduce((t: number, p: any) => t + p.monthlyIncome, 0);
       const existingPayments = prev.mortgages.filter((m: Mortgage) => m.propertyId !== propertyId).reduce((s: number, m: Mortgage) => s + m.monthlyPayment, 0);
@@ -212,6 +232,15 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
         .reduce((s: number, m: Mortgage) => s + m.remainingBalance, 0);
       const overlappingPortfolioBalance = overlappingPortfolioMortgages.reduce((s: number, m: Mortgage) => s + m.remainingBalance, 0);
       const totalCurrentMortgages = singleMortgageBalances + overlappingPortfolioBalance;
+
+      // Negative-equity guard — refuse if the new facility exceeds 95% of pooled collateral value.
+      const portfolioLTV = totalValue > 0 ? loanAmount / totalValue : Infinity;
+      if (portfolioLTV > 0.95) {
+        return {
+          ok: false,
+          reason: `Loan of £${fromPennies(loanAmount).toLocaleString()} would be ${(portfolioLTV * 100).toFixed(0)}% LTV against pooled collateral worth £${fromPennies(totalValue).toLocaleString()} — no lender will approve this.`,
+        };
+      }
 
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
       const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;

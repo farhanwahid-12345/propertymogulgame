@@ -477,20 +477,39 @@ export const PropertyCard = memo(function PropertyCard({
                 🔴 Eviction in progress
               </Badge>
             )}
-            {isListedForSale && (
-              <Badge
-                variant="outline"
-                className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20"
-                title="Open Operations → Listings"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'listings', propertyId: property.id } }));
-                  }
-                }}
-              >
-                🏷️ {listingOfferCount > 0 ? `On market — ${listingOfferCount} offer${listingOfferCount === 1 ? '' : 's'}` : 'Listed for sale'}
-              </Badge>
-            )}
+            {isListedForSale && (() => {
+              const myMortgages = (mortgages || []).filter((m: any) =>
+                m.propertyId === property.id
+                || (m.collateralPropertyIds && m.collateralPropertyIds.includes(property.id))
+              );
+              const owed = myMortgages.reduce((s: number, m: any) => s + (m.remainingBalance || 0), 0);
+              const negEq = owed > 0 && property.value < owed;
+              return (
+                <>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] border-amber-400/40 text-amber-300 bg-amber-500/10 cursor-pointer hover:bg-amber-500/20"
+                    title="Open Operations → Listings"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'listings', propertyId: property.id } }));
+                      }
+                    }}
+                  >
+                    🏷️ {listingOfferCount > 0 ? `On market — ${listingOfferCount} offer${listingOfferCount === 1 ? '' : 's'}` : 'Listed for sale'}
+                  </Badge>
+                  {negEq && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-amber-500/60 text-amber-200 bg-amber-600/20"
+                      title="Sale proceeds will not cover the outstanding mortgage. You will need to fund the shortfall from cash."
+                    >
+                      ⚠️ Negative equity
+                    </Badge>
+                  )}
+                </>
+              );
+            })()}
             {hasActiveDebtRecovery && (() => {
               const activeCase = ((useGameStore.getState() as any).debtRecoveryCases || [])
                 .find((c: any) => c.propertyId === property.id && c.status === 'in_court');

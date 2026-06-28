@@ -396,6 +396,8 @@ export interface PropertyListing {
   offers?: PropertyOffer[];
   lastOfferCheck?: number;
   autoAcceptThreshold?: number; // pennies
+  /** Item 10 — true if property.value < mortgage.remainingBalance at listing time. */
+  negativeEquityWarning?: boolean;
 }
 
 /** Chain-collapse event payload surfaced in the global pop-out modal. */

@@ -92,11 +92,26 @@ export function createConveyancingActions(set: SetFn, get: GetFn) {
         showToast("Portfolio lender refused", consent.reason || "Cannot list — refinance the portfolio first.", "destructive");
         return;
       }
+      // Item 10 — flag listings where property value is below the outstanding mortgage.
+      const propMortgageBal = prev.mortgages
+        .filter((m: any) => m.propertyId === propertyId
+          || (m.collateralPropertyIds && m.collateralPropertyIds.includes(propertyId)))
+        .reduce((s: number, m: any) => s + (m.remainingBalance || 0), 0);
+      const negativeEquityWarning = propMortgageBal > 0 && property.value < propMortgageBal;
       const listing: PropertyListing = {
         propertyId, listingDate: Date.now(), listingMonth: prev.monthsPlayed, isAuction: false,
         daysUntilSale: 30, askingPrice, offers: [], lastOfferCheck: Date.now(),
+        negativeEquityWarning: negativeEquityWarning || undefined,
       };
-      showToast("Property Listed", `${property.name} listed for £${fromPennies(askingPrice).toLocaleString()}`);
+      if (negativeEquityWarning) {
+        showToast(
+          "⚠️ Listed in Negative Equity",
+          `${property.name} value (£${fromPennies(property.value).toLocaleString()}) is below the mortgage (£${fromPennies(propMortgageBal).toLocaleString()}). You'll need to fund the shortfall from cash on completion.`,
+          "destructive",
+        );
+      } else {
+        showToast("Property Listed", `${property.name} listed for £${fromPennies(askingPrice).toLocaleString()}`);
+      }
       set((s: any) => ({ propertyListings: [...s.propertyListings, listing] }));
     },
 
