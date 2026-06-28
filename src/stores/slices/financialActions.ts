@@ -92,6 +92,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const property = prev.ownedProperties.find((p: any) => p.id === propertyId);
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
       if (!property || !provider) { showToast("Remortgage Failed", "Not found!", "destructive"); return; }
+      // Negative-equity / >95% LTV guard — no lender will write this loan.
+      const newLTV = property.value > 0 ? newLoanAmount / property.value : Infinity;
+      if (newLTV > 0.95) {
+        showToast(
+          "Remortgage Refused",
+          `New mortgage of £${fromPennies(newLoanAmount).toLocaleString()} would require ${(newLTV * 100).toFixed(0)}% LTV — no lender will approve this. The property's value (£${fromPennies(property.value).toLocaleString()}) is too close to or below the mortgage amount.`,
+          "destructive",
+        );
+        return;
+      }
       const maxLTV = Math.round(property.value * provider.maxLTV);
       if (newLoanAmount > maxLTV) { showToast("Loan Too Large", `Max: £${fromPennies(maxLTV).toLocaleString()}`, "destructive"); return; }
       const existing = prev.mortgages.find((m: Mortgage) => m.propertyId === propertyId);
