@@ -323,7 +323,17 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const redemptionNote = portfolioRedemption > 0
           ? ` · £${fromPennies(portfolioRedemption).toLocaleString()} redeemed to portfolio lender`
           : '';
-        showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}${redemptionNote}`);
+        const mortgageOwed = (mortgage?.remainingBalance || 0) + portfolioRedemption;
+        if (net < 0 && mortgageOwed > 0) {
+          const shortfall = -net;
+          showToast(
+            "⚠️ Negative Equity Sale",
+            `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()} but mortgage debt was £${fromPennies(mortgageOwed).toLocaleString()}. Shortfall of £${fromPennies(shortfall).toLocaleString()} deducted from your cash.`,
+            "destructive",
+          );
+        } else {
+          showToast("Property Sold! 🎉", `${conv.propertyName} sold for £${fromPennies(salePrice).toLocaleString()}${cgtAmount > 0 ? ` (CGT: £${fromPennies(cgtAmount).toLocaleString()})` : ''}${redemptionNote}`);
+        }
         playGavel();
       });
 
