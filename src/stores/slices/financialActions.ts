@@ -150,6 +150,16 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const currentBal = existing?.remainingBalance || 0;
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
       if (newLoanAmount < currentBal) { showToast("Refinance Failed", "Must cover existing balance!", "destructive"); return; }
+      // Negative-equity / >95% LTV guard — block before eligibility check.
+      const refiLTV = property.value > 0 ? newLoanAmount / property.value : Infinity;
+      if (refiLTV > 0.95) {
+        showToast(
+          "Refinance Refused",
+          `New mortgage of £${fromPennies(newLoanAmount).toLocaleString()} would require ${(refiLTV * 100).toFixed(0)}% LTV — no lender will approve this. The property's value (£${fromPennies(property.value).toLocaleString()}) is too close to or below the mortgage amount.`,
+          "destructive",
+        );
+        return;
+      }
 
       const totalRentalIncome = prev.ownedProperties.reduce((t: number, p: any) => t + p.monthlyIncome, 0);
       const existingPayments = prev.mortgages.filter((m: Mortgage) => m.propertyId !== propertyId).reduce((s: number, m: Mortgage) => s + m.monthlyPayment, 0);
