@@ -233,6 +233,15 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
       const overlappingPortfolioBalance = overlappingPortfolioMortgages.reduce((s: number, m: Mortgage) => s + m.remainingBalance, 0);
       const totalCurrentMortgages = singleMortgageBalances + overlappingPortfolioBalance;
 
+      // Negative-equity guard — refuse if the new facility exceeds 95% of pooled collateral value.
+      const portfolioLTV = totalValue > 0 ? loanAmount / totalValue : Infinity;
+      if (portfolioLTV > 0.95) {
+        return {
+          ok: false,
+          reason: `Loan of £${fromPennies(loanAmount).toLocaleString()} would be ${(portfolioLTV * 100).toFixed(0)}% LTV against pooled collateral worth £${fromPennies(totalValue).toLocaleString()} — no lender will approve this.`,
+        };
+      }
+
       const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId) || MORTGAGE_PROVIDERS[1];
       const providerRate = (prev.mortgageProviderRates[provider.id] || provider.baseRate) + 0.005;
       const existingPayments = prev.mortgages
