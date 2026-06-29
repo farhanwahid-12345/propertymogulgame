@@ -17,7 +17,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import { Property } from "@/components/game/property-card";
 import { COUNCIL_TAX_BAND_D, MORTGAGE_PROVIDERS } from "@/lib/engine/constants";
-import { calculateDTI, getMaxPropertiesForLevel, getAvailablePropertyTypes, getMaxPropertyValue, getFurnitureValuePennies } from "@/lib/engine/financials";
+import { calculateDTI, getMaxPropertiesForLevel, getAvailablePropertyTypes, getMaxPropertyValue, getFurnitureValuePennies, computeNetWorthPennies } from "@/lib/engine/financials";
 import { deriveSqft } from "@/lib/engine/market";
 import type { Tenant } from "@/components/game/tenant-selector";
 
@@ -134,9 +134,11 @@ export function useGameState() {
     0,
   );
   // Loan balances pulled up so net worth can subtract ALL debt (mortgages + loans).
-  const loansRawEarly = ((store as any).loans || []) as Array<{ remainingBalance?: number }>;
+  // Apply the lender's early-repayment factor so the figure reflects what it
+  // would cost to actually settle the debt today.
+  const loansRawEarly = ((store as any).loans || []) as Array<{ remainingBalance?: number; earlyRepaymentRate?: number }>;
   const totalLoanBalanceEarly = loansRawEarly.reduce(
-    (s, l: any) => s + fromPennies(l.remainingBalance || 0),
+    (s, l: any) => s + fromPennies((l.remainingBalance || 0) * (1 + (l.earlyRepaymentRate ?? 0))),
     0,
   );
   const totalMortgageDebt = mortgages.reduce((sum, m) => sum + m.remainingBalance, 0);
@@ -144,9 +146,17 @@ export function useGameState() {
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps. Subtracting mortgage
   // + loan balances stops the "free money" jump when a financed buy completes.
-  const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
-    + ownedProperties.reduce((sum, p) => sum + p.value, 0)
-    - totalMortgageDebt - totalLoanBalanceEarly - overdraftUsed;
+  const netWorth = fromPennies(computeNetWorthPennies({
+    cashPennies: toPennies(cash),
+    inflightBuyCapitalPennies: toPennies(inflightBuyCapital),
+    renovationWIPPennies: toPennies(renovationWIP),
+    furnitureValuePennies: toPennies(furnitureValue),
+    propertyValuePennies: toPennies(ownedProperties.reduce((sum, p) => sum + p.value, 0)),
+    totalMortgageDebtPennies: toPennies(totalMortgageDebt),
+    totalLoanDebtPennies: toPennies(totalLoanBalanceEarly),
+    overdraftUsedPennies: toPennies(overdraftUsed),
+  }));
+
   const nowTs = Date.now();
   const voidPeriodsRaw = Array.isArray(store.voidPeriods) ? store.voidPeriods : [];
   const conveyancingPropertyIds = new Set(

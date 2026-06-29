@@ -5,7 +5,7 @@ import { Building2, User, FileText, ChevronLeft, ChevronRight } from "lucide-rea
 import { useGameStore } from "@/stores/gameStore";
 import { calculateIncomeTax, calculateCorporationTax } from "@/lib/engine/taxation";
 import { fromPennies } from "@/lib/formatCurrency";
-import { getFurnitureValuePennies } from "@/lib/engine/financials";
+import { getFurnitureValuePennies, computeNetWorthPennies } from "@/lib/engine/financials";
 import type { AnnualAccountRecord, EntityType } from "@/types/game";
 import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
 
@@ -56,7 +56,12 @@ export function AnnualAccountsStatement() {
     const currentYear = Math.floor(monthsPlayed / 12) + 1;
     const propertyValue = ownedProperties.reduce((sum, p) => sum + (p.value || 0), 0);
     const mortgageDebt = mortgages.reduce((sum, m) => sum + (m.remainingBalance || 0), 0);
-    const loanDebt = loans.reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
+    // Mirror useGameState: apply the lender's early-repayment factor so the
+    // headline net-worth figure here matches the HeroHeader to the penny.
+    const loanDebt = loans.reduce(
+      (sum, l: any) => sum + ((l.remainingBalance || 0) * (1 + (l.earlyRepaymentRate ?? 0))),
+      0,
+    );
     // Phase 1 #7 — align with HeroHeader / useGameState netWorth formula:
     // include cash held by solicitor on in-flight buys, renovation WIP,
     // remaining furniture depreciation, and subtract overdraft drawn.
@@ -71,8 +76,17 @@ export function AnnualAccountsStatement() {
       (sum: number, p: any) => sum + getFurnitureValuePennies(p),
       0,
     );
-    const netWorth = cash + inflightBuyCapital + renovationWIP + furnitureValue
-      + propertyValue - mortgageDebt - loanDebt - overdraftUsed;
+    const netWorth = computeNetWorthPennies({
+      cashPennies: cash,
+      inflightBuyCapitalPennies: inflightBuyCapital,
+      renovationWIPPennies: renovationWIP,
+      furnitureValuePennies: furnitureValue,
+      propertyValuePennies: propertyValue,
+      totalMortgageDebtPennies: mortgageDebt,
+      totalLoanDebtPennies: loanDebt,
+      overdraftUsedPennies: overdraftUsed,
+    });
+
     const ytdTax =
       entityType === 'ltd'
         ? calculateCorporationTax(yearlyGrossRent, yearlyMortgageInterest, yearlyDeductibleExpenses)

@@ -131,3 +131,28 @@ export function getFurnitureValuePennies(property: {
   return Math.floor(installCostPennies * remainingFraction);
 }
 
+/**
+ * Canonical net-worth formula in pennies. Both the header/useGameState and the
+ * Annual Accounts statement must call this so the headline figure matches.
+ */
+export function computeNetWorthPennies(args: {
+  cashPennies: number;
+  inflightBuyCapitalPennies: number;
+  renovationWIPPennies: number;
+  furnitureValuePennies: number;
+  propertyValuePennies: number;
+  totalMortgageDebtPennies: number;
+  totalLoanDebtPennies: number;
+  overdraftUsedPennies: number;
+}): number {
+  return args.cashPennies
+    + args.inflightBuyCapitalPennies
+    + args.renovationWIPPennies
+    + args.furnitureValuePennies
+    + args.propertyValuePennies
+    - args.totalMortgageDebtPennies
+    - args.totalLoanDebtPennies
+    - args.overdraftUsedPennies;
+}
+
+
