@@ -7,10 +7,11 @@ import {
 } from "./tenantRent";
 
 describe("getProfileRentMultiplier", () => {
-  it("premium > standard = risky > budget", () => {
-    expect(getProfileRentMultiplier("premium")).toBeGreaterThan(getProfileRentMultiplier("risky"));
-    expect(getProfileRentMultiplier("risky")).toBe(getProfileRentMultiplier("standard"));
-    expect(getProfileRentMultiplier("standard")).toBeGreaterThan(getProfileRentMultiplier("budget"));
+  it("is neutralised to 1.0 (profile variance is baked into LHA tiering upstream)", () => {
+    expect(getProfileRentMultiplier("premium")).toBe(1);
+    expect(getProfileRentMultiplier("standard")).toBe(1);
+    expect(getProfileRentMultiplier("budget")).toBe(1);
+    expect(getProfileRentMultiplier("risky")).toBe(1);
   });
 });
 
@@ -26,19 +27,30 @@ describe("getFurnishingRentMultiplier", () => {
   });
 });
 
-describe("calcTenantRent — preview/store parity", () => {
-  it("matches manual product of multipliers", () => {
-    const baseRent = 1_000;
-    const expected = Math.floor(1_000 * 1.05 * 1.10 * 1.08); // premium tenant, premium condition, fully furnished
-    expect(calcTenantRent(baseRent, { profile: "premium" }, "premium", "fully_furnished")).toBe(expected);
+describe("calcTenantRent — condition × furnishing only (no profile stacking)", () => {
+  it("equals base × condition × furnishing", () => {
+    const expected = Math.floor(1_000 * 1.10 * 1.08); // premium condition × fully furnished
+    expect(calcTenantRent(1_000, { profile: "premium" }, "premium", "fully_furnished")).toBe(expected);
+  });
+  it("premium and standard profiles produce identical rent (no double-count)", () => {
+    const premium = calcTenantRent(1_000, { profile: "premium" }, "standard", "unfurnished");
+    const standard = calcTenantRent(1_000, { profile: "standard" }, "standard", "unfurnished");
+    expect(premium).toBe(standard);
   });
   it("dilapidated drops below base rent", () => {
     expect(calcTenantRent(1_000, { profile: "standard" }, "dilapidated")).toBeLessThan(1_000);
   });
-  it("unit-agnostic: scaling pennies and pounds yields same multiplier shape", () => {
-    const a = calcTenantRent(1_000, { profile: "premium" }, "standard", "part_furnished");
-    const b = calcTenantRent(100_000, { profile: "premium" }, "standard", "part_furnished");
-    expect(b).toBeGreaterThan(a * 99); // ~100×
-    expect(b).toBeLessThan(a * 101);
+  it("clamps at 2× city LHA when clamp context is provided", () => {
+    // Pass a hugely inflated baseRent; result must be capped at 2× LHA for the
+    // inferred bedroom band.
+    const out = calcTenantRent(
+      999_999, // pounds
+      { profile: "premium" },
+      "premium",
+      "fully_furnished",
+      { cityId: "middlesbrough", internalSqft: 800, unit: "pounds" },
+    );
+    expect(out).toBeLessThan(5_000); // sane upper bound regardless of city/band
+    expect(out).toBeGreaterThan(0);
   });
 });
