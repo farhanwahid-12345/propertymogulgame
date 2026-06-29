@@ -135,7 +135,14 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const slotBaseRent = isMultiUnit
         ? Math.floor(propertyBaseRent / unitCount)
         : propertyBaseRent;
-      const slotRent = calcTenantRent(slotBaseRent, tenant, property.condition, property.furnishingTier);
+      const slotRent = calcTenantRent(slotBaseRent, tenant, property.condition, property.furnishingTier, {
+        cityId: property.city,
+        internalSqft: property.internalSqft,
+        subtype: property.subtype,
+        subtypeUnits: property.subtypeUnits,
+        valuePennies: property.value,
+        unit: 'pennies',
+      });
 
       if (!isMultiUnit) {
         const isIncrease = slotRent > property.monthlyIncome;
