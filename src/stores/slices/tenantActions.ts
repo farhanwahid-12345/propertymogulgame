@@ -413,8 +413,10 @@ export function createTenantActions(set: SetFn, get: GetFn) {
     ) => {
       const prev = get();
       const property = prev.ownedProperties.find((p) => p.id === propertyId);
+      const isMultiUnitProp = (property?.subtype === 'hmo' || property?.subtype === 'flats') && (property?.subtypeUnits ?? 1) > 1;
+      const effectiveSlotIndex = slotIndex ?? (isMultiUnitProp ? 0 : undefined);
       const tenantRec = prev.tenants.find((t) =>
-        t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+        t.propertyId === propertyId && (effectiveSlotIndex === undefined || (t.slotIndex ?? 0) === effectiveSlotIndex)
       );
       if (!property || !tenantRec) {
         showToast("No Tenant", "Cannot raise rent on a vacant property.", "destructive"); return;
@@ -462,18 +464,17 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         ...(tenantRec.satisfactionReasons || []).slice(0, 4),
       ];
 
-      const isMultiUnit = (property.subtype === 'hmo' || property.subtype === 'flats') && (property.subtypeUnits ?? 1) > 1;
       const updatedTenants = prev.tenants.map((t) =>
-        t.propertyId === propertyId && (slotIndex === undefined || (t.slotIndex ?? 0) === slotIndex)
+        t.propertyId === propertyId && (effectiveSlotIndex === undefined || (t.slotIndex ?? 0) === effectiveSlotIndex)
           ? { ...t, rentPennies: newRentPennies, satisfaction: newSatisfaction, satisfactionReasons: newReasons, lastSatisfactionUpdate: prev.monthsPlayed }
           : t
       );
-      const recomputedMonthlyIncome = isMultiUnit
+      const recomputedMonthlyIncome = isMultiUnitProp
         ? updatedTenants.filter((t) => t.propertyId === propertyId).reduce((sum: number, t) => sum + (t.rentPennies ?? 0), 0)
         : newRentPennies;
       const updatedProps = prev.ownedProperties.map((p) =>
         p.id === propertyId
-          ? { ...p, monthlyIncome: recomputedMonthlyIncome, baseRent: isMultiUnit ? p.baseRent : newRentPennies, lastRentIncrease: prev.monthsPlayed }
+          ? { ...p, monthlyIncome: recomputedMonthlyIncome, baseRent: isMultiUnitProp ? p.baseRent : newRentPennies, lastRentIncrease: prev.monthsPlayed }
           : p
       );
 
