@@ -2448,6 +2448,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingCourtResolutions: resolvedCases.length > 0
           ? [...((s.pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
           : (s.pendingCourtResolutions || []),
+        debtRepaymentNotices: debtRepaymentEvents.length > 0
+          ? [...((s.debtRepaymentNotices) || []), ...debtRepaymentEvents]
+          : (s.debtRepaymentNotices || []),
         // Phase 7 #16 — overdraft prompt + bankruptcy snapshot
         pendingOverdraftPrompt: newOverdraftPrompt,
         overdraftPromptedMonth: newOverdraftPromptedMonth,
