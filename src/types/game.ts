@@ -651,7 +651,7 @@ export interface CommercialSearchUpdate {
   month: number;
   estimatedNextApplicantMonth?: number;
   leadCount: number;
-  kind: 'status' | 'new_enquiry' | 'chase';
+  kind: 'status' | 'new_enquiry' | 'chase' | 'advice';
 }
 
 export interface PoliceLetter {
