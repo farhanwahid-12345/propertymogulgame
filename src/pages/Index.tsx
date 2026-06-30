@@ -395,6 +395,7 @@ const Index = () => {
       <CourtResolutionModal />
       <OverdraftPromptDialog />
       <BankruptcyDialog />
+      <DebtRepaidDialog />
 
       <TutorialEngine />
     </div>
