@@ -417,6 +417,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
                         <Badge
                           variant="outline"
                           className={
+                            u.kind === 'advice' ? 'border-sky-400/40 bg-sky-500/10 text-sky-300' :
                             u.kind === 'new_enquiry' ? 'border-green-400/40 bg-green-500/10 text-green-300' :
                             u.kind === 'chase' ? 'border-amber-400/40 bg-amber-500/10 text-amber-300' :
                             'border-white/20 text-muted-foreground'
@@ -424,7 +425,10 @@ export function OperationsCenter(props: OperationsCenterProps) {
                         >
                           M{u.month}
                         </Badge>
-                        <span className="text-foreground/90 flex-1">{u.message}</span>
+                        <span className="text-foreground/90 flex-1">
+                          {u.kind === 'advice' && <span className="mr-1">💡</span>}
+                          {u.message}
+                        </span>
                       </div>
                     ))}
                   </div>
