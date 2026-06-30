@@ -1529,6 +1529,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // tenant resumes paying, the FULL outstanding arrears balance is paid
       // back in a single lump sum on top of normal rent (catch-up payment).
       let arrearsRepaidThisMonth = 0;
+      const debtRepaymentEvents: Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number }> = [];
       newTenants = newTenants.map(t => {
         const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
         const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
@@ -1547,6 +1548,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const owed = t.arrearsPennies ?? 0;
         if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
           arrearsRepaidThisMonth += owed;
+          debtRepaymentEvents.push({
+            id: `debtrepay_${t.propertyId}_${t.slotIndex ?? 0}_${newMonthNumber}`,
+            tenantName: t.tenant?.name ?? 'Tenant',
+            propertyName: prop?.name ?? 'a property',
+            amountPennies: owed,
+            month: newMonthNumber,
+          });
           return {
             ...t,
             arrearsPennies: 0,
@@ -2440,6 +2448,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         pendingCourtResolutions: resolvedCases.length > 0
           ? [...((s.pendingCourtResolutions) || []), ...resolvedCases.map(c => c.id)]
           : (s.pendingCourtResolutions || []),
+        debtRepaymentNotices: debtRepaymentEvents.length > 0
+          ? [...((s.debtRepaymentNotices) || []), ...debtRepaymentEvents]
+          : (s.debtRepaymentNotices || []),
         // Phase 7 #16 — overdraft prompt + bankruptcy snapshot
         pendingOverdraftPrompt: newOverdraftPrompt,
         overdraftPromptedMonth: newOverdraftPromptedMonth,
