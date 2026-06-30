@@ -2328,6 +2328,40 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           estimatedNextApplicantMonth,
           message: statusMsg,
         });
+
+        // ── Item 7 — advisory message based on covenant spread ──
+        if (queuedAfter >= 2) {
+          const ranked = [...propApplicants].sort(
+            (a, b) => (b.tenant.covenantStrength ?? 50) - (a.tenant.covenantStrength ?? 50)
+          );
+          const best = ranked[0];
+          const worst = ranked[ranked.length - 1];
+          const bestCov = best.tenant.covenantStrength ?? 50;
+          const worstCov = worst.tenant.covenantStrength ?? 50;
+          const spread = bestCov - worstCov;
+          const bestArrived = best.arrivalMonth <= newMonthNumber;
+
+          if (spread >= 25 && !bestArrived) {
+            newSearchUpdates.push({
+              id: `csu_${property.id}_${newMonthNumber}_advice`,
+              propertyId: property.id,
+              month: newMonthNumber,
+              kind: 'advice',
+              leadCount: queuedAfter,
+              estimatedNextApplicantMonth: best.arrivalMonth,
+              message: `Our advice: a stronger covenant tenant is in the pipeline (expected month ${best.arrivalMonth}). Worth waiting unless cashflow is tight — the current offer is below average for this unit.`,
+            });
+          } else if (bestArrived && bestCov >= 65) {
+            newSearchUpdates.push({
+              id: `csu_${property.id}_${newMonthNumber}_advice`,
+              propertyId: property.id,
+              month: newMonthNumber,
+              kind: 'advice',
+              leadCount: queuedAfter,
+              message: `Our advice: this is a strong offer for the area — we'd recommend taking it rather than waiting.`,
+            });
+          }
+        }
       });
 
       // Clean stale updates (property gone, occupied, or older than 12mo).
