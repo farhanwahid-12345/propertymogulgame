@@ -194,6 +194,8 @@ export interface TenantConcern {
   resolvedMonth?: number;
   /** 'damage' = real property damage (linked to repair-cap/cooldown); 'tenant' = lifestyle concern. */
   source?: 'damage' | 'tenant';
+  /** Phase 1 bugfix — set true once the ASB council letter has been dispatched for this concern. */
+  policeLetterSent?: boolean;
 }
 
 export interface MortgageProvider {

@@ -936,20 +936,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           resolveCost: cost,
           satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
         });
-        // Phase 5 #12 — risky tenant + noise/safety concern triggers an official council letter (once per concern).
-        if (riskyAsbBias && (tpl.category === 'noise' || tpl.category === 'safety')) {
-          newPoliceLetters.push({
-            id: `letter_${concernId}`,
-            concernId,
-            propertyId: property.id,
-            propertyName: property.name,
-            tenantName: t.tenant.name,
-            city: property.city,
-            concernCategory: tpl.category,
-            description: desc,
-            month: newMonthNumber,
-          });
-        }
+        // Phase 1 bugfix — letters are queued next tick (age >=1) so longstandingASB is true when player clicks "Begin Eviction".
         existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
       });
       // Resolve any open MEES concerns for properties that are now EPC C or better
