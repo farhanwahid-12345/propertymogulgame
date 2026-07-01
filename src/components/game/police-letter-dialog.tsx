@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Siren } from "lucide-react";
 import { useGameStore } from "@/stores/gameStore";
+import { pushNotification } from "@/lib/notifications";
 import type { PoliceLetter } from "@/types/game";
 
 const CITY_COUNCILS: Record<string, string> = {
@@ -14,13 +16,15 @@ const CITY_COUNCILS: Record<string, string> = {
 
 /**
  * Phase 5 #12 — Official ASB letter pop-up.
- * One letter per concern; the player either acknowledges or jumps straight
- * into eviction proceedings.
+ * Phase 1 fix — dialog stays open on rejected eviction attempts and shows the
+ * inline reason. Acknowledging (without starting proceedings) queues a
+ * persistent notification so the player is nudged to Operations → Evictions.
  */
 export function PoliceLetterDialog() {
   const letters = (useGameStore((s: any) => s.pendingPoliceLetters) || []) as PoliceLetter[];
   const dismiss = useGameStore((s: any) => s.dismissPoliceLetter);
   const evictTenant = useGameStore((s: any) => s.evictTenant);
+  const [error, setError] = useState<string | null>(null);
   const letter = letters[0];
 
   if (!letter) return null;
@@ -28,12 +32,36 @@ export function PoliceLetterDialog() {
   const council = CITY_COUNCILS[letter.city ?? "middlesbrough"] ?? "Local Borough Council";
 
   const handleBeginEviction = () => {
+    setError(null);
+    const beforeCount = (useGameStore.getState().pendingEvictions || []).filter(
+      (e: any) => e.propertyId === letter.propertyId,
+    ).length;
     evictTenant?.(letter.propertyId, "antisocial_behaviour", 0);
+    const afterCount = (useGameStore.getState().pendingEvictions || []).filter(
+      (e: any) => e.propertyId === letter.propertyId,
+    ).length;
+    if (afterCount > beforeCount) {
+      dismiss(letter.id);
+    } else {
+      setError(
+        "Cannot start proceedings yet — the noise/safety concern must be at least a month old and the tenant flagged risky. See the toast for details.",
+      );
+    }
+  };
+
+  const handleAcknowledge = () => {
+    // Phase 1 item 4 — persistent nudge in the notification bell.
+    pushNotification({
+      title: "⚠️ ASB eviction available",
+      description: `${letter.tenantName} at ${letter.propertyName}. Open Operations → Evictions to serve notice.`,
+      severity: "warning",
+    });
+    setError(null);
     dismiss(letter.id);
   };
 
   return (
-    <Dialog open={true} onOpenChange={(o) => { if (!o) dismiss(letter.id); }}>
+    <Dialog open={true} onOpenChange={(o) => { if (!o) handleAcknowledge(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-400">
@@ -70,13 +98,20 @@ export function PoliceLetterDialog() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={() => dismiss(letter.id)}>
-            Acknowledge
-          </Button>
-          <Button variant="destructive" onClick={handleBeginEviction}>
-            Begin Eviction Proceedings
-          </Button>
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={handleAcknowledge}>
+              Acknowledge
+            </Button>
+            <Button variant="destructive" onClick={handleBeginEviction}>
+              Begin Eviction Proceedings
+            </Button>
+          </div>
+          {error && (
+            <p className="text-xs text-red-400 text-right">
+              {error}
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>
