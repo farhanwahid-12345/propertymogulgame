@@ -106,7 +106,16 @@ export function EvictionDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="outline" size="sm" className="text-xs border-destructive/40 text-destructive hover:bg-destructive/10">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+            title={
+              rentArrearsCount >= 2
+                ? '2+ months in arrears — Section 8 eviction available'
+                : 'Serve eviction notice — a valid ground is required'
+            }
+          >
             Serve eviction notice
           </Button>
         )}

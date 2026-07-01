@@ -936,20 +936,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           resolveCost: cost,
           satisfactionPenaltyIfIgnored: Math.max(1, Math.round(tpl.penalty * penaltyMod * 0.5)),
         });
-        // Phase 5 #12 — risky tenant + noise/safety concern triggers an official council letter (once per concern).
-        if (riskyAsbBias && (tpl.category === 'noise' || tpl.category === 'safety')) {
-          newPoliceLetters.push({
-            id: `letter_${concernId}`,
-            concernId,
-            propertyId: property.id,
-            propertyName: property.name,
-            tenantName: t.tenant.name,
-            city: property.city,
-            concernCategory: tpl.category,
-            description: desc,
-            month: newMonthNumber,
-          });
-        }
+        // Phase 1 bugfix — letters are queued next tick (age >=1) so longstandingASB is true when player clicks "Begin Eviction".
         existingActiveByProp.set(t.propertyId, (existingActiveByProp.get(t.propertyId) || 0) + 1);
       });
       // Resolve any open MEES concerns for properties that are now EPC C or better
@@ -1206,6 +1193,33 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       }
       // Trim long-resolved
       updatedConcerns = updatedConcerns.filter(c => !c.resolvedMonth || (newMonthNumber - c.resolvedMonth) <= 6);
+
+      // Phase 1 bugfix — dispatch ASB council letter only once the noise/safety concern
+      // is already ≥1 month old, so `longstandingASB` is true when the player clicks
+      // "Begin Eviction Proceedings" from the letter dialog.
+      updatedConcerns = updatedConcerns.map(c => {
+        if (c.resolvedMonth || c.policeLetterSent) return c;
+        if (c.tenantProfile !== 'risky') return c;
+        if (c.category !== 'noise' && c.category !== 'safety') return c;
+        const age = newMonthNumber - c.raisedMonth;
+        if (age < 1) return c;
+        const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
+        if (!property) return c;
+        const tenant = newTenants.find(t => t.propertyId === c.propertyId);
+        if (!tenant) return c;
+        newPoliceLetters.push({
+          id: `letter_${c.id}`,
+          concernId: c.id,
+          propertyId: property.id,
+          propertyName: property.name,
+          tenantName: tenant.tenant.name,
+          city: property.city,
+          concernCategory: c.category,
+          description: c.description,
+          month: newMonthNumber,
+        });
+        return { ...c, policeLetterSent: true };
+      });
 
       // ── Pending evictions: tick down notice periods, end tenancies, refund deposits, add locks ──
       let activePendingEvictions: PendingEviction[] = [];

@@ -577,7 +577,12 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         }
       }
 
-      const recentDefaults = prev.tenantEvents.filter((e) => e.propertyId === propertyId && e.type === 'default').length;
+      // Phase 1 fix — tenantEvents is capped at 24 and cleared when a court case opens,
+      // so fall back to the tenant's authoritative arrearsMonths counter.
+      const recentDefaults = Math.max(
+        prev.tenantEvents.filter((e) => e.propertyId === propertyId && e.type === 'default').length,
+        (tenant as any)?.arrearsMonths ?? 0,
+      );
       const concerns = prev.tenantConcerns.filter((c) => c.propertyId === propertyId && !c.resolvedMonth);
       const longstandingASB = concerns.some((c) =>
         (c.category === 'noise' || c.category === 'safety') && (prev.monthsPlayed - c.raisedMonth) >= 1
