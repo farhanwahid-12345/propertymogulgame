@@ -2231,9 +2231,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         } as import('@/types/game').DebtRecoveryCase;
       });
       // Keep last 30 resolved cases; preserve all active (in_court or pending HCE).
+      // Phase 2 item 2: drop cases closed early because the tenant repaid in full.
+      const preRepaymentFilter = casesWithHce.filter(c => !closedByRepaymentCaseIds.has(c.id));
       const trimmedCases = [
-        ...casesWithHce.filter(c => c.status === 'in_court' || (c.escalatedToHighCourtMonth && !c.hceResolved)),
-        ...casesWithHce.filter(c => c.status !== 'in_court' && !(c.escalatedToHighCourtMonth && !c.hceResolved)).slice(-30),
+        ...preRepaymentFilter.filter(c => c.status === 'in_court' || (c.escalatedToHighCourtMonth && !c.hceResolved)),
+        ...preRepaymentFilter.filter(c => c.status !== 'in_court' && !(c.escalatedToHighCourtMonth && !c.hceResolved)).slice(-30),
       ];
 
 
