@@ -5,7 +5,7 @@ import { formatPounds } from "@/lib/formatCurrency";
 
 export function DebtRepaidDialog() {
   const notices = useGameStore((s: any) => s.debtRepaymentNotices) as
-    | Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number }>
+    | Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number; message?: string }>
     | undefined;
 
   const open = (notices?.length ?? 0) > 0;
