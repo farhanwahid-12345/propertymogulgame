@@ -543,8 +543,16 @@ export function EstateAgentWindow({
       switch (buySort) {
         case 'price-asc':  return a.value - b.value;
         case 'price-desc': return b.value - a.value;
-        case 'yield-asc':  return (a.yield ?? 0) - (b.yield ?? 0);
-        case 'yield-desc': return (b.yield ?? 0) - (a.yield ?? 0);
+        case 'yield-asc':  {
+          const ay = a.yield ?? (a.monthlyIncome * 12 / Math.max(1, a.value) * 100);
+          const by = b.yield ?? (b.monthlyIncome * 12 / Math.max(1, b.value) * 100);
+          return ay - by;
+        }
+        case 'yield-desc': {
+          const ay = a.yield ?? (a.monthlyIncome * 12 / Math.max(1, a.value) * 100);
+          const by = b.yield ?? (b.monthlyIncome * 12 / Math.max(1, b.value) * 100);
+          return by - ay;
+        }
         case 'rent-asc':   return a.monthlyIncome - b.monthlyIncome;
         case 'rent-desc':  return b.monthlyIncome - a.monthlyIncome;
       }
