@@ -5,7 +5,7 @@ import { formatPounds } from "@/lib/formatCurrency";
 
 export function DebtRepaidDialog() {
   const notices = useGameStore((s: any) => s.debtRepaymentNotices) as
-    | Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number }>
+    | Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number; message?: string }>
     | undefined;
 
   const open = (notices?.length ?? 0) > 0;
@@ -31,8 +31,14 @@ export function DebtRepaidDialog() {
         <div className="space-y-2 max-h-72 overflow-y-auto py-2">
           {(notices ?? []).map((n) => (
             <div key={n.id} className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm">
-              <strong>{n.tenantName}</strong> at <strong>{n.propertyName}</strong> has cleared their arrears —{" "}
-              <span className="font-semibold text-emerald-400">{formatPounds(n.amountPennies)}</span> credited to your account.
+              {n.message ? (
+                <span>{n.message}</span>
+              ) : (
+                <>
+                  <strong>{n.tenantName}</strong> at <strong>{n.propertyName}</strong> has cleared their arrears —{" "}
+                  <span className="font-semibold text-emerald-400">{formatPounds(n.amountPennies)}</span> credited to your account.
+                </>
+              )}
             </div>
           ))}
         </div>

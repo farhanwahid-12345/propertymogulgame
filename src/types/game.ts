@@ -621,7 +621,7 @@ export interface GameState {
   /** Phase 5 #13 — debt-recovery case IDs queued for the resolution pop-up. */
   pendingCourtResolutions?: string[];
   /** Item #5 — arrears repaid this month, surfaced via a "Debt Repaid" modal. */
-  debtRepaymentNotices?: Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number }>;
+  debtRepaymentNotices?: Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number; message?: string }>;
   /** Phase 7 #16 — overdraft prompt queued during a fresh distress episode. */
   pendingOverdraftPrompt?: { eligibleLimit: number; month: number } | null;
   /** Phase 7 #16 — monthsPlayed when overdraft prompt last fired (once per distress episode). */

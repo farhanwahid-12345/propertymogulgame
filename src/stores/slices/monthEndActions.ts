@@ -1543,7 +1543,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // tenant resumes paying, the FULL outstanding arrears balance is paid
       // back in a single lump sum on top of normal rent (catch-up payment).
       let arrearsRepaidThisMonth = 0;
-      const debtRepaymentEvents: Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number }> = [];
+      const debtRepaymentEvents: Array<{ id: string; tenantName: string; propertyName: string; amountPennies: number; month: number; message?: string }> = [];
+      // Phase 2 item 2: cases closed early because the tenant fully repaid
+      // while the case was still in court. Also charge £325 court costs back.
+      const closedByRepaymentCaseIds = new Set<string>();
+      const COURT_FILING_FEE_PENNIES = 32500;
       newTenants = newTenants.map(t => {
         const key = `${t.propertyId}::${t.slotIndex ?? 0}`;
         const prop = prev.ownedProperties.find(p => p.id === t.propertyId);
@@ -1561,13 +1565,26 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         // Paying this month — repay the FULL outstanding balance as a lump sum.
         const owed = t.arrearsPennies ?? 0;
         if (!conveyancingPropertyIds.has(t.propertyId) && owed > 0) {
-          arrearsRepaidThisMonth += owed;
+          const activeCase = (prev.debtRecoveryCases || []).find(
+            (c: any) => c.propertyId === t.propertyId && c.status === 'in_court'
+          );
+          const tenantName = t.tenant?.name ?? 'Tenant';
+          const propertyName = prop?.name ?? 'a property';
+          let creditedAmount = owed;
+          let message: string | undefined;
+          if (activeCase) {
+            creditedAmount += COURT_FILING_FEE_PENNIES;
+            closedByRepaymentCaseIds.add(activeCase.id);
+            message = `${tenantName} cleared all arrears (£${fromPennies(owed).toLocaleString()}) while the court case was pending — court costs of £325 also recovered. Case closed.`;
+          }
+          arrearsRepaidThisMonth += creditedAmount;
           debtRepaymentEvents.push({
             id: `debtrepay_${t.propertyId}_${t.slotIndex ?? 0}_${newMonthNumber}`,
-            tenantName: t.tenant?.name ?? 'Tenant',
-            propertyName: prop?.name ?? 'a property',
-            amountPennies: owed,
+            tenantName,
+            propertyName,
+            amountPennies: creditedAmount,
             month: newMonthNumber,
+            ...(message ? { message } : {}),
           });
           return {
             ...t,
@@ -2214,9 +2231,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         } as import('@/types/game').DebtRecoveryCase;
       });
       // Keep last 30 resolved cases; preserve all active (in_court or pending HCE).
+      // Phase 2 item 2: drop cases closed early because the tenant repaid in full.
+      const preRepaymentFilter = casesWithHce.filter(c => !closedByRepaymentCaseIds.has(c.id));
       const trimmedCases = [
-        ...casesWithHce.filter(c => c.status === 'in_court' || (c.escalatedToHighCourtMonth && !c.hceResolved)),
-        ...casesWithHce.filter(c => c.status !== 'in_court' && !(c.escalatedToHighCourtMonth && !c.hceResolved)).slice(-30),
+        ...preRepaymentFilter.filter(c => c.status === 'in_court' || (c.escalatedToHighCourtMonth && !c.hceResolved)),
+        ...preRepaymentFilter.filter(c => c.status !== 'in_court' && !(c.escalatedToHighCourtMonth && !c.hceResolved)).slice(-30),
       ];
 
 
