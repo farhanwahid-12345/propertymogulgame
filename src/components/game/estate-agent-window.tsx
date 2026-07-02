@@ -194,7 +194,9 @@ export function EstateAgentWindow({
       ? availableProperties
       : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
 
-    const levelFiltered = cityFiltered.filter(p => p.value >= levelMin && p.value <= levelMax);
+    const levelFiltered = cityFiltered.filter(
+      p => p.type === 'commercial' || (p.value >= levelMin && p.value <= levelMax)
+    );
 
     const affordable = levelFiltered.filter(p => {
       const maxMortgage = p.value * maxLTV;
