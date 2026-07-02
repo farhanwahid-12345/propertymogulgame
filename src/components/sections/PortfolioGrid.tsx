@@ -178,16 +178,19 @@ export function PortfolioGrid({
           const hasActiveDebtCase = ((gameState as any).debtRecoveryCases || []).some(
             (c: any) => c.propertyId === property.id && c.status === 'in_court',
           );
-          const arrearsCount = hasActiveDebtCase
+          const arrearsPenniesTotal = tenantRecs.reduce(
+            (s: number, t: any) => s + (t.arrearsPennies ?? 0), 0
+          );
+          // Phase 2 item 1: once arrears are fully repaid, penniesTotal drops to
+          // 0 but stale tenantEvents of type 'default' still exist. Require BOTH
+          // count>0 AND pennies>0 so a repaid tenant never shows the badge.
+          const arrearsCount = hasActiveDebtCase || arrearsPenniesTotal === 0
             ? 0
             : (liveArrearsMonths > 0
                 ? liveArrearsMonths
                 : (gameState.tenantEvents || []).filter(
                     (e: any) => e.propertyId === property.id && e.type === "default"
                   ).length);
-          const arrearsPenniesTotal = tenantRecs.reduce(
-            (s: number, t: any) => s + (t.arrearsPennies ?? 0), 0
-          );
           const propertyApps = ((gameState as any).planningApplications || []).filter(
             (a: any) => a.propertyId === property.id
           );
