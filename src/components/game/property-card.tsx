@@ -286,9 +286,6 @@ export const PropertyCard = memo(function PropertyCard({
   const marketValueToUse = property.marketValue || property.value;
   const equityVsMarket = marketValueToUse - totalInvested;
   const equityPct = totalInvested > 0 ? ((equityVsMarket / totalInvested) * 100).toFixed(1) : "0.0";
-  // Item #9: pure capital appreciation since purchase, separate from renovation spend.
-  const marketValueGain = marketValueToUse - property.price;
-  const marketValueGainPct = property.price > 0 ? ((marketValueGain / property.price) * 100).toFixed(1) : "0.0";
 
 
   // Calculate monthly costs for owned properties
