@@ -286,9 +286,6 @@ export const PropertyCard = memo(function PropertyCard({
   const marketValueToUse = property.marketValue || property.value;
   const equityVsMarket = marketValueToUse - totalInvested;
   const equityPct = totalInvested > 0 ? ((equityVsMarket / totalInvested) * 100).toFixed(1) : "0.0";
-  // Item #9: pure capital appreciation since purchase, separate from renovation spend.
-  const marketValueGain = marketValueToUse - property.price;
-  const marketValueGainPct = property.price > 0 ? ((marketValueGain / property.price) * 100).toFixed(1) : "0.0";
 
 
   // Calculate monthly costs for owned properties
@@ -609,16 +606,12 @@ export const PropertyCard = memo(function PropertyCard({
                 </div>
               )}
               <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-                  {propertyLTV > 0 ? 'LTV' : 'Market Value Gain'}
-                </div>
-                <div className={cn(
-                  "text-sm font-bold leading-tight",
-                  propertyLTV > 0
-                    ? (propertyLTV > 80 ? "text-danger" : propertyLTV > 60 ? "text-yellow-400" : "text-success")
-                    : (marketValueGain >= 0 ? "text-success" : "text-danger")
+                <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Yield</div>
+                <div className={cn("text-sm font-bold leading-tight",
+                  (property.yield ?? 0) >= 8 ? "text-success" :
+                  (property.yield ?? 0) >= 5 ? "text-yellow-400" : "text-danger"
                 )}>
-                  {propertyLTV > 0 ? `${propertyLTV.toFixed(0)}%` : `${marketValueGain >= 0 ? '+' : ''}${marketValueGainPct}%`}
+                  {(property.yield ?? 0).toFixed(1)}%
                 </div>
               </div>
 

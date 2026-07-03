@@ -99,7 +99,7 @@ export function GameStats({
   void monthsPlayed;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" style={{ isolation: 'isolate' }}>
       {/* Main Stats Bar — compact single-row strip */}
       <div className="glass px-3 py-1.5">
         <div className="flex flex-col md:flex-row md:items-center md:gap-6 gap-2">
@@ -113,7 +113,7 @@ export function GameStats({
                     <Info className="h-3 w-3" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-72" sideOffset={8} collisionPadding={16}>
+                <PopoverContent className="w-72" side="bottom" sideOffset={8} collisionPadding={{ top: 60 }}>
                   <div className="space-y-2">
                     <h4 className="font-medium text-sm">Net Worth Breakdown</h4>
                     <div className="space-y-1.5 text-sm">
@@ -170,7 +170,7 @@ export function GameStats({
                   <Info className="h-3 w-3" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-72" sideOffset={8} collisionPadding={16}>
+              <PopoverContent className="w-72" side="bottom" sideOffset={8} collisionPadding={{ top: 60 }}>
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Monthly Cost Breakdown</h4>
                   <div className="space-y-1.5 text-sm">
