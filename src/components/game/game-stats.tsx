@@ -99,7 +99,7 @@ export function GameStats({
   void monthsPlayed;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" style={{ isolation: 'isolate' }}>
       {/* Main Stats Bar — compact single-row strip */}
       <div className="glass px-3 py-1.5">
         <div className="flex flex-col md:flex-row md:items-center md:gap-6 gap-2">
