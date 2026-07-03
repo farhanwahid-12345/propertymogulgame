@@ -32,7 +32,7 @@ import { generateCommercialApplicantInRange } from '@/components/game/tenant-sel
 
 // Phase 5 (item 13) — city-level residential yield anchors for mean-reversion drift.
 const CITY_RESIDENTIAL_YIELD: Record<string, number> = {
-  middlesbrough: 0.10, leeds: 0.085, manchester: 0.075, london: 0.06,
+  middlesbrough: 0.075, leeds: 0.055, manchester: 0.050, london: 0.040,
 };
 // Phase 5 (item 15) — annual commercial rental growth mirrors residential
 // appreciation by city (used to derive the suggested uplift at rent reviews).
