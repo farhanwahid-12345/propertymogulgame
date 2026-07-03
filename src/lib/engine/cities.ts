@@ -109,7 +109,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Manchester',
     unlockLevel: 1,
     valueRange: { min: 160_000, max: 550_000 },
-    yieldRange: { min: 6.5, max: 8.5 },
+    yieldRange: { min: 4.0, max: 6.0 },
     monthlyAppreciation: 0.000292, // 0.35% pa rental growth
     typeMix: { residential: 0.60, commercial: 0.22, luxury: 0.18 },
     streets: MANCHESTER_STREETS,
