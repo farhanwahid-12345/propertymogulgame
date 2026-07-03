@@ -74,7 +74,7 @@ export interface RentClampContext {
   unit?: 'pennies' | 'pounds';
 }
 
-/** 2.0 × LHA per-bedroom monthly rate, in the requested unit. 0 if unknown. */
+/** 1.5 × LHA per-bedroom monthly rate, in the requested unit. 0 if unknown. */
 function lhaCeiling(ctx: RentClampContext | undefined): number {
   if (!ctx) return 0;
   const cityKey = (ctx.cityId ?? 'middlesbrough').toLowerCase();
@@ -96,7 +96,7 @@ function lhaCeiling(ctx: RentClampContext | undefined): number {
   }
   const lhaPennies = table[bedrooms] ?? table[2];
   // For multi-unit aggregate rent we compare against an aggregate ceiling.
-  const perUnitCeilingPennies = 2.0 * lhaPennies;
+  const perUnitCeilingPennies = 1.5 * lhaPennies;
   const aggregatePennies = (ctx.subtype === 'hmo' || ctx.subtype === 'flats' || ctx.subtype === 'multi-let')
     ? perUnitCeilingPennies * units
     : perUnitCeilingPennies;
@@ -110,7 +110,7 @@ function lhaCeiling(ctx: RentClampContext | undefined): number {
  * Formula: baseRent × conditionMultiplier × furnishingMultiplier
  * (profile multiplier is intentionally NOT applied — see file header.)
  *
- * If `clampCtx` is provided, the result is hard-capped at 2.0 × LHA for the
+ * If `clampCtx` is provided, the result is hard-capped at 1.5 × LHA for the
  * inferred bedroom count so future multiplier combinations cannot drift the
  * rent into unrealistic territory.
  */

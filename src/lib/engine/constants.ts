@@ -150,7 +150,7 @@ export const CONCERN_RESOLVE_CONDITION_LIFT: Record<'maintenance' | 'noise' | 'm
  * property rents to a realistic baseline (housing benefit reference rent).
  */
 export const CITY_LHA_MONTHLY_PENNIES: Record<string, Record<number, number>> = {
-  middlesbrough: { 1: 50000, 2: 57500, 3: 70000, 4: 80000 },     // £500 / £575 / £700 / £800
+  middlesbrough: { 1: 42500, 2: 52500, 3: 62500, 4: 72500 },     // £425 / £525 / £625 / £725
   leeds:         { 1: 70000, 2: 87500, 3: 105000, 4: 130000 },   // £700 / £875 / £1050 / £1300
   manchester:    { 1: 80000, 2: 95000, 3: 120000, 4: 150000 },   // £800 / £950 / £1200 / £1500
   london:        { 1: 160000, 2: 200000, 3: 250000, 4: 310000 }, // £1600 / £2000 / £2500 / £3100
@@ -165,13 +165,12 @@ export function bedroomsForSqft(sqft: number): number {
 }
 
 /** Phase 4 — risk-tier multipliers applied to the LHA baseline to derive the
- *  anchored monthly rent. Risky tenants pay above LHA because landlords would
- *  otherwise reject them; benefit/budget tenants sit at LHA. */
+ *  anchored monthly rent. Kept close to LHA so rents remain realistic. */
 export const LHA_TENANT_TIER_MULT: Record<'risky' | 'budget' | 'standard' | 'premium', number> = {
-  risky: 1.35,
+  risky: 1.05,
   budget: 1.00,
-  standard: 1.30,
-  premium: 1.60,
+  standard: 1.10,
+  premium: 1.20,
 };
 
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
