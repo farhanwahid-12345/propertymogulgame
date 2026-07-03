@@ -98,7 +98,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Leeds',
     unlockLevel: 1,
     valueRange: { min: 130_000, max: 400_000 },
-    yieldRange: { min: 7.5, max: 9.5 },
+    yieldRange: { min: 4.5, max: 6.5 },
     monthlyAppreciation: 0.000208, // 0.25% pa rental growth
     typeMix: { residential: 0.65, commercial: 0.20, luxury: 0.15 },
     streets: LEEDS_STREETS,
