@@ -120,7 +120,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'London',
     unlockLevel: 1,
     valueRange: { min: 380_000, max: 1_500_000 },
-    yieldRange: { min: 5.0, max: 7.0 },
+    yieldRange: { min: 3.0, max: 5.0 },
     monthlyAppreciation: 0.000417, // 0.5% pa rental growth
     typeMix: { residential: 0.55, commercial: 0.22, luxury: 0.23 },
     streets: LONDON_STREETS,
