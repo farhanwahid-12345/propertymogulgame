@@ -87,7 +87,7 @@ export const CITIES: Record<CityId, CityConfig> = {
     name: 'Middlesbrough',
     unlockLevel: 1,
     valueRange: { min: 60_000, max: 180_000 },
-    yieldRange: { min: 9.0, max: 11.0 },
+    yieldRange: { min: 6.5, max: 8.5 },
     monthlyAppreciation: 0.000125, // 0.15% pa rental growth
     typeMix: { residential: 0.70, commercial: 0.18, luxury: 0.12 },
     streets: MIDDLESBROUGH_STREETS,
