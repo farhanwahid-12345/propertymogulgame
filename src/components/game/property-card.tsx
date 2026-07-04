@@ -863,6 +863,16 @@ export const PropertyCard = memo(function PropertyCard({
                                   <span className="text-muted-foreground">Lease type</span>
                                   <span className="font-medium">{lease.fri ? 'FRI (Full Repairing & Insuring)' : 'Standard'}</span>
                                 </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Renewal options</span>
+                                  <span className="font-medium text-right text-[11px]">
+                                    {pendingLeaseRenewal
+                                      ? '📄 Renewal dialogue pending'
+                                      : lease.endingAtExpiry
+                                        ? `Vacating at expiry (month ${lease.expiryMonth})`
+                                        : `Expires month ${lease.expiryMonth} — dialogue opens 6mo prior`}
+                                  </span>
+                                </div>
                               </>
                             );
                           })()}
