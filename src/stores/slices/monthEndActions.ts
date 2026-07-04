@@ -533,7 +533,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const newPayment = mortgage.mortgageType === 'interest-only'
             ? Math.round(mortgage.remainingBalance * monthlyRate)
             : Math.round(mortgage.remainingBalance * (monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) / (Math.pow(1 + monthlyRate, remainingMonths) - 1));
-          fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate });
+          fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate, propertyId: mortgage.propertyId });
           workingMortgage = { ...mortgage, interestRate: svrRate, monthlyPayment: newPayment, revertedToSVR: true };
         }
         const interest = Math.round(workingMortgage.remainingBalance * (workingMortgage.interestRate / 12));
