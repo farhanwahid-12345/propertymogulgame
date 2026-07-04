@@ -462,16 +462,21 @@ export const PropertyCard = memo(function PropertyCard({
             {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
             {pendingEviction && (
               <Badge
+                asChild
                 variant="outline"
                 className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10 cursor-pointer hover:bg-red-500/20"
-                title="Open Operations → Evictions"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
-                  }
-                }}
               >
-                🔴 Eviction in progress
+                <button
+                  type="button"
+                  title="Click to view in Operations"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
+                    }
+                  }}
+                >
+                  🔴 Eviction in progress →
+                </button>
               </Badge>
             )}
             {isListedForSale && (() => {
