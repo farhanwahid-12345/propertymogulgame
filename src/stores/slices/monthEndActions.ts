@@ -547,9 +547,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       });
       if (fixedTermReversions.length > 0) {
         fixedTermReversions.forEach(r => {
+          const prop = updatedOwnedProperties.find(p => p.id === r.propertyId);
+          const label = prop ? `${prop.name} — mortgage` : 'Mortgage';
           showToast(
             "Fixed-rate ended",
-            `Mortgage reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
+            `${label} reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
           );
         });
       }
