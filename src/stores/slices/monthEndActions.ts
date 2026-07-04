@@ -1988,7 +1988,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const penalisedRate = Math.min(0.30, l.interestRate + 0.06);
           showToast(
             "⚠ Bridging Loan Expired",
-            `Bridge against ${l.propertyId ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
+            `Bridge against ${updatedOwnedProperties.find(p => p.id === l.propertyId)?.name ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
             "destructive",
           );
           updatedLoans.push({
