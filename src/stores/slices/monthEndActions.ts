@@ -1538,9 +1538,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         });
       });
       if (newlyQueuedReviews.length > 0) {
+        const names = newlyQueuedReviews
+          .map(r => updatedOwnedProperties.find(p => p.id === r.propertyId)?.name)
+          .filter(Boolean)
+          .join(', ');
         showToast(
           "Rent review due",
-          `${newlyQueuedReviews.length} commercial lease${newlyQueuedReviews.length === 1 ? '' : 's'} reached a contractual rent review — open Heads of Terms to negotiate.`,
+          `${names || `${newlyQueuedReviews.length} commercial lease${newlyQueuedReviews.length === 1 ? '' : 's'}`} reached a contractual rent review — open Heads of Terms to negotiate.`,
         );
       }
 
