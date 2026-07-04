@@ -432,6 +432,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // ── Phase 2 (v5) — HMO licence transitions + fines ──
       let hmoFines = 0;
+      const hmoFinedNames: string[] = [];
       newOwnedProperties = newOwnedProperties.map((property) => {
         if (property.subtype !== 'hmo') return property;
         let status = property.hmoLicenceStatus ?? 'none';
@@ -459,12 +460,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const monthsOwned = newMonthNumber; // approximation — no precise purchase month tracked
           if (status === 'expired' || monthsOwned >= 3) {
             hmoFines += 50_000; // £500
+            hmoFinedNames.push(property.name);
           }
         }
         return { ...property, hmoLicenceStatus: status, hmoLicenceExpiresMonth: expiresMonth };
       });
       if (hmoFines > 0) {
-        showToast('HMO Unlicensed Fine ⚠️', `£${fromPennies(hmoFines).toLocaleString()} fine for unlicensed HMO let.`, 'destructive');
+        showToast('HMO Unlicensed Fine ⚠️', `${hmoFinedNames.join(', ')} — £${fromPennies(hmoFines).toLocaleString()} fine for unlicensed HMO let.`, 'destructive');
       }
 
       // Expenses
