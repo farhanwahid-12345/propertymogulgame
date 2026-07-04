@@ -942,7 +942,12 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Resolve any open MEES concerns for properties that are now EPC C or better
       const resolvedMeesIds = new Set<string>();
       updatedConcerns = updatedConcerns.map(c => {
-        if (c.resolvedMonth || !c.description.startsWith('EPC ')) return c;
+        if (c.resolvedMonth) return c;
+        const isEpcConcern =
+          c.id.startsWith('mees2030_warn_') ||
+          c.id.startsWith('mees_') ||
+          c.description?.toLowerCase().includes('epc');
+        if (!isEpcConcern) return c;
         const property = updatedOwnedProperties.find(p => p.id === c.propertyId);
         if (!property) return c;
         const epc = property.epcRating;

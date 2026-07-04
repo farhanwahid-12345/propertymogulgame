@@ -47,6 +47,9 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
       const completedRenovations = prev.renovations.filter(isRenoComplete);
       const activeRenovations = prev.renovations.filter((r: Renovation) => !isRenoComplete(r));
       const updatedProperties = [...prev.ownedProperties];
+      // Phase 6 #15 — track properties whose EPC just improved to A/B/C so we can
+      // auto-resolve any open MEES/EPC concerns for them in the state commit below.
+      const epcUpgradedPropIds = new Set<string>();
       completedRenovations.forEach((renovation: Renovation) => {
         const idx = updatedProperties.findIndex((p: Property) => p.id === renovation.propertyId);
         if (idx >= 0) {
@@ -113,6 +116,9 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
 
           const epcTarget = (renovation.type as any).epcTarget as Property['epcRating'] | undefined;
           const epcUpdate = epcTarget && valueMult > 0 ? { epcRating: epcTarget } : {};
+          if (epcTarget && valueMult > 0 && ['A','B','C'].includes(epcTarget)) {
+            epcUpgradedPropIds.add(propRecord.id);
+          }
 
           const completedAfter = [
             ...(updatedProperties[idx].completedRenovationIds || []),
@@ -381,7 +387,18 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
         currentLoanRates: newLoanRates,
         voidPeriods: activeVoids,
         propertyListings: updatedListings.filter((l: any) => !salePropIds.has(l.propertyId)),
-        tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
+        tenantConcerns: mergeConcernsById(
+          (s.tenantConcerns || []).map((c: any) => {
+            if (c.resolvedMonth) return c;
+            if (!epcUpgradedPropIds.has(c.propertyId)) return c;
+            const isEpcConcern =
+              c.id?.startsWith('mees2030_warn_') ||
+              c.id?.startsWith('mees_') ||
+              c.description?.toLowerCase().includes('epc');
+            return isEpcConcern ? { ...c, resolvedMonth: prev.monthsPlayed } : c;
+          }),
+          newDamageConcerns,
+        ),
         lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
         conveyancing: [...prev.conveyancing, ...newConveyancing],
         opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
