@@ -516,7 +516,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Update mortgage balances + capture this month's actual interest portion
       // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
       let monthlyMortgageInterest = 0;
-      const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number }> = [];
+      const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number; propertyId?: string }> = [];
       const updatedMortgages = newMortgages.map(mortgage => {
         // Fixed-term reversion — when initial fix expires, mortgage moves to lender SVR.
         let workingMortgage = mortgage;
