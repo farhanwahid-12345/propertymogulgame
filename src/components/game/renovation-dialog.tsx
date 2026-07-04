@@ -336,6 +336,16 @@ export function RenovationDialog({
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
+  // Phase 6 #15 — auto-open when Operations feed dispatches the EPC upgrade CTA.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ propertyId: string }>).detail;
+      if (detail?.propertyId === propertyId) setIsOpen(true);
+    };
+    window.addEventListener('pm:open-renovation-for-property', handler);
+    return () => window.removeEventListener('pm:open-renovation-for-property', handler);
+  }, [propertyId]);
+
   // Item #1: target EPC band for `epc_upgrade`. Defaults to next band up.
   const EPC_ORDER: Array<'G'|'F'|'E'|'D'|'C'|'B'|'A'> = ['G','F','E','D','C','B','A'];
   const nextBandUp = (g?: string): 'A'|'B'|'C'|'D'|'E'|'F'|'G' => {
