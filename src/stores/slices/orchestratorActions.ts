@@ -116,6 +116,9 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
 
           const epcTarget = (renovation.type as any).epcTarget as Property['epcRating'] | undefined;
           const epcUpdate = epcTarget && valueMult > 0 ? { epcRating: epcTarget } : {};
+          if (epcTarget && valueMult > 0 && ['A','B','C'].includes(epcTarget)) {
+            epcUpgradedPropIds.add(propRecord.id);
+          }
 
           const completedAfter = [
             ...(updatedProperties[idx].completedRenovationIds || []),
