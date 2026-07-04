@@ -461,18 +461,18 @@ export const PropertyCard = memo(function PropertyCard({
             )}
             {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
             {pendingEviction && (
-              <Badge
-                variant="outline"
-                className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10 cursor-pointer hover:bg-red-500/20"
-                title="Open Operations → Evictions"
+              <button
+                type="button"
+                title="Click to view in Operations"
+                className="inline-flex items-center rounded-md border border-red-500/60 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-300 cursor-pointer hover:bg-red-500/20 transition-colors"
                 onClick={() => {
                   if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
                   }
                 }}
               >
-                🔴 Eviction in progress
-              </Badge>
+                🔴 Eviction in progress →
+              </button>
             )}
             {isListedForSale && (() => {
               const myMortgages = (mortgages || []).filter((m: any) =>
@@ -862,6 +862,16 @@ export const PropertyCard = memo(function PropertyCard({
                                 <div className="flex justify-between items-center">
                                   <span className="text-muted-foreground">Lease type</span>
                                   <span className="font-medium">{lease.fri ? 'FRI (Full Repairing & Insuring)' : 'Standard'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-muted-foreground">Renewal options</span>
+                                  <span className="font-medium text-right text-[11px]">
+                                    {pendingLeaseRenewal
+                                      ? '📄 Renewal dialogue pending'
+                                      : lease.endingAtExpiry
+                                        ? `Vacating at expiry (month ${lease.expiryMonth})`
+                                        : `Expires month ${lease.expiryMonth} — dialogue opens 6mo prior`}
+                                  </span>
                                 </div>
                               </>
                             );

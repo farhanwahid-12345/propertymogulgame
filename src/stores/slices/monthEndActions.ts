@@ -432,6 +432,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
 
       // ── Phase 2 (v5) — HMO licence transitions + fines ──
       let hmoFines = 0;
+      const hmoFinedNames: string[] = [];
       newOwnedProperties = newOwnedProperties.map((property) => {
         if (property.subtype !== 'hmo') return property;
         let status = property.hmoLicenceStatus ?? 'none';
@@ -459,12 +460,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const monthsOwned = newMonthNumber; // approximation — no precise purchase month tracked
           if (status === 'expired' || monthsOwned >= 3) {
             hmoFines += 50_000; // £500
+            hmoFinedNames.push(property.name);
           }
         }
         return { ...property, hmoLicenceStatus: status, hmoLicenceExpiresMonth: expiresMonth };
       });
       if (hmoFines > 0) {
-        showToast('HMO Unlicensed Fine ⚠️', `£${fromPennies(hmoFines).toLocaleString()} fine for unlicensed HMO let.`, 'destructive');
+        showToast('HMO Unlicensed Fine ⚠️', `${hmoFinedNames.join(', ')} — £${fromPennies(hmoFines).toLocaleString()} fine for unlicensed HMO let.`, 'destructive');
       }
 
       // Expenses
@@ -516,7 +518,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Update mortgage balances + capture this month's actual interest portion
       // (used for accurate annual tax calcs — Section 24 / Corp Tax deductibility).
       let monthlyMortgageInterest = 0;
-      const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number }> = [];
+      const fixedTermReversions: Array<{ id: string; oldRate: number; newRate: number; propertyId?: string }> = [];
       const updatedMortgages = newMortgages.map(mortgage => {
         // Fixed-term reversion — when initial fix expires, mortgage moves to lender SVR.
         let workingMortgage = mortgage;
@@ -533,7 +535,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const newPayment = mortgage.mortgageType === 'interest-only'
             ? Math.round(mortgage.remainingBalance * monthlyRate)
             : Math.round(mortgage.remainingBalance * (monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) / (Math.pow(1 + monthlyRate, remainingMonths) - 1));
-          fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate });
+          fixedTermReversions.push({ id: mortgage.id, oldRate: mortgage.interestRate, newRate: svrRate, propertyId: mortgage.propertyId });
           workingMortgage = { ...mortgage, interestRate: svrRate, monthlyPayment: newPayment, revertedToSVR: true };
         }
         const interest = Math.round(workingMortgage.remainingBalance * (workingMortgage.interestRate / 12));
@@ -547,9 +549,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       });
       if (fixedTermReversions.length > 0) {
         fixedTermReversions.forEach(r => {
+          const prop = newOwnedProperties.find(p => p.id === r.propertyId);
+          const label = prop ? `${prop.name} — mortgage` : 'Mortgage';
           showToast(
             "Fixed-rate ended",
-            `Mortgage reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
+            `${label} reverted to lender SVR: ${(r.oldRate * 100).toFixed(2)}% → ${(r.newRate * 100).toFixed(2)}%. Consider remortgaging.`,
           );
         });
       }
@@ -1536,9 +1540,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         });
       });
       if (newlyQueuedReviews.length > 0) {
+        const names = newlyQueuedReviews
+          .map(r => updatedOwnedProperties.find(p => p.id === r.propertyId)?.name)
+          .filter(Boolean)
+          .join(', ');
         showToast(
           "Rent review due",
-          `${newlyQueuedReviews.length} commercial lease${newlyQueuedReviews.length === 1 ? '' : 's'} reached a contractual rent review — open Heads of Terms to negotiate.`,
+          `${names || `${newlyQueuedReviews.length} commercial lease${newlyQueuedReviews.length === 1 ? '' : 's'}`} reached a contractual rent review — open Heads of Terms to negotiate.`,
         );
       }
 
@@ -1982,7 +1990,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const penalisedRate = Math.min(0.30, l.interestRate + 0.06);
           showToast(
             "⚠ Bridging Loan Expired",
-            `Bridge against ${l.propertyId ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
+            `Bridge against ${updatedOwnedProperties.find(p => p.id === l.propertyId)?.name ?? 'property'} unredeemed at expiry — credit −80, rate now ${(penalisedRate * 100).toFixed(2)}% APR. Remortgage onto a standard product ASAP.`,
             "destructive",
           );
           updatedLoans.push({
