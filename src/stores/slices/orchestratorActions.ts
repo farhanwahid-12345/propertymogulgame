@@ -387,7 +387,18 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
         currentLoanRates: newLoanRates,
         voidPeriods: activeVoids,
         propertyListings: updatedListings.filter((l: any) => !salePropIds.has(l.propertyId)),
-        tenantConcerns: mergeConcernsById(s.tenantConcerns, newDamageConcerns),
+        tenantConcerns: mergeConcernsById(
+          (s.tenantConcerns || []).map((c: any) => {
+            if (c.resolvedMonth) return c;
+            if (!epcUpgradedPropIds.has(c.propertyId)) return c;
+            const isEpcConcern =
+              c.id?.startsWith('mees2030_warn_') ||
+              c.id?.startsWith('mees_') ||
+              c.description?.toLowerCase().includes('epc');
+            return isEpcConcern ? { ...c, resolvedMonth: prev.monthsPlayed } : c;
+          }),
+          newDamageConcerns,
+        ),
         lastGlobalDamageMonth: newDamageConcerns.length > 0 ? prev.monthsPlayed : prev.lastGlobalDamageMonth,
         conveyancing: [...prev.conveyancing, ...newConveyancing],
         opsFlashAt: (renovationsCompletedThisTick || newDamageConcerns.length > 0)
