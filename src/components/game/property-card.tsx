@@ -461,23 +461,18 @@ export const PropertyCard = memo(function PropertyCard({
             )}
             {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
             {pendingEviction && (
-              <Badge
-                asChild
-                variant="outline"
-                className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10 cursor-pointer hover:bg-red-500/20"
+              <button
+                type="button"
+                title="Click to view in Operations"
+                className="inline-flex items-center rounded-md border border-red-500/60 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-300 cursor-pointer hover:bg-red-500/20 transition-colors"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
+                  }
+                }}
               >
-                <button
-                  type="button"
-                  title="Click to view in Operations"
-                  onClick={() => {
-                    if (typeof window !== 'undefined') {
-                      window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }));
-                    }
-                  }}
-                >
-                  🔴 Eviction in progress →
-                </button>
-              </Badge>
+                🔴 Eviction in progress →
+              </button>
             )}
             {isListedForSale && (() => {
               const myMortgages = (mortgages || []).filter((m: any) =>
