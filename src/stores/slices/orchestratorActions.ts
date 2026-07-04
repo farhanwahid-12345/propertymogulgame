@@ -47,6 +47,9 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
       const completedRenovations = prev.renovations.filter(isRenoComplete);
       const activeRenovations = prev.renovations.filter((r: Renovation) => !isRenoComplete(r));
       const updatedProperties = [...prev.ownedProperties];
+      // Phase 6 #15 — track properties whose EPC just improved to A/B/C so we can
+      // auto-resolve any open MEES/EPC concerns for them in the state commit below.
+      const epcUpgradedPropIds = new Set<string>();
       completedRenovations.forEach((renovation: Renovation) => {
         const idx = updatedProperties.findIndex((p: Property) => p.id === renovation.propertyId);
         if (idx >= 0) {
