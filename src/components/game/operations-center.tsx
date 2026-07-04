@@ -247,6 +247,10 @@ export function OperationsCenter(props: OperationsCenterProps) {
                 requestAnimationFrame(() => {
                   const el = document.querySelector(`[data-property-id="${propertyId}"]`);
                   el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  // Phase 6 #15 — auto-open the renovation dialog for the target property.
+                  window.dispatchEvent(
+                    new CustomEvent('pm:open-renovation-for-property', { detail: { propertyId } })
+                  );
                 });
               }}
               bare
