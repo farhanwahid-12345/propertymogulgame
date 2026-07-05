@@ -81,6 +81,7 @@ export function PendingTransactionsDialog() {
   const shortfall = Math.max(0, total - available);
 
   const [rescueMode, setRescueMode] = useState<RescueMode>('none');
+  const [confirmBankruptcy, setConfirmBankruptcy] = useState<boolean>(false);
 
   // ── Loan sub-panel state ──────────────────────────────────────────
   const [loanKind, setLoanKind] = useState<LoanKind>('investor');
