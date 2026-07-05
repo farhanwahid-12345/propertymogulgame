@@ -367,6 +367,28 @@ export function PendingTransactionsDialog() {
           <span>Available: £{fromPennies(available).toLocaleString()}</span>
         </div>
 
+        {confirmBankruptcy && (
+          <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3 space-y-2">
+            <div className="text-sm font-semibold text-red-300">Declare bankruptcy?</div>
+            <div className="text-xs text-red-200/90">
+              This will permanently end your game. Your entire portfolio will be liquidated at 70% value.
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" className="flex-1" onClick={() => setConfirmBankruptcy(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="flex-1"
+                onClick={() => { setConfirmBankruptcy(false); triggerBankruptcy(); }}
+              >
+                Confirm bankruptcy
+              </Button>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           {canApproveAll ? (
             <Button onClick={approveAll} className="w-full">
@@ -377,11 +399,8 @@ export function PendingTransactionsDialog() {
               <Button
                 variant="ghost"
                 className="flex-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                onClick={() => {
-                  if (window.confirm("Declare bankruptcy? Your entire portfolio will be liquidated at 70 % of market value and the game will end.")) {
-                    triggerBankruptcy();
-                  }
-                }}
+                onClick={() => setConfirmBankruptcy(true)}
+                disabled={confirmBankruptcy}
               >
                 Declare bankruptcy
               </Button>
