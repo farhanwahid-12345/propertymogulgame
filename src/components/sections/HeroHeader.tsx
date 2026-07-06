@@ -17,6 +17,7 @@ import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
 import { replayTour } from "@/lib/onboarding";
 import { ConfirmDialog } from "@/components/game/confirm-dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type {
   Conveyancing,
   Renovation,
@@ -28,6 +29,23 @@ import type {
   PlanningApplication,
   EntityType,
 } from "@/types/game";
+
+function getLastRateEvent(economicEvents?: MacroEconomicEvent[]) {
+  if (!economicEvents || economicEvents.length === 0) return null;
+  const rateTypes: Record<string, number> = {
+    rate_cut: -0.005,
+    rate_cut_small: -0.005,
+    rate_hike: 0.005,
+    recession: 0.01,
+  };
+  for (let i = economicEvents.length - 1; i >= 0; i--) {
+    const ev = economicEvents[i];
+    if (rateTypes[ev.type] !== undefined) {
+      return { ...ev, adjust: rateTypes[ev.type] };
+    }
+  }
+  return null;
+}
 
 interface HeroHeaderProps {
   monthsPlayed: number;
