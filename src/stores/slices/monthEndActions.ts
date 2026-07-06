@@ -2475,6 +2475,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         creditScore: Math.max(300, Math.min(850, prev.creditScore + creditAdj)),
         lastYearlyGrowth: newLastYearlyGrowth,
         mortgageProviderRates: finalProviderRates,
+        currentMarketRate: Math.max(0.005, Math.min(0.15, prev.currentMarketRate + eventRateAdjust)),
         yearlyNetProfit: finalYearlyProfit,
         yearlyGrossRent: finalYearlyGrossRent,
         yearlyMortgageInterest: finalYearlyMortgageInterest,
