@@ -81,6 +81,13 @@ export function HeroHeader({
   const togglePause = useGameStore((s) => s.togglePause);
   const resetGame = useGameStore((s) => s.resetGame);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
+  const [rateFlash, setRateFlash] = useState(false);
+
+  useEffect(() => {
+    setRateFlash(true);
+    const t = setTimeout(() => setRateFlash(false), 3000);
+    return () => clearTimeout(t);
+  }, [currentMarketRate]);
 
   const toggleSound = () => {
     const next = !soundOn;
