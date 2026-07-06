@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
