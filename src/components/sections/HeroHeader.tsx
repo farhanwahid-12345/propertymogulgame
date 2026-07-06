@@ -132,13 +132,38 @@ export function HeroHeader({
                 </div>
                 <div className="w-px h-3 bg-border/50" />
                 {/* BoE base rate */}
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span>🏦</span>
-                  <span className={rateFlash ? "font-medium text-amber-300 transition-colors duration-500" : "font-medium text-foreground transition-colors duration-500"}>
-                    {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
-                    <span className="text-muted-foreground font-normal"> BoE</span>
-                  </span>
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 text-muted-foreground cursor-help">
+                      <span>🏦</span>
+                      <span className={rateFlash ? "font-medium text-amber-300 transition-colors duration-500" : "font-medium text-foreground transition-colors duration-500"}>
+                        {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
+                        <span className="text-muted-foreground font-normal"> BoE</span>
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    {(() => {
+                      const last = getLastRateEvent(economicEvents);
+                      if (last) {
+                        const sign = last.adjust > 0 ? '+' : '';
+                        return (
+                          <div className="space-y-1">
+                            <p className="font-semibold">{last.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              BoE rate {last.adjust > 0 ? 'rose' : 'fell'} by {sign}{(last.adjust * 100).toFixed(2)}% in Month {last.month}.
+                            </p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          No rate changes yet.
+                        </p>
+                      );
+                    })()}
+                  </TooltipContent>
+                </Tooltip>
                 <div className="w-px h-3 bg-border/50" />
                 {/* Landlord reputation */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
