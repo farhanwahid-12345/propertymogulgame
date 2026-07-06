@@ -17,6 +17,7 @@ import { isSoundEnabled, setSoundEnabled } from "@/lib/sound";
 import { replayTour } from "@/lib/onboarding";
 import { ConfirmDialog } from "@/components/game/confirm-dialog";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import type {
   Conveyancing,
   Renovation,
@@ -28,6 +29,23 @@ import type {
   PlanningApplication,
   EntityType,
 } from "@/types/game";
+
+function getLastRateEvent(economicEvents?: MacroEconomicEvent[]) {
+  if (!economicEvents || economicEvents.length === 0) return null;
+  const rateTypes: Record<string, number> = {
+    rate_cut: -0.005,
+    rate_cut_small: -0.005,
+    rate_hike: 0.005,
+    recession: 0.01,
+  };
+  for (let i = economicEvents.length - 1; i >= 0; i--) {
+    const ev = economicEvents[i];
+    if (rateTypes[ev.type] !== undefined) {
+      return { ...ev, adjust: rateTypes[ev.type] };
+    }
+  }
+  return null;
+}
 
 interface HeroHeaderProps {
   monthsPlayed: number;
@@ -114,13 +132,38 @@ export function HeroHeader({
                 </div>
                 <div className="w-px h-3 bg-border/50" />
                 {/* BoE base rate */}
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <span>🏦</span>
-                  <span className={rateFlash ? "font-medium text-amber-300 transition-colors duration-500" : "font-medium text-foreground transition-colors duration-500"}>
-                    {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
-                    <span className="text-muted-foreground font-normal"> BoE</span>
-                  </span>
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 text-muted-foreground cursor-help">
+                      <span>🏦</span>
+                      <span className={rateFlash ? "font-medium text-amber-300 transition-colors duration-500" : "font-medium text-foreground transition-colors duration-500"}>
+                        {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
+                        <span className="text-muted-foreground font-normal"> BoE</span>
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    {(() => {
+                      const last = getLastRateEvent(economicEvents);
+                      if (last) {
+                        const sign = last.adjust > 0 ? '+' : '';
+                        return (
+                          <div className="space-y-1">
+                            <p className="font-semibold">{last.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              BoE rate {last.adjust > 0 ? 'rose' : 'fell'} by {sign}{(last.adjust * 100).toFixed(2)}% in Month {last.month}.
+                            </p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          No rate changes yet.
+                        </p>
+                      );
+                    })()}
+                  </TooltipContent>
+                </Tooltip>
                 <div className="w-px h-3 bg-border/50" />
                 {/* Landlord reputation */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
