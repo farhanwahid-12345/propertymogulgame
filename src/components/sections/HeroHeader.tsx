@@ -116,7 +116,7 @@ export function HeroHeader({
                 {/* BoE base rate */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <span>🏦</span>
-                  <span className="font-medium text-foreground">
+                  <span className={rateFlash ? "font-medium text-amber-300 transition-colors duration-500" : "font-medium text-foreground transition-colors duration-500"}>
                     {((currentMarketRate ?? 0.035) * 100).toFixed(2)}%
                     <span className="text-muted-foreground font-normal"> BoE</span>
                   </span>
