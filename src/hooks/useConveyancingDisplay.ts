@@ -32,7 +32,7 @@ export function useConveyancingDisplay(
           return {
             id: c.propertyId,
             name: c.propertyName,
-            type: (src?.type || "residential") as "residential" | "commercial" | "luxury",
+            type: (c.propertyType || src?.type || "residential") as "residential" | "commercial" | "luxury",
             price: purchasePounds,
             value: purchasePounds,
             neighborhood: src?.neighborhood || "",
