@@ -6,7 +6,11 @@ interface ConveyancingLike {
   propertyName: string;
   purchasePrice?: number;
   completionMonth?: number;
+  /** Snapshot of the type taken at offer-time so we don't fall back to "residential"
+   *  once the estate-agent listing has refreshed. */
+  propertyType?: "residential" | "commercial" | "luxury";
 }
+
 
 /**
  * Surfaces in-flight `buying` conveyancing entries as PropertyCard-shaped stubs
