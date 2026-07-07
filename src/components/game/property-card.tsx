@@ -607,13 +607,20 @@ export const PropertyCard = memo(function PropertyCard({
               )}
               <div className="rounded-md bg-muted/30 px-2 py-1.5">
                 <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Yield</div>
-                <div className={cn("text-sm font-bold leading-tight",
-                  (property.yield ?? 0) >= 8 ? "text-success" :
-                  (property.yield ?? 0) >= 5 ? "text-yellow-400" : "text-danger"
-                )}>
-                  {(property.yield ?? 0).toFixed(1)}%
-                </div>
+                {(() => {
+                  const valForYield = (property.value && property.value > 0) ? property.value : property.price;
+                  const liveYield = valForYield > 0 ? (property.monthlyIncome * 12 / valForYield) * 100 : 0;
+                  return (
+                    <div className={cn("text-sm font-bold leading-tight",
+                      liveYield >= 8 ? "text-success" :
+                      liveYield >= 5 ? "text-yellow-400" : "text-danger"
+                    )}>
+                      {liveYield.toFixed(1)}%
+                    </div>
+                  );
+                })()}
               </div>
+
 
             </div>
 
