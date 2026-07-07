@@ -963,6 +963,25 @@ export const PropertyCard = memo(function PropertyCard({
                       onSplitFlatUnit={onSplitFlatUnit}
                     />
 
+                  {/* Phase 2 #4b — HMO / flats property-level agent + RGI toggles.
+                      Rendered inline (not gated by the "Details" expander) so multi-unit
+                      cards get parity with single-let cards. */}
+                  <div className="flex gap-1.5 pt-1">
+                    {toggleLettingAgent && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleLettingAgent(property.id, 'standard')}>
+                        {property.isManaged ? '🧑‍💼 Dismiss agent' : '🧑‍💼 Hire agent (10%)'}
+                      </Button>
+                    )}
+                    {toggleRentGuarantee && (
+                      <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                        onClick={() => toggleRentGuarantee(property.id)}>
+                        {property.hasRentGuarantee ? '🛡️ Cancel RGI' : '🛡️ Add RGI (3%)'}
+                      </Button>
+                    )}
+                  </div>
+
+
                   ) : (
                     onSelectTenant && (
                       <TenantSelector
