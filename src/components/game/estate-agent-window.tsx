@@ -194,9 +194,16 @@ export function EstateAgentWindow({
       ? availableProperties
       : availableProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
 
+    // Phase 3 #6 — apply the level value range to EVERY property type (previously
+    // commercial bypassed the filter, which surfaced sub-level shops the player
+    // then couldn't buy). Also gate the type by getAvailablePropertyTypes so
+    // early-level players don't see commercial/luxury they can't own yet.
+    const allowedTypes = getAvailablePropertyTypes(level);
+    const typeAllowed = (t: string) => allowedTypes.includes('all') || allowedTypes.includes(t);
     const levelFiltered = cityFiltered.filter(
-      p => p.type === 'commercial' || (p.value >= levelMin && p.value <= levelMax)
+      p => typeAllowed(p.type) && p.value >= levelMin && p.value <= levelMax
     );
+
 
     const affordable = levelFiltered.filter(p => {
       const maxMortgage = p.value * maxLTV;

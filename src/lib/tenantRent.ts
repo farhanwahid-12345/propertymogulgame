@@ -95,12 +95,18 @@ function lhaCeiling(ctx: RentClampContext | undefined): number {
     bedrooms = 2;
   }
   const lhaPennies = table[bedrooms] ?? table[2];
+  // Phase 1 #4a — HMO rooms and multi-let bedsits get a per-room discount
+  // vs. self-contained LHA rates. Keep in sync with market.ts::baselineRentPennies.
+  const hmoRoomDiscount = ctx.subtype === 'hmo' ? 0.5
+                        : ctx.subtype === 'multi-let' ? 0.65
+                        : 1.0;
   // For multi-unit aggregate rent we compare against an aggregate ceiling.
-  const perUnitCeilingPennies = 1.5 * lhaPennies;
+  const perUnitCeilingPennies = 1.5 * lhaPennies * hmoRoomDiscount;
   const aggregatePennies = (ctx.subtype === 'hmo' || ctx.subtype === 'flats' || ctx.subtype === 'multi-let')
     ? perUnitCeilingPennies * units
     : perUnitCeilingPennies;
   return ctx.unit === 'pounds' ? aggregatePennies / 100 : aggregatePennies;
+
 }
 
 /**

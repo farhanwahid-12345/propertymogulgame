@@ -48,13 +48,21 @@ export function lhaAnchoredMonthlyRentPennies(args: {
   const lhaPerUnit = table[bedrooms] ?? table[2];
   const tier = args.tier ?? 'standard';
   const mult = LHA_TENANT_TIER_MULT[tier];
-  const perUnitRent = Math.round(lhaPerUnit * mult);
+  // Phase 1 #4a — HMO rooms are single rooms in a shared house, not self-contained
+  // lets. Halve the LHA-derived rent per room so aggregate HMO rent lands in the
+  // realistic £280–£380/room band for Middlesbrough. Same principle applies to
+  // multi-let bedsits (slightly less discount since they include their own kitchen).
+  const hmoRoomDiscount = args.subtype === 'hmo' ? 0.5
+                        : args.subtype === 'multi-let' ? 0.65
+                        : 1.0;
+  const perUnitRent = Math.round(lhaPerUnit * mult * hmoRoomDiscount);
   // Multi-unit properties aggregate rent across all units.
   const aggregate = (args.subtype === 'hmo' || args.subtype === 'flats' || args.subtype === 'multi-let')
     ? perUnitRent * units
     : perUnitRent;
   return Math.max(toPennies(400), aggregate);
 }
+
 
 
 

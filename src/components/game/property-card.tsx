@@ -607,13 +607,20 @@ export const PropertyCard = memo(function PropertyCard({
               )}
               <div className="rounded-md bg-muted/30 px-2 py-1.5">
                 <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Yield</div>
-                <div className={cn("text-sm font-bold leading-tight",
-                  (property.yield ?? 0) >= 8 ? "text-success" :
-                  (property.yield ?? 0) >= 5 ? "text-yellow-400" : "text-danger"
-                )}>
-                  {(property.yield ?? 0).toFixed(1)}%
-                </div>
+                {(() => {
+                  const valForYield = (property.value && property.value > 0) ? property.value : property.price;
+                  const liveYield = valForYield > 0 ? (property.monthlyIncome * 12 / valForYield) * 100 : 0;
+                  return (
+                    <div className={cn("text-sm font-bold leading-tight",
+                      liveYield >= 8 ? "text-success" :
+                      liveYield >= 5 ? "text-yellow-400" : "text-danger"
+                    )}>
+                      {liveYield.toFixed(1)}%
+                    </div>
+                  );
+                })()}
               </div>
+
 
             </div>
 
@@ -900,7 +907,7 @@ export const PropertyCard = memo(function PropertyCard({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Annual Yield:</span>
               <span className="font-semibold text-[hsl(var(--stat-credit))]">
-                {((property.monthlyIncome * 12 / property.price) * 100).toFixed(2)}%
+                {((property.monthlyIncome * 12 / (property.value || property.price)) * 100).toFixed(2)}%
               </span>
             </div>
           </div>
@@ -933,6 +940,7 @@ export const PropertyCard = memo(function PropertyCard({
                       </Tooltip>
                     </TooltipProvider>
                   ) : multiUnitSlots && multiUnitSlots.length > 0 && onSelectTenant ? (
+                    <>
                     <MultiUnitSlots
                       propertyId={property.id}
                       propertyName={property.name}
@@ -955,8 +963,26 @@ export const PropertyCard = memo(function PropertyCard({
                       furnishingTier={(property as any).furnishingTier}
                       onSplitFlatUnit={onSplitFlatUnit}
                     />
-
+                    {/* Phase 2 #4b — HMO / flats property-level agent + RGI toggles.
+                        Rendered inline (not gated by the "Details" expander) so multi-unit
+                        cards get parity with single-let cards. */}
+                    <div className="flex gap-1.5 pt-1">
+                      {toggleLettingAgent && (
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                          onClick={() => toggleLettingAgent(property.id, 'standard')}>
+                          {property.isManaged ? '🧑‍💼 Dismiss agent' : '🧑‍💼 Hire agent (10%)'}
+                        </Button>
+                      )}
+                      {toggleRentGuarantee && (
+                        <Button size="sm" variant="outline" className="h-6 text-[10px] px-2 flex-1"
+                          onClick={() => toggleRentGuarantee(property.id)}>
+                          {property.hasRentGuarantee ? '🛡️ Cancel RGI' : '🛡️ Add RGI (3%)'}
+                        </Button>
+                      )}
+                    </div>
+                    </>
                   ) : (
+
                     onSelectTenant && (
                       <TenantSelector
                         propertyId={property.id}

@@ -1,53 +1,74 @@
-# Phase 2 — Condensed cards + Ex-Tenant Debt in Operations
+# Execution Plan — Lovable Improvements #6
 
-## Goal
-Strip noisy eviction/listing detail off property cards (replace with compact deep-link badges), and move the full UI into the Operations panel. Add a brand-new Ex-Tenant Debt recovery flow so arrears don't silently vanish when a tenant leaves.
+Eight distinct issues extracted from the document, grouped into 4 phases by system area to keep the app stable between deploys.
 
-## 1. Types (`src/types/game.ts`)
-Add `ExTenantDebt` interface and `exTenantDebts: ExTenantDebt[]` to `GameState`. Fields exactly as spec'd. Bump store version + migration to seed `[]`.
+---
 
-## 2. Store — capture debt when tenant exits
-Find every place a tenant record is removed with outstanding `arrearsPennies > 0`:
-- `evictTenant` completion (in `tenantActions.ts` / monthEnd processing of `pendingEvictions`)
-- Voluntary departure / walkout paths in `monthEndActions.ts`
-- Lease expiry (commercial + AST)
+## Phase 1 — Yield & Rent Realism (Items 1, 4a)
 
-For each, build an `ExTenantDebt { status: 'chasing', remainingDebtPennies: arrearsPennies, totalRecoveredPennies: 0, vacatedMonth: monthsPlayed }` and push to `exTenantDebts`. Don't double-create if one already exists for that propertyId+tenantName+vacatedMonth.
+**1.1 Fix yield display + further reduce yields (Item 1)**
+- Property cards show "YIELD 14.9%" / "18.4%" / "15.8%" while rents are £678–£788/mo on £48–£84k values. Two problems:
+  - Displayed yield is based on **purchase price**, not current market value. Recompute displayed yield as `(annualRent / currentMarketValue) × 100` in `src/components/game/property-card.tsx` (and any hook feeding it, e.g. `usePortfolioMetrics.ts`).
+  - Underlying rents are still too high vs. Middlesbrough LHA. Lower `CITY_LHA_MONTHLY_PENNIES.middlesbrough` further (target: 1‑bed £395, 2‑bed £475, 3‑bed £565, 4‑bed £655) and audit `AVAILABLE_PROPERTIES` seed rents in `src/lib/engine/constants.ts` so headline yields land in the 5–8% band for Middlesbrough terraces.
 
-## 3. MonthEnd processing
-In `monthEndActions.ts`, after rent collection:
-- For each `exTenantDebt` with `status === 'monthly_recovery'`: credit `min(monthlyRecoveryPennies, remainingDebtPennies)` to cash, decrement remaining, push activity-feed entry. When `remainingDebtPennies <= 0` → `status = 'settled'`.
-- For each `status === 'ccj_filed'`: 60% roll → transition to `monthly_recovery`, set `monthlyRecoveryPennies` scaled to original debt (£50 for <£500, £100 for £500–£2k, £150 for >£2k). 40% → stay filed; player can re-file after 6mo.
+**1.2 HMO room rents (Item 4a)**
+- In whichever engine generates HMO per-room rents (search `hmo` / `multi-unit-slots`), halve the Middlesbrough HMO room rate to a realistic £280–£380/room/mo range, anchored to a bedroom-share of LHA rather than full-flat LHA.
 
-## 4. New store actions (`tenantActions.ts`)
-- `fileExTenantCCJ(debtId)` — debits £100, sets `status='ccj_filed'`, `ccjFiledMonth=monthsPlayed`.
-- `negotiateExTenantSettlement(debtId, pct)` — credits `remainingDebt * pct` (clamped 0.4–0.7), `status='settled'`.
-- `writeOffExTenantDebt(debtId)` — `status='written_off'`, +2 credit score (small reputation gain).
-- `refileExTenantCCJ(debtId)` — only if previously `ccj_filed` and ≥6mo since `ccjFiledMonth`; re-debits £100, resets clock.
+---
 
-## 5. Property card slimming (`src/components/game/property-card.tsx`)
-Replace the multi-line eviction timeline block with one compact badge:
-- Active eviction → `🔴 Eviction in progress` (button, dispatches `pm:open-operations` with `{ tab: 'evictions', propertyId }`)
-- Active sale listing → `🏷️ On market — N offers` (deep-links to `{ tab: 'listings', propertyId }`)
-- Remove inline marketing/estate-agency status block entirely
-- Remove arrears badge if no current tenant record exists for that property and an `ExTenantDebt` exists for it (parent passes a boolean flag).
+## Phase 2 — Property Card & Tag Fixes (Items 2, 4b, 4c, 5)
 
-PortfolioGrid: pass `hasExTenantDebt` per property and stop showing arrearsCount/pennies when there's no current tenant.
+**2.1 Hover popovers hidden under header (Item 2)**
+- Persistent z-index bug. In `src/index.css` and/or the tooltip/popover wrappers (`components/ui/tooltip.tsx`, `popover.tsx`), raise their portal `z-index` above the sticky HeroHeader (which sits around `z-40`). Set tooltip/popover content to `z-[60]` and confirm they render into a Portal at document body, not clipped by an ancestor `overflow-hidden`. Audit the header/dashboard containers for `overflow-hidden` that would clip child popovers.
 
-## 6. Operations panel (`src/components/sections/BankingPanel.tsx`)
-Add three collapsible sub-sections matching the existing court-proceedings card style:
-- **Evictions** — list every pending eviction with grounds, served month, effective month, countdown, Cancel / Send to court buttons (the detail removed from cards).
-- **Property Listings** — listing detail (asking price, days on market, offers list with Accept/Counter/Reject), the bits removed from cards.
-- **Ex-Tenant Debts** — one row per record: tenant + property, original owed, recovered so far, status pill, action buttons (File CCJ / Negotiate / Write off / Re-file) gated by status.
+**2.2 HMO cards missing agent / RGI toggles (Item 4b)**
+- In `src/components/game/multi-unit-slots.tsx` (or wherever the HMO variant of `property-card.tsx` renders), add the same "Hire agent (10%)" and "Add RGI (3%)" checkboxes present on single-let cards, wired to the same store actions but scoped to the HMO property id.
 
-Listen for `pm:open-operations` to auto-scroll to + flash the requested sub-section and propertyId row.
+**2.3 Per-room Section 13 (Item 4c)**
+- Section 13 in `src/components/game/rent-negotiation-dialog.tsx` / `tenantActions.ts` currently mutates the parent HMO rent. Change the flow to accept a `roomId` (or `unitIndex`) so rent increases apply only to the specific room's tenant. Update store shape if HMO room rents are stored as an array on the property; if they were previously a single field, migrate to per-room storage with a version bump + migration.
 
-## Out of scope
-- No new visual design language — reuse glass/sectioning that already exists.
-- No changes to rent collection or arrears accrual while a tenant is in place.
+**2.4 Commercial property mis-tagged as Residential during conveyancing (Item 5)**
+- In the buying-phase render path of `property-card.tsx` and `conveyancing-tracker.tsx`, the type badge is hard-coded / falling back to "Residential". Read `property.type` from the conveyancing record instead and render the correct badge (`Commercial` / `Luxury` / `Residential`).
 
-## Technical notes
-- All money in pennies in state; convert at UI boundary via `fromPennies`.
-- Version bump + migration seeds `exTenantDebts: []` to keep old saves loadable.
-- Court CCJ filing for *current* tenants (`sendArrearsToCourt`) is unrelated and untouched — this flow is strictly post-tenancy.
-- Event channel reuses existing `window.dispatchEvent` pattern from Phase 5 onboarding (`pm:open-operations`).
+---
+
+## Phase 3 — Estate Agent Level Gating & Commercial Evictions (Items 6, 7)
+
+**3.1 Estate agent showing sub-level properties (Item 6)**
+- In `src/components/game/estate-agent-window.tsx` / `PropertyMarket.tsx` and the market inventory generator (`marketSlice.ts` / `marketActions.ts`), filter listings so only properties at the player's **current** level are shown (currently the filter is `level <= playerLevel`, which is why buying is blocked at the transaction stage). The purchase-blocking notification stays as a safety net but should never fire during normal play.
+
+**3.2 Commercial arrears → eviction (Item 7)**
+- Extend the eviction flow to commercial tenants. In `tenantActions.ts` / `eviction-dialog.tsx`:
+  - Detect commercial leases with arrears (typically 21+ days under UK commercial forfeiture rules).
+  - Offer a "Forfeit lease / peaceable re-entry" action (no 6.8/8 grounds — commercial uses lease forfeiture).
+  - Wire into Operations → Evictions panel with a distinct commercial badge and shorter timeline (no Renters' Rights Act protection).
+
+---
+
+## Phase 4 — Financial Consistency (Items 3, 8)
+
+**4.1 Net worth mismatch + unexplained drops (Item 3, 3b)**
+- Two symptoms of the same problem: net worth calculated in two places (HeroHeader / dashboard tile vs. Statements tab / Performance chart) diverge.
+  - Consolidate to a single memoised selector in `usePortfolioMetrics.ts` (or a new `selectors/netWorth.ts`) that every consumer imports. Delete duplicate inline calculations.
+  - For the "sharp drop after month 39" chart artefact: audit `performance-chart.tsx` and the monthly snapshot writer in `monthEndActions.ts` for cases where a mid-month value (e.g. cash after a large expense but before rent) is snapshotted, or where furniture depreciation / macro-event revaluation is double-applied. Log intermediate values under a dev flag to reproduce, then patch the specific ordering bug.
+
+**4.2 Mortgage rates ignore BoE rate (Item 8)**
+- In `src/lib/mortgageEligibility.ts` and `mortgage-provider-selector.tsx`, the displayed rate uses `provider.baseRate` (static from `MORTGAGE_PROVIDERS` constant) instead of `currentMarketRate + providerSpread`. Refactor to `finalRate = currentMarketRate + provider.spread` (add a `spread` field to `MortgageProvider`, derive from existing `baseRate - BASE_MARKET_RATE`). Verify the same formula is used everywhere: eligibility check, quote display, provider comparison table, and mortgage creation in `bankingSlice.ts`.
+
+---
+
+## Technical Notes
+
+- All money remains in pennies; convert at UI boundary only.
+- Any store-shape change (per-room HMO rents, MortgageProvider.spread) needs a version bump in `src/lib/migrations.ts` and a migration seeding existing rows sensibly.
+- After each phase: `tsgo` typecheck + a targeted vitest run on the relevant slice(s).
+- No visual redesign — reuse existing glass/section styling throughout.
+
+---
+
+## Out of Scope
+- No new UI language or theme changes.
+- No changes to the tutorial engine, save-slot system, or achievements.
+- No new economic-event types.
+
+Awaiting your approval before starting Phase 1.
