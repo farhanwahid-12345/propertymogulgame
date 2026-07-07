@@ -907,7 +907,7 @@ export const PropertyCard = memo(function PropertyCard({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Annual Yield:</span>
               <span className="font-semibold text-[hsl(var(--stat-credit))]">
-                {((property.monthlyIncome * 12 / property.price) * 100).toFixed(2)}%
+                {((property.monthlyIncome * 12 / (property.value || property.price)) * 100).toFixed(2)}%
               </span>
             </div>
           </div>
