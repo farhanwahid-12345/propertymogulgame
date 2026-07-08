@@ -37,7 +37,7 @@ interface GroundConfig {
   warning?: string;
 }
 
-const GROUNDS: GroundConfig[] = [
+const RESIDENTIAL_GROUNDS: GroundConfig[] = [
   {
     id: 'rent_arrears',
     label: 'Rent arrears',
@@ -67,6 +67,20 @@ const GROUNDS: GroundConfig[] = [
     noticeLabel: '4 months',
     description: 'You or a close family member intends to move in. Always valid.',
     warning: 'Property is locked from being re-let for 12 months.',
+  },
+];
+
+// Phase 3.2 #7 — Commercial leases fall outside the Renters' Rights Act.
+// Landlords rely on the lease's forfeiture clause (peaceable re-entry after
+// 21+ days of arrears) — no protected notice periods apply.
+const COMMERCIAL_GROUNDS: GroundConfig[] = [
+  {
+    id: 'commercial_forfeiture',
+    label: 'Forfeit lease (peaceable re-entry)',
+    icon: BadgePoundSterling,
+    noticeLabel: '0 weeks',
+    description: 'Commercial tenant is 21+ days in arrears. Change the locks under the lease forfeiture clause — no Renters\' Rights Act protection.',
+    warning: 'Tenant may apply for relief from forfeiture within 6 months if they clear arrears.',
   },
 ];
 
