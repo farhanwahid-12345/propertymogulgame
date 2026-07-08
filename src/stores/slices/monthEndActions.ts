@@ -2097,7 +2097,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Subtract outstanding unsecured loan balances so the bankruptcy gate
       // reflects ALL debt the player owes (item #20).
       const loanDebtFinal = updatedLoans.reduce((s, l) => s + (l.remainingBalance || 0), 0);
-      const netWorthFinal = finalCash - finalOverdraftUsed + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
+      // Phase 4.1 #3 — align with useGameState / HeroHeader by including
+      // in-flight buy conveyancing cash so snapshots don't dip when a large
+      // deposit is held in escrow mid-purchase.
+      const inflightBuyCapitalFinal = activeConveyancing
+        .filter(c => c.status === 'buying')
+        .reduce((sum, c) => sum + (c.cashHeld || 0), 0);
+      const netWorthFinal = finalCash - finalOverdraftUsed + inflightBuyCapitalFinal + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
 
       let isBankrupt = false;
       // Phase 7 #16 — overdraft prompt: fires once at the start of a fresh distress
