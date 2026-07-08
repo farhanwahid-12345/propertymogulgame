@@ -1429,7 +1429,10 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // leveling-up cannot be triggered by borrowed money (item #20).
       const loanDebtForLevel = ((prev.loans || []) as Array<{ remainingBalance?: number }>)
         .reduce((s, l) => s + (l.remainingBalance || 0), 0);
-      const netWorth = newCashBeforeTax + propertyEquity + renovationWIP + furnitureWorth
+      const inflightBuyCapitalForLevel = activeConveyancing
+        .filter(c => c.status === 'buying')
+        .reduce((sum, c) => sum + (c.cashHeld || 0), 0);
+      const netWorth = newCashBeforeTax + inflightBuyCapitalForLevel + propertyEquity + renovationWIP + furnitureWorth
         - prev.overdraftUsed - loanDebtForLevel;
       let newLevel = prev.level;
       while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
