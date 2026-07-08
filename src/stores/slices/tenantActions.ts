@@ -547,13 +547,13 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         if (ground === 'landlord_sale' || ground === 'landlord_move_in' || ground === 'antisocial_behaviour' || ground === 'rent_arrears') {
           showToast(
             "Wrong Eviction Grounds",
-            "Commercial properties follow different lease law — use lease expiry, break clause, or persistent default as grounds.",
+            "Commercial properties follow different lease law — use forfeiture, lease expiry, break clause, or persistent default as grounds.",
             "destructive",
           );
           return;
         }
       } else {
-        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause') {
+        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause' || ground === 'commercial_forfeiture') {
           showToast(
             "Wrong Eviction Grounds",
             "These grounds apply to commercial leases only.",
