@@ -689,7 +689,8 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       appealChance = Math.max(0, Math.min(0.85, appealChance));
       const willAppeal = gameRandom() < appealChance;
 
-      const courtBacklogMonths = 3 + Math.floor(gameRandom() * 4);
+      // Commercial forfeiture bypasses the court queue (peaceable re-entry).
+      const courtBacklogMonths = ground === 'commercial_forfeiture' ? 0 : 3 + Math.floor(gameRandom() * 4);
       const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
       const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
