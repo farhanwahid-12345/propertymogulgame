@@ -22,6 +22,8 @@ interface EvictionDialogProps {
   tenantProfile?: 'premium' | 'standard' | 'budget' | 'risky';
   rentArrearsCount?: number;
   hasLongstandingASB?: boolean;
+  /** Phase 3.2 #7 — commercial leases use forfeiture, not Renters' Rights grounds. */
+  propertyType?: 'residential' | 'commercial' | 'luxury' | string;
   onEvict: (propertyId: string, ground: EvictionGround) => void;
   trigger?: React.ReactNode;
 }
