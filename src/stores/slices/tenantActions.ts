@@ -547,13 +547,13 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         if (ground === 'landlord_sale' || ground === 'landlord_move_in' || ground === 'antisocial_behaviour' || ground === 'rent_arrears') {
           showToast(
             "Wrong Eviction Grounds",
-            "Commercial properties follow different lease law — use lease expiry, break clause, or persistent default as grounds.",
+            "Commercial properties follow different lease law — use forfeiture, lease expiry, break clause, or persistent default as grounds.",
             "destructive",
           );
           return;
         }
       } else {
-        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause') {
+        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause' || ground === 'commercial_forfeiture') {
           showToast(
             "Wrong Eviction Grounds",
             "These grounds apply to commercial leases only.",
@@ -662,6 +662,22 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           validReason = `Break clause exercised @ month ${bc.atMonth} (6-month notice)`;
           break;
         }
+        case 'commercial_forfeiture': {
+          const arrears = tenant.arrearsMonths ?? 0;
+          if (arrears < 1 && recentDefaults < 1) {
+            showToast(
+              "Invalid Ground",
+              "Commercial forfeiture requires the tenant to be at least 21 days (1 month) in arrears.",
+              "destructive",
+            );
+            return;
+          }
+          // Peaceable re-entry: no protected notice period under the Renters'
+          // Rights Act (commercial leases sit outside its scope).
+          noticeMonths = 0;
+          validReason = `Commercial forfeiture — peaceable re-entry (${Math.max(arrears, recentDefaults)} mo arrears)`;
+          break;
+        }
       }
 
       let appealChance =
@@ -673,7 +689,8 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       appealChance = Math.max(0, Math.min(0.85, appealChance));
       const willAppeal = gameRandom() < appealChance;
 
-      const courtBacklogMonths = 3 + Math.floor(gameRandom() * 4);
+      // Commercial forfeiture bypasses the court queue (peaceable re-entry).
+      const courtBacklogMonths = ground === 'commercial_forfeiture' ? 0 : 3 + Math.floor(gameRandom() * 4);
       const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
       const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex

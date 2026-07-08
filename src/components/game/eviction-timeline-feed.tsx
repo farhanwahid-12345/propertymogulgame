@@ -20,6 +20,7 @@ const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; t
   lease_expiry: { label: "Lease Expiry", icon: Home, tone: "text-[hsl(var(--stat-credit))] border-[hsl(var(--stat-credit))]/30" },
   tenant_default: { label: "Tenant Default", icon: AlertTriangle, tone: "text-danger border-danger/30" },
   break_clause: { label: "Break Clause", icon: Gavel, tone: "text-amber-400 border-amber-400/30" },
+  commercial_forfeiture: { label: "Commercial Forfeiture", icon: Gavel, tone: "text-danger border-danger/30" },
 };
 
 /** Format an in-game month index into a friendly "Month N (Year Y, Mon M)" label. */

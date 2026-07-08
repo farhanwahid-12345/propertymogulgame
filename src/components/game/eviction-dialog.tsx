@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Scale, Home, AlertTriangle, BadgePoundSterling } from "lucide-react";
 
-export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause';
+export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture';
 
 interface EvictionDialogProps {
   propertyId: string;
@@ -22,6 +22,8 @@ interface EvictionDialogProps {
   tenantProfile?: 'premium' | 'standard' | 'budget' | 'risky';
   rentArrearsCount?: number;
   hasLongstandingASB?: boolean;
+  /** Phase 3.2 #7 — commercial leases use forfeiture, not Renters' Rights grounds. */
+  propertyType?: 'residential' | 'commercial' | 'luxury' | string;
   onEvict: (propertyId: string, ground: EvictionGround) => void;
   trigger?: React.ReactNode;
 }
@@ -35,7 +37,7 @@ interface GroundConfig {
   warning?: string;
 }
 
-const GROUNDS: GroundConfig[] = [
+const RESIDENTIAL_GROUNDS: GroundConfig[] = [
   {
     id: 'rent_arrears',
     label: 'Rent arrears',
@@ -68,6 +70,20 @@ const GROUNDS: GroundConfig[] = [
   },
 ];
 
+// Phase 3.2 #7 — Commercial leases fall outside the Renters' Rights Act.
+// Landlords rely on the lease's forfeiture clause (peaceable re-entry after
+// 21+ days of arrears) — no protected notice periods apply.
+const COMMERCIAL_GROUNDS: GroundConfig[] = [
+  {
+    id: 'commercial_forfeiture',
+    label: 'Forfeit lease (peaceable re-entry)',
+    icon: BadgePoundSterling,
+    noticeLabel: '0 weeks',
+    description: 'Commercial tenant is 21+ days in arrears. Change the locks under the lease forfeiture clause — no Renters\' Rights Act protection.',
+    warning: 'Tenant may apply for relief from forfeiture within 6 months if they clear arrears.',
+  },
+];
+
 export function EvictionDialog({
   propertyId,
   propertyName,
@@ -75,11 +91,15 @@ export function EvictionDialog({
   tenantProfile,
   rentArrearsCount = 0,
   hasLongstandingASB = false,
+  propertyType = 'residential',
   onEvict,
   trigger,
 }: EvictionDialogProps) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<EvictionGround | null>(null);
+
+  const isCommercial = propertyType === 'commercial';
+  const grounds = isCommercial ? COMMERCIAL_GROUNDS : RESIDENTIAL_GROUNDS;
 
   const validity = useMemo(() => {
     return {
@@ -91,6 +111,9 @@ export function EvictionDialog({
         : 'Requires a risky tenant with an unresolved noise or safety concern over 1 month old.',
       landlord_sale: null,
       landlord_move_in: null,
+      commercial_forfeiture: rentArrearsCount >= 1
+        ? null
+        : 'Requires the tenant to be at least 21 days (1 month) in arrears.',
     } as Record<EvictionGround, string | null>;
   }, [rentArrearsCount, hasLongstandingASB, tenantProfile]);
 
@@ -111,29 +134,38 @@ export function EvictionDialog({
             size="sm"
             className="text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
             title={
-              rentArrearsCount >= 2
-                ? '2+ months in arrears — Section 8 eviction available'
-                : 'Serve eviction notice — a valid ground is required'
+              isCommercial
+                ? 'Forfeit commercial lease — requires 21+ days arrears'
+                : rentArrearsCount >= 2
+                  ? '2+ months in arrears — Section 8 eviction available'
+                  : 'Serve eviction notice — a valid ground is required'
             }
           >
-            Serve eviction notice
+            {isCommercial ? 'Forfeit lease' : 'Serve eviction notice'}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Serve Eviction Notice</DialogTitle>
+          <DialogTitle>{isCommercial ? 'Forfeit Commercial Lease' : 'Serve Eviction Notice'}</DialogTitle>
           <DialogDescription>
-            Section 21 was abolished by the Renters' Rights Bill — you must select a valid ground and serve the appropriate notice period.
+            {isCommercial ? (
+              <>Commercial leases fall outside the Renters' Rights Act. Peaceable re-entry is available once the tenant is 21+ days in arrears — no protected notice period applies.</>
+            ) : (
+              <>Section 21 was abolished by the Renters' Rights Bill — you must select a valid ground and serve the appropriate notice period.</>
+            )}
             <span className="block mt-1 text-xs">
               Tenant: <span className="font-semibold text-foreground">{tenantName}</span> at{" "}
               <span className="font-semibold text-foreground">{propertyName}</span>
+              {isCommercial && (
+                <Badge variant="outline" className="ml-2 text-[10px] border-amber-400/40 text-amber-300">Commercial</Badge>
+              )}
             </span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
-          {GROUNDS.map((g) => {
+          {grounds.map((g) => {
             const invalid = validity[g.id];
             const isSelected = selected === g.id;
             const Icon = g.icon;
