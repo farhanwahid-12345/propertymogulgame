@@ -1221,13 +1221,25 @@ export const PropertyCard = memo(function PropertyCard({
                         tenantProfile={currentTenant.profile}
                         rentArrearsCount={rentArrearsCount}
                         hasLongstandingASB={tenantConcerns.some(c => c.propertyId === property.id && !c.resolvedMonth && (c.category === 'noise' || c.category === 'safety') && (monthsPlayed - c.raisedMonth) >= 1)}
+                        propertyType={property.type}
                         onEvict={evictTenant}
                       />
                     </div>
                   )}
                   {property.type === 'commercial' && currentTenant && (
-                    <div className="text-[11px] text-muted-foreground italic px-1 py-1">
-                      Commercial lease management — see the lease panel above for rent reviews, break clauses, and renewal options.
+                    <div className="flex flex-col gap-1 px-1 py-1">
+                      <div className="text-[11px] text-muted-foreground italic">
+                        Commercial lease — see the lease panel above for rent reviews, break clauses, and renewal options.
+                      </div>
+                      <EvictionDialog
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        tenantName={currentTenant.name}
+                        tenantProfile={currentTenant.profile}
+                        rentArrearsCount={rentArrearsCount}
+                        propertyType="commercial"
+                        onEvict={evictTenant}
+                      />
                     </div>
                   )}
                   </>}
