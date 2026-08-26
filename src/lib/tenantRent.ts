@@ -14,7 +14,10 @@
 import type { PropertyCondition } from "@/types/game";
 import {
   CITY_LHA_MONTHLY_PENNIES,
+  CITY_FLAT_UNIT_RENT_BAND_PENNIES,
+  roomRentDiscountForSubtype,
   bedroomsForSqft,
+
 } from "@/lib/engine/constants";
 
 export interface TenantRentInput {
