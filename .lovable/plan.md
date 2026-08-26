@@ -1,74 +1,114 @@
-# Execution Plan — Lovable Improvements #6
+# Execution Plan — Lovable Improvements #7
 
-Eight distinct issues extracted from the document, grouped into 4 phases by system area to keep the app stable between deploys.
+Audit result first: of the 14 items in the document, only two are already in place (item 9b per-room Section 13 restriction, item 10a EPC concern auto-resolve — both landed in earlier phases). Everything else still needs work, including several "I've tried to fix this" items where the previous fix was partial (popover layering, cheap listings at higher levels, HMO/apartment rents).
 
----
-
-## Phase 1 — Yield & Rent Realism (Items 1, 4a)
-
-**1.1 Fix yield display + further reduce yields (Item 1)**
-- Property cards show "YIELD 14.9%" / "18.4%" / "15.8%" while rents are £678–£788/mo on £48–£84k values. Two problems:
-  - Displayed yield is based on **purchase price**, not current market value. Recompute displayed yield as `(annualRent / currentMarketValue) × 100` in `src/components/game/property-card.tsx` (and any hook feeding it, e.g. `usePortfolioMetrics.ts`).
-  - Underlying rents are still too high vs. Middlesbrough LHA. Lower `CITY_LHA_MONTHLY_PENNIES.middlesbrough` further (target: 1‑bed £395, 2‑bed £475, 3‑bed £565, 4‑bed £655) and audit `AVAILABLE_PROPERTIES` seed rents in `src/lib/engine/constants.ts` so headline yields land in the 5–8% band for Middlesbrough terraces.
-
-**1.2 HMO room rents (Item 4a)**
-- In whichever engine generates HMO per-room rents (search `hmo` / `multi-unit-slots`), halve the Middlesbrough HMO room rate to a realistic £280–£380/room/mo range, anchored to a bedroom-share of LHA rather than full-flat LHA.
+Decisions taken from your answers: apartment rents £300–800 **per unit**, skewed to the lower median; investments use lock-ins/settlement; the Listed Properties panel is removed from the dashboard entirely; the plot-size rules are applied retroactively via a save migration.
 
 ---
 
-## Phase 2 — Property Card & Tag Fixes (Items 2, 4b, 4c, 5)
+## Phase 1 — Rent realism (items 3, 9a)
 
-**2.1 Hover popovers hidden under header (Item 2)**
-- Persistent z-index bug. In `src/index.css` and/or the tooltip/popover wrappers (`components/ui/tooltip.tsx`, `popover.tsx`), raise their portal `z-index` above the sticky HeroHeader (which sits around `z-40`). Set tooltip/popover content to `z-[60]` and confirm they render into a Portal at document body, not clipped by an ancestor `overflow-hidden`. Audit the header/dashboard containers for `overflow-hidden` that would clip child popovers.
+**1.1 Apartment (flats) rents**
+- In the LHA rent generator, derive each flat's rent from its own size/value band and city, then clamp per unit to £300–800 for Middlesbrough (scaled by city). Distribution skews low: most units land £350–550, with the top of the band reserved for large, high-value, good-condition units.
+- Block rent = sum of per-unit rents, so a 4-flat block reads as a realistic total instead of one inflated figure.
 
-**2.2 HMO cards missing agent / RGI toggles (Item 4b)**
-- In `src/components/game/multi-unit-slots.tsx` (or wherever the HMO variant of `property-card.tsx` renders), add the same "Hire agent (10%)" and "Add RGI (3%)" checkboxes present on single-let cards, wired to the same store actions but scoped to the HMO property id.
-
-**2.3 Per-room Section 13 (Item 4c)**
-- Section 13 in `src/components/game/rent-negotiation-dialog.tsx` / `tenantActions.ts` currently mutates the parent HMO rent. Change the flow to accept a `roomId` (or `unitIndex`) so rent increases apply only to the specific room's tenant. Update store shape if HMO room rents are stored as an array on the property; if they were previously a single field, migrate to per-room storage with a version bump + migration.
-
-**2.4 Commercial property mis-tagged as Residential during conveyancing (Item 5)**
-- In the buying-phase render path of `property-card.tsx` and `conveyancing-tracker.tsx`, the type badge is hard-coded / falling back to "Residential". Read `property.type` from the conveyancing record instead and render the correct badge (`Commercial` / `Luxury` / `Residential`).
+**1.2 HMO room rents −30%**
+- Reduce the HMO per-room rate by a further 30% in both the generator and the live rent calculator, keeping the two paths in sync so an existing HMO doesn't jump when a room re-lets.
+- Same reduction flows into the per-unit rent ceiling so Section 13 can't push a room back above the new realistic level.
 
 ---
 
-## Phase 3 — Estate Agent Level Gating & Commercial Evictions (Items 6, 7)
+## Phase 2 — Commercial letting overhaul (items 2, 4, 4a, 4b)
 
-**3.1 Estate agent showing sub-level properties (Item 6)**
-- In `src/components/game/estate-agent-window.tsx` / `PropertyMarket.tsx` and the market inventory generator (`marketSlice.ts` / `marketActions.ts`), filter listings so only properties at the player's **current** level are shown (currently the filter is `level <= playerLevel`, which is why buying is blocked at the transaction stage). The purchase-blocking notification stays as a safety net but should never fire during normal play.
+**2.1 Interactive lettings agent**
+- Add an agent Q&A panel to the commercial letting tab: "How long will this take?", "Can we find better tenants?", "How much more could we get?". Each returns a concrete, data-driven answer (expected months to let, probability of a stronger covenant appearing, realistic rent uplift range) drawn from the actual applicant pipeline, not canned text.
 
-**3.2 Commercial arrears → eviction (Item 7)**
-- Extend the eviction flow to commercial tenants. In `tenantActions.ts` / `eviction-dialog.tsx`:
-  - Detect commercial leases with arrears (typically 21+ days under UK commercial forfeiture rules).
-  - Offer a "Forfeit lease / peaceable re-entry" action (no 6.8/8 grounds — commercial uses lease forfeiture).
-  - Wire into Operations → Evictions panel with a distinct commercial badge and shorter timeline (no Renters' Rights Act protection).
+**2.2 Negotiable heads of terms**
+- Extend the heads of terms dialog so rent, lease length, break clause and rent-review pattern are each individually negotiable, with the tenant counter-offering per line item based on covenant strength. Stronger covenants push back harder on rent but accept longer terms; weaker ones accept rent but demand break clauses.
+
+**2.3 Lease costs corrected**
+- Replace the current tiered solicitor fee (£1,500–£3,500) and agent fee with: agent = 10% of annual rent, solicitor = flat £750. Land registry stays as-is where legally applicable.
+
+**2.4 Early re-letting window**
+- Unlock the tenant search 6 months before lease expiry or a mutual break date, so the player can market the unit while it's still occupied.
+
+**2.5 Faster search + better comms**
+- Speed up the applicant drip (fewer empty months, more applicants per tick) and add regular monthly updates: viewings booked, applicant profiles, the current chance of a better-paying or stronger-covenant tenant arriving, and a nudge when a good offer is on the table.
 
 ---
 
-## Phase 4 — Financial Consistency (Items 3, 8)
+## Phase 3 — Estate agent & auction feedback loop (items 5, 5a, 1a)
 
-**4.1 Net worth mismatch + unexplained drops (Item 3, 3b)**
-- Two symptoms of the same problem: net worth calculated in two places (HeroHeader / dashboard tile vs. Statements tab / Performance chart) diverge.
-  - Consolidate to a single memoised selector in `usePortfolioMetrics.ts` (or a new `selectors/netWorth.ts`) that every consumer imports. Delete duplicate inline calculations.
-  - For the "sharp drop after month 39" chart artefact: audit `performance-chart.tsx` and the monthly snapshot writer in `monthEndActions.ts` for cases where a mid-month value (e.g. cash after a large expense but before rent) is snapshotted, or where furniture depreciation / macro-event revaluation is double-applied. Log intermediate values under a dev flag to reproduce, then patch the specific ordering bug.
+**3.1 Faster offers, even when overpriced**
+- Rework the offer generator so overpriced listings still produce low offers within 1–2 months rather than going silent. Well-priced listings get offers faster than today.
 
-**4.2 Mortgage rates ignore BoE rate (Item 8)**
-- In `src/lib/mortgageEligibility.ts` and `mortgage-provider-selector.tsx`, the displayed rate uses `provider.baseRate` (static from `MORTGAGE_PROVIDERS` constant) instead of `currentMarketRate + providerSpread`. Refactor to `finalRate = currentMarketRate + provider.spread` (add a `spread` field to `MortgageProvider`, derive from existing `baseRate - BASE_MARKET_RATE`). Verify the same formula is used everywhere: eligibility check, quote display, provider comparison table, and mortgage creation in `bankingSlice.ts`.
+**3.2 Move Listed Properties into the Estate Agent**
+- Remove the Listed Properties panel from the dashboard entirely; it lives only inside the Estate Agent window.
+- Compensate with pop-up dialogs for every new offer, counter-offer, acceptance and completion, plus sound cues across both estate agent and auction flows.
+
+**3.3 Evictions consolidated into Operations (item 1a)**
+- Remove the eviction dialog from property cards and multi-unit slots; property cards keep only a button that deep-links into Operations → Evictions, where the full serve/appeal/forfeit flow lives.
+
+---
+
+## Phase 4 — Bank investments (item 7)
+
+New "Invest" section in the Bank tab with four products, valued monthly:
+
+- **Savings account** — BoE base rate + 0.5%. Withdrawal notice period.
+- **Premium bonds** — ~5%/yr, low volatility, hard £50,000 cap.
+- **S&P 500** — 5–12%/yr with a 9.5% median, inversely linked to the BoE rate (low rates → higher returns). One-month settlement on sells.
+- **Risky stocks & crypto** — each month rolls roughly a third big gain / a third big loss / a third flat, so value swings hard month to month. One-month settlement on sells.
+
+Holdings and pending settlements count into net worth, with an "Investments" line in the net worth breakdown. Monthly performance shows in the activity feed.
+
+---
+
+## Phase 5 — HMO licensing lifecycle (item 8)
+
+- Allow the HMO licence application as soon as planning permission is granted, rather than after renovation completion.
+- Prompt for renewal 3 months before expiry, with a clear "Renew licence" action.
+- On expiry, do not silently remove tenants: raise a blocking warning and a grace period with the renewal option still available; only enforce letting restrictions after the grace period lapses.
+
+---
+
+## Phase 6 — Property sizing & listing variety (item 12)
+
+**6.1 Footprint rules**
+- Newly generated properties start at roughly 35% of plot size; the maximum achievable internal size (after extensions) caps at roughly 70% of plot. Extension renovations respect this ceiling.
+- Retroactive migration: existing properties are rescaled to fit the 35–70% envelope, preserving relative size ordering. Values are left untouched so no one's net worth moves.
+
+**6.2 Listing variety**
+- Generated listings sometimes arrive already extended, converted or renovated (a mix of pre-improved and untouched stock), so the market isn't uniformly blank-slate.
+
+---
+
+## Phase 7 — UI/display fixes (items 6a, 11a, 13a, 14a)
+
+**7.1 Cash / LTV / DTI pop-ups behind the header (item 6a)**
+- The current fix relies on `isolation: isolate` plus collision padding, which still loses to the sticky header's stacking context. Proper fix: give the header and the popover layer explicit, non-conflicting z-index tiers in the design tokens, render popover content in a top-level portal above the header tier, and remove the stacking-context isolation that traps it. Verified by driving the actual UI and screenshotting each popover.
+
+**7.2 Cheap properties appearing at higher levels (item 11a)**
+- Trace where sub-level stock leaks through: the market inventory generator can mint below-range properties, and the level range floor may be too low. Fix at generation time so the inventory itself is level-appropriate, and keep the display filter as a backstop.
+
+**7.3 Net worth breakdown accuracy (item 13a)**
+- Make the breakdown read from the single canonical net-worth function so property values in the panel always match the actual portfolio, including when the player is in overdraft. Remove any independent value summation in the panel.
+
+**7.4 Remove the shade on the Market / Bank / Accounts panel (item 14a)**
+- Drop the gradient/overlay running through the middle of the nav panel so labels read cleanly.
 
 ---
 
 ## Technical Notes
 
-- All money remains in pennies; convert at UI boundary only.
-- Any store-shape change (per-room HMO rents, MortgageProvider.spread) needs a version bump in `src/lib/migrations.ts` and a migration seeding existing rows sensibly.
-- After each phase: `tsgo` typecheck + a targeted vitest run on the relevant slice(s).
-- No visual redesign — reuse existing glass/section styling throughout.
-
----
+- All money stays in integer pennies; conversion only at the UI boundary.
+- Two save-shape changes need a version bump and migration: investment holdings/settlements, and the retroactive sqft/plot rescale.
+- Rent changes touch both the generator and the live rent calculator — both are updated together to avoid drift on re-let.
+- Each phase ends with a typecheck plus a targeted test run on the touched engine modules; Phase 7.1 additionally gets a browser verification pass.
+- No visual redesign: reuse existing glass/section styling.
 
 ## Out of Scope
-- No new UI language or theme changes.
-- No changes to the tutorial engine, save-slot system, or achievements.
-- No new economic-event types.
 
-Awaiting your approval before starting Phase 1.
+- No changes to the tutorial engine, achievements or save-slot system.
+- No new macro event types.
+- No theme or typography changes.
