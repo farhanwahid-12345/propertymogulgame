@@ -212,9 +212,25 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
         commercialAgentChase={(gameState as any).commercialAgentChase || {}}
         vacantCommercialProperties={
           gameState.ownedProperties
-            .filter((p: any) => p.type === 'commercial' && !p.commercialLease && !gameState.tenants.some((t: any) => t.propertyId === p.id))
-            .map((p: any) => ({ id: p.id, name: p.name }))
+            .filter((p: any) => {
+              if (p.type !== 'commercial') return false;
+              if (gameState.tenants.some((t: any) => t.propertyId === p.id)) return false;
+              if (!p.commercialLease) return true;
+              // Improvements #7 item 4a — pre-marketing window (≤6mo to expiry / mutual break).
+              const l = p.commercialLease;
+              const toExpiry = l.expiryMonth - gameState.monthsPlayed;
+              const toBreak = l.breakClause?.type === 'mutual' && l.breakClause.atMonth != null
+                ? l.breakClause.atMonth - gameState.monthsPlayed : Infinity;
+              return (toExpiry > 0 && toExpiry <= 6) || (toBreak > 0 && toBreak <= 6);
+            })
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              preMarketing: !!p.commercialLease,
+              monthlyIncome: p.monthlyIncome,
+            }))
         }
+        pendingCommercialApplicants={(gameState as any).pendingCommercialApplicants || []}
         onChaseCommercialAgent={(gameState as any).chaseCommercialAgent}
       />
     </InlineDialogButton>
