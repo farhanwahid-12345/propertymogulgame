@@ -14,7 +14,10 @@
 import type { PropertyCondition } from "@/types/game";
 import {
   CITY_LHA_MONTHLY_PENNIES,
+  CITY_FLAT_UNIT_RENT_BAND_PENNIES,
+  roomRentDiscountForSubtype,
   bedroomsForSqft,
+
 } from "@/lib/engine/constants";
 
 export interface TenantRentInput {
@@ -97,11 +100,14 @@ function lhaCeiling(ctx: RentClampContext | undefined): number {
   const lhaPennies = table[bedrooms] ?? table[2];
   // Phase 1 #4a — HMO rooms and multi-let bedsits get a per-room discount
   // vs. self-contained LHA rates. Keep in sync with market.ts::baselineRentPennies.
-  const hmoRoomDiscount = ctx.subtype === 'hmo' ? 0.5
-                        : ctx.subtype === 'multi-let' ? 0.65
-                        : 1.0;
+  const hmoRoomDiscount = roomRentDiscountForSubtype(ctx.subtype);
   // For multi-unit aggregate rent we compare against an aggregate ceiling.
-  const perUnitCeilingPennies = 1.5 * lhaPennies * hmoRoomDiscount;
+  let perUnitCeilingPennies = 1.5 * lhaPennies * hmoRoomDiscount;
+  // Improvements #7 item 3 — flats ceiling respects the realistic per-unit band.
+  if (ctx.subtype === 'flats' && units > 1) {
+    const band = CITY_FLAT_UNIT_RENT_BAND_PENNIES[cityKey] ?? CITY_FLAT_UNIT_RENT_BAND_PENNIES.middlesbrough;
+    perUnitCeilingPennies = Math.min(perUnitCeilingPennies, band.max);
+  }
   const aggregatePennies = (ctx.subtype === 'hmo' || ctx.subtype === 'flats' || ctx.subtype === 'multi-let')
     ? perUnitCeilingPennies * units
     : perUnitCeilingPennies;

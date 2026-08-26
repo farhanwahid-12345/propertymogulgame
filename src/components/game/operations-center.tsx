@@ -54,8 +54,10 @@ interface OperationsCenterProps {
   // Phase 7 — commercial letting agent comms
   commercialSearchUpdates?: CommercialSearchUpdate[];
   commercialAgentChase?: Record<string, number>;
-  vacantCommercialProperties?: Array<{ id: string; name: string }>;
+  vacantCommercialProperties?: Array<{ id: string; name: string; preMarketing?: boolean; monthlyIncome?: number }>;
   onChaseCommercialAgent?: (propertyId: string) => void;
+  /** Improvements #7 item 2 — pipeline used to answer agent questions. */
+  pendingCommercialApplicants?: Array<{ propertyId: string; tenant: any; arrivalMonth: number }>;
 }
 
 type TabKey =
@@ -86,6 +88,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
     onRefileExTenantCCJ,
     commercialSearchUpdates = [],
     commercialAgentChase = {},
+    pendingCommercialApplicants = [],
     vacantCommercialProperties = [],
     onChaseCommercialAgent,
   } = props;

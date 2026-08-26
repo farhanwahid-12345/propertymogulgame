@@ -2308,16 +2308,31 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       updatedOwnedProperties.forEach(property => {
         if (property.type !== 'commercial') return;
         const hasTenant = newTenants.some(t => t.propertyId === property.id);
-        const hasLease = !!property.commercialLease;
-        if (hasTenant || hasLease) return;
+        const lease = property.commercialLease;
+        const hasLease = !!lease;
+        // Improvements #7 item 4a — pre-marketing window: start searching for a
+        // replacement tenant up to 6 months before lease expiry, or before a
+        // mutual break date.
+        let preMarketing = false;
+        if (hasLease && lease) {
+          const monthsToExpiry = lease.expiryMonth - newMonthNumber;
+          const monthsToBreak = lease.breakClause?.type === 'mutual' && lease.breakClause.atMonth !== undefined
+            ? lease.breakClause.atMonth - newMonthNumber
+            : Infinity;
+          preMarketing = (monthsToExpiry > 0 && monthsToExpiry <= 6) || (monthsToBreak > 0 && monthsToBreak <= 6);
+        }
+        if (hasTenant) return;
+        if (hasLease && !preMarketing) return;
         const queuedBefore = nextApplicants.filter(a => a.propertyId === property.id).length;
-        const monthsVacant = newMonthNumber - (property.commercialVacantSinceMonth ?? newMonthNumber);
+        const monthsVacant = preMarketing
+          ? 4 // pre-marketing units get mature-search treatment straight away
+          : newMonthNumber - (property.commercialVacantSinceMonth ?? newMonthNumber);
         const city = (property.city ?? 'middlesbrough') as 'middlesbrough'|'leeds'|'manchester'|'london';
         // Phase 7 — chase boost active for the month immediately after chasing.
         const lastChase = chaseMap[property.id] ?? -999;
         const chaseBoost = (newMonthNumber - lastChase) <= 1 ? 0.12 : 0;
         // Weak/local: 70% chance every month, arrival +1
-        if (queuedBefore < 3 && gameRandom() < (0.70 + chaseBoost)) {
+        if (queuedBefore < 4 && gameRandom() < (0.88 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [20, 50]),
@@ -2326,20 +2341,20 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         }
         // Standard business: from month 2+, 50% chance, arrival +1..3
         const queuedNow1 = nextApplicants.filter(a => a.propertyId === property.id).length;
-        if (monthsVacant >= 2 && queuedNow1 < 3 && gameRandom() < (0.50 + chaseBoost)) {
+        if (monthsVacant >= 1 && queuedNow1 < 4 && gameRandom() < (0.70 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [45, 70]),
-            arrivalMonth: newMonthNumber + 1 + Math.floor(gameRandom() * 3),
+            arrivalMonth: newMonthNumber + 1 + Math.floor(gameRandom() * 2),
           });
         }
         // Strong/national: from month 4+, 25% chance, arrival +2..4
         const queuedNow2 = nextApplicants.filter(a => a.propertyId === property.id).length;
-        if (monthsVacant >= 4 && queuedNow2 < 3 && gameRandom() < (0.25 + chaseBoost)) {
+        if (monthsVacant >= 2 && queuedNow2 < 4 && gameRandom() < (0.42 + chaseBoost)) {
           nextApplicants.push({
             propertyId: property.id,
             tenant: generateCommercialApplicantInRange(city, [70, 95]),
-            arrivalMonth: newMonthNumber + 2 + Math.floor(gameRandom() * 3),
+            arrivalMonth: newMonthNumber + 1 + Math.floor(gameRandom() * 3),
           });
         }
 
@@ -2366,13 +2381,22 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         });
         // Monthly status line.
         let statusMsg: string;
-        if (monthsVacant <= 1) {
-          statusMsg = `We've listed the property and begun our search. Initial enquiries expected within 2–3 months.`;
+        // Improvements #7 item 4b — quantify the chance of a stronger covenant
+        // appearing next month so the player can judge whether to wait.
+        const bestQueuedCov = propApplicants.reduce(
+          (m, a) => Math.max(m, a.tenant.covenantStrength ?? 50), 0);
+        const betterChancePct = Math.round(
+          (monthsVacant >= 2 ? 0.42 : 0.20) * (bestQueuedCov >= 70 ? 0.5 : 1) * 100);
+        const viewings = addedThisTick.length;
+        if (preMarketing) {
+          statusMsg = `Pre-marketing ahead of lease end — ${queuedAfter} lead${queuedAfter === 1 ? '' : 's'} on file. ~${betterChancePct}% chance of a stronger covenant enquiry next month.`;
+        } else if (monthsVacant <= 1) {
+          statusMsg = `We've listed the property and begun our search.${viewings > 0 ? ` ${viewings} viewing${viewings === 1 ? '' : 's'} booked this month.` : ''} First formal enquiries expected within 1–2 months.`;
         } else if (monthsVacant <= 3) {
-          statusMsg = `We've had ${queuedAfter} preliminary enquir${queuedAfter === 1 ? 'y' : 'ies'}. Awaiting formal expressions of interest.`;
+          statusMsg = `${queuedAfter} preliminary enquir${queuedAfter === 1 ? 'y' : 'ies'} on file${viewings > 0 ? `, ${viewings} viewing${viewings === 1 ? '' : 's'} booked this month` : ''}. ~${betterChancePct}% chance of a better-paying applicant next month.`;
         } else {
           const eta = estimatedNextApplicantMonth ? Math.max(1, estimatedNextApplicantMonth - newMonthNumber) : null;
-          statusMsg = `We are actively chasing ${queuedAfter} lead${queuedAfter === 1 ? '' : 's'}.${eta ? ` A new applicant is expected within ${eta} month${eta === 1 ? '' : 's'}.` : ''}`;
+          statusMsg = `We are actively chasing ${queuedAfter} lead${queuedAfter === 1 ? '' : 's'}.${eta ? ` A new applicant is expected within ${eta} month${eta === 1 ? '' : 's'}.` : ''} ~${betterChancePct}% chance of a stronger covenant next month.`;
         }
         newSearchUpdates.push({
           id: `csu_${property.id}_${newMonthNumber}_status`,
@@ -2423,7 +2447,17 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const ownedIdsForCsu = new Set(updatedOwnedProperties.map(p => p.id));
       const vacantCommercialIds = new Set(
         updatedOwnedProperties
-          .filter(p => p.type === 'commercial' && !p.commercialLease && !newTenants.some(t => t.propertyId === p.id))
+          .filter(p => {
+            if (p.type !== 'commercial') return false;
+            if (newTenants.some(t => t.propertyId === p.id)) return false;
+            if (!p.commercialLease) return true;
+            // Pre-marketing units (≤6mo to expiry/mutual break) keep their feed.
+            const l = p.commercialLease;
+            const toExpiry = l.expiryMonth - newMonthNumber;
+            const toBreak = l.breakClause?.type === 'mutual' && l.breakClause.atMonth !== undefined
+              ? l.breakClause.atMonth - newMonthNumber : Infinity;
+            return (toExpiry > 0 && toExpiry <= 6) || (toBreak > 0 && toBreak <= 6);
+          })
           .map(p => p.id)
       );
       const mergedSearchUpdates = [...(prev.commercialSearchUpdates || []), ...newSearchUpdates]

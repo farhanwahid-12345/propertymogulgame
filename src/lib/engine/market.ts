@@ -4,6 +4,7 @@ import { toPennies } from "@/lib/formatCurrency";
 import {
   MIDDLESBROUGH_STREETS, NEIGHBORHOODS,
   CITY_LHA_MONTHLY_PENNIES, LHA_TENANT_TIER_MULT, bedroomsForSqft,
+  roomRentDiscountForSubtype, clampFlatUnitRentPennies,
 } from "./constants";
 import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
 import { getFurnishingRentMultiplier } from "@/lib/tenantRent";
@@ -52,10 +53,13 @@ export function lhaAnchoredMonthlyRentPennies(args: {
   // lets. Halve the LHA-derived rent per room so aggregate HMO rent lands in the
   // realistic £280–£380/room band for Middlesbrough. Same principle applies to
   // multi-let bedsits (slightly less discount since they include their own kitchen).
-  const hmoRoomDiscount = args.subtype === 'hmo' ? 0.5
-                        : args.subtype === 'multi-let' ? 0.65
-                        : 1.0;
-  const perUnitRent = Math.round(lhaPerUnit * mult * hmoRoomDiscount);
+  const hmoRoomDiscount = roomRentDiscountForSubtype(args.subtype);
+  let perUnitRent = Math.round(lhaPerUnit * mult * hmoRoomDiscount);
+  // Improvements #7 item 3 — self-contained flats are clamped to a realistic
+  // per-unit band for the city, skewed to the lower median.
+  if (args.subtype === 'flats' && units > 1) {
+    perUnitRent = clampFlatUnitRentPennies(perUnitRent, args.cityId);
+  }
   // Multi-unit properties aggregate rent across all units.
   const aggregate = (args.subtype === 'hmo' || args.subtype === 'flats' || args.subtype === 'multi-let')
     ? perUnitRent * units

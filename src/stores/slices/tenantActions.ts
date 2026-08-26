@@ -18,13 +18,13 @@ import { showToast, debit, debitStrict, calcDeposit } from '../storeHelpers';
 /**
  * Commercial lease transaction fees (in pounds).
  * - Agent fee: 10% of the first year's rent.
- * - Solicitor: tiered flat fee by lease term.
+ * - Solicitor: flat £750 (Improvements #7 item 4).
  * - Land Registry: only registrable when term > 7yr (84mo); HMLR sliding scale
  *   computed against the lease "premium" = annualRent × termYears / 5.
  */
 function calcCommercialLeaseFeesPounds(monthlyRentPennies: number, termMonths: number): { solicitor: number; landRegistry: number; agentFee: number } {
   const termYears = termMonths / 12;
-  const solicitor = termYears < 5 ? 1500 : termYears <= 10 ? 2500 : 3500;
+  const solicitor = 750;
   const agentFee = Math.round((monthlyRentPennies / 100) * 12 * 0.10);
   let landRegistry = 0;
   if (termMonths > 84) {
