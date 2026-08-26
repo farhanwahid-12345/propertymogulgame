@@ -173,6 +173,51 @@ export const LHA_TENANT_TIER_MULT: Record<'risky' | 'budget' | 'standard' | 'pre
   premium: 1.20,
 };
 
+/**
+ * Improvements #7 item 9a — per-room rent discount for shared houses.
+ * HMO rooms are single rooms in a shared house (bills often inclusive), and
+ * multi-let bedsits are marginally better. Values already carry the further
+ * 30% reduction requested in item 9a on top of the previous halving.
+ */
+export const HMO_ROOM_RENT_DISCOUNT = 0.35;        // was 0.50, −30%
+export const MULTI_LET_ROOM_RENT_DISCOUNT = 0.455; // was 0.65, −30%
+
+/** Discount for a given multi-unit subtype (1.0 for self-contained lets). */
+export function roomRentDiscountForSubtype(subtype?: string): number {
+  if (subtype === 'hmo') return HMO_ROOM_RENT_DISCOUNT;
+  if (subtype === 'multi-let') return MULTI_LET_ROOM_RENT_DISCOUNT;
+  return 1.0;
+}
+
+/**
+ * Improvements #7 item 3 — realistic per-flat monthly rent band (pennies) for
+ * self-contained apartments, keyed by city. Middlesbrough is the reference
+ * (£300–£800); other cities scale off their 2-bed LHA rate.
+ */
+export const CITY_FLAT_UNIT_RENT_BAND_PENNIES: Record<string, { min: number; max: number }> = {
+  middlesbrough: { min: 30000, max: 80000 },
+  leeds:         { min: 55000, max: 140000 },
+  manchester:    { min: 62000, max: 160000 },
+  london:        { min: 120000, max: 320000 },
+};
+
+/**
+ * Clamp a generated per-flat rent into the realistic band for the city and skew
+ * the distribution toward the lower median — most units should sit in the lower
+ * half of the band, with the top reserved for large / high-value stock.
+ */
+export function clampFlatUnitRentPennies(rentPennies: number, cityId?: string): number {
+  const band = CITY_FLAT_UNIT_RENT_BAND_PENNIES[(cityId ?? 'middlesbrough').toLowerCase()]
+    ?? CITY_FLAT_UNIT_RENT_BAND_PENNIES.middlesbrough;
+  const clamped = Math.min(band.max, Math.max(band.min, rentPennies));
+  // Compress the upper half so the median lands ~35% into the band.
+  const midpoint = band.min + (band.max - band.min) * 0.35;
+  const skewed = clamped > midpoint ? midpoint + (clamped - midpoint) * 0.55 : clamped;
+  return Math.round(Math.min(band.max, Math.max(band.min, skewed)));
+}
+
+
+
 export const MORTGAGE_PROVIDERS: MortgageProvider[] = [
   { id: "hsbc", name: "HSBC", baseRate: 0.035, maxLTV: 0.75, minCreditScore: 740, description: "Premier bank with the best rates but strictest criteria" },
   { id: "nationwide", name: "Nationwide", baseRate: 0.045, maxLTV: 0.80, minCreditScore: 680, description: "Building society with competitive rates" },
