@@ -76,6 +76,29 @@ function tenantAcceptsTerm(termYears: number, covenantStrength: number): boolean
   return covenantStrength >= 60; // 15-year lease — only blue-chip covenants
 }
 
+/**
+ * Improvements #7 item 2 — per-line-item negotiation. Each heading is judged
+ * separately so the tenant can accept the rent but push back on the break
+ * clause, etc. Returns the tenant's preferred value plus a plain-English note.
+ */
+function tenantPreferredTerm(covenantStrength: number): number {
+  if (covenantStrength >= 75) return 10;
+  if (covenantStrength >= 55) return 5;
+  if (covenantStrength >= 35) return 5;
+  return 3;
+}
+
+function tenantPreferredBreak(covenantStrength: number): BreakChoice {
+  if (covenantStrength >= 75) return 'none';
+  if (covenantStrength >= 50) return 'tenant_mid';
+  return 'mutual_mid';
+}
+
+function tenantPreferredReview(covenantStrength: number, termYears: number): number {
+  if (termYears <= 3) return 3;
+  return covenantStrength >= 70 ? 5 : 3;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface HeadsOfTermsDialogProps {
@@ -146,6 +169,14 @@ export function HeadsOfTermsDialog({
   const [stage, setStage] = useState<'open' | 'counter' | 'rejected'>('open');
   const [tenantCounterPounds, setTenantCounterPounds] = useState<number | null>(null);
   const [agreedRentPounds, setAgreedRentPounds] = useState<number | null>(null);
+  // Improvements #7 item 2 — the tenant's counter-package, per line item.
+  const [counterPackage, setCounterPackage] = useState<null | {
+    rentPounds: number | null;
+    termYears: number | null;
+    breakChoice: BreakChoice | null;
+    reviewYears: number | null;
+    notes: string[];
+  }>(null);
 
   // Reset on open
   useMemo(() => {
@@ -157,6 +188,7 @@ export function HeadsOfTermsDialog({
       setStage('open');
       setTenantCounterPounds(null);
       setAgreedRentPounds(null);
+      setCounterPackage(null);
     }
   }, [open, askingPounds]);
 
@@ -175,27 +207,78 @@ export function HeadsOfTermsDialog({
                      'text-red-300 border-red-400/40 bg-red-400/10';
 
   const handlePropose = () => {
-    if (!termOk) {
-      setStage('rejected');
-      setAgreedRentPounds(null);
+    // Improvements #7 item 2 — evaluate each line item independently.
+    const notes: string[] = [];
+    const rentAccepted = Math.random() < acceptanceChance;
+    const counterRentPounds = rentAccepted
+      ? null
+      : Math.round(fromPennies(tenantCounterRent(proposedRentPennies, covenant)));
+    if (counterRentPounds != null) {
+      notes.push(`Rent: they'd pay £${counterRentPounds.toLocaleString()}/mo rather than £${proposedRentPounds.toLocaleString()}.`);
+    }
+
+    let counterTermYears: number | null = null;
+    let counterBreak: BreakChoice | null = null;
+    let counterReviewYears: number | null = null;
+
+    if (!isReview) {
+      if (!tenantAcceptsTerm(termYears, covenant)) {
+        counterTermYears = tenantPreferredTerm(covenant);
+        notes.push(`Term: ${termYears} years doesn't work for them — they'd sign ${counterTermYears} years.`);
+      }
+      const prefBreak = tenantPreferredBreak(covenant);
+      // Weak covenants insist on a break; strong ones resist a tenant-only break.
+      const breakUnacceptable =
+        (covenant < 50 && breakChoice === 'none') ||
+        (covenant >= 75 && breakChoice === 'mutual_mid');
+      if (breakUnacceptable) {
+        counterBreak = prefBreak;
+        notes.push(
+          covenant < 50
+            ? `Break clause: they won't commit without a break option — they want a ${prefBreak === 'mutual_mid' ? 'mutual' : 'tenant'} break at the midpoint.`
+            : `Break clause: a mutual break weakens their security of tenure — they'd prefer no break.`,
+        );
+      }
+      const prefReview = tenantPreferredReview(covenant, counterTermYears ?? termYears);
+      if (reviewYears < prefReview) {
+        counterReviewYears = prefReview;
+        notes.push(`Rent reviews: ${reviewYears}-yearly is too frequent — they'd agree ${prefReview}-yearly upward-only reviews.`);
+      }
+    }
+
+    if (notes.length === 0) {
+      // Full package accepted as proposed.
+      setAgreedRentPounds(proposedRentPounds);
+      setTenantCounterPounds(null);
+      setCounterPackage(null);
+      setStage('counter');
       return;
     }
-    // Roll acceptance
-    if (Math.random() < acceptanceChance) {
-      setAgreedRentPounds(proposedRentPounds);
-      setStage('counter'); // re-use 'counter' stage UI but show "Accepted" pathway via agreedRent
-      setTenantCounterPounds(null);
-    } else {
-      const counter = tenantCounterRent(proposedRentPennies, covenant);
-      setTenantCounterPounds(Math.round(fromPennies(counter)));
-      setAgreedRentPounds(null);
-      setStage('counter');
-    }
+
+    setCounterPackage({
+      rentPounds: counterRentPounds,
+      termYears: counterTermYears,
+      breakChoice: counterBreak,
+      reviewYears: counterReviewYears,
+      notes,
+    });
+    setTenantCounterPounds(counterRentPounds);
+    setAgreedRentPounds(null);
+    setStage('counter');
   };
 
+  /** Accept the tenant's full counter-package, applying every countered item. */
   const handleAcceptCounter = () => {
-    if (tenantCounterPounds == null) return;
-    setAgreedRentPounds(tenantCounterPounds);
+    if (!counterPackage) {
+      if (tenantCounterPounds == null) return;
+      setAgreedRentPounds(tenantCounterPounds);
+      return;
+    }
+    if (counterPackage.termYears != null) setTermYears(counterPackage.termYears);
+    if (counterPackage.breakChoice != null) setBreakChoice(counterPackage.breakChoice);
+    if (counterPackage.reviewYears != null) setReviewYears(counterPackage.reviewYears);
+    setAgreedRentPounds(counterPackage.rentPounds ?? proposedRentPounds);
+    setCounterPackage(null);
   };
 
   const handleSign = () => {
@@ -403,20 +486,21 @@ export function HeadsOfTermsDialog({
 
 
         {/* Counter-offer / rejection feedback */}
-        {stage === 'counter' && agreedRentPounds == null && tenantCounterPounds != null && (
+        {stage === 'counter' && agreedRentPounds == null && counterPackage && (
           <div className="glass rounded-xl p-3 border border-amber-400/30 bg-amber-400/5 space-y-2">
             <div className="text-xs font-semibold text-amber-300 flex items-center gap-1 flex-wrap">
-              <Handshake className="h-3 w-3" /> Tenant counter-offer
+              <Handshake className="h-3 w-3" /> Tenant counter-proposal
             </div>
-            <div className="text-sm">
-              {tenant.companyName ?? tenant.name} would prefer{' '}
-              <span className="font-semibold text-foreground">£{tenantCounterPounds.toLocaleString()}/mo</span>.
-            </div>
+            <ul className="text-xs space-y-1">
+              {counterPackage.notes.map((n, i) => (
+                <li key={i} className="text-foreground/90">• {n}</li>
+              ))}
+            </ul>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button size="sm" variant="outline" onClick={handleAcceptCounter}>
-                Accept £{tenantCounterPounds.toLocaleString()}
+                Accept their package
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => { setStage('open'); setTenantCounterPounds(null); }}>
+              <Button size="sm" variant="ghost" onClick={() => { setStage('open'); setTenantCounterPounds(null); setCounterPackage(null); }}>
                 Revise offer
               </Button>
             </div>
