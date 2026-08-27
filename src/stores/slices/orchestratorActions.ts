@@ -10,6 +10,7 @@
  *
  * Behaviour and persisted shape are unchanged — this is a pure code move.
  */
+import { playCoinChime, playPaper, playGavel } from '@/lib/sound';
 import { gameRandom } from '@/lib/rng';
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { LOAN_PRODUCTS, getCeilingPrice } from '@/lib/engine/constants';
@@ -18,6 +19,24 @@ import { applyCeilingDiminishingReturns, isConditionUpgradeRenovation } from '@/
 import { showToast } from '../storeHelpers';
 import { mergeConcernsById } from '../sanitizers';
 import type {
+
+/**
+ * Improvements #7 item 5 — raise a blocking pop-up + sound for every sale
+ * milestone (offer, counter-offer, acceptance, walk-away).
+ */
+function saleEvent(kind: 'offer' | 'counter' | 'accepted' | 'walkaway', title: string, message: string) {
+  try {
+    if (kind === 'accepted') playGavel();
+    else if (kind === 'offer') playCoinChime();
+    else playPaper();
+  } catch { /* noop */ }
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('pm:sale-event', { detail: { kind, title, message } }));
+    }
+  } catch { /* noop */ }
+}
+
   Property, PropertyOffer, Renovation, Conveyancing,
 } from '@/types/game';
 
@@ -195,7 +214,7 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
         const newOffers = listing.offers || [];
         let lastCheck = listing.lastOfferCheck || listing.listingDate;
 
-        if (!listing.isAuction && property && daysSinceLastCheck >= 3) {
+        if (!listing.isAuction && property && daysSinceLastCheck >= 1) {
           const asking = listing.askingPrice || property.value;
           const market = property.value;
           const askRatio = asking / Math.max(1, market);
@@ -204,15 +223,17 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
           let bandLow: number;
           let bandHigh: number;
           let bidWarChance: number;
+          // Improvements #7 item 5 — offers arrive faster at every price point, and
+          // overpriced listings still attract (low) offers rather than going silent.
           if (askRatio <= 1.0) {
-            numNew = gameRandom() > 0.4 ? 2 : 1;
-            bandLow = 0.92; bandHigh = 1.02; bidWarChance = 0.12;
+            numNew = gameRandom() > 0.25 ? 2 : 1;
+            bandLow = 0.92; bandHigh = 1.02; bidWarChance = 0.15;
           } else if (askRatio <= 1.15) {
-            numNew = gameRandom() > 0.6 ? 2 : 1;
-            bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.04;
+            numNew = gameRandom() > 0.4 ? 2 : 1;
+            bandLow = 0.86; bandHigh = 0.98; bidWarChance = 0.06;
           } else {
-            numNew = gameRandom() > 0.75 ? 1 : 0;
-            bandLow = 0.72; bandHigh = 0.84; bidWarChance = 0;
+            numNew = 1;
+            bandLow = 0.68; bandHigh = 0.84; bidWarChance = 0;
           }
           const timeAdj = Math.max(0.9, 1 - (daysOnMarket * 0.003));
 
@@ -239,13 +260,18 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
               status: 'pending', negotiationRound: 0,
             };
             newOffers.push(offer);
+            const offerAmountLabel = `£${fromPennies(offer.amount).toLocaleString()}`;
             if (listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold) {
               showToast("Offer Auto-Accepted! 🎉", `${offer.buyerName}'s offer auto-accepted for ${property.name}!`);
+              saleEvent('accepted', 'Offer auto-accepted 🎉',
+                `${offer.buyerName} offered ${offerAmountLabel} for ${property.name} — above your auto-accept threshold, so it's been accepted.`);
             } else {
               showToast(
                 isCash ? "Cash Offer Received! 💵" : "New Offer Received! 💰",
                 `${offer.buyerName} offered for ${property.name}${isCash ? ' (cash buyer)' : ''}`,
               );
+              saleEvent('offer', isCash ? 'Cash offer received 💵' : 'New offer received 💰',
+                `${offer.buyerName} has offered ${offerAmountLabel} for ${property.name}${isCash ? ' as a cash buyer' : ''}. Review it in the Estate Agent.`);
             }
           }
           lastCheck = currentTime;
@@ -443,14 +469,20 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
             const roll = gameRandom();
             if (roll < acceptChance) {
               showToast("Counter-Offer Accepted! 🎉", `${offer.buyerName} accepted your counter for ${property.name}!`);
+              saleEvent('accepted', 'Counter-offer accepted 🎉',
+                `${offer.buyerName} has accepted your counter of £${fromPennies(offer.counterAmount || offer.amount).toLocaleString()} for ${property.name}.`);
               return { ...offer, status: 'accepted' as const, amount: offer.counterAmount || offer.amount };
             } else if (roll < acceptChance + counterChance) {
               const diff = (offer.counterAmount || offer.amount) - offer.amount;
               const buyerCounter = offer.amount + Math.floor(diff * (0.4 + gameRandom() * 0.3));
               showToast("Buyer Counter-Offered", `${offer.buyerName} countered with £${fromPennies(buyerCounter).toLocaleString()}`);
+              saleEvent('counter', 'Buyer counter-offer received',
+                `${offer.buyerName} has countered with £${fromPennies(buyerCounter).toLocaleString()} for ${property.name}. Respond in the Estate Agent.`);
               return { ...offer, status: 'buyer-countered' as const, buyerCounterAmount: buyerCounter, counterResponseDate: undefined };
             } else {
               showToast("Buyer Walked Away", `${offer.buyerName} has withdrawn`, "destructive");
+              saleEvent('walkaway', 'Buyer walked away',
+                `${offer.buyerName} has withdrawn their interest in ${property.name}.`);
               return { ...offer, status: 'walkaway' as const, counterResponseDate: undefined };
             }
           }
