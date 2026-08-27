@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GameStats } from "@/components/game/game-stats";
-import { ListedProperties } from "@/components/game/listed-properties";
+import { SaleEventDialog } from "@/components/game/sale-event-dialog";
 
 import { EvictionTimelineFeed } from "@/components/game/eviction-timeline-feed";
 import { DepositDisputesFeed } from "@/components/game/deposit-disputes-feed";
@@ -325,24 +325,6 @@ const Index = () => {
           );
         })()}
 
-        {gameState.propertyListings?.length > 0 && (
-          <CollapsibleSection
-            title="📃 Listed Properties"
-            badge={
-              <Badge variant="secondary" className="text-[10px]">{gameState.propertyListings.length}</Badge>
-            }
-            defaultOpenMobile={false}
-          >
-            <ListedProperties
-              propertyListings={gameState.propertyListings}
-              ownedProperties={gameState.ownedProperties}
-              onAcceptOffer={(property, offer) => gameState.handleEstateAgentSale(property.id, offer)}
-              onSetAutoAcceptThreshold={gameState.setAutoAcceptThreshold}
-              onWithdrawListing={gameState.cancelPropertyListing}
-            />
-          </CollapsibleSection>
-        )}
-
         <div id="section-portfolio">
           <PortfolioGrid
             gameState={gameState}
@@ -356,6 +338,8 @@ const Index = () => {
           />
         </div>
       </div>
+
+      <SaleEventDialog />
 
       {showFirstPurchaseCoach && (
         <FirstPurchaseCoach
