@@ -64,6 +64,62 @@ type TabKey =
   | "conveyancing" | "planning" | "renovations" | "concerns"
   | "evictions" | "listings" | "extdebts" | "commercial";
 
+
+/** Improvements #7 item 2 — questions the player can put to the lettings agent. */
+const AGENT_QUESTIONS: Array<{ key: 'howLong' | 'better' | 'howMuch'; label: string }> = [
+  { key: 'howLong', label: 'How long will this take?' },
+  { key: 'better', label: 'Can we find better tenants?' },
+  { key: 'howMuch', label: 'How much more could we get?' },
+];
+
+/** Derive a concrete, data-driven answer from the live applicant pipeline. */
+function answerAgentQuestion(
+  key: 'howLong' | 'better' | 'howMuch',
+  pipeline: Array<{ tenant: any; arrivalMonth: number }>,
+  monthsPlayed: number,
+  prop: { preMarketing?: boolean; monthlyIncome?: number },
+): string {
+  const arrived = pipeline.filter(a => a.arrivalMonth <= monthsPlayed);
+  const upcoming = pipeline.filter(a => a.arrivalMonth > monthsPlayed)
+    .sort((a, b) => a.arrivalMonth - b.arrivalMonth);
+  const covOf = (a: { tenant: any }) => a.tenant?.covenantStrength ?? 50;
+  const bestArrivedCov = arrived.length ? Math.max(...arrived.map(covOf)) : 0;
+  const bestUpcoming = upcoming[0];
+
+  if (key === 'howLong') {
+    if (arrived.length > 0) {
+      return `You already have ${arrived.length} applicant${arrived.length === 1 ? '' : 's'} ready to view terms — we could have heads of terms agreed this month.`;
+    }
+    if (bestUpcoming) {
+      const eta = Math.max(1, bestUpcoming.arrivalMonth - monthsPlayed);
+      return `We expect the next applicant in ~${eta} month${eta === 1 ? '' : 's'}. Realistically ${eta}–${eta + 2} months to a signed lease.`;
+    }
+    return prop.preMarketing
+      ? `Nothing firm yet, but marketing early usually secures a replacement within 3–5 months of lease end.`
+      : `Nothing firm yet — typical letting time for a unit like this is 3–6 months.`;
+  }
+
+  if (key === 'better') {
+    const chance = arrived.length === 0 ? 45 : bestArrivedCov >= 75 ? 12 : bestArrivedCov >= 60 ? 28 : 45;
+    const strongerUpcoming = upcoming.find(a => covOf(a) > bestArrivedCov);
+    if (strongerUpcoming) {
+      return `Yes — a stronger covenant (${Math.round(covOf(strongerUpcoming))}/100) is due around month ${strongerUpcoming.arrivalMonth}. Roughly a ${chance}% chance per month of an even better one appearing.`;
+    }
+    return bestArrivedCov >= 75
+      ? `Unlikely — the covenant on the table (${Math.round(bestArrivedCov)}/100) is about as strong as this location attracts. Only ~${chance}% chance of better each month.`
+      : `Possible — roughly a ${chance}% chance each month of a stronger covenant enquiring. Holding out costs you the void rent in the meantime.`;
+  }
+
+  // howMuch
+  const asking = prop.monthlyIncome ?? 0;
+  const upliftLow = Math.round(asking * 0.03);
+  const upliftHigh = Math.round(asking * (bestArrivedCov >= 70 ? 0.06 : 0.12));
+  if (asking <= 0) {
+    return `Hard to say without a rent on file — we'd benchmark against comparable units in the parade first.`;
+  }
+  return `Realistically £${upliftLow.toLocaleString()}–£${upliftHigh.toLocaleString()}/mo above the current figure${bestArrivedCov >= 70 ? ' — but a strong covenant will resist much more than that' : ' if you can wait for a better covenant'}.`;
+}
+
 export function OperationsCenter(props: OperationsCenterProps) {
   const {
     monthsPlayed,
@@ -92,6 +148,9 @@ export function OperationsCenter(props: OperationsCenterProps) {
     vacantCommercialProperties = [],
     onChaseCommercialAgent,
   } = props;
+
+  // Improvements #7 item 2 — agent Q&A answers, keyed by `${propertyId}:${question}`.
+  const [agentAnswers, setAgentAnswers] = useState<Record<string, string>>({});
 
   const ownedIds = new Set(ownedProperties.map(p => p.id));
   const nameOf = (id: string) => ownedProperties.find(p => p.id === id)?.name || id;
@@ -385,6 +444,8 @@ export function OperationsCenter(props: OperationsCenterProps) {
                 .sort((a, b) => b.month - a.month)
                 .slice(0, 6);
               const latest = propUpdates[0];
+              const pipelineFor = (id: string) =>
+                pendingCommercialApplicants.filter(a => a.propertyId === id);
               const lastChase = commercialAgentChase[prop.id] ?? -999;
               const canChase = (monthsPlayed - lastChase) >= 2;
               const chaseWait = Math.max(0, 2 - (monthsPlayed - lastChase));
@@ -395,6 +456,11 @@ export function OperationsCenter(props: OperationsCenterProps) {
                       <div className="font-semibold text-foreground flex items-center gap-1.5">
                         <Megaphone className="h-3.5 w-3.5 text-primary" />
                         {prop.name}
+                        {prop.preMarketing && (
+                          <Badge variant="outline" className="border-amber-400/40 bg-amber-500/10 text-amber-300 text-[9px]">
+                            Pre-marketing
+                          </Badge>
+                        )}
                       </div>
                       {latest?.estimatedNextApplicantMonth != null && (
                         <div className="text-muted-foreground">
@@ -416,6 +482,42 @@ export function OperationsCenter(props: OperationsCenterProps) {
                       </Button>
                     )}
                   </div>
+                  {/* Improvements #7 item 2 — ask the lettings agent */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {AGENT_QUESTIONS.map(q => (
+                      <Button
+                        key={q.key}
+                        size="sm"
+                        variant="secondary"
+                        className="h-6 text-[10px] px-2"
+                        onClick={() => setAgentAnswers(prev => ({
+                          ...prev,
+                          [`${prop.id}:${q.key}`]: answerAgentQuestion(
+                            q.key,
+                            pipelineFor(prop.id),
+                            monthsPlayed,
+                            prop,
+                          ),
+                        }))}
+                      >
+                        {q.label}
+                      </Button>
+                    ))}
+                  </div>
+                  {AGENT_QUESTIONS.some(q => agentAnswers[`${prop.id}:${q.key}`]) && (
+                    <div className="rounded-md border border-sky-400/30 bg-sky-500/5 p-2 space-y-1">
+                      {AGENT_QUESTIONS.map(q => {
+                        const a = agentAnswers[`${prop.id}:${q.key}`];
+                        if (!a) return null;
+                        return (
+                          <div key={q.key} className="text-[11px]">
+                            <span className="text-sky-300 font-medium">{q.label}</span>
+                            <span className="text-foreground/90"> — {a}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     {propUpdates.length === 0 ? (
                       <p className="text-[11px] text-muted-foreground italic">No updates yet — first month-end report incoming.</p>
