@@ -203,6 +203,29 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
         propertyListings={((gameState as any).propertyListings || []).map((l: any) => ({ ...l, askingPrice: l.askingPrice }))}
         exTenantDebts={(gameState as any).exTenantDebts || []}
         onCancelEviction={gameState.cancelEviction}
+        evictionCandidates={(gameState.tenants || [])
+          .filter((t: any) => !(gameState.pendingEvictions || []).some((ev: any) =>
+            ev.propertyId === t.propertyId && (ev.slotIndex ?? 0) === (t.slotIndex ?? 0)))
+          .map((t: any) => {
+            const prop = gameState.ownedProperties.find((p: any) => p.id === t.propertyId);
+            const unitLabel = (t.slotIndex ?? 0) > 0 || t.slotIndex === 0
+              ? ` · unit ${(t.slotIndex ?? 0) + 1}`
+              : '';
+            return {
+              propertyId: t.propertyId,
+              propertyName: `${prop?.name ?? t.propertyId}${(prop as any)?.subtypeUnits > 1 ? unitLabel : ''}`,
+              slotIndex: t.slotIndex,
+              tenantName: t.name,
+              tenantProfile: t.profile,
+              rentArrearsCount: t.arrearsMonths ?? 0,
+              hasLongstandingASB: (gameState.tenantConcerns || []).some((c: any) =>
+                c.propertyId === t.propertyId && !c.resolvedMonth &&
+                (c.category === 'noise' || c.category === 'safety') &&
+                (gameState.monthsPlayed - c.raisedMonth) >= 1),
+              propertyType: prop?.type,
+            };
+          })}
+        onEvictTenant={gameState.evictTenant}
         onCancelListing={gameState.cancelPropertyListing}
         onFileExTenantCCJ={(gameState as any).fileExTenantCCJ}
         onNegotiateExTenantSettlement={(gameState as any).negotiateExTenantSettlement}
