@@ -8,6 +8,7 @@ import {
 import { ConveyancingTracker } from "@/components/game/conveyancing-tracker";
 import { RenovationTracker } from "@/components/game/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/game/tenant-concerns-feed";
+import { EvictionDialog, type EvictionGround } from "@/components/game/eviction-dialog";
 import { fromPennies } from "@/lib/formatCurrency";
 import type {
   Conveyancing,
@@ -46,6 +47,21 @@ interface OperationsCenterProps {
   propertyListings?: PropertyListing[];
   exTenantDebts?: ExTenantDebt[];
   onCancelEviction?: (propertyId: string, slotIndex?: number) => void;
+  /**
+   * Improvements #7 item 4 — serving notice now happens here rather than on the
+   * property card, so all eviction work lives in one place.
+   */
+  evictionCandidates?: Array<{
+    propertyId: string;
+    propertyName: string;
+    slotIndex?: number;
+    tenantName: string;
+    tenantProfile?: 'premium' | 'standard' | 'budget' | 'risky';
+    rentArrearsCount?: number;
+    hasLongstandingASB?: boolean;
+    propertyType?: string;
+  }>;
+  onEvictTenant?: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
   onCancelListing?: (propertyId: string) => void;
   onFileExTenantCCJ?: (debtId: string) => void;
   onNegotiateExTenantSettlement?: (debtId: string, pct: number) => void;
@@ -137,6 +153,8 @@ export function OperationsCenter(props: OperationsCenterProps) {
     propertyListings = [],
     exTenantDebts = [],
     onCancelEviction,
+  evictionCandidates = [],
+  onEvictTenant,
     onCancelListing,
     onFileExTenantCCJ,
     onNegotiateExTenantSettlement,
@@ -190,7 +208,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
       (tab === "planning" && counts.plan === 0) ||
       (tab === "renovations" && counts.reno === 0) ||
       (tab === "concerns" && counts.concerns === 0) ||
-      (tab === "evictions" && counts.ev === 0) ||
+      (tab === "evictions" && counts.ev === 0 && evictionCandidates.length === 0) ||
       (tab === "listings" && counts.lis === 0) ||
       (tab === "extdebts" && counts.ext === 0) ||
       (tab === "commercial" && counts.comm === 0);
@@ -320,8 +338,42 @@ export function OperationsCenter(props: OperationsCenterProps) {
           </TabsContent>
 
           <TabsContent value="evictions" className="mt-0 space-y-2">
+            {evictionCandidates.length > 0 && onEvictTenant && (
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                <div className="text-xs font-semibold flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+                  Serve notice
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {evictionCandidates.map((c) => (
+                    <div
+                      key={`cand_${c.propertyId}_${c.slotIndex ?? 0}`}
+                      className="rounded-md border border-border/40 bg-background/40 p-2 space-y-1.5"
+                    >
+                      <div className="text-[11px] font-medium truncate">{c.propertyName}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {c.tenantName}
+                        {(c.rentArrearsCount ?? 0) > 0 && ` · ${c.rentArrearsCount}mo arrears`}
+                      </div>
+                      <EvictionDialog
+                        propertyId={c.propertyId}
+                        propertyName={c.propertyName}
+                        tenantName={c.tenantName}
+                        tenantProfile={c.tenantProfile}
+                        rentArrearsCount={c.rentArrearsCount}
+                        hasLongstandingASB={c.hasLongstandingASB}
+                        propertyType={c.propertyType}
+                        onEvict={(pid, ground) => onEvictTenant(pid, ground, c.slotIndex)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {pendingEvictions.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No pending evictions.</p>
+              evictionCandidates.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No pending evictions.</p>
+              ) : null
             ) : pendingEvictions.map((ev) => {
               const remaining = Math.max(0, ev.effectiveMonth - monthsPlayed);
               return (

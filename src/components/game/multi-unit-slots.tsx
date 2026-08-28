@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TenantSelector, type Tenant } from "@/components/game/tenant-selector";
-import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
 import { TitleSplitDialog } from "@/components/game/title-split-dialog";
 import { Heart, ChevronDown, ChevronUp } from "lucide-react";
@@ -246,15 +245,15 @@ export function MultiUnitSlots({
                       }
                     />
                   )}
-                  <EvictionDialog
-                    propertyId={propertyId}
-                    propertyName={`${propertyName} · ${label} ${slotIndex + 1}`}
-                    tenantName={tenant.name}
-                    tenantProfile={tenant.profile}
-                    rentArrearsCount={0}
-                    hasLongstandingASB={false}
-                    onEvict={(pid, ground) => evictTenant(pid, ground, slotIndex)}
-                  />
+                  {/* Improvements #7 item 4 — eviction handled in Operations → Evictions. */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px]"
+                    onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId } }))}
+                  >
+                    Evictions →
+                  </Button>
                 </div>
               )}
 

@@ -9,7 +9,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TenantSelector, Tenant } from "@/components/game/tenant-selector";
 import { RenovationDialog, RenovationType } from "@/components/game/renovation-dialog";
 import { FurnishingDialog } from "@/components/game/furnishing-dialog";
-import { EvictionDialog } from "@/components/game/eviction-dialog";
 import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog";
 import { HeadsOfTermsDialog } from "@/components/game/heads-of-terms-dialog";
 import { CourtClaimDialog } from "@/components/game/court-claim-dialog";
@@ -1214,16 +1213,15 @@ export const PropertyCard = memo(function PropertyCard({
                           onApply={applyRentIncrease}
                         />
                       )}
-                      <EvictionDialog
-                        propertyId={property.id}
-                        propertyName={property.name}
-                        tenantName={currentTenant.name}
-                        tenantProfile={currentTenant.profile}
-                        rentArrearsCount={rentArrearsCount}
-                        hasLongstandingASB={tenantConcerns.some(c => c.propertyId === property.id && !c.resolvedMonth && (c.category === 'noise' || c.category === 'safety') && (monthsPlayed - c.raisedMonth) >= 1)}
-                        propertyType={property.type}
-                        onEvict={evictTenant}
-                      />
+                      {/* Improvements #7 item 4 — serving notice now lives in Operations → Evictions. */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px]"
+                        onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
+                      >
+                        Manage tenancy in Operations →
+                      </Button>
                     </div>
                   )}
                   {property.type === 'commercial' && currentTenant && (
@@ -1231,15 +1229,15 @@ export const PropertyCard = memo(function PropertyCard({
                       <div className="text-[11px] text-muted-foreground italic">
                         Commercial lease — see the lease panel above for rent reviews, break clauses, and renewal options.
                       </div>
-                      <EvictionDialog
-                        propertyId={property.id}
-                        propertyName={property.name}
-                        tenantName={currentTenant.name}
-                        tenantProfile={currentTenant.profile}
-                        rentArrearsCount={rentArrearsCount}
-                        propertyType="commercial"
-                        onEvict={evictTenant}
-                      />
+                      {/* Improvements #7 item 4 — serving notice now lives in Operations → Evictions. */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px]"
+                        onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
+                      >
+                        Manage tenancy in Operations →
+                      </Button>
                     </div>
                   )}
                   </>}
