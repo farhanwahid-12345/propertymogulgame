@@ -19,6 +19,8 @@ import { applyCeilingDiminishingReturns, isConditionUpgradeRenovation } from '@/
 import { showToast } from '../storeHelpers';
 import { mergeConcernsById } from '../sanitizers';
 import type {
+  Property, PropertyOffer, Renovation, Conveyancing,
+} from '@/types/game';
 
 /**
  * Improvements #7 item 5 — raise a blocking pop-up + sound for every sale
@@ -37,8 +39,6 @@ function saleEvent(kind: 'offer' | 'counter' | 'accepted' | 'walkaway', title: s
   } catch { /* noop */ }
 }
 
-  Property, PropertyOffer, Renovation, Conveyancing,
-} from '@/types/game';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
