@@ -12,7 +12,7 @@ describe('Phase 3 — landlord reputation, goal target, EPC tutorial', () => {
     runMigrations(persisted, migrationSteps, CURRENT_VERSION);
     expect(persisted.goalTarget).toBe(500_000 * 100);
     expect(persisted.seenEpcTutorial).toBe(false);
-    expect(persisted._version).toBe(20);
+    expect(persisted._version).toBe(CURRENT_VERSION);
   });
 
   it('v15→v16 migration preserves existing goalTarget', async () => {
