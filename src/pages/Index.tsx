@@ -27,7 +27,7 @@ import { useGameStore } from "@/stores/gameStore";
 import { HeroHeader } from "@/components/sections/HeroHeader";
 import { TutorialEngine } from "@/components/game/tutorial/TutorialEngine";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
-import { BankingPanelActions, OperationsInlineButton, LoansInlineButton } from "@/components/sections/BankingPanel";
+import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, InvestmentsInlineButton } from "@/components/sections/BankingPanel";
 import { AccountsPanel } from "@/components/sections/AccountsPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
 import { MobileBottomNav } from "@/components/sections/MobileBottomNav";
@@ -237,6 +237,7 @@ const Index = () => {
                       totalPortfolioIncome={totalPortfolioIncome}
                     />
                     <LoansInlineButton gameState={gameState} />
+                    <InvestmentsInlineButton gameState={gameState} />
                   </>
                 )}
                 {activeTab === 'accounts' && (

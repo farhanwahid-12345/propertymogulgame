@@ -146,7 +146,15 @@ export function useGameState() {
   // overdraftUsed is real borrowed money that must be repaid; including it stops
   // net worth from being inflated by short-term overdraft taps. Subtracting mortgage
   // + loan balances stops the "free money" jump when a financed buy completes.
+  const investmentsRaw = Array.isArray((store as any).investments) ? (store as any).investments : [];
+  const investmentWithdrawalsRaw = Array.isArray((store as any).investmentWithdrawals)
+    ? (store as any).investmentWithdrawals : [];
+  // Improvements #7 item 6 — invested pots and in-flight withdrawals are assets.
+  const investmentValuePennies = investmentsRaw.reduce((s2: number, h: any) => s2 + (h.balancePennies || 0), 0)
+    + investmentWithdrawalsRaw.reduce((s2: number, w: any) => s2 + ((w.grossPennies || 0) - (w.penaltyPennies || 0)), 0);
+
   const netWorth = fromPennies(computeNetWorthPennies({
+    investmentValuePennies,
     cashPennies: toPennies(cash),
     inflightBuyCapitalPennies: toPennies(inflightBuyCapital),
     renovationWIPPennies: toPennies(renovationWIP),
@@ -420,6 +428,10 @@ export function useGameState() {
     landlordReputation: store.landlordReputation,
     reputationLog: store.reputationLog || [],
     currentMarketRate: store.currentMarketRate,
+    investments: investmentsRaw,
+    investmentWithdrawals: investmentWithdrawalsRaw,
+    investCash: (store as any).investCash,
+    requestInvestmentWithdrawal: (store as any).requestInvestmentWithdrawal,
     tenantEvents,
     pendingEvictions: Array.isArray(store.pendingEvictions) ? store.pendingEvictions : [],
     propertyLocks: Array.isArray(store.propertyLocks) ? store.propertyLocks : [],

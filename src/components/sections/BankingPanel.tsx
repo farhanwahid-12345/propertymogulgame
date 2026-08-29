@@ -13,6 +13,9 @@ import type { useGameState } from "@/hooks/useGameState";
 const OperationsCenter = lazy(() =>
   import("@/components/game/operations-center").then((m) => ({ default: m.OperationsCenter })),
 );
+const InvestmentsPanel = lazy(() =>
+  import("@/components/game/investments-panel").then((m) => ({ default: m.InvestmentsPanel })),
+);
 const LoansPanel = lazy(() =>
   import("@/components/game/loans-panel").then((m) => ({ default: m.LoansPanel })),
 );
@@ -270,6 +273,34 @@ export function LoansInlineButton({ gameState }: { gameState: GameState }) {
       title="Loans"
     >
       <LoansPanel />
+    </InlineDialogButton>
+  );
+}
+
+/** Improvements #7 item 6 — bank investments live beside Loans in the Bank row. */
+export function InvestmentsInlineButton({ gameState }: { gameState: GameState }) {
+  const holdings = (gameState as any).investments || [];
+  const pending = (gameState as any).investmentWithdrawals || [];
+  const invested = holdings.reduce((s: number, h: any) => s + (h.balancePennies || 0), 0);
+  return (
+    <InlineDialogButton
+      id="section-investments"
+      label="📈 Investments"
+      summary={invested === 0 ? "No investments" : `£${Math.round(invested / 100).toLocaleString()} invested`}
+      title="Investments"
+      autoOpenEvent="pm:open-investments"
+    >
+      <Suspense fallback={<div className="py-6 text-center text-xs text-muted-foreground">Loading…</div>}>
+        <InvestmentsPanel
+          cashPennies={Math.round(gameState.cash * 100)}
+          boeRate={gameState.currentMarketRate ?? 0.045}
+          monthsPlayed={gameState.monthsPlayed}
+          investments={holdings}
+          withdrawals={pending}
+          onInvest={(gameState as any).investCash}
+          onWithdraw={(gameState as any).requestInvestmentWithdrawal}
+        />
+      </Suspense>
     </InlineDialogButton>
   );
 }
