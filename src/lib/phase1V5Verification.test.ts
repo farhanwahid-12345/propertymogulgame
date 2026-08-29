@@ -64,6 +64,6 @@ describe('Phase 1 (v5) — wiring', () => {
   });
 
   it('CURRENT_VERSION is 15 (rngSeed step)', () => {
-    expect(CURRENT_VERSION).toBe(20);
+    expect(CURRENT_VERSION).toBe(24);
   });
 });
