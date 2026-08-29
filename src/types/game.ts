@@ -565,6 +565,10 @@ export interface GameState {
   tenantHistory: TenantDeparture[];
   // Personal / business / bridging loans
   loans: Loan[];
+  /** Improvements #7 item 6 — bank investment holdings (pennies). */
+  investments: InvestmentHolding[];
+  /** Withdrawal requests waiting out their notice period. */
+  investmentWithdrawals: InvestmentWithdrawal[];
   // Planning approvals awaiting player acknowledgement (drives celebration dialog)
   pendingPlanningCelebrations: string[];
   // Planning refusals awaiting player acknowledgement (drives refusal dialog)
@@ -806,3 +810,27 @@ export interface TenantDeparture {
 
 // Save version — increment when changing state shape
 export const SAVE_VERSION = 20;
+
+
+/** Improvements #7 item 6 — one investment pot per product. All pennies. */
+export interface InvestmentHolding {
+  id: string;
+  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  balancePennies: number;
+  /** Total cash paid in over the life of the holding. */
+  contributedPennies: number;
+  openedMonth: number;
+  lifetimeGainPennies: number;
+  /** Last applied monthly return (decimal) — drives the UI delta badge. */
+  lastMonthReturn?: number;
+}
+
+/** A pending withdrawal serving out its notice / settlement period. */
+export interface InvestmentWithdrawal {
+  id: string;
+  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  grossPennies: number;
+  penaltyPennies: number;
+  requestedMonth: number;
+  settlesMonth: number;
+}

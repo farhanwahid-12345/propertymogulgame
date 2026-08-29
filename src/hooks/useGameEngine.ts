@@ -64,6 +64,8 @@ export function useGameEngine() {
           try {
             useGameStore.getState().processMonthEnd();
             useGameStore.getState().replenishMarket();
+            // Improvements #7 item 6 — investment returns + withdrawal settlement.
+            useGameStore.getState().processInvestmentsMonth?.();
           } finally {
             processingMonth.current = false;
           }

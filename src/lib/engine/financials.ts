@@ -144,8 +144,11 @@ export function computeNetWorthPennies(args: {
   totalMortgageDebtPennies: number;
   totalLoanDebtPennies: number;
   overdraftUsedPennies: number;
+  /** Improvements #7 item 6 — invested pots + in-flight withdrawals. */
+  investmentValuePennies?: number;
 }): number {
   return args.cashPennies
+    + (args.investmentValuePennies ?? 0)
     + args.inflightBuyCapitalPennies
     + args.renovationWIPPennies
     + args.furnitureValuePennies
