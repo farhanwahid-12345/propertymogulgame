@@ -129,6 +129,10 @@ interface GameActions {
   // Market management
   removeAuctionProperty: (propertyId: string) => void;
   replenishMarket: () => void;
+  /** Improvements #7 item 6 — investment returns + withdrawal settlement. */
+  processInvestmentsMonth: () => void;
+  investCash: (kind: 'savings' | 'bonds' | 'index' | 'risky', amountPennies: number) => void;
+  requestInvestmentWithdrawal: (kind: 'savings' | 'bonds' | 'index' | 'risky', amountPennies: number) => void;
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
   topUpCondition: (propertyId: string, points: number) => void;
