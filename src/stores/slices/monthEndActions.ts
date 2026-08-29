@@ -1432,8 +1432,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const inflightBuyCapitalForLevel = activeConveyancing
         .filter(c => c.status === 'buying')
         .reduce((sum, c) => sum + (c.cashHeld || 0), 0);
+      // Improvements #7 item 6 — invested pots + in-flight withdrawals are assets.
+      const investmentValuePennies = ((prev.investments || []) as Array<{ balancePennies?: number }>)
+        .reduce((sum, h) => sum + (h.balancePennies || 0), 0)
+        + ((prev.investmentWithdrawals || []) as Array<{ grossPennies?: number; penaltyPennies?: number }>)
+          .reduce((sum, w) => sum + ((w.grossPennies || 0) - (w.penaltyPennies || 0)), 0);
       const netWorth = newCashBeforeTax + inflightBuyCapitalForLevel + propertyEquity + renovationWIP + furnitureWorth
-        - prev.overdraftUsed - loanDebtForLevel;
+        + investmentValuePennies - prev.overdraftUsed - loanDebtForLevel;
       let newLevel = prev.level;
       while (newLevel < 10 && netWorth >= getRequiredNetWorth(newLevel + 1)) newLevel++;
       if (newLevel > prev.level) {
@@ -2106,7 +2111,11 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       const inflightBuyCapitalFinal = activeConveyancing
         .filter(c => c.status === 'buying')
         .reduce((sum, c) => sum + (c.cashHeld || 0), 0);
-      const netWorthFinal = finalCash - finalOverdraftUsed + inflightBuyCapitalFinal + propertyEquityFinal + renovationWIP + furnitureWorthFinal - loanDebtFinal;
+      const investmentValueFinal = ((prev.investments || []) as Array<{ balancePennies?: number }>)
+        .reduce((sum, h) => sum + (h.balancePennies || 0), 0)
+        + ((prev.investmentWithdrawals || []) as Array<{ grossPennies?: number; penaltyPennies?: number }>)
+          .reduce((sum, w) => sum + ((w.grossPennies || 0) - (w.penaltyPennies || 0)), 0);
+      const netWorthFinal = finalCash - finalOverdraftUsed + inflightBuyCapitalFinal + propertyEquityFinal + renovationWIP + furnitureWorthFinal + investmentValueFinal - loanDebtFinal;
 
       let isBankrupt = false;
       // Phase 7 #16 — overdraft prompt: fires once at the start of a fresh distress

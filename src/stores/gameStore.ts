@@ -27,6 +27,7 @@ import {
 import { createRenovationActions } from './slices/renovationActions';
 import { createMarketActions } from './slices/marketActions';
 import { createFinancialActions } from './slices/financialActions';
+import { createInvestmentActions } from './slices/investmentActions';
 import { createPortfolioActions } from './slices/portfolioActions';
 import { createTenantActions } from './slices/tenantActions';
 import { createConveyancingActions } from './slices/conveyancingActions';
@@ -128,6 +129,10 @@ interface GameActions {
   // Market management
   removeAuctionProperty: (propertyId: string) => void;
   replenishMarket: () => void;
+  /** Improvements #7 item 6 — investment returns + withdrawal settlement. */
+  processInvestmentsMonth: () => void;
+  investCash: (kind: 'savings' | 'bonds' | 'index' | 'risky', amountPennies: number) => void;
+  requestInvestmentWithdrawal: (kind: 'savings' | 'bonds' | 'index' | 'risky', amountPennies: number) => void;
   // Tenant concerns
   resolveTenantConcern: (concernId: string) => void;
   topUpCondition: (propertyId: string, points: number) => void;
@@ -237,6 +242,8 @@ export function createInitialState(): GameState {
     planningApplications: [],
     tenantHistory: [],
     loans: [],
+    investments: [],
+    investmentWithdrawals: [],
     pendingPlanningCelebrations: [],
     pendingPlanningRefusals: [],
     arrears: null,
@@ -279,6 +286,14 @@ export function createInitialState(): GameState {
 // Ordered registry consumed by `runMigrations` (src/lib/migrations.ts).
 // Each step mutates `persisted` in place; the runner stamps `_version`.
 export const migrationSteps: ReadonlyArray<Migration> = [
+  {
+    from: 23, to: 24,
+    describe: 'Improvements #7 item 6 — seed bank investment holdings + withdrawal queue.',
+    apply: (p: any) => {
+      if (!Array.isArray(p.investments)) p.investments = [];
+      if (!Array.isArray(p.investmentWithdrawals)) p.investmentWithdrawals = [];
+    },
+  },
   {
     from: 1, to: 2, describe: 'pounds → pennies',
     apply: (persisted) => {
@@ -645,6 +660,7 @@ export const useGameStore = create<GameState & GameActions>()(
       ...createRenovationActions(set as any, get as any),
       ...createMarketActions(set as any, get as any),
       ...createFinancialActions(set as any, get as any),
+      ...createInvestmentActions(set as any, get as any),
       ...createGameControlActions(set as any, get as any),
       ...createPropertyManagementActions(set as any, get as any),
 
