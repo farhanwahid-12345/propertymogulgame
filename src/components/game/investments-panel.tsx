@@ -50,6 +50,13 @@ export function InvestmentsPanel({
     return { invested, pending, gains };
   }, [investments, withdrawals]);
 
+  const history = useMemo(
+    () => [...ledger].sort((a, b) => (b.at || 0) - (a.at || 0)),
+    [ledger],
+  );
+  const visibleHistory = showAllHistory ? history : history.slice(0, 8);
+
+
   return (
     <Card className="glass border-0">
       <CardHeader className="pb-3">
