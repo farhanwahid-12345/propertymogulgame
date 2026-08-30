@@ -244,6 +244,7 @@ export function createInitialState(): GameState {
     loans: [],
     investments: [],
     investmentWithdrawals: [],
+    investmentLedger: [],
     pendingPlanningCelebrations: [],
     pendingPlanningRefusals: [],
     arrears: null,
