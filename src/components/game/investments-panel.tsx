@@ -38,9 +38,10 @@ const ORDER: InvestmentKind[] = ['savings', 'bonds', 'index', 'risky'];
  * tracker, and high-risk stock picks, each with its own notice period.
  */
 export function InvestmentsPanel({
-  cashPennies, boeRate, monthsPlayed, investments, withdrawals, onInvest, onWithdraw,
+  cashPennies, boeRate, monthsPlayed, investments, withdrawals, ledger = [], onInvest, onWithdraw,
 }: Props) {
   const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   const totals = useMemo(() => {
     const invested = investments.reduce((s, h) => s + h.balancePennies, 0);
