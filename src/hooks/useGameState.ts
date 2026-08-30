@@ -430,6 +430,7 @@ export function useGameState() {
     currentMarketRate: store.currentMarketRate,
     investments: investmentsRaw,
     investmentWithdrawals: investmentWithdrawalsRaw,
+    investmentLedger: Array.isArray((store as any).investmentLedger) ? (store as any).investmentLedger : [],
     investCash: (store as any).investCash,
     requestInvestmentWithdrawal: (store as any).requestInvestmentWithdrawal,
     tenantEvents,
