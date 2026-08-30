@@ -2,17 +2,32 @@
  * Improvements #7 item 6 — bank investment actions.
  *
  * Holdings hold a pennies balance per product; withdrawals go through a notice
- * period and land back in cash when they settle.
+ * period and land back in cash when they settle. Every money movement is also
+ * appended to `investmentLedger` for the transaction-history view.
  */
 import { fromPennies } from '@/lib/formatCurrency';
 import { showToast, debit, credit } from '../storeHelpers';
 import {
   INVESTMENT_PRODUCTS, monthlyReturn, type InvestmentKind,
 } from '@/lib/engine/investments';
-import type { InvestmentHolding, InvestmentWithdrawal } from '@/types/game';
+import type { InvestmentHolding, InvestmentWithdrawal, InvestmentLedgerEntry } from '@/types/game';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
+
+const LEDGER_LIMIT = 400;
+
+/** Append ledger entries (newest first) and cap the log length. */
+function appendLedger(prev: any, entries: InvestmentLedgerEntry[]): InvestmentLedgerEntry[] {
+  const existing: InvestmentLedgerEntry[] = Array.isArray(prev.investmentLedger) ? prev.investmentLedger : [];
+  return [...entries, ...existing].slice(0, LEDGER_LIMIT);
+}
+
+let ledgerSeq = 0;
+function ledgerId(kind: string, type: string) {
+  ledgerSeq += 1;
+  return `invl_${kind}_${type}_${Date.now()}_${ledgerSeq}`;
+}
 
 export function createInvestmentActions(set: SetFn, get: GetFn) {
   return {
@@ -51,7 +66,19 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
           lastMonthReturn: 0,
         });
       }
-      set({ ...debited, investments: holdings });
+      set({
+        ...debited,
+        investments: holdings,
+        investmentLedger: appendLedger(prev, [{
+          id: ledgerId(kind, 'deposit'),
+          kind,
+          type: 'deposit',
+          amountPennies: amount,
+          month: prev.monthsPlayed,
+          at: Date.now(),
+          note: product.name,
+        }]),
+      });
       showToast('Investment placed', `£${fromPennies(amount).toLocaleString()} into ${product.name}.`);
     },
 
@@ -75,7 +102,20 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
 
       if (product.noticeMonths === 0) {
         const credited = credit(prev, amount - penalty);
-        set({ ...credited, investments: remaining });
+        set({
+          ...credited,
+          investments: remaining,
+          investmentLedger: appendLedger(prev, [{
+            id: ledgerId(kind, 'settled'),
+            kind,
+            type: 'withdrawal_settled',
+            amountPennies: amount,
+            penaltyPennies: penalty,
+            month: prev.monthsPlayed,
+            at: Date.now(),
+            note: `${product.name} — instant access`,
+          }]),
+        });
         showToast(
           'Withdrawal complete',
           `£${fromPennies(amount - penalty).toLocaleString()} back in cash${penalty > 0 ? ` (£${fromPennies(penalty).toLocaleString()} exit fee)` : ''}.`,
@@ -94,7 +134,20 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
           settlesMonth: prev.monthsPlayed + product.noticeMonths,
         },
       ];
-      set({ investments: remaining, investmentWithdrawals: withdrawals });
+      set({
+        investments: remaining,
+        investmentWithdrawals: withdrawals,
+        investmentLedger: appendLedger(prev, [{
+          id: ledgerId(kind, 'requested'),
+          kind,
+          type: 'withdrawal_requested',
+          amountPennies: amount,
+          penaltyPennies: penalty,
+          month: prev.monthsPlayed,
+          at: Date.now(),
+          note: `${product.name} — ${product.noticeMonths}mo notice`,
+        }]),
+      });
       showToast(
         'Withdrawal requested',
         `£${fromPennies(amount - penalty).toLocaleString()} settles in ${product.noticeMonths} month${product.noticeMonths === 1 ? '' : 's'}.`,
@@ -128,7 +181,20 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
       let patch: any = { investments: updated, investmentWithdrawals: stillPending };
       if (due.length > 0) {
         const total = due.reduce((s, w) => s + (w.grossPennies - w.penaltyPennies), 0);
-        patch = { ...credit(get(), total), ...patch };
+        patch = {
+          ...credit(get(), total),
+          ...patch,
+          investmentLedger: appendLedger(prev, due.map(w => ({
+            id: ledgerId(w.kind, 'settled'),
+            kind: w.kind,
+            type: 'withdrawal_settled' as const,
+            amountPennies: w.grossPennies,
+            penaltyPennies: w.penaltyPennies,
+            month: prev.monthsPlayed,
+            at: Date.now(),
+            note: `${INVESTMENT_PRODUCTS[w.kind].name} — notice served`,
+          }))),
+        };
         showToast(
           'Investment funds settled',
           `£${fromPennies(total).toLocaleString()} from ${due.length} withdrawal${due.length === 1 ? '' : 's'} is now in cash.`,

@@ -244,6 +244,7 @@ export function createInitialState(): GameState {
     loans: [],
     investments: [],
     investmentWithdrawals: [],
+    investmentLedger: [],
     pendingPlanningCelebrations: [],
     pendingPlanningRefusals: [],
     arrears: null,
@@ -286,6 +287,13 @@ export function createInitialState(): GameState {
 // Ordered registry consumed by `runMigrations` (src/lib/migrations.ts).
 // Each step mutates `persisted` in place; the runner stamps `_version`.
 export const migrationSteps: ReadonlyArray<Migration> = [
+  {
+    from: 24, to: 25,
+    describe: 'Investment transaction history ledger.',
+    apply: (p: any) => {
+      if (!Array.isArray(p.investmentLedger)) p.investmentLedger = [];
+    },
+  },
   {
     from: 23, to: 24,
     describe: 'Improvements #7 item 6 — seed bank investment holdings + withdrawal queue.',
