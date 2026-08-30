@@ -834,3 +834,21 @@ export interface InvestmentWithdrawal {
   requestedMonth: number;
   settlesMonth: number;
 }
+
+/** Immutable audit line for every investment deposit / withdrawal event. */
+export interface InvestmentLedgerEntry {
+  id: string;
+  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  type: 'deposit' | 'withdrawal_requested' | 'withdrawal_settled';
+  /** Gross amount moved (pennies). Deposits positive, withdrawals positive too. */
+  amountPennies: number;
+  /** Early-exit fee applied, if any (pennies). */
+  penaltyPennies?: number;
+  /** In-game month the event happened. */
+  month: number;
+  /** Wall-clock timestamp (Date.now()) for display ordering. */
+  at: number;
+  /** Optional human note, e.g. settlement source. */
+  note?: string;
+}
+
