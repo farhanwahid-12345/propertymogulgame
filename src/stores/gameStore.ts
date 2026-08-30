@@ -288,6 +288,13 @@ export function createInitialState(): GameState {
 // Each step mutates `persisted` in place; the runner stamps `_version`.
 export const migrationSteps: ReadonlyArray<Migration> = [
   {
+    from: 24, to: 25,
+    describe: 'Investment transaction history ledger.',
+    apply: (p: any) => {
+      if (!Array.isArray(p.investmentLedger)) p.investmentLedger = [];
+    },
+  },
+  {
     from: 23, to: 24,
     describe: 'Improvements #7 item 6 — seed bank investment holdings + withdrawal queue.',
     apply: (p: any) => {
