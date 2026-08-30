@@ -172,9 +172,66 @@ export function InvestmentsPanel({
             </div>
           );
         })}
+        <div className="rounded-xl border border-border/40 bg-muted/10 p-3 space-y-2">
+          <div className="text-xs font-semibold flex items-center gap-1.5">
+            <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
+            Transaction history
+            <Badge variant="outline" className="text-[10px]">{history.length}</Badge>
+          </div>
+          {history.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              No investment transactions yet — deposits and withdrawals are logged here.
+            </p>
+          ) : (
+            <>
+              <ul className="space-y-1">
+                {visibleHistory.map((e) => {
+                  const isDeposit = e.type === 'deposit';
+                  const label = isDeposit
+                    ? 'Deposit'
+                    : e.type === 'withdrawal_requested' ? 'Withdrawal requested' : 'Withdrawal settled';
+                  const net = e.amountPennies - (e.penaltyPennies || 0);
+                  return (
+                    <li key={e.id} className="flex items-start justify-between gap-2 text-[11px]">
+                      <span className="flex items-start gap-1.5 min-w-0">
+                        {isDeposit
+                          ? <ArrowUpRight className="h-3 w-3 mt-0.5 text-[hsl(var(--stat-credit))] shrink-0" />
+                          : <ArrowDownLeft className="h-3 w-3 mt-0.5 text-amber-300 shrink-0" />}
+                        <span className="min-w-0">
+                          <span className="font-medium">{label}</span>
+                          <span className="text-muted-foreground"> · {INVESTMENT_PRODUCTS[e.kind].name}</span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            Month {e.month} · {new Date(e.at).toLocaleString(undefined, {
+                              day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                            })}
+                            {e.penaltyPennies ? ` · £${fromPennies(e.penaltyPennies).toLocaleString(undefined, { maximumFractionDigits: 0 })} fee` : ''}
+                          </span>
+                        </span>
+                      </span>
+                      <span className={`font-semibold tabular-nums shrink-0 ${isDeposit ? 'text-danger' : 'text-success'}`}>
+                        {isDeposit ? '−' : '+'}£{fromPennies(isDeposit ? e.amountPennies : net).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {history.length > 8 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-[11px] px-2"
+                  onClick={() => setShowAllHistory(v => !v)}
+                >
+                  {showAllHistory ? 'Show less' : `Show all ${history.length}`}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
         <p className="text-[10px] text-muted-foreground">
           Invested pots count toward net worth but can't be used as a deposit until they settle back into cash.
         </p>
+
       </CardContent>
     </Card>
   );
