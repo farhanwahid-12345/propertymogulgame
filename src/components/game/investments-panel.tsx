@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { PiggyBank, TrendingUp, TrendingDown, Landmark, Hourglass, Rocket } from "lucide-react";
+import { PiggyBank, TrendingUp, TrendingDown, Landmark, Hourglass, Rocket, ArrowDownLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import {
   INVESTMENT_PRODUCTS, annualisedRate, type InvestmentKind,
 } from "@/lib/engine/investments";
-import type { InvestmentHolding, InvestmentWithdrawal } from "@/types/game";
+import type { InvestmentHolding, InvestmentWithdrawal, InvestmentLedgerEntry } from "@/types/game";
 
 interface Props {
   /** Player cash in pennies. */
@@ -17,9 +17,12 @@ interface Props {
   monthsPlayed: number;
   investments: InvestmentHolding[];
   withdrawals: InvestmentWithdrawal[];
+  /** Newest-first transaction history of deposits and withdrawals. */
+  ledger?: InvestmentLedgerEntry[];
   onInvest: (kind: InvestmentKind, amountPennies: number) => void;
   onWithdraw: (kind: InvestmentKind, amountPennies: number) => void;
 }
+
 
 const ICONS: Record<InvestmentKind, typeof PiggyBank> = {
   savings: PiggyBank,
