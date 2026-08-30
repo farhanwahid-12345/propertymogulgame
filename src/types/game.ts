@@ -569,6 +569,8 @@ export interface GameState {
   investments: InvestmentHolding[];
   /** Withdrawal requests waiting out their notice period. */
   investmentWithdrawals: InvestmentWithdrawal[];
+  /** Chronological ledger of every investment deposit / withdrawal. */
+  investmentLedger: InvestmentLedgerEntry[];
   // Planning approvals awaiting player acknowledgement (drives celebration dialog)
   pendingPlanningCelebrations: string[];
   // Planning refusals awaiting player acknowledgement (drives refusal dialog)
