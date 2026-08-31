@@ -1,13 +1,20 @@
 /**
- * Improvements #7 item 6 — bank investment products.
+ * Improvements #7 item 6 / #8 item 7 — bank investment products.
  *
- * Four products with escalating risk and different liquidity rules. All money is
- * integer pennies. Monthly returns are drawn from a seeded normal-ish
- * distribution (sum of two uniforms) so saves stay replayable.
+ * Five products with escalating risk and different liquidity rules. All money is
+ * integer pennies. Monthly returns are drawn from a seeded distribution so saves
+ * stay replayable.
+ *
+ * Product spec (from design doc):
+ * - Instant-access savings: BoE base rate + 0.5%.
+ * - Premium Bonds: ~5%/yr, stable, £50,000 holding cap.
+ * - S&P 500: 5–12%/yr, ~9.5% median, inversely tied to the BoE rate.
+ * - Risky stocks: monthly thirds — 33% big gain / 33% big loss / 33% flat.
+ * - Crypto: same thirds model with much wider swings.
  */
 import { gameRandom } from '@/lib/rng';
 
-export type InvestmentKind = 'savings' | 'bonds' | 'index' | 'risky';
+export type InvestmentKind = 'savings' | 'bonds' | 'index' | 'risky' | 'crypto';
 
 export interface InvestmentProduct {
   kind: InvestmentKind;
@@ -15,6 +22,8 @@ export interface InvestmentProduct {
   blurb: string;
   /** Minimum opening deposit (pennies). */
   minDepositPennies: number;
+  /** Optional maximum total holding (pennies) — e.g. the £50k Premium Bonds cap. */
+  maxHoldingPennies?: number;
   /** Months before a withdrawal request settles into cash. */
   noticeMonths: number;
   /** Expected monthly return (decimal) before the BoE adjustment. */
@@ -33,8 +42,8 @@ export interface InvestmentProduct {
 export const INVESTMENT_PRODUCTS: Record<InvestmentKind, InvestmentProduct> = {
   savings: {
     kind: 'savings',
-    name: 'Instant-access savings',
-    blurb: 'Tracks the Bank of England base rate less 0.6%. Withdraw any time.',
+    name: 'High-interest savings',
+    blurb: 'Pays the Bank of England base rate + 0.5%. Withdraw any time.',
     minDepositPennies: 100_00,
     noticeMonths: 0,
     meanMonthlyReturn: 0,
@@ -46,26 +55,27 @@ export const INVESTMENT_PRODUCTS: Record<InvestmentKind, InvestmentProduct> = {
   },
   bonds: {
     kind: 'bonds',
-    name: '3-year government bonds',
-    blurb: 'Base rate plus 1.1%, fixed. 3 months notice; early exit costs 2% of the pot.',
-    minDepositPennies: 1_000_00,
-    noticeMonths: 3,
-    meanMonthlyReturn: 0,
+    name: 'Premium Bonds',
+    blurb: '≈5% per year via the monthly prize draw, very stable. Max holding £50,000.',
+    minDepositPennies: 100_00,
+    maxHoldingPennies: 50_000_00,
+    noticeMonths: 1,
+    meanMonthlyReturn: 0.05 / 12,
     volatility: 0.0008,
-    boeSensitivity: 1,
-    earlyExitPenalty: 0.02,
-    lockMonths: 36,
+    boeSensitivity: 0,
+    earlyExitPenalty: 0,
+    lockMonths: 0,
     riskLabel: 'Very low risk',
   },
   index: {
     kind: 'index',
     name: 'S&P 500 index fund',
-    blurb: 'Roughly 8%/yr long run, but individual months swing hard. 1 month to settle.',
+    blurb: '5–12%/yr (≈9.5% median) — does best when the base rate is low. 1 month to settle.',
     minDepositPennies: 500_00,
     noticeMonths: 1,
-    meanMonthlyReturn: 0.0065,
+    meanMonthlyReturn: 0.095 / 12,
     volatility: 0.038,
-    boeSensitivity: -0.25,
+    boeSensitivity: -0.6,
     earlyExitPenalty: 0,
     lockMonths: 0,
     riskLabel: 'Medium risk',
@@ -73,23 +83,43 @@ export const INVESTMENT_PRODUCTS: Record<InvestmentKind, InvestmentProduct> = {
   risky: {
     kind: 'risky',
     name: 'High-growth stock picks',
-    blurb: 'Big upside, real chance of a wipeout month. 1 month to settle.',
+    blurb: 'Each month: roughly a third chance of a big gain, a big loss, or flat. 1 month to settle.',
     minDepositPennies: 500_00,
     noticeMonths: 1,
-    meanMonthlyReturn: 0.014,
-    volatility: 0.135,
-    boeSensitivity: -0.5,
+    meanMonthlyReturn: 0.012,
+    volatility: 0.11,
+    boeSensitivity: -0.4,
     earlyExitPenalty: 0,
     lockMonths: 0,
     riskLabel: 'High risk',
+  },
+  crypto: {
+    kind: 'crypto',
+    name: 'Crypto basket',
+    blurb: 'Same thirds model as risky stocks but with wilder swings — moon or crash. 1 month to settle.',
+    minDepositPennies: 250_00,
+    noticeMonths: 1,
+    meanMonthlyReturn: 0.02,
+    volatility: 0.28,
+    boeSensitivity: -0.3,
+    earlyExitPenalty: 0,
+    lockMonths: 0,
+    riskLabel: 'Very high risk',
   },
 };
 
 /** Headline annualised rate shown in the UI for a product. */
 export function annualisedRate(product: InvestmentProduct, boeRate: number): number {
-  if (product.kind === 'savings') return Math.max(0.001, boeRate - 0.006);
-  if (product.kind === 'bonds') return boeRate + 0.011;
-  return product.meanMonthlyReturn * 12 + product.boeSensitivity * boeRate * 0.5;
+  if (product.kind === 'savings') return Math.max(0.005, boeRate + 0.005);
+  if (product.kind === 'bonds') return 0.05;
+  // S&P 500: 9.5% median at a 4.5% base rate, clamped into the 5–12% band;
+  // low BoE → higher returns, high BoE → lower returns.
+  if (product.kind === 'index') {
+    return Math.min(0.12, Math.max(0.05,
+      product.meanMonthlyReturn * 12 + product.boeSensitivity * (boeRate - 0.045)));
+  }
+  // Risky buckets show the long-run mean; months are drawn as thirds.
+  return product.meanMonthlyReturn * 12;
 }
 
 /** Symmetric-ish random draw in [-1, 1] with a central bias. */
@@ -98,18 +128,30 @@ function draw(): number {
 }
 
 /**
+ * Thirds model for the speculative buckets: ~33% big gain, ~33% big loss,
+ * ~33% roughly flat. Magnitudes scale with the product volatility.
+ */
+function thirdsReturn(product: InvestmentProduct): number {
+  const roll = gameRandom();
+  const swing = product.volatility * (0.8 + gameRandom() * 0.7);
+  if (roll < 1 / 3) return swing;                    // big gain
+  if (roll < 2 / 3) return -swing;                   // big loss
+  return draw() * product.volatility * 0.15;         // ~flat
+}
+
+/**
  * Monthly return (decimal) for one holding. Deterministic products ignore
- * volatility; the risky bucket can suffer a rare heavy drawdown.
+ * volatility; the speculative buckets use the thirds model.
  */
 export function monthlyReturn(kind: InvestmentKind, boeRate: number): number {
   const product = INVESTMENT_PRODUCTS[kind];
   if (kind === 'savings' || kind === 'bonds') {
-    return annualisedRate(product, boeRate) / 12;
+    return annualisedRate(product, boeRate) / 12 + draw() * product.volatility;
   }
-  const base = product.meanMonthlyReturn + product.boeSensitivity * (boeRate - 0.04) / 12;
-  let r = base + draw() * product.volatility;
-  if (kind === 'risky' && gameRandom() < 0.04) {
-    r -= 0.18 + gameRandom() * 0.22; // profit warning / blow-up
+  if (kind === 'index') {
+    return annualisedRate(product, boeRate) / 12 + draw() * product.volatility;
   }
-  return Math.max(-0.75, r);
+  const boeTilt = product.boeSensitivity * (boeRate - 0.045) / 12;
+  const floor = kind === 'crypto' ? -0.9 : -0.75;
+  return Math.max(floor, thirdsReturn(product) + boeTilt);
 }
