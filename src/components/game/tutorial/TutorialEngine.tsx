@@ -371,25 +371,28 @@ export function TutorialEngine({ onFinish }: Props) {
               )}
             </div>
             <div className="flex gap-2">
-              {!isWait && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (isLast) handleFinish();
-                    else next();
-                  }}
-                >
-                  {isLast ? (
-                    <>
-                      Got it <Check className="h-4 w-4 ml-2" />
-                    </>
-                  ) : (
-                    <>
-                      Next <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant={isWait ? "outline" : "default"}
+                onClick={() => {
+                  if (isLast) handleFinish();
+                  else next();
+                }}
+              >
+                {isLast ? (
+                  <>
+                    Got it <Check className="h-4 w-4 ml-2" />
+                  </>
+                ) : isWait ? (
+                  <>
+                    Skip ahead <ArrowRight className="h-4 w-4 ml-2" />
+                  </>
+                ) : (
+                  <>
+                    Next <ArrowRight className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
             </div>
           </div>
 
