@@ -13,7 +13,7 @@ import { RentNegotiationDialog } from "@/components/game/rent-negotiation-dialog
 import { HeadsOfTermsDialog } from "@/components/game/heads-of-terms-dialog";
 import { CourtClaimDialog } from "@/components/game/court-claim-dialog";
 import { CourtProgressDialog } from "@/components/game/court-progress-dialog";
-import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp } from "lucide-react";
+import { Building2, Home, Crown, TrendingUp, TrendingDown, Calculator, AlertTriangle, Heart, ChevronDown, ChevronUp, Gavel } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -1220,7 +1220,8 @@ export const PropertyCard = memo(function PropertyCard({
                         className="h-7 text-[11px]"
                         onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
                       >
-                        Manage tenancy in Operations →
+                        <Gavel className="h-3 w-3 shrink-0" />
+                        <span className="whitespace-nowrap">Propose eviction</span>
                       </Button>
                     </div>
                   )}
@@ -1236,7 +1237,8 @@ export const PropertyCard = memo(function PropertyCard({
                         className="h-7 text-[11px]"
                         onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
                       >
-                        Manage tenancy in Operations →
+                        <Gavel className="h-3 w-3 shrink-0" />
+                        <span className="whitespace-nowrap">Propose eviction</span>
                       </Button>
                     </div>
                   )}
