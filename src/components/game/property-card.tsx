@@ -1220,7 +1220,8 @@ export const PropertyCard = memo(function PropertyCard({
                         className="h-7 text-[11px]"
                         onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
                       >
-                        Manage tenancy in Operations →
+                        <Gavel className="h-3 w-3 shrink-0" />
+                        <span className="whitespace-nowrap">Propose eviction</span>
                       </Button>
                     </div>
                   )}
