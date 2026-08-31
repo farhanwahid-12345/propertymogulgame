@@ -398,7 +398,7 @@ export function TutorialEngine({ onFinish }: Props) {
 
           {isWait && (
             <p className="text-[11px] text-muted-foreground/80 mt-2 text-right italic">
-              Waiting for you to complete the highlighted action…
+              Waiting for you to complete the highlighted action — or skip ahead.
             </p>
           )}
         </div>
