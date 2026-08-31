@@ -297,6 +297,7 @@ export function InvestmentsInlineButton({ gameState }: { gameState: GameState })
           monthsPlayed={gameState.monthsPlayed}
           investments={holdings}
           withdrawals={pending}
+          ledger={(gameState as any).investmentLedger || []}
           onInvest={(gameState as any).investCash}
           onWithdraw={(gameState as any).requestInvestmentWithdrawal}
         />
