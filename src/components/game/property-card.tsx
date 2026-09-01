@@ -573,6 +573,14 @@ export const PropertyCard = memo(function PropertyCard({
                 Apply HMO licence
               </Button>
             )}
+            {/* Improvements #8 item 8 — renew within 3 months of expiry to keep tenants in place. */}
+            {property.subtype === 'hmo' && property.hmoLicenceStatus === 'licensed' && applyForHmoLicence
+              && typeof property.hmoLicenceExpiresMonth === 'number'
+              && property.hmoLicenceExpiresMonth - (monthsPlayed ?? 0) <= 3 && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-amber-400/40 text-amber-300 hover:bg-amber-500/10" onClick={() => applyForHmoLicence(property.id)}>
+                Renew licence ({Math.max(0, property.hmoLicenceExpiresMonth - (monthsPlayed ?? 0))}mo)
+              </Button>
+            )}
           </div>
         )}
       </CardHeader>
