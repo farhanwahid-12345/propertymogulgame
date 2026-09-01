@@ -449,9 +449,15 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           status = 'expired';
           showToast('HMO Licence Expired ⚠️', `${property.name} — renew to avoid fines.`, 'destructive');
         }
-        // 2-month-before-expiry reminder
-        if (status === 'licensed' && typeof expiresMonth === 'number' && expiresMonth - newMonthNumber === 2) {
-          showToast('HMO Licence Renewal Due', `${property.name} — licence expires in 2 months.`);
+        // Improvements #8 item 8 — renewal prompts at 3 months and again at 1 month.
+        if (status === 'licensed' && typeof expiresMonth === 'number') {
+          const monthsLeft = expiresMonth - newMonthNumber;
+          if (monthsLeft === 3 || monthsLeft === 1) {
+            showToast(
+              'HMO Licence Renewal Due 📄',
+              `${property.name} — licence expires in ${monthsLeft} month${monthsLeft === 1 ? '' : 's'}. Renew from the property card to keep your tenants.`,
+            );
+          }
         }
         // Fine: 3-month grace, then £500/mo + −2 rep (rep applied via reputationDelta after init)
         // Phase 8 (item 22) — only fine when the unit is actually let.
