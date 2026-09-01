@@ -817,7 +817,7 @@ export const SAVE_VERSION = 20;
 /** Improvements #7 item 6 — one investment pot per product. All pennies. */
 export interface InvestmentHolding {
   id: string;
-  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  kind: 'savings' | 'bonds' | 'index' | 'risky' | 'crypto';
   balancePennies: number;
   /** Total cash paid in over the life of the holding. */
   contributedPennies: number;
@@ -830,7 +830,7 @@ export interface InvestmentHolding {
 /** A pending withdrawal serving out its notice / settlement period. */
 export interface InvestmentWithdrawal {
   id: string;
-  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  kind: 'savings' | 'bonds' | 'index' | 'risky' | 'crypto';
   grossPennies: number;
   penaltyPennies: number;
   requestedMonth: number;
@@ -840,7 +840,7 @@ export interface InvestmentWithdrawal {
 /** Immutable audit line for every investment deposit / withdrawal event. */
 export interface InvestmentLedgerEntry {
   id: string;
-  kind: 'savings' | 'bonds' | 'index' | 'risky';
+  kind: 'savings' | 'bonds' | 'index' | 'risky' | 'crypto';
   type: 'deposit' | 'withdrawal_requested' | 'withdrawal_settled';
   /** Gross amount moved (pennies). Deposits positive, withdrawals positive too. */
   amountPennies: number;
