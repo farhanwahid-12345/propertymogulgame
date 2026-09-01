@@ -111,6 +111,11 @@ export function InvestmentsPanel({
                     <Badge variant="outline" className="text-[10px]">{product.riskLabel}</Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{product.blurb}</p>
+                  {product.maxHoldingPennies !== undefined && (
+                    <p className="text-[10px] text-amber-300/80 mt-0.5">
+                      Room left: £{fromPennies(Math.max(0, product.maxHoldingPennies - balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })} of the £{fromPennies(product.maxHoldingPennies).toLocaleString(undefined, { maximumFractionDigits: 0 })} cap
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-bold text-[hsl(var(--stat-credit))]">
