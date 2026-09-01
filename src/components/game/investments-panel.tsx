@@ -29,13 +29,14 @@ const ICONS: Record<InvestmentKind, typeof PiggyBank> = {
   bonds: Landmark,
   index: TrendingUp,
   risky: Rocket,
+  crypto: Bitcoin,
 };
 
-const ORDER: InvestmentKind[] = ['savings', 'bonds', 'index', 'risky'];
+const ORDER: InvestmentKind[] = ['savings', 'bonds', 'index', 'risky', 'crypto'];
 
 /**
- * Improvements #7 item 6 — put spare cash to work: savings, bonds, an index
- * tracker, and high-risk stock picks, each with its own notice period.
+ * Improvements #8 item 7 — put spare cash to work: high-interest savings,
+ * Premium Bonds (£50k cap), an S&P 500 tracker, risky stocks and crypto.
  */
 export function InvestmentsPanel({
   cashPennies, boeRate, monthsPlayed, investments, withdrawals, ledger = [], onInvest, onWithdraw,
