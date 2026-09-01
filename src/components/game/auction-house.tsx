@@ -74,9 +74,28 @@ export function AuctionHouse({ ownedProperties, onAuctionSale, monthsPlayed, auc
   // Phase 4 #3 — city filter for the auction Buy list.
   const [cityFilter, setCityFilter] = useState<CityId | 'all'>('all');
   const unlockedCities = getUnlockedCities(level);
-  const filteredAuctionProperties = cityFilter === 'all'
+  // Improvements #8 item 11 — auction stock is level-gated like the estate agent,
+  // with a 40% lower band because auction lots sell below market value.
+  const getLevelRange = (playerLevel: number) => {
+    switch (playerLevel) {
+      case 1: return { min: 0, max: 100000 };
+      case 2: return { min: 100000, max: 250000 };
+      case 3: return { min: 250000, max: 500000 };
+      case 4: return { min: 500000, max: 750000 };
+      case 5: return { min: 750000, max: 1000000 };
+      case 6: return { min: 1000000, max: 2500000 };
+      case 7: return { min: 2500000, max: 5000000 };
+      case 8: return { min: 5000000, max: 10000000 };
+      case 9: return { min: 10000000, max: 20000000 };
+      case 10: return { min: 20000000, max: 30000000 };
+      default: return { min: 0, max: 100000 };
+    }
+  };
+  const { min: levelMin, max: levelMax } = getLevelRange(level);
+  const filteredAuctionProperties = (cityFilter === 'all'
     ? auctionProperties
-    : auctionProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter);
+    : auctionProperties.filter(p => (p.city ?? 'middlesbrough') === cityFilter)
+  ).filter(p => p.value >= levelMin * 0.6 && p.value <= levelMax);
 
 
   
