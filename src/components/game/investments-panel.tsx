@@ -91,7 +91,13 @@ export function InvestmentsPanel({
           const rate = annualisedRate(product, boeRate);
           const raw = amounts[kind] ?? '';
           const amountPennies = raw ? toPennies(Number(raw) || 0) : 0;
-          const canInvest = amountPennies >= product.minDepositPennies && amountPennies <= cashPennies;
+          // Improvements #8 item 7b — Premium Bonds are capped at £50,000 held.
+          const headroom = product.maxHoldingPennies !== undefined
+            ? Math.max(0, product.maxHoldingPennies - balance)
+            : Infinity;
+          const canInvest = amountPennies >= product.minDepositPennies
+            && amountPennies <= cashPennies
+            && amountPennies <= headroom;
           const locked = holding ? (monthsPlayed - holding.openedMonth) < product.lockMonths : false;
           const pendingForKind = withdrawals.filter(w => w.kind === kind);
 
