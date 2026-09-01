@@ -549,6 +549,13 @@ export function RenovationDialog({
     if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
       return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
     }
+    // Improvements #8 item 13 — planning caps built footprint at 70% of the plot.
+    if (r.sqftAdded && plotSqft) {
+      const maxFootprint = Math.floor(plotSqft * 0.7);
+      if (effectiveInternalSqft + r.sqftAdded > maxFootprint) {
+        return `Exceeds 70% plot coverage (max ${maxFootprint.toLocaleString()} sqft)`;
+      }
+    }
 
     // Already-converted: hide ANY further conversion option.
     if (r.category === 'conversion' && currentSubtype && currentSubtype !== 'standard') {
