@@ -45,6 +45,19 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
         );
         return;
       }
+      // Improvements #8 item 7b — enforce per-product holding caps (Premium Bonds £50k).
+      if (product.maxHoldingPennies !== undefined) {
+        const held = (prev.investments || []).find((h: InvestmentHolding) => h.kind === kind)?.balancePennies ?? 0;
+        const headroom = Math.max(0, product.maxHoldingPennies - held);
+        if (amount > headroom) {
+          showToast(
+            'Holding cap reached',
+            `${product.name} is capped at £${fromPennies(product.maxHoldingPennies).toLocaleString()} — you can add £${fromPennies(headroom).toLocaleString()} more.`,
+            'destructive',
+          );
+          return;
+        }
+      }
       const debited = debit(prev, amount);
       if (!debited) {
         showToast('Insufficient cash', `You need £${fromPennies(amount).toLocaleString()} available.`, 'destructive');

@@ -146,17 +146,20 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     epcRating = epcRoll < 0.1 ? 'B' : epcRoll < 0.45 ? 'C' : epcRoll < 0.85 ? 'D' : epcRoll < 0.97 ? 'E' : 'F';
   }
 
-  // Sqft generation by type
+  // Improvements #8 item 13 — footprint rules: a new build occupies ~35% of its
+  // plot (30–40% jitter) so there is real headroom to extend up to the 70%
+  // planning maximum enforced by the renovation engine.
   let internalSqft: number, plotSqft: number;
+  const coverage = 0.30 + Math.random() * 0.10; // 30–40%, ~35% typical
   if (type === 'commercial') {
     internalSqft = Math.round(800 + Math.random() * 3200);
-    plotSqft = Math.round(internalSqft * 1.2);
+    plotSqft = Math.round(internalSqft / coverage);
   } else if (type === 'luxury') {
     internalSqft = Math.round(1500 + Math.random() * 3500);
-    plotSqft = Math.round(5000 + Math.random() * 15000);
+    plotSqft = Math.round(Math.max(5000, internalSqft / coverage));
   } else {
     internalSqft = Math.round(500 + Math.random() * 1300);
-    plotSqft = Math.round(1500 + Math.random() * 4500);
+    plotSqft = Math.round(Math.max(1200, internalSqft / coverage));
   }
 
   const marketJitter = 1 + (Math.random() - 0.5) * 0.30; // ±15%
@@ -296,16 +299,19 @@ export function deriveSqft(p: { type: 'residential' | 'commercial' | 'luxury'; v
   if (p.internalSqft && p.plotSqft) return { internalSqft: p.internalSqft, plotSqft: p.plotSqft };
   // Use value as a rough proxy (pennies → pounds → sqft band)
   const valuePounds = p.value / 100;
+  // Improvements #8 item 13 — legacy saves get a ~35% coverage plot so they can
+  // still extend up to the 70% planning maximum.
+  const COVERAGE = 0.35;
   if (p.type === 'commercial') {
-    const internal = Math.round(800 + (valuePounds / 350) ); // gentle scaling
-    return { internalSqft: Math.min(4000, Math.max(800, internal)), plotSqft: Math.round(Math.min(4000, Math.max(800, internal)) * 1.2) };
+    const internal = Math.min(4000, Math.max(800, Math.round(800 + (valuePounds / 350))));
+    return { internalSqft: internal, plotSqft: Math.round(internal / COVERAGE) };
   }
   if (p.type === 'luxury') {
-    const internal = Math.round(1500 + (valuePounds / 200));
-    return { internalSqft: Math.min(5000, Math.max(1500, internal)), plotSqft: Math.round(5000 + (valuePounds / 80)) };
+    const internal = Math.min(5000, Math.max(1500, Math.round(1500 + (valuePounds / 200))));
+    return { internalSqft: internal, plotSqft: Math.round(Math.max(5000, internal / COVERAGE)) };
   }
-  const internal = Math.round(500 + (valuePounds / 150));
-  return { internalSqft: Math.min(1800, Math.max(500, internal)), plotSqft: Math.round(1500 + (valuePounds / 50)) };
+  const internal = Math.min(1800, Math.max(500, Math.round(500 + (valuePounds / 150))));
+  return { internalSqft: internal, plotSqft: Math.round(Math.max(1200, internal / COVERAGE)) };
 }
 
 /**

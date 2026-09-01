@@ -89,9 +89,18 @@ export function createPropertyManagementActions(set: SetFn, get: GetFn) {
         showToast('HMO Licence', 'Only HMO properties need a licence.', 'destructive');
         return;
       }
-      if (prop.hmoLicenceStatus === 'applied' || prop.hmoLicenceStatus === 'licensed') {
-        showToast('HMO Licence', 'Already applied or licensed.', 'destructive');
+      if (prop.hmoLicenceStatus === 'applied') {
+        showToast('HMO Licence', 'Application already in progress.', 'destructive');
         return;
+      }
+      // Improvements #8 item 8 — allow early renewal within 3 months of expiry.
+      const isRenewal = prop.hmoLicenceStatus === 'licensed';
+      if (isRenewal) {
+        const monthsLeft = (prop.hmoLicenceExpiresMonth ?? Infinity) - state.monthsPlayed;
+        if (monthsLeft > 3) {
+          showToast('HMO Licence', `Renewal opens 3 months before expiry (${monthsLeft} months left).`, 'destructive');
+          return;
+        }
       }
       const debited = debit(state, HMO_LICENCE_COST_PENNIES);
       if (!debited) {

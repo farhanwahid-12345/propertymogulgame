@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { PiggyBank, TrendingUp, TrendingDown, Landmark, Hourglass, Rocket, ArrowDownLeft, ArrowUpRight, Receipt } from "lucide-react";
+import { PiggyBank, TrendingUp, TrendingDown, Landmark, Hourglass, Rocket, Bitcoin, ArrowDownLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { fromPennies, toPennies } from "@/lib/formatCurrency";
 import {
   INVESTMENT_PRODUCTS, annualisedRate, type InvestmentKind,
@@ -29,13 +29,14 @@ const ICONS: Record<InvestmentKind, typeof PiggyBank> = {
   bonds: Landmark,
   index: TrendingUp,
   risky: Rocket,
+  crypto: Bitcoin,
 };
 
-const ORDER: InvestmentKind[] = ['savings', 'bonds', 'index', 'risky'];
+const ORDER: InvestmentKind[] = ['savings', 'bonds', 'index', 'risky', 'crypto'];
 
 /**
- * Improvements #7 item 6 — put spare cash to work: savings, bonds, an index
- * tracker, and high-risk stock picks, each with its own notice period.
+ * Improvements #8 item 7 — put spare cash to work: high-interest savings,
+ * Premium Bonds (£50k cap), an S&P 500 tracker, risky stocks and crypto.
  */
 export function InvestmentsPanel({
   cashPennies, boeRate, monthsPlayed, investments, withdrawals, ledger = [], onInvest, onWithdraw,
@@ -90,7 +91,13 @@ export function InvestmentsPanel({
           const rate = annualisedRate(product, boeRate);
           const raw = amounts[kind] ?? '';
           const amountPennies = raw ? toPennies(Number(raw) || 0) : 0;
-          const canInvest = amountPennies >= product.minDepositPennies && amountPennies <= cashPennies;
+          // Improvements #8 item 7b — Premium Bonds are capped at £50,000 held.
+          const headroom = product.maxHoldingPennies !== undefined
+            ? Math.max(0, product.maxHoldingPennies - balance)
+            : Infinity;
+          const canInvest = amountPennies >= product.minDepositPennies
+            && amountPennies <= cashPennies
+            && amountPennies <= headroom;
           const locked = holding ? (monthsPlayed - holding.openedMonth) < product.lockMonths : false;
           const pendingForKind = withdrawals.filter(w => w.kind === kind);
 
@@ -104,6 +111,11 @@ export function InvestmentsPanel({
                     <Badge variant="outline" className="text-[10px]">{product.riskLabel}</Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{product.blurb}</p>
+                  {product.maxHoldingPennies !== undefined && (
+                    <p className="text-[10px] text-amber-300/80 mt-0.5">
+                      Room left: £{fromPennies(Math.max(0, product.maxHoldingPennies - balance)).toLocaleString(undefined, { maximumFractionDigits: 0 })} of the £{fromPennies(product.maxHoldingPennies).toLocaleString(undefined, { maximumFractionDigits: 0 })} cap
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-bold text-[hsl(var(--stat-credit))]">
