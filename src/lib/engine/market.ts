@@ -299,16 +299,19 @@ export function deriveSqft(p: { type: 'residential' | 'commercial' | 'luxury'; v
   if (p.internalSqft && p.plotSqft) return { internalSqft: p.internalSqft, plotSqft: p.plotSqft };
   // Use value as a rough proxy (pennies → pounds → sqft band)
   const valuePounds = p.value / 100;
+  // Improvements #8 item 13 — legacy saves get a ~35% coverage plot so they can
+  // still extend up to the 70% planning maximum.
+  const COVERAGE = 0.35;
   if (p.type === 'commercial') {
-    const internal = Math.round(800 + (valuePounds / 350) ); // gentle scaling
-    return { internalSqft: Math.min(4000, Math.max(800, internal)), plotSqft: Math.round(Math.min(4000, Math.max(800, internal)) * 1.2) };
+    const internal = Math.min(4000, Math.max(800, Math.round(800 + (valuePounds / 350))));
+    return { internalSqft: internal, plotSqft: Math.round(internal / COVERAGE) };
   }
   if (p.type === 'luxury') {
-    const internal = Math.round(1500 + (valuePounds / 200));
-    return { internalSqft: Math.min(5000, Math.max(1500, internal)), plotSqft: Math.round(5000 + (valuePounds / 80)) };
+    const internal = Math.min(5000, Math.max(1500, Math.round(1500 + (valuePounds / 200))));
+    return { internalSqft: internal, plotSqft: Math.round(Math.max(5000, internal / COVERAGE)) };
   }
-  const internal = Math.round(500 + (valuePounds / 150));
-  return { internalSqft: Math.min(1800, Math.max(500, internal)), plotSqft: Math.round(1500 + (valuePounds / 50)) };
+  const internal = Math.min(1800, Math.max(500, Math.round(500 + (valuePounds / 150))));
+  return { internalSqft: internal, plotSqft: Math.round(Math.max(1200, internal / COVERAGE)) };
 }
 
 /**
