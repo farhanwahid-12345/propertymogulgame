@@ -78,7 +78,16 @@ export function AnnualAccountsStatement() {
       (sum: number, p: any) => sum + getFurnitureValuePennies(p),
       0,
     );
+    // Improvements #8 Phase 6 — investments (and in-flight withdrawals) are assets
+    // in the header figure, so include them here to keep both in sync.
+    const investmentValuePennies =
+      investments.reduce((s: number, h: any) => s + (h.balancePennies || 0), 0)
+      + investmentWithdrawals.reduce(
+        (s: number, w: any) => s + ((w.grossPennies || 0) - (w.penaltyPennies || 0)),
+        0,
+      );
     const netWorth = computeNetWorthPennies({
+      investmentValuePennies,
       cashPennies: cash,
       inflightBuyCapitalPennies: inflightBuyCapital,
       renovationWIPPennies: renovationWIP,
