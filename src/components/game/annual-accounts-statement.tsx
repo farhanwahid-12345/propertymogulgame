@@ -45,6 +45,8 @@ export function AnnualAccountsStatement() {
   const conveyancing = useGameStore((s) => s.conveyancing || []);
   const renovations = useGameStore((s) => s.renovations || []);
   const overdraftUsed = useGameStore((s) => s.overdraftUsed || 0);
+  const investments = useGameStore((s) => (s as any).investments || []);
+  const investmentWithdrawals = useGameStore((s) => (s as any).investmentWithdrawals || []);
   const annualAccounts = useGameStore(
     (s) => (s as any).annualAccounts as AnnualAccountRecord[] | undefined,
   );
