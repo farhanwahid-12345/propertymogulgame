@@ -157,6 +157,8 @@ export function AnnualAccountsStatement() {
     conveyancing,
     renovations,
     overdraftUsed,
+    investments,
+    investmentWithdrawals,
     annualAccounts,
   ]);
 
