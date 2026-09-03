@@ -254,7 +254,7 @@ export interface Mortgage {
   revertedToSVR?: boolean;
 }
 
-export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture';
+export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture' | 'commercial_arrears';
 
 export interface PropertyTenant {
   propertyId: string;
@@ -301,6 +301,11 @@ export interface PendingEviction {
   ground: EvictionGround;
   servedMonth: number;
   effectiveMonth: number;
+  /** Commercial arrears flow — month the served notice period expires and the
+   *  claim joins the court queue. Undefined on legacy/no-notice grounds. */
+  noticeExpiryMonth?: number;
+  /** Months of county court backlog baked into `effectiveMonth`. */
+  courtBacklogMonths?: number;
   /** True if the tenant has filed (or will file) a tribunal appeal. */
   appealFiled?: boolean;
   /** Month the tribunal will rule on the tenant's appeal. */

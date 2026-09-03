@@ -13,7 +13,7 @@ function setTab(tab: "market" | "bank" | "accounts") {
 }
 
 /**
- * Phase 2 scripted 13-step tutorial scenario. The first 6 steps are interactive
+ * Phase 2 scripted 14-step tutorial scenario. The first 6 steps are interactive
  * (auto-advance on real game state changes); steps 7-12 are explanatory clicks
  * forward; step 13 is a centered congratulations modal.
  */
@@ -154,6 +154,16 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "bottom",
     advance: "button",
     beforeStep: () => setTab("accounts"),
+  },
+  {
+    id: "commercial-arrears",
+    title: "Step 13 · Commercial rent arrears",
+    body:
+      "Commercial tenants sit outside the Renters' Rights Act. At 21 days (1 month) unpaid you can forfeit the lease by peaceable re-entry — instant, but roughly 1 in 3 tenants win relief from forfeiture. At 2+ months you can instead take the court route: 1 month formal demand, then a 2-5 month possession backlog, but far harder to overturn. Both are served from Operations → Evictions, and possession ends the lease so the unit goes vacant and re-marketing starts.",
+    targetSelector: '[data-tutorial="ops-evictions"]',
+    tooltipSide: "bottom",
+    advance: "button",
+    beforeStep: () => setTab("market"),
   },
   {
     id: "done",

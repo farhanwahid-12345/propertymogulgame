@@ -371,7 +371,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const lastToast = t.lastDefaultToastMonth ?? -999;
           if (prop && newMonthNumber - lastToast >= 3) {
             const arrearsAfter = (t.arrearsMonths ?? 0) + 1;
-            const evictHint = arrearsAfter >= 2 ? " — Section 8 eviction now available." : "";
+            // Commercial arrears escalate differently: 21 days (1mo) unlocks
+            // peaceable re-entry, 2mo unlocks court forfeiture proceedings.
+            const evictHint = prop.type === 'commercial'
+              ? (arrearsAfter >= 2
+                  ? " — court forfeiture for rent arrears now available."
+                  : " — 21 days in arrears: lease forfeiture clause is live.")
+              : (arrearsAfter >= 2 ? " — Section 8 eviction now available." : "");
             showToast("Missed Rent ⚠️", `${t.tenant.name} missed rent at ${prop.name} (${arrearsAfter}mo arrears).${evictHint}`, "destructive");
             flashOps();
           }
@@ -1336,6 +1342,22 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         } else if (ev.ground === 'landlord_move_in') {
           newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12, slotIndex: ev.slotIndex });
         }
+
+        // Commercial arrears flow — possession ends the lease itself, so strip
+        // the lease, zero the rent roll and start the vacancy clock so the
+        // letting agent starts a fresh tenant search.
+        if (property?.type === 'commercial') {
+          const idx = updatedOwnedProperties.findIndex(p => p.id === ev.propertyId);
+          if (idx >= 0) {
+            updatedOwnedProperties[idx] = {
+              ...updatedOwnedProperties[idx],
+              commercialLease: undefined,
+              monthlyIncome: 0,
+              commercialVacantSinceMonth: newMonthNumber,
+            };
+          }
+        }
+
 
         showToast(
           "Eviction Complete",

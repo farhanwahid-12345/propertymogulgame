@@ -21,6 +21,7 @@ const GROUND_META: Record<EvictionGround, { label: string; icon: typeof Gavel; t
   tenant_default: { label: "Tenant Default", icon: AlertTriangle, tone: "text-danger border-danger/30" },
   break_clause: { label: "Break Clause", icon: Gavel, tone: "text-amber-400 border-amber-400/30" },
   commercial_forfeiture: { label: "Commercial Forfeiture", icon: Gavel, tone: "text-danger border-danger/30" },
+  commercial_arrears: { label: "Court Forfeiture · Rent Arrears", icon: Scale, tone: "text-danger border-danger/30" },
 };
 
 /** Format an in-game month index into a friendly "Month N (Year Y, Mon M)" label. */
@@ -124,6 +125,16 @@ export function EvictionTimelineFeed({
                 </div>
                 <Progress value={progressPct} className="h-1.5" />
               </div>
+
+              {ev.courtBacklogMonths !== undefined && ev.courtBacklogMonths > 0 && (
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Gavel className="h-3 w-3" />
+                  {ev.noticeExpiryMonth !== undefined && monthsPlayed < ev.noticeExpiryMonth
+                    ? `Notice period runs to month ${ev.noticeExpiryMonth}, then ~${ev.courtBacklogMonths}mo court backlog.`
+                    : `Awaiting possession hearing — ${ev.courtBacklogMonths}mo county court backlog.`}
+                </div>
+              )}
+
 
               {ev.appealFiled && !ev.appealResolved && (
                 <div className="flex items-center gap-1.5 text-[10px] text-amber-300">

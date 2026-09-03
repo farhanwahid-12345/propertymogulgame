@@ -104,9 +104,9 @@ interface PropertyCardProps {
   tenantSatisfaction?: number;
   tenantSatisfactionReasons?: Array<{ reason: string; delta: number }>;
   propertyListings?: any[];
-  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture', slotIndex?: number) => void;
+  evictTenant?: (propertyId: string, ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture' | 'commercial_arrears', slotIndex?: number) => void;
   cancelEviction?: (propertyId: string, slotIndex?: number) => void;
-  pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture'; effectiveMonth: number; servedMonth: number };
+  pendingEviction?: { ground: 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture' | 'commercial_arrears'; effectiveMonth: number; servedMonth: number };
   rentArrearsCount?: number;
   /** Item 2: total £ in arrears across slots (pennies). Used for the arrears pill. */
   arrearsPenniesTotal?: number;
