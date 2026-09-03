@@ -371,7 +371,13 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const lastToast = t.lastDefaultToastMonth ?? -999;
           if (prop && newMonthNumber - lastToast >= 3) {
             const arrearsAfter = (t.arrearsMonths ?? 0) + 1;
-            const evictHint = arrearsAfter >= 2 ? " — Section 8 eviction now available." : "";
+            // Commercial arrears escalate differently: 21 days (1mo) unlocks
+            // peaceable re-entry, 2mo unlocks court forfeiture proceedings.
+            const evictHint = prop.type === 'commercial'
+              ? (arrearsAfter >= 2
+                  ? " — court forfeiture for rent arrears now available."
+                  : " — 21 days in arrears: lease forfeiture clause is live.")
+              : (arrearsAfter >= 2 ? " — Section 8 eviction now available." : "");
             showToast("Missed Rent ⚠️", `${t.tenant.name} missed rent at ${prop.name} (${arrearsAfter}mo arrears).${evictHint}`, "destructive");
             flashOps();
           }
