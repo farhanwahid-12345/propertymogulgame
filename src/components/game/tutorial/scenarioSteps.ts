@@ -13,7 +13,7 @@ function setTab(tab: "market" | "bank" | "accounts") {
 }
 
 /**
- * Phase 2 scripted 13-step tutorial scenario. The first 6 steps are interactive
+ * Phase 2 scripted 14-step tutorial scenario. The first 6 steps are interactive
  * (auto-advance on real game state changes); steps 7-12 are explanatory clicks
  * forward; step 13 is a centered congratulations modal.
  */
@@ -163,7 +163,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="ops-evictions"]',
     tooltipSide: "bottom",
     advance: "button",
-    beforeStep: () => setTab("dashboard"),
+    beforeStep: () => setTab("market"),
   },
   {
     id: "done",
