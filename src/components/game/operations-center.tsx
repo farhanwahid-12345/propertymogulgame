@@ -267,7 +267,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
               <TabsTrigger
                 key={t.key}
                 value={t.key}
-                data-tutorial={t.key === 'conveyancing' ? 'ops-conveyancing' : t.key === 'concerns' ? 'ops-concerns' : undefined}
+                data-tutorial={t.key === 'conveyancing' ? 'ops-conveyancing' : t.key === 'concerns' ? 'ops-concerns' : t.key === 'evictions' ? 'ops-evictions' : undefined}
                 className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary rounded-lg text-xs gap-1.5 flex-1 min-w-[90px]"
               >
                 <Icon className="h-3.5 w-3.5" />
