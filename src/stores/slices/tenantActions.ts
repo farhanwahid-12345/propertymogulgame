@@ -678,11 +678,32 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           validReason = `Commercial forfeiture — peaceable re-entry (${Math.max(arrears, recentDefaults)} mo arrears)`;
           break;
         }
+        case 'commercial_arrears': {
+          // Commercial arrears flow — forfeiture through the courts: serve a
+          // s.146-style formal demand (1 month) then queue for a possession
+          // hearing. Safer than re-entry (tenant rarely wins relief) but slow.
+          const arrears = tenant.arrearsMonths ?? 0;
+          if (arrears < 2 && recentDefaults < 2) {
+            showToast(
+              "Invalid Ground",
+              "Court forfeiture for rent arrears requires ≥2 months of unpaid commercial rent.",
+              "destructive",
+            );
+            return;
+          }
+          noticeMonths = 1;
+          validReason = `Commercial rent arrears — formal demand served (${Math.max(arrears, recentDefaults)} mo arrears, 1-month notice)`;
+          break;
+        }
       }
 
       let appealChance =
         ground === 'landlord_sale' || ground === 'landlord_move_in' ? 0.35 :
         ground === 'antisocial_behaviour' ? 0.10 :
+        // Commercial tenants can apply for relief from forfeiture; a peaceable
+        // re-entry is far more vulnerable than a court-sanctioned possession.
+        ground === 'commercial_forfeiture' ? 0.30 :
+        ground === 'commercial_arrears' ? 0.10 :
         0.05;
       if ((tenant.satisfaction ?? 50) >= 60) appealChance += 0.15;
       if (tenant.tenant.profile === 'risky') appealChance -= 0.10;
@@ -690,7 +711,11 @@ export function createTenantActions(set: SetFn, get: GetFn) {
       const willAppeal = gameRandom() < appealChance;
 
       // Commercial forfeiture bypasses the court queue (peaceable re-entry).
-      const courtBacklogMonths = ground === 'commercial_forfeiture' ? 0 : 3 + Math.floor(gameRandom() * 4);
+      // The court route for commercial arrears sits in a 2–5 month backlog.
+      const courtBacklogMonths =
+        ground === 'commercial_forfeiture' ? 0 :
+        ground === 'commercial_arrears' ? 2 + Math.floor(gameRandom() * 4) :
+        3 + Math.floor(gameRandom() * 4);
       const effectiveMonth = prev.monthsPlayed + noticeMonths + courtBacklogMonths;
       const updatedTenants = prev.tenants.map((t) =>
         t.propertyId === propertyId && (t.slotIndex ?? 0) === slotIndex
