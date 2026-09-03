@@ -553,7 +553,7 @@ export function createTenantActions(set: SetFn, get: GetFn) {
           return;
         }
       } else {
-        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause' || ground === 'commercial_forfeiture') {
+        if (ground === 'lease_expiry' || ground === 'tenant_default' || ground === 'break_clause' || ground === 'commercial_forfeiture' || ground === 'commercial_arrears') {
           showToast(
             "Wrong Eviction Grounds",
             "These grounds apply to commercial leases only.",
