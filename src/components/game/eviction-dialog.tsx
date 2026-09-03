@@ -80,7 +80,15 @@ const COMMERCIAL_GROUNDS: GroundConfig[] = [
     icon: BadgePoundSterling,
     noticeLabel: '0 weeks',
     description: 'Commercial tenant is 21+ days in arrears. Change the locks under the lease forfeiture clause — no Renters\' Rights Act protection.',
-    warning: 'Tenant may apply for relief from forfeiture within 6 months if they clear arrears.',
+    warning: 'Fast but risky: roughly a 1-in-3 chance the tenant applies for relief from forfeiture and gets the lease back.',
+  },
+  {
+    id: 'commercial_arrears',
+    label: 'Court forfeiture — rent arrears',
+    icon: Scale,
+    noticeLabel: '1 month + court backlog',
+    description: 'Two or more months of unpaid commercial rent. Serve a formal demand (1 month), then queue for a possession hearing — county court backlog is currently 2–5 months.',
+    warning: 'Slower than re-entry, but a court-sanctioned possession is far harder for the tenant to overturn.',
   },
 ];
 
