@@ -122,6 +122,9 @@ export function EvictionDialog({
       commercial_forfeiture: rentArrearsCount >= 1
         ? null
         : 'Requires the tenant to be at least 21 days (1 month) in arrears.',
+      commercial_arrears: rentArrearsCount >= 2
+        ? null
+        : `Requires ≥2 months of unpaid commercial rent (${rentArrearsCount} so far).`,
     } as Record<EvictionGround, string | null>;
   }, [rentArrearsCount, hasLongstandingASB, tenantProfile]);
 
