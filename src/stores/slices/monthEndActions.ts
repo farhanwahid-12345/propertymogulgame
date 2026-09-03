@@ -1337,6 +1337,22 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           newPropertyLocks.push({ propertyId: ev.propertyId, reason: 'relet_lock', untilMonth: newMonthNumber + 12, slotIndex: ev.slotIndex });
         }
 
+        // Commercial arrears flow — possession ends the lease itself, so strip
+        // the lease, zero the rent roll and start the vacancy clock so the
+        // letting agent starts a fresh tenant search.
+        if (property?.type === 'commercial') {
+          const idx = updatedOwnedProperties.findIndex(p => p.id === ev.propertyId);
+          if (idx >= 0) {
+            updatedOwnedProperties[idx] = {
+              ...updatedOwnedProperties[idx],
+              commercialLease: undefined,
+              monthlyIncome: 0,
+              commercialVacantSinceMonth: newMonthNumber,
+            };
+          }
+        }
+
+
         showToast(
           "Eviction Complete",
           `${tenantRec.tenant.name} vacated ${property?.name || 'the property'}. Deposit refunded: £${fromPennies(refund).toLocaleString()}${withheld > 0 ? ` (£${fromPennies(withheld).toLocaleString()} withheld — tenant may dispute)` : ''}.`,
