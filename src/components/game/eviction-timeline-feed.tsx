@@ -126,6 +126,16 @@ export function EvictionTimelineFeed({
                 <Progress value={progressPct} className="h-1.5" />
               </div>
 
+              {ev.courtBacklogMonths !== undefined && ev.courtBacklogMonths > 0 && (
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Gavel className="h-3 w-3" />
+                  {ev.noticeExpiryMonth !== undefined && monthsPlayed < ev.noticeExpiryMonth
+                    ? `Notice period runs to month ${ev.noticeExpiryMonth}, then ~${ev.courtBacklogMonths}mo court backlog.`
+                    : `Awaiting possession hearing — ${ev.courtBacklogMonths}mo county court backlog.`}
+                </div>
+              )}
+
+
               {ev.appealFiled && !ev.appealResolved && (
                 <div className="flex items-center gap-1.5 text-[10px] text-amber-300">
                   <Scale className="h-3 w-3" />
