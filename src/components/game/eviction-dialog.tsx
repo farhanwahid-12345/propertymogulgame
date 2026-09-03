@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Scale, Home, AlertTriangle, BadgePoundSterling } from "lucide-react";
 
-export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture';
+export type EvictionGround = 'rent_arrears' | 'landlord_sale' | 'landlord_move_in' | 'antisocial_behaviour' | 'lease_expiry' | 'tenant_default' | 'break_clause' | 'commercial_forfeiture' | 'commercial_arrears';
 
 interface EvictionDialogProps {
   propertyId: string;
