@@ -729,6 +729,8 @@ export function createTenantActions(set: SetFn, get: GetFn) {
         ground,
         servedMonth: prev.monthsPlayed,
         effectiveMonth,
+        noticeExpiryMonth: prev.monthsPlayed + noticeMonths,
+        courtBacklogMonths,
         appealFiled: willAppeal,
         appealResolveMonth: willAppeal ? prev.monthsPlayed + 1 : undefined,
       };
