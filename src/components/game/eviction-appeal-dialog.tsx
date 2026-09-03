@@ -31,6 +31,7 @@ const GROUND_LABELS: Record<EvictionGround, string> = {
   tenant_default: "Tenant Default",
   break_clause: "Break Clause",
   commercial_forfeiture: "Commercial Forfeiture",
+  commercial_arrears: "Court Forfeiture (Rent Arrears)",
 };
 
 export function EvictionAppealDialog({
