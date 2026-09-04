@@ -338,7 +338,10 @@ export function TutorialEngine({ onFinish }: Props) {
         style={tooltipStyle}
         className={cn("animate-in fade-in slide-in-from-bottom-1 duration-300")}
       >
-        <div className="relative glass rounded-2xl border border-border bg-background/95 backdrop-blur-xl shadow-2xl p-4">
+        <div
+          className="relative glass rounded-2xl border border-border bg-background/95 backdrop-blur-xl shadow-2xl p-4 overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 24px)" }}
+        >
           {tooltipPosition && <div style={tooltipPosition.arrowStyle} />}
 
           <div className="flex items-center gap-2 mb-2">
@@ -373,7 +376,7 @@ export function TutorialEngine({ onFinish }: Props) {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant={isWait ? "outline" : "default"}
+                data-tutorial-next
                 onClick={() => {
                   if (isLast) handleFinish();
                   else next();
@@ -382,10 +385,6 @@ export function TutorialEngine({ onFinish }: Props) {
                 {isLast ? (
                   <>
                     Got it <Check className="h-4 w-4 ml-2" />
-                  </>
-                ) : isWait ? (
-                  <>
-                    Skip ahead <ArrowRight className="h-4 w-4 ml-2" />
                   </>
                 ) : (
                   <>
@@ -398,7 +397,7 @@ export function TutorialEngine({ onFinish }: Props) {
 
           {isWait && (
             <p className="text-[11px] text-muted-foreground/80 mt-2 text-right italic">
-              Waiting for you to complete the highlighted action — or skip ahead.
+              Complete the highlighted action, or press Next to move on.
             </p>
           )}
         </div>
