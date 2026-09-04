@@ -49,14 +49,15 @@ function makeCommercialProperty(overrides: Partial<Property> = {}): Property {
     plotSqft: 2000,
     epcRating: 'C',
     commercialLease: {
-      tenantName: 'Teesside Trading Ltd',
-      covenantStrength: 'medium',
-      termYears: 10,
+      fri: true,
+      termMonths: 120,
       startMonth: 0,
-      rentReviewEveryYears: 5,
-      breakClauseAtMonth: undefined,
-      annualRentPennies: toPennies(18_000),
-    } as Property['commercialLease'],
+      expiryMonth: 120,
+      reviewFrequencyMonths: 60,
+      breakClause: { type: 'none' },
+      conditionScoreAtLeaseStart: 70,
+      negotiatedRentPennies: toPennies(1_500),
+    },
     ...overrides,
   };
 }
@@ -131,6 +132,7 @@ describe('commercial arrears eviction', () => {
       ownedProperties: [makeCommercialProperty()],
       tenants: [makeCommercialTenant({ arrearsMonths: 3 })],
       monthsPlayed: 10,
+      timeUntilNextMonth: 0,
       pendingEvictions: [{
         propertyId: PROP_ID,
         slotIndex: 0,
