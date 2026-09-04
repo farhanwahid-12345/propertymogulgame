@@ -132,6 +132,7 @@ describe('commercial arrears eviction', () => {
       ownedProperties: [makeCommercialProperty()],
       tenants: [makeCommercialTenant({ arrearsMonths: 3 })],
       monthsPlayed: 10,
+      timeUntilNextMonth: 0,
       pendingEvictions: [{
         propertyId: PROP_ID,
         slotIndex: 0,
