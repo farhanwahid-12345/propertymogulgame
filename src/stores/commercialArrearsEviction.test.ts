@@ -53,6 +53,7 @@ function makeCommercialProperty(overrides: Partial<Property> = {}): Property {
       covenantStrength: 'medium',
       termYears: 10,
       startMonth: 0,
+      expiryMonth: 120,
       rentReviewEveryYears: 5,
       breakClauseAtMonth: undefined,
       annualRentPennies: toPennies(18_000),
