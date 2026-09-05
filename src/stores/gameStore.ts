@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, Property, EntityType, EvictionGround, PropertyCondition, PropertyOffer } from '@/types/game';
+import type { GameState, Property, EntityType, EvictionGround, PropertyCondition, PropertyOffer, GameSettings } from '@/types/game';
+import { DEFAULT_GAME_SETTINGS } from '@/types/game';
 import type { Tenant } from '@/components/game/tenant-selector';
 import { type RenovationType } from '@/components/game/renovation-dialog';
 import { toPennies } from '@/lib/formatCurrency';
@@ -173,6 +174,7 @@ interface GameActions {
   applyForHmoLicence: (propertyId: string) => void;
   // Game
   resetGame: () => void;
+  updateSettings: (patch: Partial<GameSettings>) => void;
   // Phase — emergency rescue actions surfaced from the Pending Transactions dialog
   forceQuickSale: (propertyId: string) => void;
   triggerBankruptcy: () => void;
@@ -278,6 +280,7 @@ export function createInitialState(): GameState {
     exTenantDebts: [],
     commercialSearchUpdates: [],
     commercialAgentChase: {},
+    settings: { ...DEFAULT_GAME_SETTINGS },
 
 
   };
@@ -288,6 +291,16 @@ export function createInitialState(): GameState {
 // Each step mutates `persisted` in place; the runner stamps `_version`.
 export const migrationSteps: ReadonlyArray<Migration> = [
   {
+    from: 25, to: 26,
+    describe: 'Quick wins — auto-management settings object.',
+    apply: (p: any) => {
+      if (!p.settings || typeof p.settings !== 'object' || Array.isArray(p.settings)) {
+        p.settings = { ...DEFAULT_GAME_SETTINGS };
+      }
+    },
+  },
+  {
+
     from: 24, to: 25,
     describe: 'Investment transaction history ledger.',
     apply: (p: any) => {
@@ -591,6 +604,12 @@ function migrateState(persisted: any): GameState {
     persisted.goalTarget = 500_000 * 100;
   }
   if (typeof persisted.seenEpcTutorial !== 'boolean') persisted.seenEpcTutorial = false;
+  // Quick wins — auto-management settings (defensive backfill for any save shape).
+  if (!persisted.settings || typeof persisted.settings !== 'object' || Array.isArray(persisted.settings)) {
+    persisted.settings = { ...DEFAULT_GAME_SETTINGS };
+  } else {
+    persisted.settings = { ...DEFAULT_GAME_SETTINGS, ...persisted.settings };
+  }
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',

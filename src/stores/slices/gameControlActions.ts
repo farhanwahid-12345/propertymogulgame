@@ -7,6 +7,7 @@
  * persisted shape are unchanged. Cross-slice reads via `get()` only.
  */
 import type { PendingTransaction } from '@/types/game';
+import { DEFAULT_GAME_SETTINGS } from '@/types/game';
 import { fromPennies } from '@/lib/formatCurrency';
 import { showToast, debit } from '../storeHelpers';
 import { createInitialState } from '../gameStore';
@@ -24,6 +25,11 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       set(fresh);
       try { window.localStorage.removeItem('pm_onboarding_done'); } catch { /* noop */ }
       showToast("Game Reset", "Started fresh with £100K!");
+    },
+
+    updateSettings: (patch: Record<string, boolean>) => {
+      const prev = get();
+      set({ settings: { ...DEFAULT_GAME_SETTINGS, ...(prev.settings || {}), ...patch } });
     },
 
     setGameSpeed: (speed: number) => {
