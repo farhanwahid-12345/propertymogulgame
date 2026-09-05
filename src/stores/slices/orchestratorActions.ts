@@ -261,7 +261,10 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
             };
             newOffers.push(offer);
             const offerAmountLabel = `£${fromPennies(offer.amount).toLocaleString()}`;
-            if (listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold) {
+            // Quick win #1 — optional auto-accept for offers within 5% of asking.
+            const autoWithin5 = !!prev.settings?.autoAcceptOffersWithin5Percent
+              && offer.amount >= Math.round(asking * 0.95);
+            if (autoWithin5 || (listing.autoAcceptThreshold && offer.amount >= listing.autoAcceptThreshold)) {
               showToast("Offer Auto-Accepted! 🎉", `${offer.buyerName}'s offer auto-accepted for ${property.name}!`);
               saleEvent('accepted', 'Offer auto-accepted 🎉',
                 `${offer.buyerName} offered ${offerAmountLabel} for ${property.name} — above your auto-accept threshold, so it's been accepted.`);
@@ -277,8 +280,12 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
           lastCheck = currentTime;
         }
 
+        const autoAcceptFloor = prev.settings?.autoAcceptOffersWithin5Percent
+          ? Math.round(asking * 0.95)
+          : undefined;
         const autoAccepted = newOffers.find((o: PropertyOffer) =>
-          listing.autoAcceptThreshold && o.amount >= listing.autoAcceptThreshold,
+          (listing.autoAcceptThreshold && o.amount >= listing.autoAcceptThreshold)
+          || (autoAcceptFloor !== undefined && o.amount >= autoAcceptFloor),
         );
         if (autoAccepted) {
           return { ...listing, listingMonth, daysUntilSale: 0, offers: newOffers, lastOfferCheck: lastCheck };
@@ -291,7 +298,13 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
       completedSales.forEach((sale: any) => {
         const property = prev.ownedProperties.find((p: Property) => p.id === sale.propertyId);
         if (property) {
-          const autoOffer = sale.offers?.find((o: PropertyOffer) => sale.autoAcceptThreshold && o.amount >= sale.autoAcceptThreshold);
+          const saleFloor = prev.settings?.autoAcceptOffersWithin5Percent
+            ? Math.round((sale.askingPrice || 0) * 0.95)
+            : undefined;
+          const autoOffer = sale.offers?.find((o: PropertyOffer) =>
+            (sale.autoAcceptThreshold && o.amount >= sale.autoAcceptThreshold)
+            || (saleFloor !== undefined && saleFloor > 0 && o.amount >= saleFloor),
+          );
           if (!autoOffer) return;
           newConveyancing.push({
             id: `conv_sell_${Date.now()}_${property.id}`,
