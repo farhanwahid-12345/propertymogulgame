@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameState, Property, EntityType, EvictionGround, PropertyCondition, PropertyOffer } from '@/types/game';
+import type { GameState, Property, EntityType, EvictionGround, PropertyCondition, PropertyOffer, GameSettings } from '@/types/game';
+import { DEFAULT_GAME_SETTINGS } from '@/types/game';
 import type { Tenant } from '@/components/game/tenant-selector';
 import { type RenovationType } from '@/components/game/renovation-dialog';
 import { toPennies } from '@/lib/formatCurrency';
@@ -173,6 +174,7 @@ interface GameActions {
   applyForHmoLicence: (propertyId: string) => void;
   // Game
   resetGame: () => void;
+  updateSettings: (patch: Partial<GameSettings>) => void;
   // Phase — emergency rescue actions surfaced from the Pending Transactions dialog
   forceQuickSale: (propertyId: string) => void;
   triggerBankruptcy: () => void;
@@ -278,6 +280,7 @@ export function createInitialState(): GameState {
     exTenantDebts: [],
     commercialSearchUpdates: [],
     commercialAgentChase: {},
+    settings: { ...DEFAULT_GAME_SETTINGS },
 
 
   };
