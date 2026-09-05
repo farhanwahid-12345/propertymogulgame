@@ -659,6 +659,27 @@ export interface GameState {
 
 }
 
+/**
+ * Quick wins — auto-management toggles. All default to false so existing saves
+ * keep their manual behaviour until the player opts in.
+ */
+export interface GameSettings {
+  /** Auto-accept sale offers within 5% of the asking price. */
+  autoAcceptOffersWithin5Percent: boolean;
+  /** Auto-sign commercial renewals when the agreed uplift is ≥ 3%. */
+  autoRenewCommercialIfRentIncreaseGte3: boolean;
+  /** Auto-pay tenant damage repairs costing under £500. */
+  autoPayDamagesUnder500: boolean;
+}
+
+export const DEFAULT_GAME_SETTINGS: GameSettings = {
+  autoAcceptOffersWithin5Percent: false,
+  autoRenewCommercialIfRentIncreaseGte3: false,
+  autoPayDamagesUnder500: false,
+};
+
+
+
 /** Phase 7 — agent update for a vacant commercial unit. */
 export interface CommercialSearchUpdate {
   id: string;
