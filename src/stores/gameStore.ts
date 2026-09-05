@@ -288,6 +288,16 @@ export function createInitialState(): GameState {
 // Each step mutates `persisted` in place; the runner stamps `_version`.
 export const migrationSteps: ReadonlyArray<Migration> = [
   {
+    from: 25, to: 26,
+    describe: 'Quick wins — auto-management settings object.',
+    apply: (p: any) => {
+      if (!p.settings || typeof p.settings !== 'object' || Array.isArray(p.settings)) {
+        p.settings = { ...DEFAULT_GAME_SETTINGS };
+      }
+    },
+  },
+  {
+
     from: 24, to: 25,
     describe: 'Investment transaction history ledger.',
     apply: (p: any) => {
