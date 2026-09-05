@@ -604,6 +604,12 @@ function migrateState(persisted: any): GameState {
     persisted.goalTarget = 500_000 * 100;
   }
   if (typeof persisted.seenEpcTutorial !== 'boolean') persisted.seenEpcTutorial = false;
+  // Quick wins — auto-management settings (defensive backfill for any save shape).
+  if (!persisted.settings || typeof persisted.settings !== 'object' || Array.isArray(persisted.settings)) {
+    persisted.settings = { ...DEFAULT_GAME_SETTINGS };
+  } else {
+    persisted.settings = { ...DEFAULT_GAME_SETTINGS, ...persisted.settings };
+  }
 
   const arrayKeys: Array<keyof GameState> = [
     'ownedProperties', 'estateAgentProperties', 'auctionProperties', 'propertyListings',
