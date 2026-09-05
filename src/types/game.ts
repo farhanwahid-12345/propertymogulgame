@@ -654,6 +654,9 @@ export interface GameState {
   commercialSearchUpdates?: CommercialSearchUpdate[];
   /** Phase 7 — monthsPlayed when player last chased the agent per property. */
   commercialAgentChase?: Record<string, number>;
+  /** Quick wins — opt-in auto-management flags honoured at month end. */
+  settings?: GameSettings;
+
 }
 
 /** Phase 7 — agent update for a vacant commercial unit. */
