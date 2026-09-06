@@ -66,6 +66,8 @@ export function useGameEngine() {
             useGameStore.getState().replenishMarket();
             // Improvements #7 item 6 — investment returns + withdrawal settlement.
             useGameStore.getState().processInvestmentsMonth?.();
+            // Quick win #1 — honour auto-management toggles for the new month.
+            useGameStore.getState().applyAutoManagement?.();
           } finally {
             processingMonth.current = false;
           }

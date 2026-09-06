@@ -32,6 +32,46 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
       set({ settings: { ...DEFAULT_GAME_SETTINGS, ...(prev.settings || {}), ...patch } });
     },
 
+    /**
+     * Quick win #1 — auto-management pass, run straight after `processMonthEnd`.
+     * Honours the opt-in flags in `settings`:
+     *   • autoRenewCommercialIfRentIncreaseGte3 — signs queued commercial
+     *     renewals on a fresh 5-year term at a 3% uplift.
+     *   • autoPayDamagesUnder500 — settles small repair bills from cash.
+     * (autoAcceptOffersWithin5Percent is handled where offers arrive.)
+     */
+    applyAutoManagement: () => {
+      const settings = { ...DEFAULT_GAME_SETTINGS, ...(get().settings || {}) };
+
+      if (settings.autoRenewCommercialIfRentIncreaseGte3) {
+        const queued = [...((get().pendingLeaseRenewals) || [])];
+        queued.forEach((r: any) => {
+          const props = get().ownedProperties || [];
+          const property = props.find((p: any) => p.id === r.propertyId);
+          if (!property || property.type !== 'commercial') return;
+          const currentRent = Math.max(1, Math.round(r.currentRentPennies || property.monthlyIncome || 0));
+          const agreedRentPennies = Math.round(currentRent * 1.03);
+          if (agreedRentPennies < Math.round(currentRent * 1.03)) return;
+          (get() as any).renewCommercialLease?.(r.propertyId, {
+            agreedRentPennies,
+            termMonths: 60,
+            reviewFrequencyMonths: 60,
+            breakClause: { type: 'none' as const },
+          });
+        });
+      }
+
+      if (settings.autoPayDamagesUnder500) {
+        const threshold = 500 * 100; // pennies
+        const smallDamages = ((get().pendingDamages) || [])
+          .filter((d: any) => (d?.repairCost ?? 0) > 0 && d.repairCost < threshold);
+        smallDamages.forEach((d: any) => {
+          if ((get().cash || 0) < d.repairCost) return;
+          (get() as any).payDamageWithCash?.(d.id);
+        });
+      }
+    },
+
     setGameSpeed: (speed: number) => {
       const clamped = Math.max(0.25, Math.min(8, speed));
       set({ gameSpeed: clamped });
