@@ -51,7 +51,6 @@ export function createGameControlActions(set: SetFn, get: GetFn) {
           if (!property || property.type !== 'commercial') return;
           const currentRent = Math.max(1, Math.round(r.currentRentPennies || property.monthlyIncome || 0));
           const agreedRentPennies = Math.round(currentRent * 1.03);
-          if (agreedRentPennies < Math.round(currentRent * 1.03)) return;
           (get() as any).renewCommercialLease?.(r.propertyId, {
             agreedRentPennies,
             termMonths: 60,
