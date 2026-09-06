@@ -10,6 +10,8 @@ import { RenovationTracker } from "@/components/game/renovation-tracker";
 import { TenantConcernsFeed } from "@/components/game/tenant-concerns-feed";
 import { EvictionDialog, type EvictionGround } from "@/components/game/eviction-dialog";
 import { fromPennies } from "@/lib/formatCurrency";
+import { NotificationTriage } from "@/components/game/notification-triage";
+import { useGameStore } from "@/stores/gameStore";
 import type {
   Conveyancing,
   Renovation,
@@ -232,6 +234,11 @@ export function OperationsCenter(props: OperationsCenterProps) {
     }
   }, []);
 
+  // Quick win #2 — extra store reads the triage panel needs (not passed as props).
+  const triageTenants = useGameStore((st: any) => st.tenants) as any[] | undefined;
+  const triageRenewals = useGameStore((st: any) => st.pendingLeaseRenewals) as any[] | undefined;
+  const triageDamages = useGameStore((st: any) => st.pendingDamages) as any[] | undefined;
+
   if (allEmpty) {
     return null;
   }
@@ -258,6 +265,23 @@ export function OperationsCenter(props: OperationsCenterProps) {
           )}
         </div>
       </div>
+
+      {/* Quick win #2 — triage everything actionable into Urgent / Financial / Opportunities. */}
+      <NotificationTriage
+        monthsPlayed={monthsPlayed}
+        ownedProperties={ownedPropertiesFull}
+        tenants={triageTenants}
+        tenantConcerns={tenantConcerns}
+        pendingEvictions={pendingEvictions}
+        propertyListings={propertyListings}
+        exTenantDebts={exTenantDebts}
+        renovations={renovations}
+        planningApplications={planningApplications}
+        conveyancing={conveyancing}
+        pendingLeaseRenewals={triageRenewals}
+        pendingDamages={triageDamages}
+        onNavigate={(t) => setTab(t as TabKey)}
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
         <TabsList className="flex flex-wrap w-full bg-white/[0.06] border-0 mb-3 h-auto">
