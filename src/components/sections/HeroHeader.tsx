@@ -3,6 +3,7 @@ import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
 import { SaveSlotsInlineButton } from "@/components/game/save-slots-dialog";
+import { SettingsInlineButton } from "@/components/game/settings-dialog";
 import { Button } from "@/components/ui/button";
 import { Pause, Play, Volume2, VolumeX, MoreVertical, HelpCircle, RotateCcw } from "lucide-react";
 import {
@@ -289,6 +290,7 @@ export function HeroHeader({
                 />
                 <AchievementsInlineButton />
                 <SaveSlotsInlineButton />
+                <SettingsInlineButton />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
