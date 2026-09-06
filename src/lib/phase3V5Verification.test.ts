@@ -3,7 +3,7 @@ import { CURRENT_VERSION, runMigrations } from '@/lib/migrations';
 
 describe('Phase 3 — landlord reputation, goal target, EPC tutorial', () => {
   it('CURRENT_VERSION advanced to 16', () => {
-    expect(CURRENT_VERSION).toBe(25);
+    expect(CURRENT_VERSION).toBe(26);
   });
 
   it('v15→v16 migration backfills goalTarget and seenEpcTutorial', async () => {
