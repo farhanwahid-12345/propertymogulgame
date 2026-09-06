@@ -118,6 +118,10 @@ interface PropertyCardProps {
     propertyId: string;
     monthlyPayment: number;
     remainingBalance: number;
+    /** Quick win #3 — used for the fixed-rate expiry countdown badge. */
+    startMonth?: number;
+    fixedTermYears?: number;
+    revertedToSVR?: boolean;
   }>;
   monthsPlayed?: number;
   isInConveyancing?: boolean;
@@ -458,6 +462,67 @@ export const PropertyCard = memo(function PropertyCard({
                 💸 {rentArrearsCount}mo · £{Math.round(arrearsPenniesTotal / 100).toLocaleString()} owed
               </Badge>
             )}
+            {/* Quick win #3 — countdown badges: commercial lease expiry / break clause. */}
+            {(() => {
+              const lease: any = (currentTenant as any)?.commercialLease;
+              if (!lease || monthsPlayed == null) return null;
+              const events: Array<{ label: string; at: number }> = [];
+              if (typeof lease.expiryMonth === 'number') events.push({ label: 'Lease ends', at: lease.expiryMonth });
+              if (typeof lease.breakClause?.atMonth === 'number') events.push({ label: 'Break clause', at: lease.breakClause.atMonth });
+              const next = events
+                .filter(e => e.at >= monthsPlayed)
+                .sort((a, b) => a.at - b.at)[0];
+              if (!next) return null;
+              const left = next.at - monthsPlayed;
+              const cls = left <= 3
+                ? 'border-red-500/60 text-red-300 bg-red-500/10'
+                : left <= 9
+                  ? 'border-amber-400/50 text-amber-300 bg-amber-500/10'
+                  : 'border-green-400/40 text-green-300 bg-green-500/10';
+              return (
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px]", cls)}
+                  title={`${next.label} at month ${next.at} — ${left} month${left === 1 ? '' : 's'} away. Start renewal talks early to avoid a void.`}
+                >
+                  📜 {next.label}: {left}mo
+                </Badge>
+              );
+            })()}
+            {/* Quick win #3 — fixed-rate mortgage expiry countdown. */}
+            {(() => {
+              const m: any = propertyMortgage;
+              if (!m || monthsPlayed == null) return null;
+              if (m.revertedToSVR) {
+                return (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] border-red-500/60 text-red-300 bg-red-500/10"
+                    title="Your fixed rate has ended — you're on the lender's standard variable rate. Remortgaging usually lowers the payment."
+                  >
+                    🏦 On SVR
+                  </Badge>
+                );
+              }
+              if (typeof m.startMonth !== 'number' || !m.fixedTermYears) return null;
+              const endMonth = m.startMonth + m.fixedTermYears * 12;
+              const left = endMonth - monthsPlayed;
+              if (left < 0) return null;
+              const cls = left <= 3
+                ? 'border-red-500/60 text-red-300 bg-red-500/10'
+                : left <= 9
+                  ? 'border-amber-400/50 text-amber-300 bg-amber-500/10'
+                  : 'border-green-400/40 text-green-300 bg-green-500/10';
+              return (
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px]", cls)}
+                  title={`Fixed rate ends at month ${endMonth} — ${left} month${left === 1 ? '' : 's'} away. After that the payment moves to the variable rate.`}
+                >
+                  🏦 Fix ends: {left}mo
+                </Badge>
+              );
+            })()}
             {/* Phase 2 — compact deep-link badges (full detail in Operations) */}
             {pendingEviction && (
               <button
