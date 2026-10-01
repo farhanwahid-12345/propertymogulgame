@@ -1,3 +1,4 @@
+import { decodeSave } from './saveCodec';
 /**
  * Phase 4 (v5) — Multiple save slots.
  *
@@ -79,6 +80,8 @@ export interface SlotSummary {
   cash?: number;
   propertyCount?: number;
   monthsPlayed?: number;
+  lastSavedAt?: number;
+  cities?: string[];
 }
 
 /** Cheap peek into a slot's persisted state for the slot picker UI. */
@@ -88,7 +91,7 @@ export function readSlotSummary(slot: SlotIndex): SlotSummary {
   if (typeof localStorage === 'undefined') {
     return { slot, name: fallbackName, empty: true };
   }
-  const raw = localStorage.getItem(slotKey(slot));
+  const raw = decodeSave(localStorage.getItem(slotKey(slot)));
   if (!raw) return { slot, name: fallbackName, empty: true };
   try {
     const parsed = JSON.parse(raw);
@@ -100,6 +103,8 @@ export function readSlotSummary(slot: SlotIndex): SlotSummary {
       empty: false,
       cash: typeof s?.cash === 'number' ? s.cash : 0,
       propertyCount: owned.length,
+      lastSavedAt: typeof s?.lastSavedAt === 'number' ? s.lastSavedAt : undefined,
+      cities: Array.from(new Set(owned.map((p: any) => p?.cityId).filter(Boolean))) as string[],
       monthsPlayed: typeof s?.monthsPlayed === 'number' ? s.monthsPlayed : 0,
       netWorth: typeof s?.cash === 'number'
         ? s.cash + owned.reduce((acc: number, p: any) => acc + (p?.marketValue || p?.value || 0), 0)
@@ -116,5 +121,17 @@ export function deleteSlot(slot: SlotIndex) {
   try {
     localStorage.removeItem(slotKey(slot));
     localStorage.removeItem(slotMetaKey(slot));
+  } catch { /* noop */ }
+}
+
+/** Copy one slot's save (and name) into another slot. */
+export function duplicateSlot(from: SlotIndex, to: SlotIndex) {
+  if (typeof localStorage === 'undefined') return;
+  const raw = localStorage.getItem(slotKey(from));
+  if (!raw) return;
+  try {
+    localStorage.setItem(slotKey(to), raw);
+    const meta = readSlotMeta(from);
+    writeSlotMeta(to, { name: `${meta.name || `Save ${from + 1}`} (copy)` });
   } catch { /* noop */ }
 }

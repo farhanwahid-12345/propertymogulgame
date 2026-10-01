@@ -16,7 +16,7 @@ import { Save } from "lucide-react";
 import { useGameStore } from "@/stores/gameStore";
 import {
   SLOT_COUNT, type SlotIndex,
-  readSlotSummary, writeSlotMeta, readSlotMeta, deleteSlot,
+  readSlotSummary, writeSlotMeta, readSlotMeta, deleteSlot, duplicateSlot,
   getActiveSlot, setActiveSlot,
 } from "@/lib/saveSlots";
 import { flushPersistedSave } from "@/lib/debouncedSave";
@@ -145,6 +145,8 @@ export function SaveSlotsInlineButton() {
                             {s.propertyCount} prop{s.propertyCount === 1 ? '' : 's'}
                             {" · "}
                             Month {s.monthsPlayed}
+                            {s.cities && s.cities.length > 0 && <>{" · "}<span className="capitalize">{s.cities.join(", ")}</span></>}
+                            {s.lastSavedAt && <div className="text-[11px] text-foreground/50">Saved {new Date(s.lastSavedAt).toLocaleString()}</div>}
                           </div>
                         )}
                       </div>
@@ -152,6 +154,17 @@ export function SaveSlotsInlineButton() {
                         {!isActive && (
                           <Button size="sm" onClick={() => switchSlot(s.slot)}>
                             {s.empty ? "New" : "Load"}
+                          </Button>
+                        )}
+                        {!s.empty && slots.some(o => o.empty) && (
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            const target = slots.find(o => o.empty);
+                            if (!target) return;
+                            if (isActive) flushPersistedSave();
+                            duplicateSlot(s.slot, target.slot);
+                            setRefresh(n => n + 1);
+                          }}>
+                            Copy
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => startRename(s.slot)}>
