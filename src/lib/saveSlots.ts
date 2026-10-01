@@ -104,7 +104,7 @@ export function readSlotSummary(slot: SlotIndex): SlotSummary {
       cash: typeof s?.cash === 'number' ? s.cash : 0,
       propertyCount: owned.length,
       lastSavedAt: typeof s?.lastSavedAt === 'number' ? s.lastSavedAt : undefined,
-      cities: Array.from(new Set(owned.map((p: any) => p?.cityId).filter(Boolean))) as string[],
+      cities: Array.from(new Set(owned.map((p: any) => p?.city || "middlesbrough").filter(Boolean))) as string[],
       monthsPlayed: typeof s?.monthsPlayed === 'number' ? s.monthsPlayed : 0,
       netWorth: typeof s?.cash === 'number'
         ? s.cash + owned.reduce((acc: number, p: any) => acc + (p?.marketValue || p?.value || 0), 0)
