@@ -280,8 +280,9 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
           lastCheck = currentTime;
         }
 
-        const autoAcceptFloor = prev.settings?.autoAcceptOffersWithin5Percent
-          ? Math.round(asking * 0.95)
+        const askingForFloor = listing.askingPrice || property?.value || 0;
+        const autoAcceptFloor = prev.settings?.autoAcceptOffersWithin5Percent && askingForFloor > 0
+          ? Math.round(askingForFloor * 0.95)
           : undefined;
         const autoAccepted = newOffers.find((o: PropertyOffer) =>
           (listing.autoAcceptThreshold && o.amount >= listing.autoAcceptThreshold)

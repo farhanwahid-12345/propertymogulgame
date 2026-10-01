@@ -8,6 +8,7 @@
  * (e.g. dismissing the tutorial) can force-write immediately, preventing a
  * stale pending tick from clobbering them.
  */
+import { decodeSave, encodeSave } from './saveCodec';
 
 let activeFlush: (() => void) | null = null;
 
@@ -53,7 +54,7 @@ export function createDebouncedStorage(
       if (pendingName === name && pendingValue !== null) {
         flush();
       }
-      const raw = localStorage.getItem(resolve(name));
+      const raw = decodeSave(localStorage.getItem(resolve(name)));
       if (!raw) return null;
       try {
         return JSON.parse(raw);
@@ -62,7 +63,10 @@ export function createDebouncedStorage(
       }
     },
     setItem(name: string, value: any): void {
-      const serialized = JSON.stringify(value);
+      if (value?.state && typeof value.state === 'object') {
+        value = { ...value, state: { ...value.state, lastSavedAt: Date.now() } };
+      }
+      const serialized = encodeSave(JSON.stringify(value));
       pendingName = name;
       pendingValue = serialized;
       if (timer) clearTimeout(timer);
