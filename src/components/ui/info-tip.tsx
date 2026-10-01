@@ -50,4 +50,8 @@ export const TIP_TEXTS = {
   PLANNING_PERMISSION: "Major works (extensions, conversions) need Local Planning Authority approval. £400 fee + 2-3 month wait, ~70% chance of approval.",
   CGT: "Capital Gains Tax: 18% (basic) or 24% (higher) on profit from selling property, after £3,000 annual allowance and acquisition costs.",
   CREDIT_SCORE: "Affects mortgage rates and LTV caps. Below 600 = subprime, 750+ = best rates.",
+  YIELD: "Gross yield: annual rent ÷ property value. Net yield also deducts running costs.",
+  FRI_LEASE: "Full Repairing and Insuring lease: the commercial tenant pays for repairs and insurance, not you.",
+  SECTION_21: "Section 21 'no-fault' eviction — abolished under the Renters' Rights rules. You now need a valid Section 8 ground.",
+  MEES: "Minimum Energy Efficiency Standards: rentals must reach EPC C by 2030 or they can't be let.",
 } as const;
