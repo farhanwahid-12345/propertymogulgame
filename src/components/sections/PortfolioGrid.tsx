@@ -3,6 +3,8 @@ import { Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PropertyCard } from "@/components/game/property-card";
+import { PortfolioMap } from "@/components/game/portfolio-map";
+import { InfoTip, TIP_TEXTS } from "@/components/ui/info-tip";
 import { RENOVATION_OPTIONS } from "@/components/game/renovation-dialog";
 import type { useGameState } from "@/hooks/useGameState";
 
@@ -34,19 +36,12 @@ export function PortfolioGrid({
   portfolioLTV,
   getDebtForProperty,
 }: PortfolioGridProps) {
-  if (gameState.ownedProperties.length === 0 && conveyancingBuyProperties.length === 0) {
-    return (
-      <div className="glass p-3 animate-fade-in">
-        <div className="text-center py-10 text-muted-foreground">
-          <Home className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm">Your portfolio is empty.</p>
-          <p className="text-xs mt-1">Visit the Estate Agent or Auction House to buy your first property.</p>
-        </div>
-      </div>
-    );
-  }
-
   const [sortKey, setSortKey] = useState<SortKey>("value-desc");
+  const [view, setView] = useState<"cards" | "map">("cards");
+  const openFromMap = (id: string) => {
+    setView("cards");
+    requestAnimationFrame(() => document.getElementById(`pcard-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
 
   const displayedOwnedProperties = useMemo(() => {
     const list = [...sortedOwnedProperties];
@@ -66,6 +61,18 @@ export function PortfolioGrid({
     list.sort(cmp);
     return list;
   }, [sortedOwnedProperties, sortKey]);
+
+  if (gameState.ownedProperties.length === 0 && conveyancingBuyProperties.length === 0) {
+    return (
+      <div className="glass p-3 animate-fade-in">
+        <div className="text-center py-10 text-muted-foreground">
+          <Home className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="text-sm">Your portfolio is empty.</p>
+          <p className="text-xs mt-1">Visit the Estate Agent or Auction House to buy your first property.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass p-3 animate-fade-in">
@@ -96,6 +103,10 @@ export function PortfolioGrid({
                   <SelectItem value="loss">Value loss</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button type="button" onClick={() => setView("cards")} className={`px-2 h-7 text-xs ${view === "cards" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Cards</button>
+                <button type="button" onClick={() => setView("map")} className={`px-2 h-7 text-xs ${view === "map" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Map</button>
+              </div>
             </div>
           )}
         </div>
@@ -106,7 +117,7 @@ export function PortfolioGrid({
           <span className="text-muted-foreground">Income</span>
           <span className="font-semibold text-success">£{totalPortfolioIncome.toLocaleString()}</span>
           <span className="text-muted-foreground/40">·</span>
-          <span className="text-muted-foreground">Yield</span>
+          <span className="text-muted-foreground inline-flex items-center gap-1">Yield <InfoTip text={TIP_TEXTS.YIELD} /></span>
           <span className="font-semibold text-[hsl(var(--stat-credit))]">{avgYield}%</span>
           {portfolioLTV > 0 && (
             <Badge
@@ -122,11 +133,24 @@ export function PortfolioGrid({
               LTV {portfolioLTV.toFixed(1)}%
             </Badge>
           )}
+          {portfolioLTV > 0 && (
+            <InfoTip text={TIP_TEXTS.LTV} />
+          )}
         </div>
       </div>
 
 
 
+      {view === "map" ? (
+        <PortfolioMap
+          properties={displayedOwnedProperties}
+          tenants={gameState.tenants || []}
+          mortgages={gameState.mortgages || []}
+          listings={gameState.propertyListings || []}
+          onOpen={openFromMap}
+          onListForSale={gameState.listPropertyForSale}
+        />
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
 
 
@@ -249,8 +273,8 @@ export function PortfolioGrid({
             : undefined;
 
           return (
+            <div key={property.id} id={`pcard-${property.id}`} className="contents">
             <PropertyCard
-              key={property.id}
               property={propertyForCard}
               onSell={gameState.sellProperty}
               onSelectTenant={gameState.selectTenant}
@@ -300,10 +324,11 @@ export function PortfolioGrid({
                 return l ? (l.offers || []).length : 0;
               })()}
             />
-
+            </div>
           );
         })}
       </div>
+      )}
     </div>
   );
 }
