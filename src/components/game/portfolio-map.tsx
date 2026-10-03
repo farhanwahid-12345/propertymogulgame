@@ -32,7 +32,6 @@ interface Props {
 export function PortfolioMap({ properties, tenants, mortgages, listings, onOpen, onListForSale }: Props) {
   const [metric, setMetric] = useState<Metric>("cashflow");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const rows = useMemo(() => properties.map((p) => {
     const debtPay = mortgages.filter((m) => m.propertyId === p.id).reduce((s, m) => s + (m.monthlyPayment ?? 0), 0);
@@ -80,9 +79,20 @@ export function PortfolioMap({ properties, tenants, mortgages, listings, onOpen,
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(selected.size === rows.length ? new Set() : new Set(rows.map((r) => r.p.id)))}>
             {selected.size === rows.length ? "Clear" : "Select all"}
           </Button>
-          <Button size="sm" className="h-7 text-xs" disabled={sellable.length === 0} onClick={() => setConfirmOpen(true)}>
-            List selected for sale
-          </Button>
+          {sellable.length === 0 ? (
+            <Button size="sm" className="h-7 text-xs" disabled>List selected for sale</Button>
+          ) : (
+            <ConfirmDialog
+              trigger={<Button size="sm" className="h-7 text-xs">List selected for sale</Button>}
+              title={`List ${sellable.length} ${sellable.length === 1 ? "property" : "properties"} for sale?`}
+              description={`Each will be listed at its current value — £${Math.round(totalAsking).toLocaleString()} in total. Properties already for sale are skipped. Buyers' offers arrive over the coming months.`}
+              confirmLabel="List for sale"
+              onConfirm={() => {
+                sellable.forEach((r) => onListForSale(r.p.id, Math.round(r.p.value ?? 0)));
+                setSelected(new Set());
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -105,18 +115,6 @@ export function PortfolioMap({ properties, tenants, mortgages, listings, onOpen,
         </div>
       ))}
 
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title={`List ${sellable.length} ${sellable.length === 1 ? "property" : "properties"} for sale?`}
-        description={`Each will be listed at its current value — £${Math.round(totalAsking).toLocaleString()} in total. Properties already for sale are skipped. Buyers' offers arrive over the coming months.`}
-        confirmLabel="List for sale"
-        onConfirm={() => {
-          sellable.forEach((r) => onListForSale(r.p.id, Math.round(r.p.value ?? 0)));
-          setSelected(new Set());
-          setConfirmOpen(false);
-        }}
-      />
     </div>
   );
 }
