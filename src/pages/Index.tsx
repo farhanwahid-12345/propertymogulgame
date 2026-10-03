@@ -28,6 +28,7 @@ import { HeroHeader } from "@/components/sections/HeroHeader";
 import { TutorialEngine } from "@/components/game/tutorial/TutorialEngine";
 import { PropertyMarketActions } from "@/components/sections/PropertyMarket";
 import { CashflowForecastButton } from "@/components/game/cashflow-forecast";
+import { WhatIfCalculatorButton } from "@/components/game/what-if-calculator";
 import { BankingPanelActions, OperationsInlineButton, LoansInlineButton, InvestmentsInlineButton } from "@/components/sections/BankingPanel";
 import { AccountsPanel } from "@/components/sections/AccountsPanel";
 import { PortfolioGrid } from "@/components/sections/PortfolioGrid";
@@ -248,6 +249,7 @@ const Index = () => {
                     <Button variant={accountsSubTab === 'statements' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('statements')}>📑 Statements</Button>
                   </>
                 )}
+                <WhatIfCalculatorButton />
                 <CashflowForecastButton />
                 <OperationsInlineButton gameState={gameState} />
               </div>
