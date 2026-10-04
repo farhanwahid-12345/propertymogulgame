@@ -4,18 +4,22 @@ import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Too
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useGameStore } from "@/stores/gameStore";
-import { projectCashflow } from "@/lib/engine/forecast";
+import { useForecastWorker } from "@/hooks/useForecastWorker";
 import { fromPennies } from "@/lib/formatCurrency";
 
 const gbp = (p: number) => `£${Math.round(fromPennies(p)).toLocaleString()}`;
 
 export function CashflowForecastButton() {
   const [open, setOpen] = useState(false);
-  const s = useGameStore();
-  const data = useMemo(() => open ? projectCashflow({
-    cash: s.cash, monthsPlayed: s.monthsPlayed, ownedProperties: s.ownedProperties,
-    tenants: s.tenants || [], mortgages: s.mortgages || [],
-  }) : [], [open, s.cash, s.monthsPlayed, s.ownedProperties, s.tenants, s.mortgages]);
+  const cash = useGameStore(st => st.cash);
+  const monthsPlayed = useGameStore(st => st.monthsPlayed);
+  const ownedProperties = useGameStore(st => st.ownedProperties);
+  const tenants = useGameStore(st => st.tenants);
+  const mortgages = useGameStore(st => st.mortgages);
+  const args = useMemo(() => open ? {
+    cash, monthsPlayed, ownedProperties, tenants: tenants || [], mortgages: mortgages || [],
+  } : null, [open, cash, monthsPlayed, ownedProperties, tenants, mortgages]);
+  const { data } = useForecastWorker(args);
   const firstNegative = data.find(d => d.cash < 0);
   const fixes = data.filter(d => d.fixEnding.length > 0);
   const chart = data.map(d => ({ label: `M${d.month}`, cash: fromPennies(d.cash), net: fromPennies(d.net) }));
