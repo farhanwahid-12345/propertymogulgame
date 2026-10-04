@@ -25,12 +25,17 @@ export interface TenantRentInput {
 }
 
 /**
- * @deprecated Profile-based rent variance is now baked into the listing's
- * `baseRent` upstream (via LHA_TENANT_TIER_MULT in market.ts). Retained as a
- * pure helper for legacy callers but always returns 1.0 to avoid double-count.
+ * Profile-based rent offer multiplier. Listing rent is generated once at the
+ * neutral 'standard' level, so applying this here is the only profile swing.
  */
-export function getProfileRentMultiplier(_profile: TenantRentInput["profile"]): number {
-  return 1.0;
+export function getProfileRentMultiplier(profile: TenantRentInput["profile"]): number {
+  switch (profile) {
+    case "premium": return 1.10;
+    case "risky":   return 1.05;
+    case "budget":  return 0.90;
+    case "standard":
+    default:        return 1.00;
+  }
 }
 
 /**
@@ -128,14 +133,15 @@ function lhaCeiling(ctx: RentClampContext | undefined): number {
  */
 export function calcTenantRent(
   baseRent: number,
-  _tenant: { profile: TenantRentInput["profile"] },
+  tenant: { profile: TenantRentInput["profile"] },
   condition?: PropertyCondition,
   furnishingTier?: 'unfurnished' | 'part_furnished' | 'fully_furnished',
   clampCtx?: RentClampContext,
 ): number {
+  const profileMult = getProfileRentMultiplier(tenant?.profile ?? "standard");
   const conditionMult = getConditionRentMultiplierShared(condition);
   const furnishingMult = getFurnishingRentMultiplier(furnishingTier);
-  const raw = baseRent * conditionMult * furnishingMult;
+  const raw = baseRent * profileMult * conditionMult * furnishingMult;
   const ceiling = lhaCeiling(clampCtx);
   const clamped = ceiling > 0 ? Math.min(raw, ceiling) : raw;
   return Math.floor(clamped);

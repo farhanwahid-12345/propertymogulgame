@@ -30,10 +30,8 @@ import {
 import { impliedCommercialYield } from '@/lib/engine/market';
 import { generateCommercialApplicantInRange } from '@/components/game/tenant-selector';
 
-// Phase 5 (item 13) — city-level residential yield anchors for mean-reversion drift.
-const CITY_RESIDENTIAL_YIELD: Record<string, number> = {
-  middlesbrough: 0.075, leeds: 0.055, manchester: 0.050, london: 0.040,
-};
+// Residential fair value uses the shared price→yield curve (cheap stock yields more).
+import { expectedResidentialYieldPct } from '@/lib/engine/constants';
 // Phase 5 (item 15) — annual commercial rental growth mirrors residential
 // appreciation by city (used to derive the suggested uplift at rent reviews).
 const CITY_COMMERCIAL_ANNUAL_GROWTH: Record<string, number> = {
@@ -132,7 +130,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
         const advertisedRent = conv.advertisedMonthlyIncome ?? prop.monthlyIncome;
         const bargainRatio = listedValue > 0 ? paid / listedValue : 1;
         // Phase 2 — yield-implied fair value (residential) using city yield anchor.
-        const cityYieldAtBuy = CITY_RESIDENTIAL_YIELD[prop.city ?? 'middlesbrough'] ?? 0.08;
+        const cityYieldAtBuy = expectedResidentialYieldPct(paid) / 100;
         const yieldImpliedValueAtBuy = (prop.type !== 'commercial' && advertisedRent > 0)
           ? Math.round((advertisedRent * 12) / cityYieldAtBuy)
           : paid;
@@ -1496,7 +1494,7 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           return { ...property, value: noisy, marketValue: noisy };
         }
         // Phase 2 — residential: yield mean-reversion toward city-implied fair value.
-        const cityYield = CITY_RESIDENTIAL_YIELD[property.city ?? 'middlesbrough'] ?? 0.08;
+        const cityYield = expectedResidentialYieldPct(property.value) / 100;
         const monthlyIncomePennies = property.monthlyIncome || 0;
         const yieldImpliedValue = monthlyIncomePennies > 0
           ? Math.round((monthlyIncomePennies * 12) / cityYield)

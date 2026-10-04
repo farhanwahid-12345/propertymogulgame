@@ -7,11 +7,11 @@ import {
 } from "./tenantRent";
 
 describe("getProfileRentMultiplier", () => {
-  it("is neutralised to 1.0 (profile variance is baked into LHA tiering upstream)", () => {
-    expect(getProfileRentMultiplier("premium")).toBe(1);
+  it("varies by profile", () => {
+    expect(getProfileRentMultiplier("premium")).toBe(1.1);
     expect(getProfileRentMultiplier("standard")).toBe(1);
-    expect(getProfileRentMultiplier("budget")).toBe(1);
-    expect(getProfileRentMultiplier("risky")).toBe(1);
+    expect(getProfileRentMultiplier("budget")).toBe(0.9);
+    expect(getProfileRentMultiplier("risky")).toBe(1.05);
   });
 });
 
@@ -27,15 +27,15 @@ describe("getFurnishingRentMultiplier", () => {
   });
 });
 
-describe("calcTenantRent — condition × furnishing only (no profile stacking)", () => {
-  it("equals base × condition × furnishing", () => {
-    const expected = Math.floor(1_000 * 1.10 * 1.08); // premium condition × fully furnished
+describe("calcTenantRent — profile × condition × furnishing", () => {
+  it("equals base × profile × condition × furnishing", () => {
+    const expected = Math.floor(1_000 * 1.10 * 1.10 * 1.08);
     expect(calcTenantRent(1_000, { profile: "premium" }, "premium", "fully_furnished")).toBe(expected);
   });
-  it("premium and standard profiles produce identical rent (no double-count)", () => {
+  it("premium profile pays more than standard", () => {
     const premium = calcTenantRent(1_000, { profile: "premium" }, "standard", "unfurnished");
     const standard = calcTenantRent(1_000, { profile: "standard" }, "standard", "unfurnished");
-    expect(premium).toBe(standard);
+    expect(premium).toBeGreaterThan(standard);
   });
   it("dilapidated drops below base rent", () => {
     expect(calcTenantRent(1_000, { profile: "standard" }, "dilapidated")).toBeLessThan(1_000);
