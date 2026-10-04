@@ -286,11 +286,13 @@ export const AVAILABLE_PROPERTIES: Property[] = [
  * RESIDENTIAL_YIELD_FLOOR_PCT. £50k ≈ 12% (£500/mo), £150k ≈ 8%, £1.5m ≈ 4.5%.
  */
 export const RESIDENTIAL_YIELD_FLOOR_PCT = 4.5;
-const YIELD_CURVE: Array<[number, number]> = [
-  [40_000, 12.8], [50_000, 12.0], [80_000, 10.0], [150_000, 8.0],
-  [300_000, 6.5], [600_000, 5.5], [1_200_000, 4.75], [2_000_000, 4.5],
-];
 export function expectedResidentialYieldPct(pricePennies: number): number {
+  // Declared inside the function: AVAILABLE_PROPERTIES calls this at module init.
+  const RESIDENTIAL_YIELD_FLOOR_PCT = 4.5;
+  const YIELD_CURVE: Array<[number, number]> = [
+    [40_000, 12.8], [50_000, 12.0], [80_000, 10.0], [150_000, 8.0],
+    [300_000, 6.5], [600_000, 5.5], [1_200_000, 4.75], [2_000_000, 4.5],
+  ];
   const v = Math.max(1, pricePennies / 100);
   if (v <= YIELD_CURVE[0][0]) return YIELD_CURVE[0][1];
   for (let i = 1; i < YIELD_CURVE.length; i++) {
