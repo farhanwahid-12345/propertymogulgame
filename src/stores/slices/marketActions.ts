@@ -13,7 +13,7 @@
 import { gameRandom } from '@/lib/rng';
 import { toPennies } from '@/lib/formatCurrency';
 import {
-  SOLICITOR_FEES, MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES,
+  SOLICITOR_FEES, MORTGAGE_PROVIDERS, AVAILABLE_PROPERTIES, expectedResidentialYieldPct,
 } from '@/lib/engine/constants';
 import { getPropertyValueRangeForLevel } from '@/lib/engine/financials';
 import { generateRandomProperty, generateMarketProperty } from '@/lib/engine/market';
@@ -101,7 +101,15 @@ export function createMarketActions(set: SetFn, get: GetFn) {
           const prop = generateRandomProperty(prev.level, pickedCity);
           prop.price = adjusted;
           prop.value = adjusted;
-          prop.monthlyIncome = Math.floor((adjusted * (6 + gameRandom() * 9) / 100) / 12);
+          if (prop.type === 'commercial') {
+            const y = prop.yield && prop.yield > 0 ? prop.yield : 9;
+            prop.monthlyIncome = Math.round((adjusted * y / 100) / 12);
+          } else {
+            const y = expectedResidentialYieldPct(adjusted) + (gameRandom() - 0.5);
+            prop.monthlyIncome = Math.round((adjusted * y / 100) / 12 / 100) * 100;
+          }
+          prop.marketValue = adjusted;
+          prop.yield = +(((prop.monthlyIncome * 12) / adjusted) * 100).toFixed(2);
           if (!usedIds.has(prop.id) && !excludedIds.has(prop.id)) {
             estate.push(prop);
             usedIds.add(prop.id);

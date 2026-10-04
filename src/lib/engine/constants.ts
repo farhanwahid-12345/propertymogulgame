@@ -269,7 +269,42 @@ export const AVAILABLE_PROPERTIES: Property[] = [
   // Level 5
   { id: "21", name: "Waterfront Development", type: "luxury", price: toPennies(1200000), value: toPennies(1200000), neighborhood: "Middlesbrough Centre", monthlyIncome: toPennies(7000), marketTrend: "stable", yield: 7.0, lastRentIncrease: 0, condition: "premium" as const, monthsSinceLastRenovation: 0, epcRating: 'C' as const },
   { id: "22", name: "Historic Mansion", type: "luxury", price: toPennies(1500000), value: toPennies(1500000), neighborhood: "Nunthorpe", monthlyIncome: toPennies(8500), marketTrend: "up", yield: 6.8, lastRentIncrease: 0, condition: "premium" as const, monthsSinceLastRenovation: 0, epcRating: 'C' as const },
-];
+].map((p) => {
+  // Residential/luxury starter stock is re-based onto the price→yield curve so
+  // the quoted rent, price and yield always agree. Commercial keeps its
+  // covenant-based figures; yield is still recomputed from rent ÷ price.
+  if (p.type === 'commercial') {
+    return { ...p, yield: +(((p.monthlyIncome * 12) / p.price) * 100).toFixed(2) };
+  }
+  const monthlyIncome = Math.round((p.price * expectedResidentialYieldPct(p.price) / 100) / 12 / 100) * 100;
+  return { ...p, monthlyIncome, yield: +(((monthlyIncome * 12) / p.price) * 100).toFixed(2) };
+});
+
+/**
+ * Gross residential yield (%) expected for a given price (pennies).
+ * Cheap stock yields more; yields compress as prices rise, but never below
+ * RESIDENTIAL_YIELD_FLOOR_PCT. £50k ≈ 12% (£500/mo), £150k ≈ 8%, £1.5m ≈ 4.5%.
+ */
+export const RESIDENTIAL_YIELD_FLOOR_PCT = 4.5;
+export function expectedResidentialYieldPct(pricePennies: number): number {
+  // Declared inside the function: AVAILABLE_PROPERTIES calls this at module init.
+  const RESIDENTIAL_YIELD_FLOOR_PCT = 4.5;
+  const YIELD_CURVE: Array<[number, number]> = [
+    [40_000, 12.8], [50_000, 12.0], [80_000, 10.0], [150_000, 8.0],
+    [300_000, 6.5], [600_000, 5.5], [1_200_000, 4.75], [2_000_000, 4.5],
+  ];
+  const v = Math.max(1, pricePennies / 100);
+  if (v <= YIELD_CURVE[0][0]) return YIELD_CURVE[0][1];
+  for (let i = 1; i < YIELD_CURVE.length; i++) {
+    const [x1, y1] = YIELD_CURVE[i];
+    if (v <= x1) {
+      const [x0, y0] = YIELD_CURVE[i - 1];
+      const t = (Math.log(v) - Math.log(x0)) / (Math.log(x1) - Math.log(x0));
+      return Math.max(RESIDENTIAL_YIELD_FLOOR_PCT, y0 + (y1 - y0) * t);
+    }
+  }
+  return RESIDENTIAL_YIELD_FLOOR_PCT;
+}
 
 export const NEIGHBORHOODS = ["Linthorpe", "Acklam", "Marton", "Nunthorpe", "Middlesbrough Centre", "Hemlington", "South Bank", "Pallister Park", "North Ormesby", "Port Clarence"];
 

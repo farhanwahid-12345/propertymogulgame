@@ -3,7 +3,7 @@ import type { Property } from "@/types/game";
 import { toPennies } from "@/lib/formatCurrency";
 import {
   MIDDLESBROUGH_STREETS, NEIGHBORHOODS,
-  CITY_LHA_MONTHLY_PENNIES, LHA_TENANT_TIER_MULT, bedroomsForSqft,
+  CITY_LHA_MONTHLY_PENNIES, LHA_TENANT_TIER_MULT, bedroomsForSqft, expectedResidentialYieldPct,
   roomRentDiscountForSubtype, clampFlatUnitRentPennies,
 } from "./constants";
 import { getPropertyValueRangeForLevel, getFurnitureValuePennies } from "./financials";
@@ -176,22 +176,16 @@ export function generateRandomProperty(level: number, cityId?: CityId): Property
     const cityYield = city.yieldRange.min + Math.random() * (city.yieldRange.max - city.yieldRange.min);
     baseMonthlyIncome = Math.floor((price * (cityYield / 100)) / 12);
   } else {
-    const rentJitter = 1 + (Math.random() - 0.5) * 0.16; // ±8%
-    baseMonthlyIncome = Math.round(
-      lhaAnchoredMonthlyRentPennies({
-        cityId: city.id,
-        internalSqft,
-        valuePennies: value,
-        subtype: 'standard',
-        subtypeUnits: 1,
-        tier: 'standard',
-      }) * rentJitter,
-    );
+    // Price→yield curve (±0.5pp jitter) so rent, price and yield always agree.
+    const y = expectedResidentialYieldPct(value) + (Math.random() - 0.5);
+    baseMonthlyIncome = Math.round((value * y / 100) / 12 / 100) * 100;
   }
 
   let finalPrice = price;
   let finalValue = value;
-  let finalMonthlyIncome = Math.max(toPennies(400), baseMonthlyIncome);
+  let finalMonthlyIncome = type === 'commercial'
+    ? Math.max(toPennies(400), baseMonthlyIncome)
+    : baseMonthlyIncome;
   // Yield is now back-computed from anchored rent and value.
   let finalYield = (finalMonthlyIncome * 12) / value * 100;
 
