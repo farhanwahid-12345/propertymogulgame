@@ -7,4 +7,4 @@
 - [x] What-if calculator (purchase/remortgage)
 - [x] Portfolio map view coloured by metric
 - [x] Bulk portfolio actions (list selected for sale)
-- [ ] Offload valuation/tax maths to a worker — deferred: month-end mutates the whole store; low gain vs risk of breaking saves
+- [x] Offload forecast maths to a worker (month-end stays on main thread to protect saves)
