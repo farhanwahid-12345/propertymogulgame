@@ -239,7 +239,7 @@ export const MIDDLESBROUGH_STREETS = [
 ];
 
 // All property prices/incomes in PENNIES
-export const AVAILABLE_PROPERTIES: Property[] = [
+export const AVAILABLE_PROPERTIES: Property[] = ([
   // Level 1
   // Phase 1 #1 — Middlesbrough terrace yields tempered to a realistic 6.5–7.2% band.
   { id: "1", name: "45 Linthorpe Road", type: "residential", price: toPennies(75000), value: toPennies(75000), neighborhood: "Linthorpe", monthlyIncome: toPennies(430), marketTrend: "up", yield: 6.9, lastRentIncrease: 0, condition: "standard" as const, monthsSinceLastRenovation: 0, epcRating: 'D' as const },
@@ -269,7 +269,7 @@ export const AVAILABLE_PROPERTIES: Property[] = [
   // Level 5
   { id: "21", name: "Waterfront Development", type: "luxury", price: toPennies(1200000), value: toPennies(1200000), neighborhood: "Middlesbrough Centre", monthlyIncome: toPennies(7000), marketTrend: "stable", yield: 7.0, lastRentIncrease: 0, condition: "premium" as const, monthsSinceLastRenovation: 0, epcRating: 'C' as const },
   { id: "22", name: "Historic Mansion", type: "luxury", price: toPennies(1500000), value: toPennies(1500000), neighborhood: "Nunthorpe", monthlyIncome: toPennies(8500), marketTrend: "up", yield: 6.8, lastRentIncrease: 0, condition: "premium" as const, monthsSinceLastRenovation: 0, epcRating: 'C' as const },
-].map((p) => {
+] as Property[]).map((p: Property): Property => {
   // Residential/luxury starter stock is re-based onto the price→yield curve so
   // the quoted rent, price and yield always agree. Commercial keeps its
   // covenant-based figures; yield is still recomputed from rent ÷ price.
