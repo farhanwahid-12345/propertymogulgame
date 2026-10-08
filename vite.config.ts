@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         // Allow precaching of larger JS bundles (default is 2 MiB).
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Activate new builds immediately so players never get stuck on an old version.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         // Never intercept OAuth callbacks — Lovable convention.
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [

@@ -367,11 +367,15 @@ export function TutorialEngine({ onFinish }: Props) {
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-2">
-              {stepIndex > 0 && (
-                <Button variant="ghost" size="sm" onClick={prev}>
-                  Back
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={prev}
+                disabled={stepIndex === 0}
+                data-tutorial-back
+              >
+                Back
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button
