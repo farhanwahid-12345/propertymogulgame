@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import logoAsset from "@/assets/property-mogul-logo.png.asset.json";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
@@ -119,9 +120,13 @@ export function HeroHeader({
       <div className="relative w-full px-4 flex items-center">
         <div className="container mx-auto min-w-0">
           <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-            <div className="min-w-0 flex-1">
-              <h1 className="font-bold tracking-tight gradient-text truncate text-base md:text-lg">
-                Property Tycoon
+            <div className="min-w-0 flex-1 flex items-center">
+              <h1 className="m-0 leading-none">
+                <img
+                  src={logoAsset.url}
+                  alt="Property Mogul UK"
+                  className="h-9 md:h-10 w-auto max-w-full object-contain drop-shadow"
+                />
               </h1>
             </div>
             <div className="flex-1 flex items-center justify-center">
