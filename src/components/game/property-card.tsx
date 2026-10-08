@@ -1294,7 +1294,7 @@ export const PropertyCard = memo(function PropertyCard({
                         onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
                       >
                         <Gavel className="h-3 w-3 shrink-0" />
-                        <span className="whitespace-nowrap">Propose eviction</span>
+                        <span className="whitespace-nowrap">Eviction</span>
                       </Button>
                     </div>
                   )}
@@ -1311,7 +1311,7 @@ export const PropertyCard = memo(function PropertyCard({
                         onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId: property.id } }))}
                       >
                         <Gavel className="h-3 w-3 shrink-0" />
-                        <span className="whitespace-nowrap">Propose eviction</span>
+                        <span className="whitespace-nowrap">Eviction</span>
                       </Button>
                     </div>
                   )}

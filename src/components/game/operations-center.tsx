@@ -190,7 +190,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
   }, [conveyancing, planningApplications, renovations, tenantConcerns, ownedIds, pendingEvictions, propertyListings, openDebts, vacantCommercialProperties]);
 
   const totalActionable = counts.conv + counts.plan + counts.reno + counts.concerns + counts.ev + counts.lis + counts.ext + counts.comm;
-  const allEmpty = totalActionable === 0;
+  const allEmpty = totalActionable === 0 && evictionCandidates.length === 0;
 
   const defaultTab: TabKey = useMemo(() => {
     if (counts.concerns > 0) return "concerns";
@@ -202,7 +202,14 @@ export function OperationsCenter(props: OperationsCenterProps) {
     return "renovations";
   }, [counts]);
 
-  const [tab, setTab] = useState<TabKey>(defaultTab);
+  const [tab, setTab] = useState<TabKey>(() => {
+    const req = typeof window !== 'undefined' ? (window as any).__pmOpsRequestedTab : undefined;
+    if (req) {
+      (window as any).__pmOpsRequestedTab = undefined;
+      return req as TabKey;
+    }
+    return defaultTab;
+  });
   // Re-sync when there's nothing on current tab and default has changed
   useEffect(() => {
     const isCurrentEmpty =

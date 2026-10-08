@@ -113,7 +113,12 @@ function InlineDialogButton({
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!autoOpenEvent || typeof window === 'undefined') return;
-    const handler = () => setOpen(true);
+    const handler = (e: Event) => {
+      // Remember the requested sub-tab so a lazily-mounted panel can pick it up.
+      const tab = (e as CustomEvent).detail?.tab;
+      if (tab) (window as any).__pmOpsRequestedTab = tab;
+      setOpen(true);
+    };
     window.addEventListener(autoOpenEvent, handler);
     return () => window.removeEventListener(autoOpenEvent, handler);
   }, [autoOpenEvent]);
