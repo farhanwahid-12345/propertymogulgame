@@ -252,7 +252,7 @@ export function MultiUnitSlots({
                     className="h-7 text-[11px]"
                     onClick={() => window.dispatchEvent(new CustomEvent('pm:open-operations', { detail: { tab: 'evictions', propertyId } }))}
                   >
-                    Evictions →
+                    Eviction
                   </Button>
                 </div>
               )}
