@@ -9,7 +9,7 @@ import { createDebouncedStorage } from '@/lib/debouncedSave';
 import { getActiveSlot, slotKey, migrateLegacySaveIntoSlot0, LEGACY_SAVE_KEY } from '@/lib/saveSlots';
 import {
   INITIAL_CASH, EXPERIENCE_BASE, BASE_MARKET_RATE,
-  AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS, LOAN_PRODUCTS,
+  AVAILABLE_PROPERTIES, MONTH_DURATION_SECONDS, LOAN_PRODUCTS, expectedResidentialYieldPct,
 } from '@/lib/engine/constants';
 import { getInitialProviderRates } from '@/lib/engine/financials';
 import { gameRandom, seedRng } from '@/lib/rng';
@@ -562,6 +562,19 @@ export const migrationSteps: ReadonlyArray<Migration> = [
           return !!p && p.type === 'commercial' && !!p.commercialLease;
         });
       }
+    },
+  },
+  {
+    from: 26, to: 27, describe: 'Rebase unowned residential listings onto the price→yield curve',
+    apply: (persisted) => {
+      ['estateAgentProperties', 'auctionProperties'].forEach((k) => {
+        if (!Array.isArray(persisted[k])) return;
+        persisted[k] = persisted[k].map((p: any) => {
+          if (!p || p.type === 'commercial' || p.sittingTenant || !(p.price > 0)) return p;
+          const monthlyIncome = Math.round((p.price * expectedResidentialYieldPct(p.price) / 100) / 12 / 100) * 100;
+          return { ...p, monthlyIncome, yield: +(((monthlyIncome * 12) / p.price) * 100).toFixed(2) };
+        });
+      });
     },
   },
 ];
