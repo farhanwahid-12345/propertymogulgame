@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGameStore } from "@/stores/gameStore";
+import { useTutorialStore } from "@/stores/tutorialStore";
 import {
   Dialog,
   DialogContent,
@@ -19,19 +20,21 @@ import { Button } from "@/components/ui/button";
  */
 export function EpcTutorialDialog() {
   const seen = useGameStore((s: any) => s.seenEpcTutorial);
+  const onboarded = useGameStore((s: any) => s.onboardingCompleted);
+  const tutorialActive = useTutorialStore((s) => s.active);
   const estate = useGameStore((s) => s.estateAgentProperties);
   const auction = useGameStore((s) => s.auctionProperties);
   const owned = useGameStore((s) => s.ownedProperties);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (seen) return;
+    if (seen || !onboarded || tutorialActive) return;
     const all = [...(estate || []), ...(auction || []), ...(owned || [])];
     const triggered = all.some((p: any) =>
       p?.epcRating && ['E', 'F', 'G'].includes(p.epcRating),
     );
     if (triggered) setOpen(true);
-  }, [seen, estate, auction, owned]);
+  }, [seen, onboarded, tutorialActive, estate, auction, owned]);
 
   const dismiss = () => {
     setOpen(false);
