@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import logoAsset from "@/assets/property-mogul-logo.png.asset.json";
+import logoUrl from "@/assets/property-mogul-logo.png";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
@@ -123,7 +123,7 @@ export function HeroHeader({
             <div className="min-w-0 flex-1 flex items-center">
               <h1 className="m-0 leading-none">
                 <img
-                  src={logoAsset.url}
+                  src={logoUrl}
                   alt="Property Mogul UK"
                   className="h-9 md:h-10 w-auto max-w-full object-contain drop-shadow"
                 />
