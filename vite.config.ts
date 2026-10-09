@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registration happens only from src/lib/pwa.ts.
+      injectRegister: null,
       // Don't activate the SW in dev — Lovable's preview iframe + HMR don't play well with it.
       devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "robots.txt", "pwa-192x192.png", "pwa-512x512.png"],
@@ -36,6 +38,11 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         // Allow precaching of larger JS bundles (default is 2 MiB).
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Never precache the HTML shell: a precached index.html is served
+        // cache-first and pins players to an old build. HTML always comes
+        // from the network (NetworkFirst below) so new publishes load at once.
+        globPatterns: ["**/*.{js,css,png,svg,ico,webmanifest,woff2}"],
+        navigateFallback: null,
         // Activate new builds immediately so players never get stuck on an old version.
         skipWaiting: true,
         clientsClaim: true,
