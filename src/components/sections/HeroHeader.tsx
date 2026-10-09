@@ -120,12 +120,14 @@ export function HeroHeader({
       <div className="relative w-full px-4 flex items-center">
         <div className="container mx-auto min-w-0">
           <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-            <div className="min-w-0 flex-1 flex items-center">
-              <h1 className="m-0 leading-none">
+            <div className="shrink-0 flex items-center">
+              <h1 className="m-0 leading-none shrink-0">
                 <img
                   src={logoUrl}
                   alt="Property Mogul UK"
-                  className="h-9 md:h-10 w-auto max-w-full object-contain drop-shadow"
+                  width={80}
+                  height={40}
+                  className="block h-9 md:h-10 w-auto min-w-[72px] object-contain drop-shadow"
                 />
               </h1>
             </div>
