@@ -106,7 +106,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
     return (
       <Button variant="outline" disabled className="opacity-50">
         <Briefcase className="h-4 w-4 mr-2" />
-        Portfolio Mortgage (Need 3+ properties)
+        Portfolio Mortgages
       </Button>
     );
   }
@@ -116,7 +116,7 @@ export function PortfolioMortgage({ ownedProperties, mortgages = [], mortgagePro
       <DialogTrigger asChild>
         <Button variant="outline" className="bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20">
           <Briefcase className="h-4 w-4 mr-2" />
-          Portfolio Mortgage
+          Portfolio Mortgages
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">

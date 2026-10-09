@@ -247,10 +247,10 @@ const Index = () => {
                     <Button variant={accountsSubTab === 'tax' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('tax')}>🧾 Tax</Button>
                     <Button variant={accountsSubTab === 'performance' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('performance')}>📈 Performance</Button>
                     <Button variant={accountsSubTab === 'statements' ? 'default' : 'outline'} size="sm" className="h-8 px-3 text-xs" onClick={() => setAccountsSubTab('statements')}>📑 Statements</Button>
+                    <WhatIfCalculatorButton />
+                    <CashflowForecastButton />
                   </>
                 )}
-                <WhatIfCalculatorButton />
-                <CashflowForecastButton />
                 <OperationsInlineButton gameState={gameState} />
               </div>
             </div>
