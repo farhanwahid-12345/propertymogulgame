@@ -581,8 +581,34 @@ export function EstateAgentWindow({
   // Onboarding tour: external open trigger + open-state broadcast.
   useEffect(() => {
     const handler = () => setIsOpen(true);
+    const close = () => { setIsOpen(false); setSelectedBuyProperty(null); };
+    const deselect = () => setSelectedBuyProperty(null);
     window.addEventListener('pm:open-estate-agent', handler);
-    return () => window.removeEventListener('pm:open-estate-agent', handler);
+    window.addEventListener('pm:tutorial-close-dialogs', close);
+    window.addEventListener('pm:tutorial-deselect-property', deselect);
+    return () => {
+      window.removeEventListener('pm:open-estate-agent', handler);
+      window.removeEventListener('pm:tutorial-close-dialogs', close);
+      window.removeEventListener('pm:tutorial-deselect-property', deselect);
+    };
+  }, []);
+  // Tutorial: open the agent and pre-select the first listing.
+  const firstBuyRef = useRef<Property | null>(null);
+  firstBuyRef.current = sortedBuyProperties[0] ?? null;
+  useEffect(() => {
+    const handler = () => {
+      setIsOpen(true);
+      const p = firstBuyRef.current;
+      if (p) {
+        setSelectedBuyProperty(p);
+        setOfferAmount([p.value]);
+        setVendorResponse(null);
+        setVendorCounterAmount(null);
+        setNegotiationHistory([]);
+      }
+    };
+    window.addEventListener('pm:tutorial-select-first-property', handler);
+    return () => window.removeEventListener('pm:tutorial-select-first-property', handler);
   }, []);
   useEffect(() => {
     if (isOpen) {

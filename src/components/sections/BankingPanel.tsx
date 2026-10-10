@@ -119,8 +119,13 @@ function InlineDialogButton({
       if (tab) (window as any).__pmOpsRequestedTab = tab;
       setOpen(true);
     };
+    const close = () => setOpen(false);
     window.addEventListener(autoOpenEvent, handler);
-    return () => window.removeEventListener(autoOpenEvent, handler);
+    window.addEventListener('pm:tutorial-close-dialogs', close);
+    return () => {
+      window.removeEventListener(autoOpenEvent, handler);
+      window.removeEventListener('pm:tutorial-close-dialogs', close);
+    };
   }, [autoOpenEvent]);
   return (
     <>
