@@ -4,6 +4,21 @@ import type { TutorialStep } from "@/stores/tutorialStore";
  * Tutorial helper — request the page-level Tabs to switch via a window event
  * that Index.tsx listens for. Keeps `beforeStep: () => void` signature clean.
  */
+function fire(name: string, detail?: unknown) {
+  try {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+  } catch {
+    /* noop */
+  }
+}
+function closeAll() {
+  fire("pm:tutorial-close-dialogs");
+}
+function openOps(tab: string) {
+  closeAll();
+  setTab("bank");
+  setTimeout(() => fire("pm:open-operations", { tab }), 50);
+}
 function setTab(tab: "market" | "bank" | "accounts") {
   try {
     window.dispatchEvent(new CustomEvent("pm:set-active-tab", { detail: { tab } }));
@@ -27,7 +42,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "bottom",
     advance: "event",
     advanceEvent: "pm:estate-agent-opened",
-    beforeStep: () => setTab("market"),
+    beforeStep: () => { closeAll(); setTab("market"); },
   },
   {
     id: "pick-property",
@@ -38,6 +53,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "right",
     advance: "event",
     advanceEvent: "pm:estate-agent-property-selected",
+    beforeStep: () => { setTab("market"); fire("pm:open-estate-agent"); fire("pm:tutorial-deselect-property"); },
   },
   {
     id: "ltv-and-costs",
@@ -48,6 +64,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "left",
     advance: "event",
     advanceEvent: "pm:purchase-initiated",
+    beforeStep: () => { setTab("market"); fire("pm:tutorial-select-first-property"); },
   },
   {
     id: "conveyancing",
@@ -58,16 +75,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "top",
     advance: "event",
     advanceEvent: "pm:conveyancing-complete",
-    beforeStep: () => {
-      setTab("bank");
-      try {
-        window.dispatchEvent(
-          new CustomEvent("pm:open-operations", { detail: { tab: "conveyancing" } }),
-        );
-      } catch {
-        /* noop */
-      }
-    },
+    beforeStep: () => openOps("conveyancing"),
   },
   {
     id: "select-tenant",
@@ -78,6 +86,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "top",
     advance: "event",
     advanceEvent: "pm:tenant-selected",
+    beforeStep: () => { closeAll(); setTab("market"); },
   },
   {
     id: "rent-incoming",
@@ -88,6 +97,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "right",
     advance: "event",
     advanceEvent: "pm:month-end-completed",
+    beforeStep: () => { closeAll(); setTab("market"); },
   },
   {
     id: "cashflow-stat",
@@ -97,6 +107,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="cashflow-stat"]',
     tooltipSide: "bottom",
     advance: "button",
+    beforeStep: () => closeAll(),
   },
   {
     id: "concerns",
@@ -106,16 +117,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="ops-concerns"]',
     tooltipSide: "top",
     advance: "button",
-    beforeStep: () => {
-      setTab("bank");
-      try {
-        window.dispatchEvent(
-          new CustomEvent("pm:open-operations", { detail: { tab: "concerns" } }),
-        );
-      } catch {
-        /* noop */
-      }
-    },
+    beforeStep: () => openOps("concerns"),
   },
   {
     id: "epc",
@@ -125,6 +127,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="property-epc-badge"]',
     tooltipSide: "right",
     advance: "button",
+    beforeStep: () => { closeAll(); setTab("market"); },
   },
   {
     id: "renovate",
@@ -134,6 +137,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="renovate-btn"]',
     tooltipSide: "top",
     advance: "button",
+    beforeStep: () => { closeAll(); setTab("market"); },
   },
   {
     id: "bank",
@@ -143,7 +147,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="bank-tab"]',
     tooltipSide: "bottom",
     advance: "button",
-    beforeStep: () => setTab("bank"),
+    beforeStep: () => { closeAll(); setTab("bank"); },
   },
   {
     id: "tax",
@@ -153,7 +157,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="accounts-tab"]',
     tooltipSide: "bottom",
     advance: "button",
-    beforeStep: () => setTab("accounts"),
+    beforeStep: () => { closeAll(); setTab("accounts"); },
   },
   {
     id: "commercial-arrears",
@@ -163,7 +167,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     targetSelector: '[data-tutorial="ops-evictions"]',
     tooltipSide: "bottom",
     advance: "button",
-    beforeStep: () => setTab("market"),
+    beforeStep: () => openOps("evictions"),
   },
   {
     id: "done",
@@ -174,5 +178,6 @@ export const SCENARIO_STEPS: TutorialStep[] = [
     tooltipSide: "bottom",
     advance: "button",
     isFinal: true,
+    beforeStep: () => closeAll(),
   },
 ];

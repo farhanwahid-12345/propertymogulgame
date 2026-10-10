@@ -230,10 +230,8 @@ export function OperationsCenter(props: OperationsCenterProps) {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { tab?: string } | undefined;
       const requested = detail?.tab;
-      if (requested === 'evictions') setTab('evictions');
-      else if (requested === 'listings') setTab('listings');
-      else if (requested === 'extdebts') setTab('extdebts');
-      else if (requested === 'commercial') setTab('commercial');
+      const allowed = ['evictions', 'listings', 'extdebts', 'commercial', 'conveyancing', 'concerns', 'planning', 'renovations'];
+      if (requested && allowed.includes(requested)) setTab(requested as any);
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('pm:open-operations', handler as EventListener);
