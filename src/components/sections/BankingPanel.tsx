@@ -133,9 +133,6 @@ function InlineDialogButton({
         className={`h-8 text-xs px-2.5 gap-2 bg-white/[0.04] border-white/10 ${attention ? 'ops-attention' : ''} ${flash && !attention ? 'ops-flash' : ''}`}
       >
         <span>{label}</span>
-        <span className={attention ? 'text-destructive-foreground text-[10px] font-semibold' : 'text-muted-foreground text-[10px]'}>
-          {summary}
-        </span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -183,7 +180,7 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
   return (
     <InlineDialogButton
       id="section-ops"
-      label="🔨 Operations"
+      label="Operations"
       summary={summary}
       attention={attention}
       flash={flash}
@@ -273,7 +270,7 @@ export function LoansInlineButton({ gameState }: { gameState: GameState }) {
   return (
     <InlineDialogButton
       id="section-loans"
-      label="💷 Loans"
+      label="Loans"
       summary={count === 0 ? "No active loans" : `${count} active`}
       title="Loans"
     >
@@ -290,7 +287,7 @@ export function InvestmentsInlineButton({ gameState }: { gameState: GameState })
   return (
     <InlineDialogButton
       id="section-investments"
-      label="📈 Investments"
+      label="Investments"
       summary={invested === 0 ? "No investments" : `£${Math.round(invested / 100).toLocaleString()} invested`}
       title="Investments"
       autoOpenEvent="pm:open-investments"
