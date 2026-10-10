@@ -18,7 +18,19 @@ export interface TutorialStep {
   advanceEvent?: string;
   beforeStep?: () => void;
   isFinal?: boolean;
+  /** Example card shown in the tooltip when the target isn't on screen. */
+  mockup?: TutorialMockup;
 }
+
+export type TutorialMockup =
+  | "purchase"
+  | "conveyancing"
+  | "tenant"
+  | "rent"
+  | "concerns"
+  | "epc"
+  | "renovate"
+  | "evictions";
 
 export type StepStatus = "idle" | "waiting" | "done";
 
