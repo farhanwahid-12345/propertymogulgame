@@ -94,7 +94,10 @@ export function createOrchestratorActions(set: SetFn, get: GetFn) {
             renovation.type.valueIncrease, valuePounds, ceilingPounds,
           );
           const rentFactor = 0.5 + 0.5 * diminishingFactor;
-          const actualValueGain = Math.round(toPennies(cappedValuePounds) * valueMult);
+          // Works delivered on spec (or better) always add at least what they cost;
+          // poorer outcomes still recover a proportional share of the spend.
+          const costFloor = Math.round(toPennies(renovation.type.cost || 0) * Math.min(1, valueMult));
+          const actualValueGain = Math.max(Math.round(toPennies(cappedValuePounds) * valueMult), costFloor);
           const actualRentGain = Math.round(toPennies(renovation.type.rentIncrease) * rentMult * rentFactor);
 
           const subtypeUpdate = (renovation.type as any).resultingSubtype
