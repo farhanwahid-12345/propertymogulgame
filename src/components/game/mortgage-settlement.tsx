@@ -76,7 +76,10 @@ export function MortgageSettlement({
 
   const handlePayment = () => {
     if (selectedMortgage && canMakePayment) {
-      onSettleMortgage(selectedMortgage, true, undefined, paymentAmount);
+      // Paying the whole (rounded) balance → settle the exact penny balance in full.
+      const isFull = paymentAmount >= Math.floor(selectedMortgageDetails!.remainingBalance);
+      if (isFull) onSettleMortgage(selectedMortgage, true);
+      else onSettleMortgage(selectedMortgage, true, undefined, paymentAmount);
       
       const remainingAfterPayment = (selectedMortgageDetails?.remainingBalance || 0) - paymentAmount;
       

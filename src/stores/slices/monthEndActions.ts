@@ -1493,6 +1493,9 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
           const noisy = Math.round(capValue * (1 + (gameRandom() - 0.5) * 0.004));
           return { ...property, value: noisy, marketValue: noisy };
         }
+        // Value is frozen while renovation works are in progress — no dips/reversion
+        // eroding the asset while capital is tied up in the build.
+        if (prev.renovations.some((r: any) => r.propertyId === property.id)) return property;
         // Phase 2 — residential: yield mean-reversion toward city-implied fair value.
         const cityYield = expectedResidentialYieldPct(property.value) / 100;
         const monthlyIncomePennies = property.monthlyIncome || 0;

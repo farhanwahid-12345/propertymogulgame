@@ -23,7 +23,7 @@ import { RepairBar } from "@/components/game/repair-bar";
 import { MultiUnitSlots } from "@/components/game/multi-unit-slots";
 import { useGameStore } from "@/stores/gameStore";
 import { FirstTimeTooltip } from "@/components/game/first-time-tooltip";
-import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH } from "@/lib/engine/constants";
+import { TENANT_MIN_CONDITION, CONDITION_TOPUP_PENNIES_PER_POINT_PER_SQFT, MAX_TOPUP_POINTS_PER_MONTH, clampFlatUnitRentPennies } from "@/lib/engine/constants";
 import { fromPennies } from "@/lib/formatCurrency";
 import { getFurnitureValuePennies } from "@/lib/engine/financials";
 
@@ -709,7 +709,12 @@ export const PropertyCard = memo(function PropertyCard({
                 {financialsExpanded ? 'Hide details' : 'Details'}
               </span>
               {currentTenant ? (
-                <span data-tutorial="property-rent-display">Rent £{property.monthlyIncome.toLocaleString()}/mo</span>
+                <span data-tutorial="property-rent-display">
+                  Rent £{property.monthlyIncome.toLocaleString()}/mo
+                  {(property.subtype === 'flats' || property.subtype === 'hmo' || property.subtype === 'multi-let') && (property.subtypeUnits || 0) > 1 && (
+                    <> ({property.subtypeUnits} {property.subtype === 'flats' ? 'flats' : 'rooms'} · £{Math.round(property.monthlyIncome / (property.subtypeUnits || 1)).toLocaleString()} each)</>
+                  )}
+                </span>
               ) : (
                 <span className="text-danger">Vacant — no income</span>
               )}
@@ -1058,7 +1063,16 @@ export const PropertyCard = memo(function PropertyCard({
                     onSelectTenant && (
                       <TenantSelector
                         propertyId={property.id}
-                        baseRent={property.baseRent || property.monthlyIncome}
+                        baseRent={(() => {
+                          const raw = property.baseRent || property.monthlyIncome;
+                          const units = property.subtypeUnits || 1;
+                          // A tenant only ever rents one flat — use the per-flat figure, clamped to the city's flat band.
+                          if (property.subtype === 'flats' || /flat|apartment/i.test(property.name || '')) {
+                            const perUnit = units > 1 ? raw / units : raw;
+                            return Math.round(clampFlatUnitRentPennies(perUnit * 100, property.city) / 100);
+                          }
+                          return raw;
+                        })()}
                         onSelectTenant={onSelectTenant}
                         currentTenant={currentTenant}
                         currentMonthlyRent={property.monthlyIncome}

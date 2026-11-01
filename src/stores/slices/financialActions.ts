@@ -50,7 +50,8 @@ export function createFinancialActions(set: SetFn, get: GetFn) {
           const newBal = mortgage.remainingBalance - partialAmount;
           const odNote = debited.usedOverdraft > 0 ? ` (£${fromPennies(debited.usedOverdraft).toLocaleString()} via overdraft)` : '';
           const ercNote = erc > 0 ? ` ERC: £${fromPennies(erc).toLocaleString()}.` : '';
-          if (newBal <= 0) {
+          // Balances under £1 (penny rounding from pound inputs) count as fully repaid.
+          if (newBal < 100) {
             showToast("Mortgage Paid Off!", `Fully paid with £${fromPennies(partialAmount).toLocaleString()}.${ercNote}${odNote}`);
             set({ cash: debited.cash, overdraftUsed: debited.overdraftUsed, mortgages: prev.mortgages.filter((m: Mortgage) => m.propertyId !== mortgagePropertyId), creditScore: Math.min(850, prev.creditScore + 5) });
           } else {
