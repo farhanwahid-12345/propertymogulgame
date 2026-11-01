@@ -57,6 +57,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "ltv-and-costs",
+    mockup: "purchase",
     title: "Step 3 · LTV and costs",
     body:
       "Stamp duty and solicitor fees are charged on completion — not shown in the price. The LTV slider sets your mortgage size: lower LTV means less borrowed but more cash upfront. Click Buy when ready.",
@@ -68,6 +69,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "conveyancing",
+    mockup: "conveyancing",
     title: "Step 4 · Conveyancing in progress",
     body:
       "Your purchase is now in conveyancing — typically 6-12 weeks. The clock runs automatically. Speed it up using the 4× button above.",
@@ -79,6 +81,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "select-tenant",
+    mockup: "tenant",
     title: "Step 5 · Select a tenant",
     body:
       "Your property is ready. Select a tenant from your applicants — each has a rental offer range. Run reference checks first to see credit history and right-to-rent status.",
@@ -90,6 +93,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "rent-incoming",
+    mockup: "rent",
     title: "Step 6 · Rent incoming",
     body:
       "Rent arrives at every month end. Expenses — mortgage, council tax, insurance — are deducted at the same time. Speed up time to collect your first payment.",
@@ -111,6 +115,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "concerns",
+    mockup: "concerns",
     title: "Step 8 · Concerns and satisfaction",
     body:
       "Tenants raise concerns when repairs are needed. Ignoring them tanks satisfaction. Below 40%, they may leave mid-tenancy. Respond within 1 month.",
@@ -121,6 +126,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "epc",
+    mockup: "epc",
     title: "Step 9 · EPC rating",
     body:
       "Every property has an EPC rating A-G. From 2030 (month 72 in game), properties rated D or below cannot be re-let legally. Renovate to improve — insulation, central heating, and double glazing all help.",
@@ -131,6 +137,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "renovate",
+    mockup: "renovate",
     title: "Step 10 · Renovation",
     body:
       "Open Renovate to add value, improve EPC, extend, or convert. Extensions and conversions need planning permission first — submit then wait for approval.",
@@ -161,6 +168,7 @@ export const SCENARIO_STEPS: TutorialStep[] = [
   },
   {
     id: "commercial-arrears",
+    mockup: "evictions",
     title: "Step 13 · Commercial rent arrears",
     body:
       "Commercial tenants sit outside the Renters' Rights Act. At 21 days (1 month) unpaid you can forfeit the lease by peaceable re-entry — instant, but roughly 1 in 3 tenants win relief from forfeiture. At 2+ months you can instead take the court route: 1 month formal demand, then a 2-5 month possession backlog, but far harder to overturn. Both are served from Operations → Evictions, and possession ends the lease so the unit goes vacant and re-marketing starts.",
