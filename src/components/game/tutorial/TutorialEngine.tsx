@@ -4,6 +4,7 @@ import { ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTutorialStore } from "@/stores/tutorialStore";
+import { TutorialMockupCard } from "./TutorialMockups";
 
 interface Props {
   /** Called when the tutorial finishes (last step, skip, or X). */
@@ -28,6 +29,7 @@ export function TutorialEngine({ onFinish }: Props) {
   const step = steps[stepIndex];
   const [confirmSkip, setConfirmSkip] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [missing, setMissing] = useState(false);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -56,13 +58,17 @@ export function TutorialEngine({ onFinish }: Props) {
     let observer: ResizeObserver | null = null;
     let lastEl: Element | null = null;
 
+    setMissing(false);
+    const startedAt = performance.now();
     const measure = () => {
       if (cancelled) return;
       const el = document.querySelector(step.targetSelector);
       if (!el) {
+        if (performance.now() - startedAt > 800) setMissing(true);
         rafRef.current = requestAnimationFrame(measure);
         return;
       }
+      setMissing(false);
       if (el !== lastEl) {
         lastEl = el;
         try {
@@ -350,6 +356,10 @@ export function TutorialEngine({ onFinish }: Props) {
               {stepIndex + 1} / {steps.length}
             </span>
           </div>
+
+          {!targetRect && missing && step.mockup && (
+            <TutorialMockupCard kind={step.mockup} />
+          )}
 
           <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
 
