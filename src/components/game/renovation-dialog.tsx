@@ -13,7 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Hammer, Paintbrush, Home, Plus, Wrench, Zap, FileText, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { scaleRenovationCost, scaleRenovationRent, scaleRenovationValue, applyCeilingDiminishingReturns, RENOVATION_EXPECTED_MULTIPLIER, getConversionScaleMultiplier, CONVERSION_EXPECTED_MULTIPLIER } from "@/lib/engine/renovation";
-import { computePlanningApprovalProbability } from "@/lib/engine/planning";
+import { computePlanningApprovalProbability, maxConversionUnits, applyConversionUnits } from "@/lib/engine/planning";
 import { getCeilingPrice } from "@/lib/engine/constants";
 import { Slider } from "@/components/ui/slider";
 import { DialogErrorBoundary } from "@/components/dialog-error-boundary";
@@ -333,6 +333,7 @@ export function RenovationDialog({
   const [selectedRenovation, setSelectedRenovation] = useState<RenovationType | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [conversionUnits, setConversionUnits] = useState<number>(4);
+  const [batchUnits, setBatchUnits] = useState<number | null>(null);
   const [batchMode, setBatchMode] = useState<boolean>(false);
   const [batchSelected, setBatchSelected] = useState<Set<string>>(new Set());
 
@@ -432,6 +433,25 @@ export function RenovationDialog({
   const minUnits = (r: RenovationType | null) => isFlats(r) ? 2 : 3;
   const maxUnits = (r: RenovationType | null) => isFlats(r) ? maxFlatUnits : isHmo(r) ? maxHmoUnits : 1;
   const defaultUnits = (r: RenovationType | null) => isFlats(r) ? 2 : isHmo(r) ? 4 : 1;
+
+  // Joint planning: conversions in a batch are sized against the floor area the
+  // batch's extensions would add, so the max rooms/flats reflect the enlarged building.
+  const batchConversionInfo = (items: RenovationType[]) => {
+    const conv = items.find(r => r.id === 'convert_hmo' || r.id === 'convert_flats');
+    if (!conv) return null;
+    const kind = conv.id === 'convert_flats' ? 'flats' : 'hmo';
+    const extSqft = items.filter(r => r.category === 'extension').reduce((s, r) => s + (r.sqftAdded || 0), 0);
+    const max = maxConversionUnits(kind, sqft + extSqft);
+    const maxWithout = maxConversionUnits(kind, sqft);
+    const min = kind === 'flats' ? 2 : 3;
+    const units = Math.min(max, Math.max(min, batchUnits ?? max));
+    return { conv, kind, max, maxWithout, min, units, extSqft };
+  };
+  const adjustBatchItems = (items: RenovationType[]): RenovationType[] => {
+    const info = batchConversionInfo(items);
+    if (!info) return items;
+    return items.map(r => r.id === info.conv.id ? (applyConversionUnits(r as any, info.units) as any as RenovationType) : r);
+  };
 
 
   // All headline costs/rent/value uplifts are scaled to this property's profile
@@ -1060,11 +1080,12 @@ export function RenovationDialog({
             .filter(Boolean) as RenovationType[];
 
           // Split planning-required (and not-yet-approved) items from the rest
-          const planningItems = items.filter(r => {
+          const planningItems = adjustBatchItems(items.filter(r => {
             const app = findApplication(r.id);
             return r.requiresPlanning && app?.status !== 'approved';
-          });
-          const worksItems = items.filter(r => !planningItems.includes(r));
+          }));
+          const jointInfo = batchConversionInfo(planningItems);
+          const worksItems = items.filter(r => !planningItems.some(p => p.id === r.id));
 
           // Extension sqft in this batch — used to size any conversion against
           // the post-extension footprint.
@@ -1143,6 +1164,27 @@ export function RenovationDialog({
                     <span>Planning bundle · {planningItems.length} application{planningItems.length > 1 ? 's' : ''}</span>
                     <span className="text-muted-foreground">Fee £{planningFeeTotal.toLocaleString()}{planningBundleDiscount > 0 && ` (saved £${(planningRawFee - planningFeeTotal).toLocaleString()})`}</span>
                   </div>
+                  {jointInfo && (
+                    <div className="space-y-1 rounded-lg bg-muted/40 p-2">
+                      <div className="flex justify-between text-xs">
+                        <span>{jointInfo.kind === 'flats' ? 'Flats' : 'Rooms'} applied for</span>
+                        <span className="font-semibold">{jointInfo.units}</span>
+                      </div>
+                      <Slider
+                        min={jointInfo.min}
+                        max={jointInfo.max}
+                        step={1}
+                        value={[jointInfo.units]}
+                        onValueChange={(v) => setBatchUnits(v[0])}
+                        disabled={jointInfo.max <= jointInfo.min}
+                      />
+                      <div className="text-[11px] text-muted-foreground">
+                        Up to {jointInfo.max} {jointInfo.kind === 'flats' ? 'flats' : 'rooms'}
+                        {jointInfo.extSqft > 0 ? ` with extensions (${jointInfo.maxWithout} without)` : ''}.
+                        {jointInfo.extSqft > 0 && ' If an extension is refused, the conversion is approved for the smaller count.'}
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-0.5">
                     {itemProbs.map(({ r, prob }) => {
                       const pct = Math.round(prob * 100);
@@ -1180,11 +1222,12 @@ export function RenovationDialog({
                 .map(id => RENOVATION_OPTIONS.find(o => o.id === id))
                 .filter(Boolean) as RenovationType[];
               if (items.length === 0) return <Button disabled>Select renovations</Button>;
-              const planningItems = items.filter(r => {
+              const rawPlanning = items.filter(r => {
                 const app = findApplication(r.id);
                 return r.requiresPlanning && app?.status !== 'approved';
               });
-              const worksItems = items.filter(r => !planningItems.includes(r));
+              const planningItems = adjustBatchItems(rawPlanning);
+              const worksItems = items.filter(r => !rawPlanning.includes(r));
               if (planningItems.length > 0) {
                 const rawFee = planningItems.reduce((s, r) => s + (r.planningFee ?? 250), 0);
                 const planningDiscount = planningItems.length >= 2 ? 0.10 : 0;

@@ -1370,6 +1370,36 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       let newPlanningApplications = [...(prev.planningApplications || [])];
       const newlyApprovedPlanningIds: string[] = [];
       const newlyRefusedPlanningIds: string[] = [];
+      // Joint bundles: if an extension in a bundle is refused, an approved
+      // conversion in the same bundle is downgraded to the unit count the
+      // building supports without that extension.
+      const bundlesWithRefusedExtension = new Set(
+        newPlanningApplications
+          .filter(a => a.bundleId && !a.approved && (a.sqftAdded || 0) > 0
+            && (a.status === 'refused' || (a.status === 'pending' && newMonthNumber >= a.decisionMonth)))
+          .map(a => a.bundleId as string),
+      );
+      newPlanningApplications = newPlanningApplications.map(app => {
+        if (app.status === 'pending' && newMonthNumber >= app.decisionMonth && app.approved
+          && app.bundleId && bundlesWithRefusedExtension.has(app.bundleId)
+          && app.subtypeUnits && app.unitsWithoutExtensions && app.unitsWithoutExtensions < app.subtypeUnits) {
+          const from = app.subtypeUnits;
+          const to = app.unitsWithoutExtensions;
+          const noun = app.renovationTypeId === 'convert_flats' ? 'flat' : 'bed';
+          const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
+          showToast(
+            "Conversion Reduced",
+            `Extension refused on ${propName}, so the conversion was approved for ${to} ${noun}s instead of ${from}.`,
+          );
+          return {
+            ...app,
+            subtypeUnits: to,
+            renovationName: app.renovationName.replace(new RegExp(`\\(${from}-${noun}\\)`), `(${to}-${noun})`),
+            renovationCostPennies: Math.round(app.renovationCostPennies * to / from),
+          };
+        }
+        return app;
+      });
       newPlanningApplications = newPlanningApplications.map(app => {
         if (app.status === 'pending' && newMonthNumber >= app.decisionMonth) {
           const propName = prev.ownedProperties.find(p => p.id === app.propertyId)?.name || 'property';
