@@ -109,3 +109,29 @@ export function getEffectiveInternalSqft(
     }, 0);
   return base + pending;
 }
+
+/** Max rooms (HMO) or flats a building of `sqft` internal floor area can be
+ *  converted into. Shared by the renovation dialog and the planning store. */
+export function maxConversionUnits(kind: 'hmo' | 'flats', sqft: number): number {
+  const s = sqft || 900;
+  return kind === 'flats'
+    ? Math.max(2, Math.min(5, Math.floor(s / 550)))
+    : Math.max(3, Math.min(8, Math.floor(s / 180)));
+}
+
+/** Unit-count adjustment applied to a conversion's planning submission
+ *  (same rules as the single-item path): name, fee, approval odds. */
+export function applyConversionUnits<T extends { id: string; name: string; planningFee?: number; baseApprovalProb?: number }>(
+  r: T, units: number,
+): T & { subtypeUnits: number } {
+  const isFlats = r.id === 'convert_flats';
+  const def = isFlats ? 2 : 4;
+  const noun = isFlats ? 'flat' : 'bed';
+  return {
+    ...r,
+    name: `${r.name} (${units}-${noun})`,
+    planningFee: Math.max(250, (r.planningFee ?? 500) + (units - def) * 100),
+    baseApprovalProb: Math.max(0.35, (r.baseApprovalProb ?? 0.7) - 0.05 * (units - def)),
+    subtypeUnits: units,
+  };
+}

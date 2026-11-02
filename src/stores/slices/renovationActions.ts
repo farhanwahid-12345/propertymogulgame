@@ -12,7 +12,7 @@ import { RENOVATION_OPTIONS, type RenovationType } from '@/components/game/renov
 import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { showToast, debit, debitStrict } from '../storeHelpers';
 import { gameRandom } from '@/lib/rng';
-import { computePlanningApprovalProbability, getEffectiveInternalSqft } from '@/lib/engine/planning';
+import { computePlanningApprovalProbability, getEffectiveInternalSqft, maxConversionUnits } from '@/lib/engine/planning';
 import { deriveSqft } from '@/lib/engine/market';
 import {
   scaleRenovationCost, scaleRenovationRent, scaleRenovationValue,
@@ -70,6 +70,11 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
         if (!approved) {
           (get() as any).submitPlanningApplication(propertyId, renovationType);
           return;
+        }
+        // Joint applications fix the approved unit count (may be reduced if an
+        // extension in the bundle was refused).
+        if (approved.subtypeUnits && renovationType.category === 'conversion') {
+          renovationType = { ...renovationType, ...({ subtypeUnits: approved.subtypeUnits } as any) };
         }
       }
 
@@ -386,6 +391,8 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
         'Inadequate amenity space for proposed occupancy.',
       ];
 
+      const bundleId = filtered.length >= 2 ? `ppb_${propertyId}_${Date.now()}` : undefined;
+      const hasBatchExtension = batchExtensionSqft > 0;
       const newApps: PlanningApplication[] = filtered.map((r, i) => {
         const { prob } = computePlanningApprovalProbability({
           baseProb: r.baseApprovalProb,
@@ -419,6 +426,13 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
           approved,
           refusalReason,
           sqftAdded: (r as any).sqftAdded as number | undefined,
+          bundleId,
+          ...(r.category === 'conversion' && (r as any).subtypeUnits ? {
+            subtypeUnits: (r as any).subtypeUnits,
+            unitsWithoutExtensions: hasBatchExtension
+              ? Math.min((r as any).subtypeUnits, maxConversionUnits(r.id === 'convert_flats' ? 'flats' : 'hmo', property.internalSqft || 0))
+              : (r as any).subtypeUnits,
+          } : {}),
         } as PlanningApplication;
       });
 

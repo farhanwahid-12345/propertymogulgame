@@ -351,6 +351,12 @@ export interface PlanningApplication {
    *  internalSqft at planning approval, so completion (and the display helper)
    *  must not add it again. */
   sqftAppliedAtPlanning?: boolean;
+  /** Joint application id shared by a conversion and its extensions. */
+  bundleId?: string;
+  /** Rooms/flats applied for (conversions). */
+  subtypeUnits?: number;
+  /** Rooms/flats the building supports without the bundle's extensions. */
+  unitsWithoutExtensions?: number;
 }
 
 /** Player-raised dispute over a withheld portion of a tenant's deposit (TDS adjudication). */
