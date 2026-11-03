@@ -591,7 +591,7 @@ export const migrationSteps: ReadonlyArray<Migration> = [
         persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => !(ok.has(c?.propertyId) && /epc|mees/i.test(String(c?.id ?? '') + ' ' + String(c?.description ?? ''))));
       }
     },
-
+  },
 ];
 
 
