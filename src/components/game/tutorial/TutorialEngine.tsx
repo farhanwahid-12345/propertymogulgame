@@ -59,6 +59,7 @@ export function TutorialEngine({ onFinish }: Props) {
     let lastEl: Element | null = null;
 
     setMissing(false);
+    setRect(null);
     const startedAt = performance.now();
     const measure = () => {
       if (cancelled) return;
@@ -275,7 +276,7 @@ export function TutorialEngine({ onFinish }: Props) {
         left: -20,
         width: 0,
         height: 0,
-        boxShadow: "0 0 0 9999px rgba(0,0,0,0.72)",
+        boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
         pointerEvents: "none",
         zIndex: 60,
       };
