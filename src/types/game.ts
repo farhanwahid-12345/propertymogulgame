@@ -860,6 +860,8 @@ export interface InvestmentHolding {
   lifetimeGainPennies: number;
   /** Last applied monthly return (decimal) — drives the UI delta badge. */
   lastMonthReturn?: number;
+  /** Month-end balance history for the price chart (optional — old saves lack it). */
+  history?: { month: number; balancePennies: number; contributedPennies: number }[];
 }
 
 /** A pending withdrawal serving out its notice / settlement period. */
