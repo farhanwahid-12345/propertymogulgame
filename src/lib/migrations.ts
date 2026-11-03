@@ -13,7 +13,7 @@
  *      mutates the persisted blob in place.
  */
 
-export const CURRENT_VERSION = 27;
+export const CURRENT_VERSION = 28;
 
 export type Migration = {
   from: number;
