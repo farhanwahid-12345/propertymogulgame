@@ -582,8 +582,7 @@ export const migrationSteps: ReadonlyArray<Migration> = [
     apply: (persisted) => {
       if (!Array.isArray(persisted.properties)) return;
       persisted.properties = persisted.properties.map((p: any) => {
-        const done = Array.isArray(p?.completedRenovations) ? p.completedRenovations : [];
-        const ids = done.map((r: any) => (typeof r === 'string' ? r : r?.id));
+        const ids: string[] = Array.isArray(p?.completedRenovationIds) ? p.completedRenovationIds : [];
         if (ids.includes('epc_upgrade') && ['D','E','F','G'].includes(p.epcRating)) return { ...p, epcRating: 'C' };
         return p;
       });
