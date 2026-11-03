@@ -191,7 +191,6 @@ export function OperationsInlineButton({ gameState }: { gameState: GameState }) 
       flash={flash}
       title="Operations"
       autoOpenEvent="pm:open-operations"
-      dataTutorial="ops-conveyancing"
     >
       <OperationsCenter
         monthsPlayed={gameState.monthsPlayed}
