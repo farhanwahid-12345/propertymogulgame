@@ -577,6 +577,22 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       });
     },
   },
+  {
+    from: 27, to: 28, describe: 'Lift properties with completed EPC upgrades to at least band C',
+    apply: (persisted) => {
+      if (!Array.isArray(persisted.properties)) return;
+      persisted.properties = persisted.properties.map((p: any) => {
+        const done = Array.isArray(p?.completedRenovations) ? p.completedRenovations : [];
+        const ids = done.map((r: any) => (typeof r === 'string' ? r : r?.id));
+        if (ids.includes('epc_upgrade') && ['D','E','F','G'].includes(p.epcRating)) return { ...p, epcRating: 'C' };
+        return p;
+      });
+      if (Array.isArray(persisted.tenantConcerns) && Array.isArray(persisted.properties)) {
+        const ok = new Set(persisted.properties.filter((p: any) => ['A','B','C'].includes(p?.epcRating)).map((p: any) => p.id));
+        persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => !(ok.has(c?.propertyId) && /epc|mees/i.test(String(c?.type ?? c?.kind ?? ''))));
+      }
+    },
+
 ];
 
 

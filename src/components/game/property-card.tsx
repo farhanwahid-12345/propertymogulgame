@@ -666,7 +666,7 @@ export const PropertyCard = memo(function PropertyCard({
                     "text-sm font-bold leading-tight",
                     netMonthlyIncome >= 0 ? "text-success" : "text-danger"
                   )}>
-                    £{netMonthlyIncome.toLocaleString()}
+                    £{Math.round(netMonthlyIncome).toLocaleString()}
                   </div>
                 </div>
               ) : (
@@ -819,7 +819,7 @@ export const PropertyCard = memo(function PropertyCard({
                   <div className="flex justify-between items-center pt-1 border-t border-border/40 font-semibold">
                     <span>Net monthly</span>
                     <span className={cn(netMonthlyIncome >= 0 ? "text-success" : "text-danger")}>
-                      £{netMonthlyIncome.toLocaleString()}/mo
+                      £{Math.round(netMonthlyIncome).toLocaleString()}/mo
                     </span>
                   </div>
                   {(property.isManaged || property.hasRentGuarantee) && (
