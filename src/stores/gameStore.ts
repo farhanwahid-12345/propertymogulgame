@@ -588,7 +588,7 @@ export const migrationSteps: ReadonlyArray<Migration> = [
       });
       if (Array.isArray(persisted.tenantConcerns) && Array.isArray(persisted.properties)) {
         const ok = new Set(persisted.properties.filter((p: any) => ['A','B','C'].includes(p?.epcRating)).map((p: any) => p.id));
-        persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => !(ok.has(c?.propertyId) && /epc|mees/i.test(String(c?.type ?? c?.kind ?? ''))));
+        persisted.tenantConcerns = persisted.tenantConcerns.filter((c: any) => !(ok.has(c?.propertyId) && /epc|mees/i.test(String(c?.id ?? '') + ' ' + String(c?.description ?? ''))));
       }
     },
 
