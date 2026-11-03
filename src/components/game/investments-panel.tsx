@@ -9,6 +9,7 @@ import {
   INVESTMENT_PRODUCTS, annualisedRate, type InvestmentKind,
 } from "@/lib/engine/investments";
 import type { InvestmentHolding, InvestmentWithdrawal, InvestmentLedgerEntry } from "@/types/game";
+import { InvestmentChart } from "./investment-chart";
 
 interface Props {
   /** Player cash in pennies. */
@@ -82,6 +83,9 @@ export function InvestmentsPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
+        {investments.length > 0 && (
+          <InvestmentChart investments={investments} monthsPlayed={monthsPlayed} />
+        )}
         {ORDER.map((kind) => {
           const product = INVESTMENT_PRODUCTS[kind];
           const Icon = ICONS[kind];

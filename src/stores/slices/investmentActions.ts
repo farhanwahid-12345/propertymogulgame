@@ -16,6 +16,8 @@ type SetFn = (partial: any) => void;
 type GetFn = () => any;
 
 const LEDGER_LIMIT = 400;
+/** Max month-end points kept per holding for the chart (20 years). */
+const HISTORY_LIMIT = 240;
 
 /** Append ledger entries (newest first) and cap the log length. */
 function appendLedger(prev: any, entries: InvestmentLedgerEntry[]): InvestmentLedgerEntry[] {
@@ -64,10 +66,16 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
         return;
       }
       const holdings: InvestmentHolding[] = [...(prev.investments || [])];
-      const existing = holdings.find(h => h.kind === kind);
-      if (existing) {
-        existing.balancePennies += amount;
-        existing.contributedPennies += amount;
+      const idx = holdings.findIndex(h => h.kind === kind);
+      if (idx >= 0) {
+        const ex = holdings[idx];
+        const balancePennies = ex.balancePennies + amount;
+        const contributedPennies = ex.contributedPennies + amount;
+        const prior = (ex.history || []).filter(p => p.month !== prev.monthsPlayed);
+        holdings[idx] = {
+          ...ex, balancePennies, contributedPennies,
+          history: [...prior, { month: prev.monthsPlayed, balancePennies, contributedPennies }].slice(-HISTORY_LIMIT),
+        };
       } else {
         holdings.push({
           id: `inv_${kind}_${Date.now()}`,
@@ -77,6 +85,7 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
           openedMonth: prev.monthsPlayed,
           lifetimeGainPennies: 0,
           lastMonthReturn: 0,
+          history: [{ month: prev.monthsPlayed, balancePennies: amount, contributedPennies: amount }],
         });
       }
       set({
@@ -181,11 +190,17 @@ export function createInvestmentActions(set: SetFn, get: GetFn) {
       const updated = holdings.map(h => {
         const r = monthlyReturn(h.kind, boe);
         const gain = Math.round(h.balancePennies * r);
+        const balancePennies = Math.max(0, h.balancePennies + gain);
+        const prior = (h.history || []).filter(p => p.month !== prev.monthsPlayed);
+        const history = [...prior, {
+          month: prev.monthsPlayed, balancePennies, contributedPennies: h.contributedPennies,
+        }].slice(-HISTORY_LIMIT);
         return {
           ...h,
-          balancePennies: Math.max(0, h.balancePennies + gain),
+          balancePennies,
           lifetimeGainPennies: (h.lifetimeGainPennies || 0) + gain,
           lastMonthReturn: r,
+          history,
         };
       });
 
