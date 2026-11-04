@@ -10,6 +10,7 @@ import {
 } from "@/lib/engine/investments";
 import type { InvestmentHolding, InvestmentWithdrawal, InvestmentLedgerEntry } from "@/types/game";
 import { InvestmentChart } from "./investment-chart";
+import { MarketPriceChart } from "./market-price-chart";
 
 interface Props {
   /** Player cash in pennies. */
@@ -136,6 +137,10 @@ export function InvestmentsPanel({
                   )}
                 </div>
               </div>
+
+              {(kind === 'index' || kind === 'risky' || kind === 'crypto') && (
+                <MarketPriceChart kind={kind} monthsPlayed={monthsPlayed} />
+              )}
 
               <div className="flex items-center gap-2 flex-wrap">
                 <Input
