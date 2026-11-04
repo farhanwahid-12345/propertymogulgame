@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import logoUrl from "@/assets/property-mogul-logo.png";
+import logoAsset from "@/assets/property-mogul-wordmark.png.asset.json";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
@@ -119,20 +119,26 @@ export function HeroHeader({
     <header className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md border-b border-border/30 py-2">
       <div className="relative w-full px-4 flex items-center">
         <div className="container mx-auto min-w-0">
-          <div className="flex items-center justify-between gap-3 flex-nowrap min-w-0">
-            <div className="shrink-0 flex items-center">
+          <div className="flex items-center justify-between gap-2 flex-nowrap min-w-0">
+            <div className="shrink-0 flex items-center -my-2 -ml-2">
               <h1 className="m-0 leading-none shrink-0">
                 <img
-                  src={logoUrl}
-                  alt="Property Mogul UK"
-                  width={80}
-                  height={40}
-                  className="block h-9 md:h-10 w-auto min-w-[72px] object-contain drop-shadow"
+                  src={logoAsset.url}
+                  alt="Property Mogul"
+                  width={168}
+                  height={56}
+                  className="block h-[52px] w-auto object-cover opacity-95"
+                  style={{
+                    WebkitMaskImage:
+                      "radial-gradient(ellipse 70% 75% at 50% 50%, #000 55%, transparent 100%)",
+                    maskImage:
+                      "radial-gradient(ellipse 70% 75% at 50% 50%, #000 55%, transparent 100%)",
+                  }}
                 />
               </h1>
             </div>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex items-center gap-4 glass rounded-full px-4 py-1.5 text-xs">
+            <div className="flex-1 min-w-0 flex items-center justify-start">
+              <div className="flex items-center gap-3 glass rounded-full px-3 py-1.5 text-xs whitespace-nowrap">
                 {/* In-game month */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <span>📅</span>
