@@ -4,7 +4,7 @@ import { ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTutorialStore } from "@/stores/tutorialStore";
-import { TutorialMockupCard } from "./TutorialMockups";
+import { TutorialMockupScene } from "./TutorialMockupScene";
 
 interface Props {
   /** Called when the tutorial finishes (last step, skip, or X). */
@@ -281,7 +281,10 @@ export function TutorialEngine({ onFinish }: Props) {
         zIndex: 60,
       };
 
-  const tooltipStyle: React.CSSProperties = tooltipPosition
+  const showScene = !targetRect && !!step.mockup && missing;
+  const tooltipStyle: React.CSSProperties = showScene
+    ? { position: "relative", width: TOOLTIP_MAX_W, maxWidth: "calc(100vw - 24px)", pointerEvents: "auto" }
+    : tooltipPosition
     ? {
         position: "fixed",
         top: tooltipPosition.top,
@@ -337,7 +340,16 @@ export function TutorialEngine({ onFinish }: Props) {
         )}
       </div>
 
-      {/* Tooltip */}
+      {/* Tooltip (+ example scene when the real element is missing) */}
+      <div
+        style={showScene ? { position: "fixed", inset: 0, zIndex: 61, pointerEvents: "none", overflowY: "auto" } : { display: "contents" }}
+        className={showScene ? "flex flex-col md:flex-row items-center justify-center gap-4 p-3" : undefined}
+      >
+      {showScene && step.mockup && (
+        <div style={{ pointerEvents: "auto" }} className="animate-in fade-in zoom-in-95 duration-300">
+          <TutorialMockupScene kind={step.mockup} />
+        </div>
+      )}
       <div
         key={step.id}
         role="dialog"
@@ -358,9 +370,6 @@ export function TutorialEngine({ onFinish }: Props) {
             </span>
           </div>
 
-          {!targetRect && missing && step.mockup && (
-            <TutorialMockupCard kind={step.mockup} />
-          )}
 
           <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
 
@@ -416,6 +425,7 @@ export function TutorialEngine({ onFinish }: Props) {
             </p>
           )}
         </div>
+      </div>
       </div>
     </>,
     document.body,
