@@ -281,7 +281,10 @@ export function TutorialEngine({ onFinish }: Props) {
         zIndex: 60,
       };
 
-  const tooltipStyle: React.CSSProperties = tooltipPosition
+  const showScene = !targetRect && !!step.mockup && missing;
+  const tooltipStyle: React.CSSProperties = showScene
+    ? { position: "relative", width: TOOLTIP_MAX_W, maxWidth: "calc(100vw - 24px)", pointerEvents: "auto" }
+    : tooltipPosition
     ? {
         position: "fixed",
         top: tooltipPosition.top,
@@ -358,9 +361,6 @@ export function TutorialEngine({ onFinish }: Props) {
             </span>
           </div>
 
-          {!targetRect && missing && step.mockup && (
-            <TutorialMockupCard kind={step.mockup} />
-          )}
 
           <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
 
