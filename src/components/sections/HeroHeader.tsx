@@ -120,24 +120,22 @@ export function HeroHeader({
       <div className="relative w-full px-4 flex items-center">
         <div className="container mx-auto min-w-0">
           <div className="flex items-center justify-between gap-2 flex-nowrap min-w-0">
-            <div className="shrink-0 flex items-center -my-2 -ml-2">
-              <h1 className="m-0 leading-none shrink-0">
+            <div className="flex-1 min-w-[120px] flex items-center -my-2 -ml-2">
+              <h1 className="m-0 leading-none w-full">
                 <img
                   src={logoAsset.url}
                   alt="Property Mogul"
-                  width={168}
-                  height={56}
-                  className="block h-[52px] w-auto object-cover opacity-95"
+                  className="block h-[52px] w-full object-fill opacity-95"
                   style={{
                     WebkitMaskImage:
-                      "radial-gradient(ellipse 70% 75% at 50% 50%, #000 55%, transparent 100%)",
+                      "linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%)",
                     maskImage:
-                      "radial-gradient(ellipse 70% 75% at 50% 50%, #000 55%, transparent 100%)",
+                      "linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%)",
                   }}
                 />
               </h1>
             </div>
-            <div className="flex-1 min-w-0 flex items-center justify-start">
+            <div className="shrink-0 flex items-center justify-end">
               <div className="flex items-center gap-3 glass rounded-full px-3 py-1.5 text-xs whitespace-nowrap">
                 {/* In-game month */}
                 <div className="flex items-center gap-1.5 text-muted-foreground">
