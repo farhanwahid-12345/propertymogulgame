@@ -65,7 +65,8 @@ export function TutorialEngine({ onFinish }: Props) {
       if (cancelled) return;
       const el = document.querySelector(step.targetSelector);
       if (!el) {
-        if (performance.now() - startedAt > 800) setMissing(true);
+        const grace = step.mockup ? 120 : 800;
+        if (performance.now() - startedAt > grace) setMissing(true);
         rafRef.current = requestAnimationFrame(measure);
         return;
       }
