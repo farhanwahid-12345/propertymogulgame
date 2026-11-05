@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import logoAsset from "@/assets/property-mogul-wordmark.png.asset.json";
+import logoAsset from "@/assets/property-mogul-glossy-logo.png.asset.json";
 import { GameClock, SpeedSelector } from "@/components/game/game-clock";
 import { NotificationCentre } from "@/components/game/notification-centre";
 import { AchievementsInlineButton } from "@/components/game/achievements-dialog";
@@ -125,13 +125,7 @@ export function HeroHeader({
                 <img
                   src={logoAsset.url}
                   alt="Property Mogul"
-                  className="block h-[52px] w-full object-fill opacity-95"
-                  style={{
-                    WebkitMaskImage:
-                      "linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%)",
-                    maskImage:
-                      "linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%)",
-                  }}
+                  className="block h-[44px] w-auto max-w-full object-contain object-left"
                 />
               </h1>
             </div>
