@@ -31,6 +31,9 @@ export interface Conveyancing {
     fixedTermYears?: number;
   };
   cashHeld: number; // pennies - cash locked in conveyancing
+  /** Lender underwriting outcome during conveyancing. Undefined = pending. */
+  mortgageStatus?: 'approved' | 'refused';
+  mortgageRefusalReason?: string;
   isAuction?: boolean;
   buyerOffer?: any; // for selling via estate agent
   /** Snapshot of the yield shown at the estate agent at offer-time —

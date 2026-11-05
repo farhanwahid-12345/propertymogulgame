@@ -1,3 +1,5 @@
+import { MORTGAGE_UNDERWRITING_REFUSAL_PROB } from '@/lib/engine/probabilities';
+import { MORTGAGE_PROVIDERS as __MP } from '@/lib/engine/constants';
 /**
  * Month-end action slice (Outstanding Improvements doc — Phase 1).
  *
@@ -73,7 +75,26 @@ export function createMonthEndActions(set: SetFn, get: GetFn) {
       // Phase 3 #5 — chain-collapse pop-out queue (replaces silent toast).
       const newChainCollapseEvents: import('@/types/game').ChainCollapseEvent[] = [];
 
-      prev.conveyancing.forEach(conv => {
+      prev.conveyancing.forEach(rawConv => {
+        let conv = rawConv;
+        if (conv.status === 'buying' && conv.mortgageData) {
+          // Purchase on hold until the player resolves a refused mortgage.
+          if (conv.mortgageStatus === 'refused') { activeConveyancing.push(conv); return; }
+          if (!conv.mortgageStatus) {
+            const refusalChance = MORTGAGE_UNDERWRITING_REFUSAL_PROB[conv.mortgageData.providerId] ?? 0;
+            if (refusalChance > 0 && gameRandom() < refusalChance) {
+              const lender = __MP.find(p => p.id === conv.mortgageData!.providerId)?.name || conv.mortgageData.providerId.toUpperCase();
+              activeConveyancing.push({
+                ...conv,
+                mortgageStatus: 'refused',
+                mortgageRefusalReason: `${lender} underwriting declined the mortgage after valuation and checks.`,
+              });
+              flashOps();
+              return;
+            }
+            conv = { ...conv, mortgageStatus: 'approved' };
+          }
+        }
         if (newMonthNumber >= conv.completionMonth) {
           // Phase 3 #5: reduced chain collapse chance (was 10%, now 4%).
           if (gameRandom() < CHAIN_COLLAPSE_PROB) {

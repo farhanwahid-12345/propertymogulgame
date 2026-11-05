@@ -90,14 +90,7 @@ const PROVIDER_DTI_LIMITS: Record<string, number> = {
   easyloan: 0.85,
 };
 
-// Random rejection chance for premium providers
-const PROVIDER_REJECTION_CHANCE: Record<string, number> = {
-  hsbc: 0.15,
-  nationwide: 0.10,
-  halifax: 0.05,
-  quickcash: 0,
-  easyloan: 0,
-};
+
 
 export function calculateMonthlyPayment(
   principal: number,
@@ -232,16 +225,8 @@ export function calculateMortgageEligibility(
     };
   }
 
-  // 5. Random rejection for premium providers
-  const rejectionChance = PROVIDER_REJECTION_CHANCE[req.providerId] || 0;
-  if (rejectionChance > 0 && Math.random() < rejectionChance) {
-    return {
-      ...result,
-      eligible: false,
-      reason: `Mortgage Denied: Application declined by ${req.providerId.toUpperCase()} underwriting. Try again next month or apply with another lender.`,
-    };
-  }
-
+  // Lender underwriting (random refusal) now happens during conveyancing —
+  // see MORTGAGE_UNDERWRITING_REFUSAL_PROB in engine/probabilities.
   return result;
 }
 

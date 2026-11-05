@@ -36,3 +36,13 @@ export const PRICE_TICK_CLAMP = 0.06;
 /** Default yield jitter range applied to reconstructed legacy properties. */
 export const DEFAULT_YIELD_MIN_PCT = 6;
 export const DEFAULT_YIELD_MAX_PCT = 15;
+
+/** Per-lender chance that full underwriting refuses a mortgage during
+ *  conveyancing (after the Agreement in Principle was granted). */
+export const MORTGAGE_UNDERWRITING_REFUSAL_PROB: Record<string, number> = {
+  hsbc: 0.15,
+  nationwide: 0.10,
+  halifax: 0.05,
+  quickcash: 0,
+  easyloan: 0,
+};
