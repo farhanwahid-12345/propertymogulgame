@@ -16,6 +16,8 @@ import { Hourglass, AlertTriangle, ShoppingCart, Tag, Ban } from "lucide-react";
 import type { Conveyancing } from "@/types/game";
 import { fromPennies } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
+import { useGameStore } from "@/stores/gameStore";
+import { MORTGAGE_PROVIDERS } from "@/lib/engine/constants";
 
 interface ConveyancingTrackerProps {
   conveyancing: Conveyancing[];
@@ -78,10 +80,16 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
                 </Badge>
               </div>
 
+              {isBuying && c.mortgageStatus === "refused" && c.mortgageData && (
+                <MortgageRefusedPanel conv={c} />
+              )}
+
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
-                    {monthsRemaining === 0
+                    {c.mortgageStatus === "refused"
+                      ? "On hold — mortgage refused"
+                      : monthsRemaining === 0
                       ? "Completes this month"
                       : `Completes in ${monthsRemaining} ${monthsRemaining === 1 ? "month" : "months"}`}
                   </span>
@@ -161,6 +169,29 @@ export function ConveyancingTracker({ conveyancing, monthsPlayed, bare = false, 
         <Badge variant="secondary" className="text-xs">{conveyancing.length}</Badge>
       </div>
       {body}
+    </div>
+  );
+}
+
+function MortgageRefusedPanel({ conv }: { conv: Conveyancing }) {
+  const switchLender = useGameStore((s: any) => s.switchConveyancingLender);
+  const payCash = useGameStore((s: any) => s.completeConveyancingInCash);
+  const current = conv.mortgageData?.providerId;
+  return (
+    <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-2.5 space-y-2">
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-destructive">
+        <AlertTriangle className="h-4 w-4" /> Mortgage Refused
+      </div>
+      <p className="text-xs text-muted-foreground">{conv.mortgageRefusalReason}</p>
+      <p className="text-xs text-muted-foreground">Purchase is on hold. Switch lender, pay the £{fromPennies(conv.mortgageData?.amount || 0).toLocaleString()} loan in cash, or withdraw.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {MORTGAGE_PROVIDERS.filter(p => p.id !== current).map(p => (
+          <Button key={p.id} size="sm" variant="outline" className="h-7 text-xs" onClick={() => switchLender(conv.id, p.id)}>
+            Try {p.name}
+          </Button>
+        ))}
+        <Button size="sm" className="h-7 text-xs" onClick={() => payCash(conv.id)}>Complete in cash</Button>
+      </div>
     </div>
   );
 }

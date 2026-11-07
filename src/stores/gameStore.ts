@@ -97,6 +97,8 @@ interface GameActions {
   evictTenant: (propertyId: string, ground: EvictionGround, slotIndex?: number) => void;
   cancelEviction: (propertyId: string, slotIndex?: number) => void;
   withdrawFromConveyancing: (conveyancingId: string) => void;
+  switchConveyancingLender: (conveyancingId: string, providerId: string) => void;
+  completeConveyancingInCash: (conveyancingId: string) => void;
   // appealEviction removed — appeals are now tenant-driven & resolved by tick
   disputeDeposit: (disputeId: string) => void;
   dismissDispute: (disputeId: string) => void;
