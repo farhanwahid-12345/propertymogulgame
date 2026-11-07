@@ -10,6 +10,8 @@ import { toPennies, fromPennies } from '@/lib/formatCurrency';
 import { gameRandom } from '@/lib/rng';
 import { evaluatePortfolioSaleConsent } from '@/lib/portfolioMortgageConsent';
 import { showToast, debit, credit } from '../storeHelpers';
+import { MORTGAGE_PROVIDERS } from '@/lib/engine/constants';
+import { calculateMortgageEligibility, getEffectiveProviderRate } from '@/lib/mortgageEligibility';
 
 type SetFn = (partial: any) => void;
 type GetFn = () => any;
@@ -269,6 +271,64 @@ export function createConveyancingActions(set: SetFn, get: GetFn) {
           } : l
         )
       }));
+    },
+
+    switchConveyancingLender: (conveyancingId: string, providerId: string) => {
+      const prev = get();
+      const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
+      if (!conv || !conv.mortgageData) return;
+      const provider = MORTGAGE_PROVIDERS.find(p => p.id === providerId);
+      if (!provider) return;
+      const md = conv.mortgageData;
+      const rent = conv.advertisedMonthlyIncome ?? 0;
+      const elig = calculateMortgageEligibility({
+        creditScore: prev.creditScore,
+        loanAmount: fromPennies(md.amount),
+        propertyValue: fromPennies(conv.purchasePrice || 0),
+        propertyMonthlyRent: fromPennies(rent),
+        providerBaseRate: getEffectiveProviderRate({ liveProviderRate: prev.mortgageProviderRates?.[provider.id] || provider.baseRate, currentMarketRate: prev.currentMarketRate, fixedTermYears: md.fixedTermYears ?? 0 }),
+        providerMinCreditScore: provider.minCreditScore,
+        providerMaxLTV: provider.maxLTV,
+        providerId: provider.id,
+        termYears: md.termYears, mortgageType: md.mortgageType,
+        existingMonthlyMortgagePayments: fromPennies((prev.mortgages || []).reduce((s: number, m: any) => s + m.monthlyPayment, 0)),
+        totalRentalIncome: fromPennies((prev.ownedProperties || []).reduce((s: number, p: any) => s + p.monthlyIncome, 0)),
+        ownedPropertyCount: prev.ownedProperties.length,
+        mortgagedPropertyCount: new Set((prev.mortgages || []).map((m: any) => m.propertyId)).size,
+      } as any);
+      if (!elig.eligible) {
+        set({ conveyancing: prev.conveyancing.map((c: any) => c.id === conveyancingId ? { ...c, mortgageRefusalReason: `${provider.name}: ${elig.reason || 'not eligible'}` } : c) });
+        return;
+      }
+      set({
+        conveyancing: prev.conveyancing.map((c: any) => c.id === conveyancingId ? {
+          ...c,
+          mortgageStatus: undefined,
+          mortgageRefusalReason: undefined,
+          completionMonth: Math.max(c.completionMonth, prev.monthsPlayed + 1),
+          mortgageData: { ...md, providerId: provider.id, monthlyPayment: toPennies(elig.monthlyPayment), interestRate: elig.adjustedRate },
+        } : c),
+      });
+    },
+
+    completeConveyancingInCash: (conveyancingId: string) => {
+      const prev = get();
+      const conv = (prev.conveyancing || []).find((c: any) => c.id === conveyancingId);
+      if (!conv || !conv.mortgageData) return;
+      const dbg = debit(prev, conv.mortgageData.amount);
+      if (!dbg) {
+        set({ conveyancing: prev.conveyancing.map((c: any) => c.id === conveyancingId ? { ...c, mortgageRefusalReason: `Not enough cash: need £${fromPennies(conv.mortgageData.amount).toLocaleString()} to replace the mortgage.` } : c) });
+        return;
+      }
+      set({
+        cash: dbg.cash,
+        overdraftUsed: dbg.overdraftUsed,
+        conveyancing: prev.conveyancing.map((c: any) => c.id === conveyancingId ? {
+          ...c, mortgageData: undefined, mortgageStatus: undefined, mortgageRefusalReason: undefined,
+          cashHeld: (c.cashHeld || 0) + conv.mortgageData.amount,
+          completionMonth: Math.max(c.completionMonth, prev.monthsPlayed + 1),
+        } : c),
+      });
     },
 
     withdrawFromConveyancing: (conveyancingId: string) => {
