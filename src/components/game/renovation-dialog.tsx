@@ -563,8 +563,19 @@ export function RenovationDialog({
     if (r.minPropertyValue && propertyValue < r.minPropertyValue) {
       return `Needs value ≥ £${r.minPropertyValue.toLocaleString()}`;
     }
-    if (r.minInternalSqft && internalSqft !== undefined && effectiveInternalSqft < r.minInternalSqft) {
-      return `Needs ${r.minInternalSqft}+ sqft int (have ${effectiveInternalSqft})`;
+    // Joint planning: in batch mode, conversions count the floor area of any
+    // extensions selected in the same batch.
+    const batchExtSqftForGate = batchMode && r.category === 'conversion'
+      ? Array.from(batchSelected).reduce((sum, id) => {
+          const o = RENOVATION_OPTIONS.find(x => x.id === id);
+          return sum + (o && o.category === 'extension' ? (o.sqftAdded || 0) : 0);
+        }, 0)
+      : 0;
+    const gateSqft = effectiveInternalSqft + batchExtSqftForGate;
+    if (r.minInternalSqft && internalSqft !== undefined && gateSqft < r.minInternalSqft) {
+      return batchMode && r.category === 'conversion'
+        ? `Needs ${r.minInternalSqft}+ sqft int (have ${gateSqft}) — add an extension to the batch`
+        : `Needs ${r.minInternalSqft}+ sqft int (have ${gateSqft})`;
     }
     if (r.minPlotSqft && plotSqft !== undefined && plotSqft < r.minPlotSqft) {
       return `Needs ${r.minPlotSqft}+ sqft plot (have ${plotSqft})`;
@@ -721,7 +732,20 @@ export function RenovationDialog({
                         if (batchMode) {
                           if (batchPlanningBlock || batchConversionConflict) return;
                           const next = new Set(batchSelected);
-                          if (next.has(renovation.id)) next.delete(renovation.id);
+                          if (next.has(renovation.id)) {
+                            next.delete(renovation.id);
+                            // Removing an extension may drop a conversion below its sqft minimum.
+                            if (renovation.category === 'extension') {
+                              const extLeft = Array.from(next).reduce((sum, id) => {
+                                const o = RENOVATION_OPTIONS.find(x => x.id === id);
+                                return sum + (o && o.category === 'extension' ? (o.sqftAdded || 0) : 0);
+                              }, 0);
+                              for (const id of Array.from(next)) {
+                                const o = RENOVATION_OPTIONS.find(x => x.id === id);
+                                if (o?.category === 'conversion' && o.minInternalSqft && effectiveInternalSqft + extLeft < o.minInternalSqft) next.delete(id);
+                              }
+                            }
+                          }
                           else next.add(renovation.id);
                           setBatchSelected(next);
                           return;
