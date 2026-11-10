@@ -101,7 +101,7 @@ export function GameStats({
   return (
     <div className="animate-fade-in" style={{ isolation: 'isolate' }}>
       {/* Main Stats Bar — compact single-row strip */}
-      <div className="glass px-3 py-1.5">
+      <div className="bg-card border border-white/10 rounded-2xl px-3 py-1.5">
         <div className="flex flex-col md:flex-row md:items-center md:gap-6 gap-2">
           {/* Net Worth */}
           <div className="border-l-4 border-[hsl(var(--stat-money))] pl-2 flex items-center gap-2 flex-wrap min-w-0">
