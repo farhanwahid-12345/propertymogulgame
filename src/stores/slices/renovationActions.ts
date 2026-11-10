@@ -393,19 +393,26 @@ export function createRenovationActions(set: SetFn, get: GetFn) {
 
       const bundleId = filtered.length >= 2 ? `ppb_${propertyId}_${Date.now()}` : undefined;
       const hasBatchExtension = batchExtensionSqft > 0;
+      // One joint decision: the whole bundle is approved or refused together,
+      // using the product of each item's approval odds, on one decision date.
+      const itemProbs = filtered.map(r => computePlanningApprovalProbability({
+        baseProb: r.baseApprovalProb,
+        propertyValuePounds: valuePounds,
+        neighborhood: property.neighborhood,
+        propertyType: property.type,
+        renovationCategory: r.category,
+        approvalsCount,
+        refusalsCount,
+      }).prob);
+      const jointProb = itemProbs.reduce((a, b) => a * b, 1);
+      const jointApproved = gameRandom() < jointProb;
+      const jointRefusalReason = jointApproved ? undefined : refusalReasons[Math.floor(gameRandom() * refusalReasons.length)];
+      const jointWait = Math.max(1, ...filtered.map(r => r.planningWaitMonths ?? 2));
       const newApps: PlanningApplication[] = filtered.map((r, i) => {
-        const { prob } = computePlanningApprovalProbability({
-          baseProb: r.baseApprovalProb,
-          propertyValuePounds: valuePounds,
-          neighborhood: property.neighborhood,
-          propertyType: property.type,
-          renovationCategory: r.category,
-          approvalsCount,
-          refusalsCount,
-        });
-        const approved = gameRandom() < prob;
-        const refusalReason = approved ? undefined : refusalReasons[Math.floor(gameRandom() * refusalReasons.length)];
-        const waitMonths = Math.max(1, r.planningWaitMonths ?? 2);
+        const prob = jointProb;
+        const approved = jointApproved;
+        const refusalReason = jointRefusalReason;
+        const waitMonths = jointWait;
         const sizingSqft = r.category === 'conversion'
           ? (property.internalSqft || 0) + batchExtensionSqft
           : property.internalSqft;
