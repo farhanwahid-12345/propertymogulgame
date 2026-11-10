@@ -565,15 +565,16 @@ export function RenovationDialog({
     }
     // Joint planning: in batch mode, conversions count the floor area of any
     // extensions selected in the same batch.
-    const batchExtSqftForGate = batchMode && r.category === 'conversion'
+    const batchExtSqftForGate = batchMode && (r.category === 'conversion' || r.category === 'extension')
       ? Array.from(batchSelected).reduce((sum, id) => {
+          if (id === r.id) return sum;
           const o = RENOVATION_OPTIONS.find(x => x.id === id);
           return sum + (o && o.category === 'extension' ? (o.sqftAdded || 0) : 0);
         }, 0)
       : 0;
     const gateSqft = effectiveInternalSqft + batchExtSqftForGate;
     if (r.minInternalSqft && internalSqft !== undefined && gateSqft < r.minInternalSqft) {
-      return batchMode && r.category === 'conversion'
+      return batchMode && (r.category === 'conversion' || r.category === 'extension')
         ? `Needs ${r.minInternalSqft}+ sqft int (have ${gateSqft}) — add an extension to the batch`
         : `Needs ${r.minInternalSqft}+ sqft int (have ${gateSqft})`;
     }
@@ -736,13 +737,20 @@ export function RenovationDialog({
                             next.delete(renovation.id);
                             // Removing an extension may drop a conversion below its sqft minimum.
                             if (renovation.category === 'extension') {
-                              const extLeft = Array.from(next).reduce((sum, id) => {
-                                const o = RENOVATION_OPTIONS.find(x => x.id === id);
-                                return sum + (o && o.category === 'extension' ? (o.sqftAdded || 0) : 0);
-                              }, 0);
-                              for (const id of Array.from(next)) {
-                                const o = RENOVATION_OPTIONS.find(x => x.id === id);
-                                if (o?.category === 'conversion' && o.minInternalSqft && effectiveInternalSqft + extLeft < o.minInternalSqft) next.delete(id);
+                              // Repeatedly prune items whose sqft minimum is no longer met.
+                              let changed = true;
+                              while (changed) {
+                                changed = false;
+                                for (const id of Array.from(next)) {
+                                  const o = RENOVATION_OPTIONS.find(x => x.id === id);
+                                  if (!o || !o.minInternalSqft || (o.category !== 'conversion' && o.category !== 'extension')) continue;
+                                  const others = Array.from(next).reduce((sum, oid) => {
+                                    if (oid === id) return sum;
+                                    const x = RENOVATION_OPTIONS.find(y => y.id === oid);
+                                    return sum + (x && x.category === 'extension' ? (x.sqftAdded || 0) : 0);
+                                  }, 0);
+                                  if (effectiveInternalSqft + others < o.minInternalSqft) { next.delete(id); changed = true; }
+                                }
                               }
                             }
                           }
